@@ -6,26 +6,6 @@ import './App.css'
 
 const WEB_GAMES = [
   {
-    title: "2048",
-    href: "https://greentea524.github.io/game/js-2048-main/",
-    description: "Slide numbered tiles to combine them and reach the 2048 tile.",
-  },
-  {
-    title: "Wordle",
-    href: "https://greentea524.github.io/game/wordle-clone-main/",
-    description: "Guess the hidden 5-letter word in 6 attempts.",
-  },
-  {
-    title: "Pacman",
-    href: "https://greentea524.github.io/game/js-pacman/",
-    description: "Navigate a maze, eat dots, and avoid ghosts.",
-  },
-  {
-    title: "Boxing RPG",
-    href: "https://greentea524.github.io/game/js-boxing/",
-    description: "A role-playing boxing game where you train and fight opponents.",
-  },
-  {
     title: "Invasion",
     href: "https://greentea524.github.io/vite-project/space/",
     description: "Defend against waves of alien invaders. Features a multiplayer mode!",
