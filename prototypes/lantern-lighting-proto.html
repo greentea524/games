@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lantern Keeper — Lighting Prototype (KAN-109)</title>
+<style>
+  body { margin:0; background:#0b0f0c; color:#e0f8cf; font-family:monospace; display:flex; flex-direction:column; align-items:center; gap:8px; padding:12px; }
+  #hud { font-size:15px; }
+  #help { font-size:12px; color:#86b06a; }
+  canvas { image-rendering: pixelated; border:2px solid #2d4a33; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+</head>
+<body>
+<div id="hud">loading…</div>
+<div id="game"></div>
+<div id="help">[1] overlay cutouts &middot; [2] Light2D &middot; [3] tile fog-of-war &middot; arrows to move, walk into a lantern to light it</div>
+<script>
+const W = 160, H = 144, TS = 8, COLS = W / TS, ROWS = H / TS;
+const PAL = { darkest: 0x0f1a12, dark: 0x2d4a33, light: 0x86b06a, lightest: 0xe0f8cf, warm: 0xffcc66 };
+
+class Demo extends Phaser.Scene {
+  create() {
+    const g = this.make.graphics({ add: false });
+    g.fillStyle(PAL.dark); g.fillRect(0, 0, TS, TS);
+    g.fillStyle(PAL.darkest); g.fillRect(1, 1, 1, 1); g.fillRect(5, 4, 1, 1);
+    g.generateTexture('ground', TS, TS); g.clear();
+    g.fillStyle(PAL.darkest); g.fillRect(0, 0, TS, TS);
+    g.fillStyle(PAL.dark); g.fillRect(2, 1, 4, 6);
+    g.fillStyle(PAL.light); g.fillRect(3, 2, 2, 2);
+    g.generateTexture('tree', TS, TS); g.clear();
+    g.fillStyle(PAL.lightest); g.fillRect(1, 0, 4, 6);
+    g.fillStyle(PAL.darkest); g.fillRect(2, 1, 1, 1); g.fillRect(4, 1, 1, 1);
+    g.generateTexture('player', 6, 6); g.clear();
+    g.fillStyle(PAL.light); g.fillRect(2, 0, 2, 2);
+    g.fillStyle(PAL.warm); g.fillRect(1, 2, 4, 4);
+    g.generateTexture('lanternLit', 6, 6); g.clear();
+    g.fillStyle(PAL.light); g.fillRect(2, 0, 2, 2);
+    g.fillStyle(PAL.darkest); g.fillRect(1, 2, 4, 4);
+    g.generateTexture('lanternUnlit', 6, 6); g.clear();
+    g.fillStyle(0xffffff); g.fillCircle(28, 28, 28);
+    g.generateTexture('brushBig', 56, 56); g.clear();
+    g.fillStyle(0xffffff); g.fillCircle(18, 18, 18);
+    g.generateTexture('brushSmall', 36, 36); g.clear();
+
+    this.world = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const isTree = (r * 7 + c * 13) % 11 === 0 && r > 1;
+      this.world.push(this.add.image(c * TS + TS / 2, r * TS + TS / 2, isTree ? 'tree' : 'ground'));
+    }
+    this.lanterns = [{ x: 24, y: 112 }, { x: 76, y: 40 }, { x: 128, y: 96 }, { x: 140, y: 24 }].map(p => {
+      const s = this.add.image(p.x, p.y, 'lanternUnlit');
+      this.world.push(s);
+      return { s, lit: false, x: p.x, y: p.y, lightObj: null };
+    });
+    this.player = this.add.image(16, 24, 'player');
+    this.world.push(this.player);
+
+    this.rt = this.add.renderTexture(0, 0, W, H).setOrigin(0).setDepth(10);
+    this.brushBig = this.make.image({ key: 'brushBig', add: false });
+    this.brushSmall = this.make.image({ key: 'brushSmall', add: false });
+    this.playerLight = null;
+
+    this.fog = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const f = this.add.rectangle(c * TS, r * TS, TS, TS, 0x000000).setOrigin(0).setDepth(10);
+      f.gridC = c; f.gridR = r;
+      this.fog.push(f);
+    }
+
+    window.__scene = this;
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.input.keyboard.on('keydown-ONE', () => this.setMode(1));
+    this.input.keyboard.on('keydown-TWO', () => this.setMode(2));
+    this.input.keyboard.on('keydown-THREE', () => this.setMode(3));
+    window.setMode = m => this.setMode(m);
+    window.lightAll = () => this.lanterns.forEach(l => this.lightLantern(l));
+    window.setPlayer = (x, y) => this.player.setPosition(x, y);
+    this.setMode(1);
+  }
+
+  lightLantern(l) {
+    l.lit = true;
+    l.s.setTexture('lanternLit');
+    if (this.mode === 2) this.addLanternLight(l);
+  }
+
+  addLanternLight(l) {
+    if (!l.lightObj) l.lightObj = this.lights.addLight(l.x, l.y, 44, 0xffcc88, 1.5);
+  }
+
+  setMode(m) {
+    this.mode = m;
+    this.rt.setVisible(m === 1);
+    this.fog.forEach(f => f.setVisible(m === 3));
+    if (m === 2) {
+      this.lights.enable().setAmbientColor(0x0a120c);
+      this.world.forEach(o => o.setPipeline && o.setPipeline('Light2D'));
+      if (!this.playerLight) this.playerLight = this.lights.addLight(this.player.x, this.player.y, 30, 0xaaddff, 1.2);
+      this.lanterns.forEach(l => { if (l.lit) this.addLanternLight(l); });
+    } else {
+      this.world.forEach(o => o.resetPipeline && o.resetPipeline());
+      if (this.playerLight) { this.lights.removeLight(this.playerLight); this.playerLight = null; }
+      this.lanterns.forEach(l => { if (l.lightObj) { this.lights.removeLight(l.lightObj); l.lightObj = null; } });
+      this.lights.disable();
+    }
+    this.modeName = { 1: 'MODE 1: overlay cutouts (RenderTexture erase)', 2: 'MODE 2: Light2D pipeline', 3: 'MODE 3: tile fog-of-war' }[m];
+  }
+
+  update(t, dt) {
+    const sp = 40 * dt / 1000;
+    if (this.cursors.left.isDown) this.player.x -= sp;
+    if (this.cursors.right.isDown) this.player.x += sp;
+    if (this.cursors.up.isDown) this.player.y -= sp;
+    if (this.cursors.down.isDown) this.player.y += sp;
+    this.player.x = Phaser.Math.Clamp(this.player.x, 3, W - 3);
+    this.player.y = Phaser.Math.Clamp(this.player.y, 3, H - 3);
+
+    this.lanterns.forEach(l => {
+      if (!l.lit && Phaser.Math.Distance.Between(this.player.x, this.player.y, l.x, l.y) < 10) this.lightLantern(l);
+    });
+
+    if (this.mode === 1) {
+      this.rt.clear();
+      this.rt.fill(0x000000, 1);
+      this.rt.erase(this.brushSmall, this.player.x - 18, this.player.y - 18);
+      this.lanterns.forEach(l => { if (l.lit) this.rt.erase(this.brushBig, l.x - 28, l.y - 28); });
+    } else if (this.mode === 2) {
+      if (this.playerLight) { this.playerLight.x = this.player.x; this.playerLight.y = this.player.y; }
+    } else if (this.mode === 3) {
+      const pc = this.player.x / TS, pr = this.player.y / TS;
+      this.fog.forEach(f => {
+        let show = true;
+        if (Math.hypot(f.gridC + 0.5 - pc, f.gridR + 0.5 - pr) <= 2.5) show = false;
+        this.lanterns.forEach(l => {
+          if (l.lit && Math.hypot(f.gridC + 0.5 - l.x / TS, f.gridR + 0.5 - l.y / TS) <= 3.5) show = false;
+        });
+        f.setVisible(show);
+      });
+    }
+    document.getElementById('hud').textContent = this.modeName + ' · ' + Math.round(this.game.loop.actualFps) + ' fps';
+  }
+}
+
+const game = new Phaser.Game({
+  type: Phaser.WEBGL,
+  parent: 'game',
+  width: W, height: H, zoom: 4,
+  pixelArt: true,
+  preserveDrawingBuffer: true,
+  backgroundColor: '#0f1a12',
+  scene: Demo
+});
+window.__game = game;
+// Manual frame stepping for environments where rAF never fires (hidden tab)
+window.__t = 0;
+window.step = (n, dt) => {
+  n = n || 1; dt = dt || 16.6;
+  for (let i = 0; i < n; i++) { window.__t += dt; game.loop.step(window.__t); }
+  return document.getElementById('hud').textContent;
+};
+window.capture = () => game.canvas.toDataURL('image/png');
+</script>
+</body>
+</html>
