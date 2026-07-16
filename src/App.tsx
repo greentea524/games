@@ -4,11 +4,78 @@ import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 
+const WEB_GAMES = [
+  {
+    title: "2048",
+    href: "https://greentea524.github.io/game/js-2048-main/",
+    description: "Slide numbered tiles to combine them and reach the 2048 tile.",
+  },
+  {
+    title: "Wordle",
+    href: "https://greentea524.github.io/game/wordle-clone-main/",
+    description: "Guess the hidden 5-letter word in 6 attempts.",
+  },
+  {
+    title: "Pacman",
+    href: "https://greentea524.github.io/game/js-pacman/",
+    description: "Navigate a maze, eat dots, and avoid ghosts.",
+  },
+  {
+    title: "Boxing RPG",
+    href: "https://greentea524.github.io/game/js-boxing/",
+    description: "A role-playing boxing game where you train and fight opponents.",
+  },
+  {
+    title: "Invasion",
+    href: "https://greentea524.github.io/vite-project/space/",
+    description: "Defend against waves of alien invaders. Features a multiplayer mode!",
+  },
+  {
+    title: "Platformer",
+    href: "https://greentea524.github.io/vite-project/platformer/",
+    description:
+      "A 2D side-scrolling adventure featuring a multiplayer 'Race a friend' mode.",
+  },
+  {
+    title: "Big 2",
+    href: "https://greentea524.github.io/vite-project/big2/",
+    description: "Shed all 13 cards first in this classic climbing card game.",
+  },
+];
+
 function App() {
   const [count, setCount] = useState(0)
 
   return (
     <>
+      <section id="web-games" style={{ padding: '48px 0' }}>
+        <h2>Web Games</h2>
+        <p style={{ marginBottom: '32px' }}>Check out some of our web games</p>
+        <div className="games-grid">
+          {WEB_GAMES.map((game) => (
+            <div className="game-card" key={game.title}>
+              <a
+                className="game-link"
+                href={game.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${game.title} (opens in a new tab)`}
+              >
+                <span className="game-link-title-row">
+                  🎮 {game.title}
+                </span>
+                <span>↗</span>
+              </a>
+              <p className="game-link-description">
+                {game.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="ticks"></div>
+
       <section id="center">
         <div className="hero">
           <img src={heroImg} className="base" width="170" height="179" alt="" />

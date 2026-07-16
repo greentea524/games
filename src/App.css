@@ -182,3 +182,69 @@
     border-right-color: var(--border);
   }
 }
+
+/* Web Games Section Styles */
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
+.game-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--social-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-align: left;
+}
+
+.game-card:hover {
+  transform: translateY(-2px);
+}
+
+.game-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 999px;
+  color: #fff !important;
+  text-decoration: none;
+  font-weight: 700;
+  background: linear-gradient(90deg, #bd34fe, #61dafb);
+  box-shadow: 0 4px 15px rgba(189, 52, 254, 0.3);
+  transition: all 0.3s ease;
+}
+
+.game-link:hover,
+.game-link:focus {
+  background: linear-gradient(90deg, #991deb, #3ebbf0);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(189, 52, 254, 0.4);
+}
+
+.game-link-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-link-description {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  opacity: 0.9;
+  margin: 0;
+}
