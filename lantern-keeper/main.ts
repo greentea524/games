@@ -75,3 +75,42 @@ document.querySelectorAll('.d-btn, .a-btn').forEach((btn) => {
   btn.addEventListener('pointercancel', release)
   btn.addEventListener('pointerout', release)
 })
+
+// Overlay logic for Pause and Info
+const overlay = document.getElementById('overlay')
+const overlayText = document.getElementById('overlay-text')
+let overlayMode: 'pause' | 'info' | null = null
+
+function toggleOverlay(mode: 'pause' | 'info') {
+  if (!overlay || !overlayText) return
+  if (overlayMode === mode) {
+    game.scene.resume('play')
+    overlay.classList.add('hidden')
+    overlayMode = null
+  } else {
+    game.scene.pause('play')
+    overlay.classList.remove('hidden')
+    overlayMode = mode
+    
+    if (mode === 'pause') {
+      overlayText.innerHTML = '<h2>PAUSED</h2><p>Press START to resume</p>'
+    } else {
+      overlayText.innerHTML = '<h2>LANTERN KEEPER</h2><p>A GBC-style puzzle platformer.<br/><br/>Light the lanterns to reveal the path and unlock new abilities.<br/><br/>Press SELECT to resume.</p>'
+    }
+  }
+}
+
+document.getElementById('btn-start')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault()
+  toggleOverlay('pause')
+})
+
+document.getElementById('btn-select')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault()
+  toggleOverlay('info')
+})
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') toggleOverlay('pause')
+  if (e.key === 'Shift') toggleOverlay('info')
+})
