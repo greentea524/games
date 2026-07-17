@@ -161,6 +161,27 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('bouncy_shroom', 12, 8)
     g.clear()
 
+    // Heart Tree (64x64)
+    g.fillStyle(PAL.darkest) // trunk outline
+    g.fillRect(28, 30, 8, 34)
+    g.fillStyle(PAL.dark) // trunk inner
+    g.fillRect(30, 30, 4, 34)
+    // Heart canopy
+    g.fillStyle(PAL.warm) 
+    g.fillCircle(20, 20, 16) // Left lobe
+    g.fillCircle(44, 20, 16) // Right lobe
+    g.fillTriangle(4, 20, 60, 20, 32, 45) // Bottom point
+    // Some bright glowing spots
+    g.fillStyle(PAL.lightest)
+    g.fillCircle(18, 14, 3)
+    g.fillCircle(46, 14, 3)
+    g.fillCircle(32, 28, 3)
+    g.fillCircle(24, 22, 2)
+    g.fillCircle(40, 22, 2)
+    g.generateTexture('heart_tree_graphic', 64, 64)
+    g.clear()
+
+    // Parallax background textures
     // Background Tree Trunk (8x24)
     g.fillStyle(PAL.darkest)
     g.fillRect(3, 0, 2, 24) // trunk

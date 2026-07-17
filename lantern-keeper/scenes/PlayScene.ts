@@ -161,9 +161,16 @@ export class PlayScene extends Phaser.Scene {
         const c = this.add.rectangle(obj.x!, obj.y!, obj.width!, obj.height!, 0x553311).setOrigin(0, 1)
         this.crumbleGroup.add(c)
       } else {
+        const isHeartTree = obj.name === 'heart_tree'
+        const texture = isHeartTree ? 'heart_tree_graphic' : 'lanternUnlit'
+        const sprite = this.add.image(obj.x!, obj.y!, texture)
+        if (isHeartTree) {
+          sprite.setOrigin(0.5, 1)
+          sprite.setDepth(-0.5)
+        }
         this.lanterns.push({
           name: obj.name,
-          sprite: this.add.image(obj.x!, obj.y!, 'lanternUnlit'),
+          sprite: sprite,
           lit: false,
         })
       }
