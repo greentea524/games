@@ -14,26 +14,96 @@ export class BootScene extends Phaser.Scene {
   create() {
     const g = this.make.graphics({}, false)
 
-    // Tileset texture: 2 tiles side by side (gid 1 = ground, gid 2 = accent)
+    // Tileset texture: 6 tiles (Glade, Mossy Hollows, Rootspire)
+    // Glade (tiles 1, 2)
     g.fillStyle(PAL.dark)
     g.fillRect(0, 0, TILE_SIZE, TILE_SIZE)
     g.fillStyle(PAL.darkest)
     g.fillRect(1, 1, 1, 1)
     g.fillRect(5, 4, 1, 1)
+    
     g.fillStyle(PAL.darkest)
     g.fillRect(TILE_SIZE, 0, TILE_SIZE, TILE_SIZE)
     g.fillStyle(PAL.dark)
     g.fillRect(TILE_SIZE + 2, 1, 4, 6)
-    g.generateTexture('tiles', TILE_SIZE * 2, TILE_SIZE)
+    
+    // Mossy Hollows (tiles 3, 4)
+    g.fillStyle(PAL.darkest)
+    g.fillRect(TILE_SIZE * 2, 0, TILE_SIZE, TILE_SIZE)
+    g.fillStyle(PAL.light)
+    g.fillRect(TILE_SIZE * 2 + 1, 2, 1, 1)
+    g.fillRect(TILE_SIZE * 2 + 4, 5, 2, 1)
+    g.fillRect(TILE_SIZE * 2 + 6, 1, 1, 1)
+    
+    g.fillStyle(PAL.dark)
+    g.fillRect(TILE_SIZE * 3, 0, TILE_SIZE, TILE_SIZE)
+    g.fillStyle(PAL.light)
+    g.fillRect(TILE_SIZE * 3 + 2, 0, 4, 2)
+    g.fillRect(TILE_SIZE * 3 + 1, 2, 3, 2)
+
+    // Rootspire (tiles 5, 6)
+    g.fillStyle(PAL.dark)
+    g.fillRect(TILE_SIZE * 4, 0, TILE_SIZE, TILE_SIZE)
+    g.fillStyle(PAL.darkest)
+    g.fillRect(TILE_SIZE * 4 + 2, 0, 1, TILE_SIZE)
+    g.fillRect(TILE_SIZE * 4 + 5, 0, 1, TILE_SIZE)
+    
+    g.fillStyle(PAL.darkest)
+    g.fillRect(TILE_SIZE * 5, 0, TILE_SIZE, TILE_SIZE)
+    g.fillStyle(PAL.dark)
+    g.fillRect(TILE_SIZE * 5 + 3, 0, 2, TILE_SIZE)
+
+    g.generateTexture('tiles', TILE_SIZE * 6, TILE_SIZE)
     g.clear()
 
-    // Player
+    // Player Textures (Idle, Walk1, Walk2, Cling)
+    const drawPlayer = (key: string, drawFn: () => void) => {
+      drawFn()
+      g.generateTexture(key, 6, 6)
+      g.clear()
+    }
+    
+    drawPlayer('player_idle', () => {
+      g.fillStyle(PAL.lightest)
+      g.fillRect(1, 0, 4, 6)
+      g.fillStyle(PAL.darkest)
+      g.fillRect(2, 1, 1, 1)
+      g.fillRect(4, 1, 1, 1)
+    })
+    
+    drawPlayer('player_walk1', () => {
+      g.fillStyle(PAL.lightest)
+      g.fillRect(1, 1, 4, 5)
+      g.fillStyle(PAL.darkest)
+      g.fillRect(2, 2, 1, 1)
+      g.fillRect(4, 2, 1, 1)
+    })
+    
+    drawPlayer('player_walk2', () => {
+      g.fillStyle(PAL.lightest)
+      g.fillRect(2, 0, 4, 6)
+      g.fillStyle(PAL.darkest)
+      g.fillRect(3, 1, 1, 1)
+      g.fillRect(5, 1, 1, 1)
+    })
+    
+    drawPlayer('player_cling', () => {
+      g.fillStyle(PAL.lightest)
+      g.fillRect(0, 0, 3, 6)
+      g.fillStyle(PAL.darkest)
+      g.fillRect(1, 1, 1, 1)
+      g.fillRect(1, 4, 1, 1)
+    })
+
+    // Particles
     g.fillStyle(PAL.lightest)
-    g.fillRect(1, 0, 4, 6)
-    g.fillStyle(PAL.darkest)
-    g.fillRect(2, 1, 1, 1)
-    g.fillRect(4, 1, 1, 1)
-    g.generateTexture('player', 6, 6)
+    g.fillRect(0, 0, 2, 2)
+    g.generateTexture('particle', 2, 2)
+    g.clear()
+
+    g.fillStyle(PAL.warm)
+    g.fillRect(0, 0, 1, 1)
+    g.generateTexture('spark', 1, 1)
     g.clear()
 
     // Lanterns (unlit / lit)

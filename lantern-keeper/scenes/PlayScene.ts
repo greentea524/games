@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { sfx } from '../audio'
 import {
   GBC_WIDTH,
   GBC_HEIGHT,
@@ -52,6 +53,9 @@ export class PlayScene extends Phaser.Scene {
   private glow = 1
   private glowDurationMs = GLOW.durationMs
   private respawnPoint = { ...SPAWN_POINT }
+  
+  private dashParticles!: Phaser.GameObjects.Particles.ParticleEmitter
+  private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter
 
   constructor() {
     super('play')
@@ -63,9 +67,36 @@ export class PlayScene extends Phaser.Scene {
     const ground = map.createLayer('ground', tileset)!
     ground.setCollisionBetween(1, 2)
 
-    this.player = this.physics.add.sprite(SPAWN_POINT.x, SPAWN_POINT.y, 'player')
+    this.player = this.physics.add.sprite(SPAWN_POINT.x, SPAWN_POINT.y, 'player_idle')
     this.player.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, ground)
+
+    this.anims.create({
+      key: 'walk',
+      frames: [
+        { key: 'player_walk1' },
+        { key: 'player_idle' },
+        { key: 'player_walk2' },
+        { key: 'player_idle' },
+      ],
+      frameRate: 10,
+      repeat: -1
+    })
+
+    this.dashParticles = this.add.particles(0, 0, 'particle', {
+      lifespan: 200,
+      alpha: { start: 1, end: 0 },
+      scale: { start: 1, end: 0 },
+      emitting: false
+    })
+
+    this.sparkParticles = this.add.particles(0, 0, 'spark', {
+      lifespan: 300,
+      speed: { min: 20, max: 50 },
+      angle: { min: 0, max: 360 },
+      alpha: { start: 1, end: 0 },
+      emitting: false
+    })
 
     // Default TILE_BIAS (16) lets a jump that peaks just below a ledge
     // corner-snap on top, breaking ability gates. 8 still covers our max
@@ -119,6 +150,12 @@ export class PlayScene extends Phaser.Scene {
     lantern.lit = true
     lantern.sprite.setTexture('lanternLit')
     this.respawnPoint = { x: lantern.sprite.x, y: lantern.sprite.y - 6 }
+    
+    if (lantern.name !== 'crown') {
+      sfx.lantern()
+      this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 10)
+    }
+
     if (lantern.name === 'ember') {
       this.hasDoubleJump = true
       this.toast('DOUBLE JUMP!')
@@ -131,7 +168,32 @@ export class PlayScene extends Phaser.Scene {
       this.toast('WALL CLING!')
     } else if (lantern.name === 'crown') {
       this.won = true
-      this.toast('FOREST FLOOR COMPLETE', 0)
+      sfx.win()
+      this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
+      this.toast('THE FOREST GLOWS AGAIN', 0)
+      
+      this.tweens.add({
+        targets: this.darkness,
+        alpha: 0,
+        duration: 3000
+      })
+      
+      this.time.delayedCall(3000, () => {
+        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'PRESS ENTER TO RESTART', {
+          fontFamily: '"Courier New", Courier, monospace',
+          fontSize: '10px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          backgroundColor: '#000000',
+          padding: { x: 3, y: 2 },
+          resolution: 4,
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
+
+        const enterKey = this.input.keyboard!.addKey('ENTER')
+        enterKey.once('down', () => {
+          this.scene.restart()
+        })
+      })
     }
   }
 
@@ -158,6 +220,7 @@ export class PlayScene extends Phaser.Scene {
     this.player.setPosition(this.respawnPoint.x, this.respawnPoint.y)
     this.player.setVelocity(0, 0)
     this.glow = 1
+    sfx.die()
     this.toast('THE DARK CLOSES IN...', 1500)
   }
 
@@ -189,6 +252,9 @@ export class PlayScene extends Phaser.Scene {
 
     const maxJumps = this.hasDoubleJump ? 2 : 1
     if (body.blocked.down) {
+      if (this.jumpsLeft !== maxJumps && body.velocity.y > 0) {
+        sfx.land()
+      }
       this.jumpsLeft = maxJumps
       this.lastGroundedAt = time
       this.airDashUsed = false
@@ -213,6 +279,7 @@ export class PlayScene extends Phaser.Scene {
     if (clinging) {
       this.lastWallAt = time
       this.lastWallDir = body.blocked.left ? -1 : 1
+      this.facing = this.lastWallDir
       if (body.velocity.y > WALL.slideSpeed) {
         this.player.setVelocityY(WALL.slideSpeed)
       }
@@ -226,8 +293,11 @@ export class PlayScene extends Phaser.Scene {
       this.facing = -this.lastWallDir
       this.wallJumpLockUntil = time + WALL.jumpLockMs
       this.jumpBufferedUntil = 0
+      sfx.wallKick()
+      this.dashParticles.emitParticleAt(this.player.x, this.player.y, 5)
     } else if (!dashing && time < this.jumpBufferedUntil && this.jumpsLeft > 0) {
       this.player.setVelocityY(JUMP_VELOCITY)
+      this.jumpsLeft === maxJumps ? sfx.jump() : sfx.doubleJump()
       this.jumpsLeft--
       this.jumpBufferedUntil = 0
     }
@@ -252,6 +322,24 @@ export class PlayScene extends Phaser.Scene {
       }
       body.setAllowGravity(false)
       this.player.setVelocity(this.facing * DASH.speed, 0)
+      sfx.dash()
+      this.dashParticles.startFollow(this.player)
+      this.dashParticles.start()
+      this.time.delayedCall(DASH.durationMs, () => this.dashParticles.stop())
+    }
+
+    this.player.setFlipX(this.facing === -1)
+    if (clinging) {
+      this.player.setTexture('player_cling')
+      this.player.stop()
+    } else if (!body.blocked.down) {
+      this.player.setTexture('player_idle')
+      this.player.stop()
+    } else if (body.velocity.x !== 0) {
+      this.player.play('walk', true)
+    } else {
+      this.player.setTexture('player_idle')
+      this.player.stop()
     }
 
     let nearLitLantern = false
