@@ -42,6 +42,7 @@ export class PlayScene extends Phaser.Scene {
   private jumpsLeft = 0
   private facing = 1
   private won = false
+  private justResumed = false
   
   private levelKey = 'level1'
   
@@ -186,6 +187,14 @@ export class PlayScene extends Phaser.Scene {
     this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER)
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
+
+    // The same Enter/Esc/Shift press that resumes from the pause overlay
+    // is still queued in Phaser and flushes as a JustDown on the first
+    // update after resume — which would instantly re-open the overlay.
+    // Swallow it (see the guard at the top of update()).
+    this.events.on('resume', () => {
+      this.justResumed = true
+    })
 
     this.hudText = this.add.text(4, 12, '', {
       fontFamily: '"Press Start 2P"',
@@ -533,6 +542,16 @@ export class PlayScene extends Phaser.Scene {
   }
 
   update(time: number) {
+    if (this.justResumed) {
+      this.justResumed = false
+      // Consume the stale pause/info keys queued during the pause so they
+      // don't immediately re-trigger the overlay on this first frame.
+      Phaser.Input.Keyboard.JustDown(this.enterKey)
+      Phaser.Input.Keyboard.JustDown(this.escKey)
+      Phaser.Input.Keyboard.JustDown(this.shiftKey)
+      this.redrawDarkness()
+      return
+    }
     if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.escKey)) {
       if (typeof (window as any).toggleOverlay === 'function') {
         (window as any).toggleOverlay('pause')
