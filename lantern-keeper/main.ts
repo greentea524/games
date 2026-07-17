@@ -40,43 +40,44 @@ declare global {
 }
 window.__game = game
 
+const dispatchSimulatedKey = (type: 'keydown' | 'keyup', key: string) => {
+  const KEY_CODES: Record<string, number> = {
+    ArrowLeft: 37,
+    ArrowUp: 38,
+    ArrowRight: 39,
+    ArrowDown: 40,
+    KeyX: 88,
+    Enter: 13,
+    Shift: 16,
+  }
+  const event = new KeyboardEvent(type, {
+    code: key,
+    key: key,
+    bubbles: true,
+  })
+  Object.defineProperty(event, 'keyCode', { get: () => KEY_CODES[key] })
+  window.dispatchEvent(event)
+}
+
 // Set up mobile on-screen controls
 document.querySelectorAll('.d-btn, .a-btn').forEach((btn) => {
   const key = btn.getAttribute('data-key')
   if (!key) return
 
-  const dispatchKey = (type: 'keydown' | 'keyup') => {
-    const KEY_CODES: Record<string, number> = {
-      ArrowLeft: 37,
-      ArrowUp: 38,
-      ArrowRight: 39,
-      ArrowDown: 40,
-      KeyX: 88,
-    }
-    const event = new KeyboardEvent(type, {
-      code: key,
-      key: key,
-      bubbles: true,
-    })
-    Object.defineProperty(event, 'keyCode', { get: () => KEY_CODES[key] })
-    window.dispatchEvent(event)
-  }
-
   btn.addEventListener('pointerdown', (e) => {
     e.preventDefault()
-    dispatchKey('keydown')
+    dispatchSimulatedKey('keydown', key)
   })
 
   const release = (e: Event) => {
     e.preventDefault()
-    dispatchKey('keyup')
+    dispatchSimulatedKey('keyup', key)
   }
 
   btn.addEventListener('pointerup', release)
   btn.addEventListener('pointercancel', release)
   btn.addEventListener('pointerout', release)
 })
-
 // Overlay logic for Pause and Info
 const overlay = document.getElementById('overlay')
 const overlayText = document.getElementById('overlay-text')
@@ -98,9 +99,9 @@ function toggleOverlay(mode: 'pause' | 'info') {
       overlayText.innerHTML = `
         <h2>PAUSED</h2>
         <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px; align-items:center;">
-          <button id="btn-pause-resume" style="background:transparent;border:none;color:#e0f8cf;font-family:monospace;font-size:14px;cursor:pointer;text-decoration:underline;">Resume</button>
-          <button id="btn-pause-controls" style="background:transparent;border:none;color:#e0f8cf;font-family:monospace;font-size:14px;cursor:pointer;text-decoration:underline;">Controls</button>
-          <button id="btn-pause-exit" style="background:transparent;border:none;color:#e0f8cf;font-family:monospace;font-size:14px;cursor:pointer;text-decoration:underline;">Exit Game</button>
+          <button id="btn-pause-resume" class="overlay-btn">Resume</button>
+          <button id="btn-pause-controls" class="overlay-btn">Controls</button>
+          <button id="btn-pause-exit" class="overlay-btn">Exit Game</button>
         </div>
       `
       
@@ -120,13 +121,13 @@ function toggleOverlay(mode: 'pause' | 'info') {
     } else {
       overlayText.innerHTML = `
         <h2>LANTERN KEEPER</h2>
-        <p>Light lanterns to unlock abilities.<br/><br/>
+        <p style="font-size:10px; font-family:'Courier New', Courier, monospace; color:#86b06a;">Light lanterns to unlock abilities.<br/><br/>
         <b>Controls</b><br/>
         Arrows / D-Pad: Move & Jump<br/>
         X / B Button: Dash<br/><br/>
         Press SELECT or Shift to resume.</p>
         <div style="margin-top:15px;">
-          <button id="btn-info-back" style="background:transparent;border:none;color:#e0f8cf;font-family:monospace;font-size:12px;cursor:pointer;text-decoration:underline;">Back</button>
+          <button id="btn-info-back" class="overlay-btn">Back</button>
         </div>
       `
       
@@ -137,15 +138,27 @@ function toggleOverlay(mode: 'pause' | 'info') {
   }
 }
 
-document.getElementById('btn-start')?.addEventListener('pointerdown', (e) => {
-  e.preventDefault()
-  toggleOverlay('pause')
-})
+const setupSysBtn = (id: string, key: string) => {
+  const btn = document.getElementById(id)
+  if (!btn) return
+  
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault()
+    dispatchSimulatedKey('keydown', key)
+  })
 
-document.getElementById('btn-select')?.addEventListener('pointerdown', (e) => {
-  e.preventDefault()
-  toggleOverlay('info')
-})
+  const release = (e: Event) => {
+    e.preventDefault()
+    dispatchSimulatedKey('keyup', key)
+  }
+
+  btn.addEventListener('pointerup', release)
+  btn.addEventListener('pointercancel', release)
+  btn.addEventListener('pointerout', release)
+}
+
+setupSysBtn('btn-start', 'Enter')
+setupSysBtn('btn-select', 'Shift')
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === 'Escape') toggleOverlay('pause')
