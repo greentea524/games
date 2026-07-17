@@ -1,13 +1,13 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT, GLOW } from '../constants'
 
 // Tuned to the KAN-110 movement budget: single jump ~2.8 tiles,
 // double jump ~5.6 tiles, so the 5-tile cliff gate needs the Ember lantern.
 const RUN_SPEED = 60
 const JUMP_VELOCITY = -150
-const PLAYER_LIGHT_RADIUS = 24
 const LANTERN_LIGHT_RADIUS = 28
 const LIGHT_TOUCH_DISTANCE = 10
+const SPAWN_POINT = { x: 16, y: 120 }
 
 interface Lantern {
   name: string
@@ -25,6 +25,11 @@ export class PlayScene extends Phaser.Scene {
   private hasDoubleJump = false
   private jumpsLeft = 0
   private won = false
+  // Fading glow (KAN-113): fraction 1 -> 0; kept on the instance so it
+  // stays tunable at runtime alongside the GLOW config.
+  private glow = 1
+  private glowDurationMs = GLOW.durationMs
+  private respawnPoint = { ...SPAWN_POINT }
 
   constructor() {
     super('play')
@@ -36,7 +41,7 @@ export class PlayScene extends Phaser.Scene {
     const ground = map.createLayer('ground', tileset)!
     ground.setCollisionBetween(1, 2)
 
-    this.player = this.physics.add.sprite(16, 120, 'player')
+    this.player = this.physics.add.sprite(SPAWN_POINT.x, SPAWN_POINT.y, 'player')
     this.player.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, ground)
 
@@ -65,11 +70,14 @@ export class PlayScene extends Phaser.Scene {
     this.hasDoubleJump = false
     this.jumpsLeft = 0
     this.won = false
+    this.glow = 1
+    this.respawnPoint = { ...SPAWN_POINT }
   }
 
   private lightLantern(lantern: Lantern) {
     lantern.lit = true
     lantern.sprite.setTexture('lanternLit')
+    this.respawnPoint = { x: lantern.sprite.x, y: lantern.sprite.y - 6 }
     if (lantern.name === 'ember') {
       this.hasDoubleJump = true
       this.toast('DOUBLE JUMP!')
@@ -96,7 +104,14 @@ export class PlayScene extends Phaser.Scene {
     }
   }
 
-  update() {
+  private respawn() {
+    this.player.setPosition(this.respawnPoint.x, this.respawnPoint.y)
+    this.player.setVelocity(0, 0)
+    this.glow = 1
+    this.toast('THE DARK CLOSES IN...', 1500)
+  }
+
+  update(_time: number, delta: number) {
     const body = this.player.body
 
     if (this.won) {
@@ -121,31 +136,51 @@ export class PlayScene extends Phaser.Scene {
       this.jumpsLeft--
     }
 
+    let nearLitLantern = false
     for (const lantern of this.lanterns) {
-      if (
-        !lantern.lit &&
+      const touching =
         Phaser.Math.Distance.Between(
           this.player.x,
           this.player.y,
           lantern.sprite.x,
           lantern.sprite.y,
         ) < LIGHT_TOUCH_DISTANCE
-      ) {
+      if (touching && !lantern.lit) {
         this.lightLantern(lantern)
+      }
+      if (touching && lantern.lit) {
+        nearLitLantern = true
+      }
+    }
+
+    // Fading glow (KAN-113): decays over time, refills at lit lanterns,
+    // full depletion sends the keeper back to the last lit lantern.
+    if (nearLitLantern) {
+      this.glow = 1
+    } else {
+      this.glow -= delta / this.glowDurationMs
+      if (this.glow <= 0) {
+        this.respawn()
       }
     }
 
     this.redrawDarkness()
   }
 
+  private playerLightRadius(): number {
+    return GLOW.minRadius + (GLOW.maxRadius - GLOW.minRadius) * Math.max(0, this.glow)
+  }
+
   private redrawDarkness() {
     const cam = this.cameras.main
+    const radius = this.playerLightRadius()
     this.darkness.clear()
     this.darkness.fill(0x000000, 1)
+    this.brush.setDisplaySize(radius * 2, radius * 2)
     this.darkness.erase(
       this.brush,
-      this.player.x - cam.scrollX - PLAYER_LIGHT_RADIUS,
-      this.player.y - cam.scrollY - PLAYER_LIGHT_RADIUS,
+      this.player.x - cam.scrollX - radius,
+      this.player.y - cam.scrollY - radius,
     )
     for (const lantern of this.lanterns) {
       if (lantern.lit) {

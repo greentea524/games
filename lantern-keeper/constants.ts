@@ -2,6 +2,13 @@ export const GBC_WIDTH = 160
 export const GBC_HEIGHT = 144
 export const TILE_SIZE = 8
 
+// Fading firefly glow (KAN-113) — all tunable
+export const GLOW = {
+  maxRadius: 24,
+  minRadius: 5,
+  durationMs: 30000, // time for a full glow to fade to minimum
+} as const
+
 // GBC-inspired 4-color palette
 export const PAL = {
   darkest: 0x0f1a12,
