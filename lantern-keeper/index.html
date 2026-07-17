@@ -2,16 +2,55 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Lantern Keeper</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #0b0f0c; }
+      html, body { margin: 0; height: 100%; background: #0b0f0c; user-select: none; -webkit-user-select: none; overflow: hidden; }
       body { display: flex; align-items: center; justify-content: center; }
       #game canvas { image-rendering: pixelated; }
+      
+      .gb-controls { display: none; }
+
+      @media (pointer: coarse) {
+        body { flex-direction: column; background: #e0e0e0; justify-content: space-evenly; }
+        .gb-shell { width: 100%; max-width: 500px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 10px; box-sizing: border-box; }
+        
+        #game { border: 15px solid #222; border-radius: 10px 10px 40px 10px; background: #000; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        
+        .gb-controls { display: flex; justify-content: space-around; width: 100%; max-width: 400px; padding: 10px; }
+        
+        .d-pad { position: relative; width: 120px; height: 120px; }
+        .d-btn { position: absolute; background: #333; border-radius: 4px; touch-action: none; }
+        .d-btn:active { background: #111; }
+        .d-up { top: 0; left: 40px; width: 40px; height: 40px; border-radius: 4px 4px 0 0; }
+        .d-down { bottom: 0; left: 40px; width: 40px; height: 40px; border-radius: 0 0 4px 4px; }
+        .d-left { top: 40px; left: 0; width: 40px; height: 40px; border-radius: 4px 0 0 4px; }
+        .d-right { top: 40px; right: 0; width: 40px; height: 40px; border-radius: 0 4px 4px 0; }
+        .d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; position: absolute; }
+
+        .action-btns { display: flex; gap: 15px; transform: rotate(-20deg); align-items: flex-end; padding-top: 30px; }
+        .a-btn { width: 50px; height: 50px; background: #b00; border-radius: 50%; box-shadow: 0 4px 0 #500; touch-action: none; display: flex; align-items: center; justify-content: center; color: #500; font-family: sans-serif; font-weight: bold; }
+        .a-btn:active { transform: translateY(4px); box-shadow: none; background: #900; }
+      }
     </style>
   </head>
   <body>
-    <div id="game"></div>
+    <div class="gb-shell">
+      <div id="game"></div>
+      <div class="gb-controls">
+        <div class="d-pad">
+          <div class="d-center"></div>
+          <div class="d-btn d-up" data-key="ArrowUp"></div>
+          <div class="d-btn d-down" data-key="ArrowDown"></div>
+          <div class="d-btn d-left" data-key="ArrowLeft"></div>
+          <div class="d-btn d-right" data-key="ArrowRight"></div>
+        </div>
+        <div class="action-btns">
+          <div class="a-btn" data-key="KeyX">B</div>
+          <div class="a-btn" data-key="ArrowUp">A</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
