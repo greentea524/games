@@ -7,6 +7,7 @@ export class MenuScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private enterKey!: Phaser.Input.Keyboard.Key;
   private xKey!: Phaser.Input.Keyboard.Key;
+  private zKey!: Phaser.Input.Keyboard.Key;
   
   private viewMode: 'menu' | 'controls' = 'menu';
   private controlsText!: Phaser.GameObjects.Text;
@@ -58,6 +59,7 @@ export class MenuScene extends Phaser.Scene {
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     this.xKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+    this.zKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
 
     this.updateSelection();
     
@@ -100,7 +102,7 @@ export class MenuScene extends Phaser.Scene {
 
   update() {
     if (this.viewMode === 'controls') {
-      if (Phaser.Input.Keyboard.JustDown(this.xKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      if (Phaser.Input.Keyboard.JustDown(this.xKey) || Phaser.Input.Keyboard.JustDown(this.zKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
         this.hideControls();
       }
       return;
@@ -114,7 +116,7 @@ export class MenuScene extends Phaser.Scene {
       this.updateSelection();
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.xKey)) {
+    if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.xKey) || Phaser.Input.Keyboard.JustDown(this.zKey)) {
       if (this.selectedIndex === 0) {
         this.startGame();
       } else if (this.selectedIndex === 1) {

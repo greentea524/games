@@ -145,6 +145,7 @@ function toggleOverlay(mode: 'pause' | 'info') {
         <p style="font-size:10px; font-family:'Courier New', Courier, monospace; color:#86b06a;">Light lanterns to unlock abilities.<br/><br/>
         <b>Controls</b><br/>
         Arrows / D-Pad: Move & Jump<br/>
+        Z / A Button: Jump<br/>
         X / B Button: Dash<br/><br/>
         Press SELECT or Shift to resume.</p>
         <div style="margin-top:15px;">

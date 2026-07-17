@@ -30,6 +30,7 @@ export class PlayScene extends Phaser.Scene {
   private brushBig!: Phaser.GameObjects.Image
   private lanterns: Lantern[] = []
   private dashKey!: Phaser.Input.Keyboard.Key
+  private jumpKey!: Phaser.Input.Keyboard.Key
   private hasDoubleJump = false
   private hasDash = false
   private hasWallCling = false
@@ -119,6 +120,9 @@ export class PlayScene extends Phaser.Scene {
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.dashKey = this.input.keyboard!.addKey(
       Phaser.Input.Keyboard.KeyCodes.X,
+    )
+    this.jumpKey = this.input.keyboard!.addKey(
+      Phaser.Input.Keyboard.KeyCodes.Z,
     )
 
     this.darkness = this.add
@@ -275,7 +279,7 @@ export class PlayScene extends Phaser.Scene {
     ) {
       this.jumpsLeft = maxJumps - 1 // walked off a ledge past coyote time
     }
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.jumpKey)) {
       this.jumpBufferedUntil = time + JUMP_ASSIST.bufferMs
     }
 
