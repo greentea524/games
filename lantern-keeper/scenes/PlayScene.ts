@@ -191,7 +191,7 @@ export class PlayScene extends Phaser.Scene {
       fontFamily: '"Press Start 2P"',
       fontSize: '8px',
       color: '#e0f8cf',
-      resolution: 4,
+      resolution: 1,
       stroke: '#0f1a12',
       strokeThickness: 2,
     })
@@ -509,7 +509,7 @@ export class PlayScene extends Phaser.Scene {
         color: '#e0f8cf',
         backgroundColor: '#0f1a12',
         padding: { x: 3, y: 2 },
-        resolution: 4,
+        resolution: 1,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
