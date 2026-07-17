@@ -118,7 +118,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.xKey) || Phaser.Input.Keyboard.JustDown(this.zKey)) {
       if (this.selectedIndex === 0) {
-        this.startGame();
+        this.scene.start('play', { levelKey: 'level1', hasDoubleJump: false, hasDash: false, hasWallCling: false })
       } else if (this.selectedIndex === 1) {
         this.showControls();
       }

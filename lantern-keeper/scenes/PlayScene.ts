@@ -37,6 +37,16 @@ export class PlayScene extends Phaser.Scene {
   private jumpsLeft = 0
   private facing = 1
   private won = false
+  
+  private levelKey = 'level1'
+
+  init(data: any) {
+    this.levelKey = data?.levelKey || 'level1'
+    this.hasDoubleJump = data?.hasDoubleJump || false
+    this.hasDash = data?.hasDash || false
+    this.hasWallCling = data?.hasWallCling || false
+  }
+  
   // Wall-cling state (KAN-115)
   private lastWallAt = -Infinity
   private lastWallDir = 0
@@ -64,7 +74,13 @@ export class PlayScene extends Phaser.Scene {
   }
 
   create() {
-    const map = this.make.tilemap({ key: 'level1' })
+    this.won = false
+    this.jumpsLeft = 0
+    this.dashingUntil = 0
+    this.dashCooldownUntil = 0
+    this.airDashUsed = false
+
+    const map = this.make.tilemap({ key: this.levelKey })
     const tileset = map.addTilesetImage('tiles', 'tiles')!
     const ground = map.createLayer('ground', tileset)!
     ground.setCollisionBetween(1, 6)
@@ -133,15 +149,6 @@ export class PlayScene extends Phaser.Scene {
     this.brush = new Phaser.GameObjects.Image(this, 0, 0, 'brush')
     this.brushBig = new Phaser.GameObjects.Image(this, 0, 0, 'brushBig')
 
-    this.hasDoubleJump = false
-    this.hasDash = false
-    this.hasWallCling = false
-    this.lastWallAt = -Infinity
-    this.lastWallDir = 0
-    this.wallJumpLockUntil = 0
-    this.jumpsLeft = 0
-    this.facing = 1
-    this.won = false
     this.glow = 1
     this.respawnPoint = { ...SPAWN_POINT }
     this.lastGroundedAt = 0
@@ -149,7 +156,6 @@ export class PlayScene extends Phaser.Scene {
     this.dashingUntil = 0
     this.dashCooldownUntil = 0
     this.dashBufferedUntil = 0
-    this.airDashUsed = false
   }
 
   private lightLantern(lantern: Lantern) {
@@ -169,6 +175,22 @@ export class PlayScene extends Phaser.Scene {
       this.hasDash = true
       const isMobile = window.matchMedia('(pointer: coarse)').matches
       this.toast(isMobile ? 'DASH! (B)' : 'DASH! (X)')
+      
+      if (this.levelKey === 'level2') {
+         this.won = true
+         sfx.win()
+         this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
+         this.toast('THE MARSH CLEARED', 0)
+         this.tweens.add({ targets: this.darkness, alpha: 0, duration: 3000 })
+         this.time.delayedCall(3000, () => {
+           this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'PRESS ENTER TO RETURN TO MENU', {
+             fontFamily: 'monospace', fontSize: '10px', color: '#e0f8cf',
+             stroke: '#0f1a12', strokeThickness: 2, padding: { x: 4, y: 4 }
+           }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
+           const enterKey = this.input.keyboard!.addKey('ENTER')
+           enterKey.once('down', () => this.scene.start('menu'))
+         })
+      }
     } else if (lantern.name === 'root') {
       this.hasWallCling = true
       this.toast('WALL CLING!')
@@ -185,7 +207,7 @@ export class PlayScene extends Phaser.Scene {
       })
       
       this.time.delayedCall(3000, () => {
-        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'PRESS ENTER TO RESTART', {
+        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'PRESS ENTER FOR LEVEL 2', {
           fontFamily: '"Courier New", Courier, monospace',
           fontSize: '10px',
           fontStyle: 'bold',
@@ -197,7 +219,12 @@ export class PlayScene extends Phaser.Scene {
 
         const enterKey = this.input.keyboard!.addKey('ENTER')
         enterKey.once('down', () => {
-          this.scene.restart()
+          this.scene.start('play', { 
+            levelKey: 'level2',
+            hasDoubleJump: this.hasDoubleJump,
+            hasDash: this.hasDash,
+            hasWallCling: this.hasWallCling
+          })
         })
       })
     }
