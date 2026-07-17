@@ -6,6 +6,12 @@ import './App.css'
 
 const WEB_GAMES = [
   {
+    title: "Lantern Keeper",
+    href: `${import.meta.env.BASE_URL}lantern-keeper/`,
+    description:
+      "Light lanterns in a dark forest in this GBC-style puzzle-platformer. Double jump, dash, and wall-cling your way to the Crown.",
+  },
+  {
     title: "Invasion",
     href: "https://greentea524.github.io/vite-project/space/",
     description: "Defend against waves of alien invaders. Features a multiplayer mode!",

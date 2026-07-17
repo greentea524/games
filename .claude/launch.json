@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "scratchpad-static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "-l", "5050", "C:\\Users\\DELL\\AppData\\Local\\Temp\\claude\\C--codebase-games\\02d561cf-a055-4b4d-a5ba-8b806c261ae0\\scratchpad"],
+      "port": 5050
+    }
+  ]
+}

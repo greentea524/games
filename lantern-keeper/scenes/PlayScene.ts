@@ -12,7 +12,6 @@ import {
 // double jump ~5.6 tiles, so the 5-tile cliff gate needs the Ember lantern.
 const RUN_SPEED = 60
 const JUMP_VELOCITY = -150
-const LANTERN_LIGHT_RADIUS = 28
 const LIGHT_TOUCH_DISTANCE = 10
 const SPAWN_POINT = { x: 16, y: 120 }
 
