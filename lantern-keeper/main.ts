@@ -23,7 +23,7 @@ const game = new Phaser.Game({
   backgroundColor: '#0f1a12',
   physics: {
     default: 'arcade',
-    arcade: { gravity: { x: 0, y: 400 } },
+    arcade: { gravity: { x: 0, y: 500 } },
   },
   scene: [BootScene, PlayScene],
 })
