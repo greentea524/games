@@ -1,5 +1,12 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, GLOW, DASH, JUMP_ASSIST } from '../constants'
+import {
+  GBC_WIDTH,
+  GBC_HEIGHT,
+  GLOW,
+  DASH,
+  JUMP_ASSIST,
+  WALL,
+} from '../constants'
 
 // Tuned to the KAN-110 movement budget: single jump ~2.8 tiles,
 // double jump ~5.6 tiles, so the 5-tile cliff gate needs the Ember lantern.
@@ -25,9 +32,14 @@ export class PlayScene extends Phaser.Scene {
   private dashKey!: Phaser.Input.Keyboard.Key
   private hasDoubleJump = false
   private hasDash = false
+  private hasWallCling = false
   private jumpsLeft = 0
   private facing = 1
   private won = false
+  // Wall-cling state (KAN-115)
+  private lastWallAt = -Infinity
+  private lastWallDir = 0
+  private wallJumpLockUntil = 0
   // Jump assist (coyote time + input buffer)
   private lastGroundedAt = 0
   private jumpBufferedUntil = 0
@@ -87,6 +99,10 @@ export class PlayScene extends Phaser.Scene {
 
     this.hasDoubleJump = false
     this.hasDash = false
+    this.hasWallCling = false
+    this.lastWallAt = -Infinity
+    this.lastWallDir = 0
+    this.wallJumpLockUntil = 0
     this.jumpsLeft = 0
     this.facing = 1
     this.won = false
@@ -110,7 +126,10 @@ export class PlayScene extends Phaser.Scene {
     } else if (lantern.name === 'gale') {
       this.hasDash = true
       this.toast('DASH! (X)')
-    } else if (lantern.name === 'goal') {
+    } else if (lantern.name === 'root') {
+      this.hasWallCling = true
+      this.toast('WALL CLING!')
+    } else if (lantern.name === 'crown') {
       this.won = true
       this.toast('FOREST FLOOR COMPLETE', 0)
     }
@@ -154,7 +173,7 @@ export class PlayScene extends Phaser.Scene {
       body.setAllowGravity(true) // dash just ended
     }
 
-    if (!dashing) {
+    if (!dashing && time >= this.wallJumpLockUntil) {
       if (this.cursors.left.isDown) {
         this.player.setVelocityX(-RUN_SPEED)
         this.facing = -1
@@ -180,7 +199,32 @@ export class PlayScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
       this.jumpBufferedUntil = time + JUMP_ASSIST.bufferMs
     }
-    if (!dashing && time < this.jumpBufferedUntil && this.jumpsLeft > 0) {
+
+    // Wall cling (KAN-115): hold toward a wall while airborne to slide
+    // slowly; jump kicks away from the wall (with a short input lockout
+    // so the kick isn't immediately overridden by the held arrow).
+    const clinging =
+      this.hasWallCling &&
+      !body.blocked.down &&
+      ((body.blocked.left && this.cursors.left.isDown) ||
+        (body.blocked.right && this.cursors.right.isDown))
+    if (clinging) {
+      this.lastWallAt = time
+      this.lastWallDir = body.blocked.left ? -1 : 1
+      if (body.velocity.y > WALL.slideSpeed) {
+        this.player.setVelocityY(WALL.slideSpeed)
+      }
+    }
+    const wallJumpReady =
+      this.hasWallCling &&
+      !body.blocked.down &&
+      time - this.lastWallAt <= WALL.coyoteMs
+    if (!dashing && time < this.jumpBufferedUntil && wallJumpReady) {
+      this.player.setVelocity(-this.lastWallDir * WALL.jumpVx, WALL.jumpVy)
+      this.facing = -this.lastWallDir
+      this.wallJumpLockUntil = time + WALL.jumpLockMs
+      this.jumpBufferedUntil = 0
+    } else if (!dashing && time < this.jumpBufferedUntil && this.jumpsLeft > 0) {
       this.player.setVelocityY(JUMP_VELOCITY)
       this.jumpsLeft--
       this.jumpBufferedUntil = 0

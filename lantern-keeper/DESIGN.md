@@ -39,6 +39,12 @@ Dash tuning (KAN-114): 400px/s for 100ms, 400ms cooldown, 120ms input
 buffer, one air dash per airtime, vertical velocity frozen during the
 burst. Jump assist: 80ms coyote time, 100ms jump buffer.
 
+Wall-cling tuning (KAN-115): hold toward a wall while airborne to cling
+(slide capped at 25px/s); jump kicks away at (±100, −150) with a 150ms
+horizontal-input lockout and an 80ms wall-coyote window. The shaft is a
+12-tile chimney with a 3-tile interior, entered through a 2-tile tunnel
+at ground level; each wall-to-wall bounce gains ~21px.
+
 ## Anti-soft-lock rules
 
 1. **Abilities are permanent.** Nothing removes a granted ability, so the

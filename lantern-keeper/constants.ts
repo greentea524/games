@@ -17,6 +17,15 @@ export const DASH = {
   bufferMs: 120, // presses this early still fire when the cooldown ends
 } as const
 
+// Wall-cling (KAN-115) — all tunable
+export const WALL = {
+  slideSpeed: 25, // max fall speed while clinging
+  jumpVx: 100, // horizontal kick away from the wall
+  jumpVy: -150,
+  coyoteMs: 80, // wall-jump grace after leaving the wall
+  jumpLockMs: 150, // arrows can't override the kick during this window
+} as const
+
 // Jump feel (KAN-112 tuning note)
 export const JUMP_ASSIST = {
   coyoteMs: 80,
