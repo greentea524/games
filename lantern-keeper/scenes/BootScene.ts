@@ -181,6 +181,61 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('bg_tree_canopy', 24, 24)
     g.clear()
 
+    // Background Swamp Trunk (12x24) - Level 2
+    g.fillStyle(PAL.darkest)
+    g.fillRect(4, 0, 4, 24)
+    g.fillRect(3, 8, 6, 4) // gnarled knot
+    g.fillRect(2, 20, 8, 4) // flared base
+    g.fillStyle(PAL.dark)
+    g.fillRect(5, 2, 1, 6)
+    g.fillRect(4, 14, 1, 4)
+    g.generateTexture('bg_swamp_trunk', 12, 24)
+    g.clear()
+
+    // Background Spanish Moss (8x16) - Level 2
+    g.fillStyle(PAL.dark)
+    g.fillRect(3, 0, 2, 8)
+    g.fillRect(2, 6, 4, 2)
+    g.fillRect(2, 8, 2, 6)
+    g.fillRect(3, 14, 1, 2)
+    g.generateTexture('bg_moss', 8, 16)
+    g.clear()
+
+    // Background Leaf Cloud (32x32) - Level 3
+    g.fillStyle(PAL.darkest) // bottom layers
+    g.fillCircle(16, 18, 12)
+    g.fillCircle(8, 16, 8)
+    g.fillCircle(24, 16, 8)
+    g.fillStyle(PAL.dark) // middle layer
+    g.fillCircle(16, 14, 10)
+    g.fillCircle(10, 12, 6)
+    g.fillCircle(22, 12, 6)
+    g.fillStyle(PAL.light) // highlight top layers
+    g.fillCircle(16, 8, 6)
+    g.generateTexture('bg_leaf_cloud', 32, 32)
+    g.clear()
+
+    // Background Stalactite (8x16) - Level 4
+    g.fillStyle(PAL.darkest)
+    g.fillRect(2, 0, 4, 2)
+    g.fillRect(2, 2, 3, 3)
+    g.fillRect(3, 5, 2, 4)
+    g.fillRect(3, 9, 1, 7)
+    g.generateTexture('bg_stalactite', 8, 16)
+    g.clear()
+
+    // Background Hollow Root (16x24) - Level 4
+    g.fillStyle(PAL.darkest)
+    g.fillRect(4, 0, 4, 6)
+    g.fillRect(6, 6, 4, 8) // curves right
+    g.fillRect(4, 14, 4, 10) // curves left
+    g.fillStyle(PAL.dark)
+    g.fillRect(5, 1, 1, 4)
+    g.fillRect(7, 7, 1, 6)
+    g.fillRect(5, 15, 1, 8)
+    g.generateTexture('bg_hollow_root', 16, 24)
+    g.clear()
+
     // Particles
     g.fillStyle(PAL.lightest)
     g.fillRect(0, 0, 2, 2)

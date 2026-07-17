@@ -216,26 +216,86 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private createBackground(map: Phaser.Tilemaps.Tilemap) {
-    if (this.levelKey !== 'level1') return
-
-    const treeCount = 18
     const levelWidth = map.widthInPixels
+    const levelHeight = map.heightInPixels
     const rng = new Phaser.Math.RandomDataGenerator([this.levelKey + '_bg'])
-    
-    for (let i = 0; i < treeCount; i++) {
-      const x = rng.between(20, levelWidth - 40)
-      const canopyY = rng.between(20, 60)
+
+    if (this.levelKey === 'level1') {
+      const treeCount = 18
+      for (let i = 0; i < treeCount; i++) {
+        const x = rng.between(20, levelWidth - 40)
+        const canopyY = rng.between(20, 60)
+        const canopy = this.add.image(x, canopyY, 'bg_tree_canopy')
+        canopy.setDepth(0.2)
+        canopy.setScrollFactor(0.7, 1)
+        
+        let trunkY = canopyY + 12
+        while (trunkY < levelHeight) {
+          const trunk = this.add.image(x, trunkY + 12, 'bg_tree_trunk')
+          trunk.setDepth(0.1)
+          trunk.setScrollFactor(0.7, 1)
+          trunkY += 24
+        }
+      }
+    } else if (this.levelKey === 'level2') {
+      const treeCount = 15
+      for (let i = 0; i < treeCount; i++) {
+        const x = rng.between(20, levelWidth - 40)
+        const treeY = levelHeight - 16
+        let trunkY = treeY - 12
+        while (trunkY > 40) {
+          const trunk = this.add.image(x, trunkY, 'bg_swamp_trunk')
+          trunk.setDepth(0.1)
+          trunk.setScrollFactor(0.6, 1)
+          trunkY -= 24
+        }
+        
+        if (rng.frac() < 0.5) {
+          const mossX = x + rng.between(-10, 10)
+          const mossY = rng.between(10, 30)
+          const moss = this.add.image(mossX, mossY, 'bg_moss')
+          moss.setDepth(0.15)
+          moss.setScrollFactor(0.6, 1)
+          if (rng.frac() < 0.3) {
+            const moss2 = this.add.image(mossX, mossY + 16, 'bg_moss')
+            moss2.setDepth(0.15)
+            moss2.setScrollFactor(0.6, 1)
+          }
+        }
+      }
+    } else if (this.levelKey === 'level3') {
+      const cloudCount = 20
+      for (let i = 0; i < cloudCount; i++) {
+        const x = rng.between(20, levelWidth - 40)
+        const y = rng.between(40, levelHeight - 40)
+        const scale = rng.between(7, 13) / 10
+        
+        const cloud = this.add.image(x, y, 'bg_leaf_cloud')
+        cloud.setDepth(0.1)
+        cloud.setScale(scale)
+        cloud.setScrollFactor(0.5, 0.7)
+      }
+    } else if (this.levelKey === 'level4') {
+      const rootCount = 12
+      for (let i = 0; i < rootCount; i++) {
+        const x = rng.between(20, levelWidth - 40)
+        let rootY = rng.between(10, 50)
+        while (rootY < levelHeight) {
+          const root = this.add.image(x, rootY, 'bg_hollow_root')
+          root.setDepth(0.1)
+          root.setScrollFactor(0.4, 0.4)
+          rootY += 24
+        }
+      }
       
-      const canopy = this.add.image(x, canopyY, 'bg_tree_canopy')
-      canopy.setDepth(0.2)
-      canopy.setScrollFactor(0.7, 1)
-      
-      let trunkY = canopyY + 12
-      while (trunkY < 144) {
-        const trunk = this.add.image(x, trunkY + 12, 'bg_tree_trunk')
-        trunk.setDepth(0.1)
-        trunk.setScrollFactor(0.7, 1)
-        trunkY += 24
+      const stalactiteCount = 20
+      for (let i = 0; i < stalactiteCount; i++) {
+        const x = rng.between(10, levelWidth - 10)
+        const y = rng.between(10, 40)
+        
+        const stalactite = this.add.image(x, y, 'bg_stalactite')
+        stalactite.setDepth(0.15)
+        stalactite.setScrollFactor(0.4, 0.4)
       }
     }
   }
