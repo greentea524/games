@@ -138,11 +138,13 @@ export class PlayScene extends Phaser.Scene {
   private toast(message: string, duration = 2000) {
     const text = this.add
       .text(GBC_WIDTH / 2, 28, message, {
-        fontFamily: 'monospace',
+        fontFamily: '"Courier New", Courier, monospace',
         fontSize: '8px',
+        fontStyle: 'bold',
         color: '#e0f8cf',
         backgroundColor: '#0f1a12',
         padding: { x: 2, y: 1 },
+        resolution: 4,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
