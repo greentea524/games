@@ -39,6 +39,7 @@ export class PlayScene extends Phaser.Scene {
   private won = false
   
   private marshEntered = false
+  private canopyEntered = false
   
   init(data: any) {
     this.hasDoubleJump = data?.hasDoubleJump || false
@@ -67,6 +68,7 @@ export class PlayScene extends Phaser.Scene {
   private dashParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private groundLayer!: Phaser.Tilemaps.TilemapLayer
+  private mushrooms!: Phaser.Physics.Arcade.StaticGroup
 
   constructor() {
     super('play')
@@ -81,6 +83,7 @@ export class PlayScene extends Phaser.Scene {
     this.dashCooldownUntil = 0
     this.airDashUsed = false
     this.marshEntered = false
+    this.canopyEntered = false
 
     const map = this.make.tilemap({ key: 'world' })
     const tileset = map.addTilesetImage('tiles', 'tiles')!
@@ -127,13 +130,33 @@ export class PlayScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
     this.cameras.main.startFollow(this.player, true)
 
-    this.lanterns = (map.getObjectLayer('lanterns')?.objects ?? []).map(
-      (obj) => ({
-        name: obj.name,
-        sprite: this.add.image(obj.x!, obj.y!, 'lanternUnlit'),
-        lit: false,
-      }),
-    )
+    this.mushrooms = this.physics.add.staticGroup()
+    this.lanterns = []
+    const mapObjects = map.getObjectLayer('lanterns')?.objects ?? []
+    
+    for (const obj of mapObjects) {
+      if (obj.name === 'mushroom') {
+        const m = this.add.rectangle(obj.x!, obj.y! - 4, 12, 8, 0xffaadd)
+        this.mushrooms.add(m)
+      } else {
+        this.lanterns.push({
+          name: obj.name,
+          sprite: this.add.image(obj.x!, obj.y!, 'lanternUnlit'),
+          lit: false,
+        })
+      }
+    }
+
+    this.physics.add.overlap(this.player, this.mushrooms, (_, m) => {
+      if (this.player.body.velocity.y >= 0) {
+        this.player.setVelocityY(-JUMP_VELOCITY * 1.4)
+        this.jumpsLeft = this.hasDoubleJump ? 1 : 0
+        this.dashCooldownUntil = 0
+        this.airDashUsed = false
+        sfx.jump()
+        this.sparkParticles.emitParticleAt((m as any).x, (m as any).y, 20)
+      }
+    })
 
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.dashKey = this.input.keyboard!.addKey(
@@ -212,6 +235,29 @@ export class PlayScene extends Phaser.Scene {
         this.sparkParticles.emitParticleAt(96 * 8 + 4, y * 8 + 4, 3)
         this.sparkParticles.emitParticleAt(97 * 8 + 4, y * 8 + 4, 3)
       }
+    } else if (lantern.name === 'canopy_grand') {
+      this.won = true
+      sfx.win()
+      this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 100)
+      this.toast('BRIDGE TO THE HOLLOW REVEALED', 0)
+      
+      this.time.delayedCall(1000, () => {
+        // Spawn bridge across bottomless pit
+        for (let x = 290; x <= 299; x++) {
+          this.time.delayedCall((x - 290) * 100, () => {
+            this.groundLayer.putTileAt(5, x, 16)
+            this.sparkParticles.emitParticleAt(x * 8 + 4, 16 * 8 + 4, 10)
+            sfx.lantern()
+          })
+        }
+      })
+      
+      this.time.delayedCall(4000, () => {
+        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'LEVEL 3 CLEARED. MORE TO COME!', {
+          fontFamily: 'monospace', fontSize: '10px', color: '#e0f8cf',
+          stroke: '#0f1a12', strokeThickness: 2, padding: { x: 4, y: 4 }
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
+      })
     }
   }
 
@@ -245,7 +291,7 @@ export class PlayScene extends Phaser.Scene {
   update(time: number, delta: number) {
     const body = this.player.body
 
-    if (body.center.x > 96 * 8 && !this.marshEntered) {
+    if (body.center.x > 96 * 8 && !this.marshEntered && body.center.x < 196 * 8) {
       this.marshEntered = true
       this.toast('THE MARSH', 3000)
       this.tweens.add({
@@ -253,6 +299,11 @@ export class PlayScene extends Phaser.Scene {
         alpha: 0.95,
         duration: 2000
       })
+    }
+    
+    if (body.center.x > 196 * 8 && body.center.x < 205 * 8 && !this.canopyEntered) {
+      this.canopyEntered = true
+      this.toast('THE CANOPY', 3000)
     }
 
     const tileInside = this.groundLayer.getTileAtWorldXY(body.center.x, body.center.y, true)

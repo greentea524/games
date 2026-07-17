@@ -10,6 +10,7 @@ export const GLOW = {
 } as const
 
 // Dash (KAN-114) — all tunable
+export const SPAWN_POINT = { x: 32, y: 360 }
 export const DASH = {
   speed: 400,
   durationMs: 100, // 40px = 5 tiles of travel
