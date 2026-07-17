@@ -223,9 +223,6 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Shift' || e.key === 'z' || e.key === 'Z' || e.key === 'KeyZ' || e.key === 'x' || e.key === 'X' || e.key === 'KeyX') {
        toggleOverlay('info')
     }
-  } else {
-    if (e.key === 'Enter' || e.key === 'Escape') toggleOverlay('pause')
-    if (e.key === 'Shift') toggleOverlay('info')
   }
 })
 

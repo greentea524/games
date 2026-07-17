@@ -31,6 +31,9 @@ export class PlayScene extends Phaser.Scene {
   private lanterns: Lantern[] = []
   private dashKey!: Phaser.Input.Keyboard.Key
   private jumpKey!: Phaser.Input.Keyboard.Key
+  private enterKey!: Phaser.Input.Keyboard.Key
+  private escKey!: Phaser.Input.Keyboard.Key
+  private shiftKey!: Phaser.Input.Keyboard.Key
   private hasDoubleJump = false
   private hasDash = false
   private hasWallCling = false
@@ -159,12 +162,11 @@ export class PlayScene extends Phaser.Scene {
     })
 
     this.cursors = this.input.keyboard!.createCursorKeys()
-    this.dashKey = this.input.keyboard!.addKey(
-      Phaser.Input.Keyboard.KeyCodes.X,
-    )
-    this.jumpKey = this.input.keyboard!.addKey(
-      Phaser.Input.Keyboard.KeyCodes.Z,
-    )
+    this.dashKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X)
+    this.jumpKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
+    this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER)
+    this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
+    this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
 
     this.darkness = this.add
       .renderTexture(0, 0, GBC_WIDTH, GBC_HEIGHT)
@@ -289,6 +291,19 @@ export class PlayScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
+    if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.escKey)) {
+      if (typeof (window as any).toggleOverlay === 'function') {
+        (window as any).toggleOverlay('pause')
+      }
+      return
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.shiftKey)) {
+      if (typeof (window as any).toggleOverlay === 'function') {
+        (window as any).toggleOverlay('info')
+      }
+      return
+    }
+
     const body = this.player.body
 
     if (body.center.x > 96 * 8 && !this.marshEntered && body.center.x < 196 * 8) {
