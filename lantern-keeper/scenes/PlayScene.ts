@@ -158,6 +158,8 @@ export class PlayScene extends Phaser.Scene {
     this.dashingUntil = 0
     this.dashCooldownUntil = 0
     this.dashBufferedUntil = 0
+
+    this.toast('THE FOREST', 3000)
   }
 
   private lightLantern(lantern: Lantern) {
