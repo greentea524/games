@@ -28,7 +28,7 @@
         
         #game { border: 15px solid #222; border-radius: 10px 10px 40px 10px; background: #000; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
         
-        .gb-controls { display: flex; justify-content: space-around; width: 100%; max-width: 400px; padding: 10px; margin-bottom: 15px; }
+        .gb-controls { display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 400px; padding: 10px; margin-bottom: 15px; }
         
         .d-pad { position: relative; width: 120px; height: 120px; }
         .d-btn { position: absolute; background: #333; border-radius: 4px; touch-action: none; }
@@ -39,11 +39,11 @@
         .d-right { top: 40px; right: 0; width: 40px; height: 40px; border-radius: 0 4px 4px 0; }
         .d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; position: absolute; }
 
-        .action-btns { display: flex; gap: 15px; transform: rotate(-20deg); align-items: flex-end; padding-top: 30px; }
+        .action-btns { display: flex; gap: 15px; transform: rotate(-20deg); align-items: flex-end; }
         .a-btn { width: 50px; height: 50px; background: #b00; border-radius: 50%; box-shadow: 0 4px 0 #500; touch-action: none; display: flex; align-items: center; justify-content: center; color: #500; font-family: sans-serif; font-weight: bold; }
         .a-btn:active { transform: translateY(4px); box-shadow: none; background: #900; }
         
-        .sys-btns { display: flex; gap: 30px; justify-content: center; width: 100%; max-width: 400px; padding-bottom: 10px; }
+        .sys-btns { display: flex; gap: 30px; justify-content: center; width: 100%; max-width: 400px; padding-bottom: 10px; margin-top: 25px; }
         .s-btn-container { display: flex; flex-direction: column; align-items: center; gap: 5px; }
         .s-btn { width: 45px; height: 12px; background: #555; border-radius: 6px; transform: rotate(-20deg); box-shadow: 0 2px 0 #222; touch-action: none; }
         .s-btn:active { transform: rotate(-20deg) translateY(2px); box-shadow: none; background: #333; }
