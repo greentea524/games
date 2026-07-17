@@ -357,7 +357,9 @@ export class PlayScene extends Phaser.Scene {
 
   private lightLantern(lantern: Lantern) {
     lantern.lit = true
-    lantern.sprite.setTexture('lanternLit')
+    if (lantern.name !== 'heart_tree') {
+      lantern.sprite.setTexture('lanternLit')
+    }
     this.respawnPoint = { x: lantern.sprite.x, y: lantern.sprite.y - 6 }
     
     if (lantern.name !== 'crown') {
