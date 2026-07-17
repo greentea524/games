@@ -146,6 +146,21 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('deco_vine', 3, 8)
     g.clear()
 
+    // Bouncy Mushroom (12x8)
+    g.fillStyle(PAL.darkest) // cap outline
+    g.fillRect(1, 2, 10, 4)
+    g.fillRect(2, 1, 8, 5)
+    g.fillStyle(PAL.warm) // cap top
+    g.fillRect(3, 1, 6, 4)
+    g.fillRect(2, 2, 8, 3)
+    g.fillStyle(PAL.lightest) // cap spots
+    g.fillRect(4, 2, 1, 1)
+    g.fillRect(7, 2, 2, 1)
+    g.fillStyle(PAL.lightest) // stem
+    g.fillRect(5, 4, 2, 4)
+    g.generateTexture('bouncy_shroom', 12, 8)
+    g.clear()
+
     // Particles
     g.fillStyle(PAL.lightest)
     g.fillRect(0, 0, 2, 2)
