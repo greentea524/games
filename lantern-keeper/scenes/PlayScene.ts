@@ -313,9 +313,16 @@ export class PlayScene extends Phaser.Scene {
         })
       })
     } else if (lantern.name === 'canopy_grand') {
+      this.won = true
       sfx.win()
       this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 100)
-      this.toast('BRIDGE TO THE HOLLOW REVEALED', 0)
+      this.toast('THE CANOPY GLOWS AGAIN', 3000)
+      
+      this.tweens.add({
+        targets: this.darkness,
+        alpha: 0,
+        duration: 3000
+      })
       
       this.time.delayedCall(1000, () => {
         // Spawn bridge across bottomless pit
@@ -328,11 +335,16 @@ export class PlayScene extends Phaser.Scene {
         }
       })
       
-      this.time.delayedCall(4000, () => {
-        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'LEVEL 3 CLEARED. PROCEED RIGHT!', {
-          fontFamily: 'monospace', fontSize: '10px', color: '#e0f8cf',
-          stroke: '#0f1a12', strokeThickness: 2, padding: { x: 4, y: 4 }
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
+      this.time.delayedCall(5000, () => {
+        this.cameras.main.fadeOut(1000, 0, 0, 0)
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.start('play', { 
+            levelKey: 'level4',
+            hasDoubleJump: this.hasDoubleJump,
+            hasDash: this.hasDash,
+            hasWallCling: this.hasWallCling
+          })
+        })
       })
     } else if (lantern.name === 'heart_tree') {
       this.won = true
@@ -427,18 +439,6 @@ export class PlayScene extends Phaser.Scene {
 
     const body = this.player.body
 
-    if (this.levelKey === 'level3' && body.center.x > 98 * 8 && !this.won) {
-      this.won = true
-      this.cameras.main.fadeOut(1000, 0, 0, 0)
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('play', {
-          levelKey: 'level4',
-          hasDoubleJump: this.hasDoubleJump,
-          hasDash: this.hasDash,
-          hasWallCling: this.hasWallCling
-        })
-      })
-    }
 
     const tileInside = this.groundLayer.getTileAtWorldXY(body.center.x, body.center.y, true)
     const tileBelow = this.groundLayer.getTileAtWorldXY(body.center.x, body.bottom - 1, true)
