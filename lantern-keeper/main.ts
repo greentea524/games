@@ -114,3 +114,14 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') toggleOverlay('pause')
   if (e.key === 'Shift') toggleOverlay('info')
 })
+
+// Prevent zooming via double-tap and pinch on iOS
+document.addEventListener('dblclick', (event) => {
+  event.preventDefault()
+}, { passive: false })
+
+document.addEventListener('touchstart', (event) => {
+  if (event.touches.length > 1) {
+    event.preventDefault()
+  }
+}, { passive: false })

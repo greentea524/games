@@ -139,11 +139,11 @@ export class PlayScene extends Phaser.Scene {
     const text = this.add
       .text(GBC_WIDTH / 2, 28, message, {
         fontFamily: '"Courier New", Courier, monospace',
-        fontSize: '8px',
+        fontSize: '10px',
         fontStyle: 'bold',
         color: '#e0f8cf',
         backgroundColor: '#0f1a12',
-        padding: { x: 2, y: 1 },
+        padding: { x: 3, y: 2 },
         resolution: 4,
       })
       .setOrigin(0.5)
