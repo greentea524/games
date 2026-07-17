@@ -5,12 +5,11 @@ import { PlayScene } from './scenes/PlayScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 
 function integerZoom(): number {
-  const isMobile = window.matchMedia('(pointer: coarse)').matches
-  const availableHeight = isMobile ? window.innerHeight - 250 : window.innerHeight
+  const availableHeight = window.innerHeight - 250
   return Math.max(
     1,
     Math.min(
-      Math.floor(window.innerWidth / GBC_WIDTH),
+      Math.floor((window.innerWidth - 40) / GBC_WIDTH),
       Math.floor(availableHeight / GBC_HEIGHT),
     ),
   )
@@ -226,6 +225,20 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === 'Escape') toggleOverlay('pause')
     if (e.key === 'Shift') toggleOverlay('info')
   }
+})
+
+window.addEventListener('keydown', (e) => {
+  let btn: Element | null = document.querySelector(`[data-key="${e.code}"]`)
+  if (e.code === 'Enter') btn = document.getElementById('btn-start')
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') btn = document.getElementById('btn-select')
+  if (btn) btn.classList.add('active-kb')
+})
+
+window.addEventListener('keyup', (e) => {
+  let btn: Element | null = document.querySelector(`[data-key="${e.code}"]`)
+  if (e.code === 'Enter') btn = document.getElementById('btn-start')
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') btn = document.getElementById('btn-select')
+  if (btn) btn.classList.remove('active-kb')
 })
 
 // Prevent zooming via double-tap and pinch on iOS
