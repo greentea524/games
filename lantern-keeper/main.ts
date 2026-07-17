@@ -218,6 +218,8 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat) return
 
   if (overlayMode === 'pause') {
+    e.preventDefault()
+    e.stopPropagation()
     if (e.key === 'ArrowUp') {
       pauseSelectedIndex = (pauseSelectedIndex - 1 + 3) % 3
       updatePauseMenuSelection()
@@ -231,6 +233,8 @@ window.addEventListener('keydown', (e) => {
        toggleOverlay('pause')
     }
   } else if (overlayMode === 'info') {
+    e.preventDefault()
+    e.stopPropagation()
     if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Shift' || e.key === 'z' || e.key === 'Z' || e.key === 'KeyZ' || e.key === 'x' || e.key === 'X' || e.key === 'KeyX') {
        toggleOverlay('info')
     }

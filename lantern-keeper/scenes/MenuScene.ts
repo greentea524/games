@@ -7,12 +7,14 @@ export class MenuScene extends Phaser.Scene {
   
   private viewMode: 'menu' | 'controls' = 'menu';
   private controlsText!: Phaser.GameObjects.Text;
-  
+  private inputCooldownUntil = 0;
+
   constructor() {
     super('menu')
   }
 
   create() {
+    this.inputCooldownUntil = this.time.now + 200
     this.cameras.main.setBackgroundColor('#0f1a12')
 
     // Title
@@ -97,6 +99,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   handleKey(event: KeyboardEvent) {
+    if (this.time.now < this.inputCooldownUntil) return;
+
     if (this.viewMode === 'controls') {
       if (event.code === 'KeyX' || event.code === 'KeyZ' || event.code === 'Enter') {
         this.hideControls();
