@@ -169,6 +169,7 @@ function toggleOverlay(mode: 'pause' | 'info') {
     }
   }
 }
+(window as any).toggleOverlay = toggleOverlay;
 
 const setupSysBtn = (id: string, key: string) => {
   const btn = document.getElementById(id)

@@ -4,10 +4,6 @@ import { GBC_WIDTH } from '../constants'
 export class MenuScene extends Phaser.Scene {
   private selectedIndex = 0;
   private options: Phaser.GameObjects.Text[] = [];
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private enterKey!: Phaser.Input.Keyboard.Key;
-  private xKey!: Phaser.Input.Keyboard.Key;
-  private zKey!: Phaser.Input.Keyboard.Key;
   
   private viewMode: 'menu' | 'controls' = 'menu';
   private controlsText!: Phaser.GameObjects.Text;
@@ -56,11 +52,8 @@ export class MenuScene extends Phaser.Scene {
       align: 'center',
     }).setOrigin(0.5).setVisible(false);
 
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-    this.xKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X);
-    this.zKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
-
+    this.input.keyboard!.on('keydown', this.handleKey, this);
+    
     this.updateSelection();
     
     // Allow touch/click on options
@@ -100,23 +93,23 @@ export class MenuScene extends Phaser.Scene {
     this.controlsText.setVisible(false);
   }
 
-  update() {
+  handleKey(event: KeyboardEvent) {
     if (this.viewMode === 'controls') {
-      if (Phaser.Input.Keyboard.JustDown(this.xKey) || Phaser.Input.Keyboard.JustDown(this.zKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      if (event.code === 'KeyX' || event.code === 'KeyZ' || event.code === 'Enter') {
         this.hideControls();
       }
       return;
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+    if (event.code === 'ArrowUp') {
       this.selectedIndex = (this.selectedIndex - 1 + this.options.length) % this.options.length;
       this.updateSelection();
-    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) {
+    } else if (event.code === 'ArrowDown') {
       this.selectedIndex = (this.selectedIndex + 1) % this.options.length;
       this.updateSelection();
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.xKey) || Phaser.Input.Keyboard.JustDown(this.zKey)) {
+    if (event.code === 'Enter' || event.code === 'KeyX' || event.code === 'KeyZ') {
       if (this.selectedIndex === 0) {
         this.scene.start('play', { levelKey: 'level1', hasDoubleJump: false, hasDash: false, hasWallCling: false })
       } else if (this.selectedIndex === 1) {
