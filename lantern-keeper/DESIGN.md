@@ -28,16 +28,16 @@ These numbers are what makes the gates enforceable. Level geometry MUST
 respect the "gate minimum" column — it exceeds the reach of every ability
 combination before that gate by at least a 2-tile margin.
 
-| Capability | Max reach | Gate minimum built against it |
+| Capability | Max reach (measured, gravity 500 / jump −150 / run 60) | Gate minimum built against it |
 |------------|-----------|-------------------------------|
-| Baseline jump | 3 tiles up / 3 tiles across | double-jump ledges: **5+ tiles up** |
-| Double jump | 5 tiles up / 4 tiles across | dash gaps: **6+ tiles across** |
-| Dash (+ jump) | 6 tiles across | wall shafts: **8+ tiles up**, no ledge spacing under 6 tiles |
+| Baseline jump | ~2.8 tiles up / ~4.5 across | double-jump ledges: **5+ tiles up** |
+| Double jump | ~5.6 tiles up / ~7.5 across (59px) | dash gaps: **10+ tiles across** |
+| Dash | +5 tiles horizontal (40px burst), no vertical gain | goal/wall blocks: **6+ tiles up** (DJ can't scale 48px) |
 | Wall-cling + wall-jump | unbounded vertical | — |
 
-Implementation note: the scaffold's current constants (gravity 400,
-jump −170) give a ~4.5-tile jump — retune in KAN-112 to hit the 3-tile
-baseline (e.g. gravity 500, jump −150) before building gate geometry.
+Dash tuning (KAN-114): 400px/s for 100ms, 400ms cooldown, 120ms input
+buffer, one air dash per airtime, vertical velocity frozen during the
+burst. Jump assist: 80ms coyote time, 100ms jump buffer.
 
 ## Anti-soft-lock rules
 

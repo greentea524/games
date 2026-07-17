@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, GLOW } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT, GLOW, DASH, JUMP_ASSIST } from '../constants'
 
 // Tuned to the KAN-110 movement budget: single jump ~2.8 tiles,
 // double jump ~5.6 tiles, so the 5-tile cliff gate needs the Ember lantern.
@@ -22,9 +22,20 @@ export class PlayScene extends Phaser.Scene {
   private brush!: Phaser.GameObjects.Image
   private brushBig!: Phaser.GameObjects.Image
   private lanterns: Lantern[] = []
+  private dashKey!: Phaser.Input.Keyboard.Key
   private hasDoubleJump = false
+  private hasDash = false
   private jumpsLeft = 0
+  private facing = 1
   private won = false
+  // Jump assist (coyote time + input buffer)
+  private lastGroundedAt = 0
+  private jumpBufferedUntil = 0
+  // Dash state (KAN-114)
+  private dashingUntil = 0
+  private dashCooldownUntil = 0
+  private dashBufferedUntil = 0
+  private airDashUsed = false
   // Fading glow (KAN-113): fraction 1 -> 0; kept on the instance so it
   // stays tunable at runtime alongside the GLOW config.
   private glow = 1
@@ -45,6 +56,10 @@ export class PlayScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, ground)
 
+    // Default TILE_BIAS (16) lets a jump that peaks just below a ledge
+    // corner-snap on top, breaking ability gates. 8 still covers our max
+    // fall speed (~3.5px/frame) with margin.
+    this.physics.world.TILE_BIAS = 8
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
     this.cameras.main.startFollow(this.player, true)
@@ -58,6 +73,9 @@ export class PlayScene extends Phaser.Scene {
     )
 
     this.cursors = this.input.keyboard!.createCursorKeys()
+    this.dashKey = this.input.keyboard!.addKey(
+      Phaser.Input.Keyboard.KeyCodes.X,
+    )
 
     this.darkness = this.add
       .renderTexture(0, 0, GBC_WIDTH, GBC_HEIGHT)
@@ -68,10 +86,18 @@ export class PlayScene extends Phaser.Scene {
     this.brushBig = new Phaser.GameObjects.Image(this, 0, 0, 'brushBig')
 
     this.hasDoubleJump = false
+    this.hasDash = false
     this.jumpsLeft = 0
+    this.facing = 1
     this.won = false
     this.glow = 1
     this.respawnPoint = { ...SPAWN_POINT }
+    this.lastGroundedAt = 0
+    this.jumpBufferedUntil = 0
+    this.dashingUntil = 0
+    this.dashCooldownUntil = 0
+    this.dashBufferedUntil = 0
+    this.airDashUsed = false
   }
 
   private lightLantern(lantern: Lantern) {
@@ -81,6 +107,9 @@ export class PlayScene extends Phaser.Scene {
     if (lantern.name === 'ember') {
       this.hasDoubleJump = true
       this.toast('DOUBLE JUMP!')
+    } else if (lantern.name === 'gale') {
+      this.hasDash = true
+      this.toast('DASH! (X)')
     } else if (lantern.name === 'goal') {
       this.won = true
       this.toast('FOREST FLOOR COMPLETE', 0)
@@ -111,7 +140,7 @@ export class PlayScene extends Phaser.Scene {
     this.toast('THE DARK CLOSES IN...', 1500)
   }
 
-  update(_time: number, delta: number) {
+  update(time: number, delta: number) {
     const body = this.player.body
 
     if (this.won) {
@@ -120,20 +149,63 @@ export class PlayScene extends Phaser.Scene {
       return
     }
 
-    if (this.cursors.left.isDown) {
-      this.player.setVelocityX(-RUN_SPEED)
-    } else if (this.cursors.right.isDown) {
-      this.player.setVelocityX(RUN_SPEED)
-    } else {
-      this.player.setVelocityX(0)
+    const dashing = time < this.dashingUntil
+    if (!dashing && !body.allowGravity) {
+      body.setAllowGravity(true) // dash just ended
     }
 
-    if (body.blocked.down) {
-      this.jumpsLeft = this.hasDoubleJump ? 2 : 1
+    if (!dashing) {
+      if (this.cursors.left.isDown) {
+        this.player.setVelocityX(-RUN_SPEED)
+        this.facing = -1
+      } else if (this.cursors.right.isDown) {
+        this.player.setVelocityX(RUN_SPEED)
+        this.facing = 1
+      } else {
+        this.player.setVelocityX(0)
+      }
     }
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up) && this.jumpsLeft > 0) {
+
+    const maxJumps = this.hasDoubleJump ? 2 : 1
+    if (body.blocked.down) {
+      this.jumpsLeft = maxJumps
+      this.lastGroundedAt = time
+      this.airDashUsed = false
+    } else if (
+      this.jumpsLeft === maxJumps &&
+      time - this.lastGroundedAt > JUMP_ASSIST.coyoteMs
+    ) {
+      this.jumpsLeft = maxJumps - 1 // walked off a ledge past coyote time
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+      this.jumpBufferedUntil = time + JUMP_ASSIST.bufferMs
+    }
+    if (!dashing && time < this.jumpBufferedUntil && this.jumpsLeft > 0) {
       this.player.setVelocityY(JUMP_VELOCITY)
       this.jumpsLeft--
+      this.jumpBufferedUntil = 0
+    }
+
+    // Dash (KAN-114): fixed distance burst, buffered input, cooldown,
+    // one air dash per airtime, vertical velocity frozen while dashing.
+    if (Phaser.Input.Keyboard.JustDown(this.dashKey)) {
+      this.dashBufferedUntil = time + DASH.bufferMs
+    }
+    if (
+      this.hasDash &&
+      !dashing &&
+      time < this.dashBufferedUntil &&
+      time >= this.dashCooldownUntil &&
+      (body.blocked.down || !this.airDashUsed)
+    ) {
+      this.dashingUntil = time + DASH.durationMs
+      this.dashCooldownUntil = time + DASH.durationMs + DASH.cooldownMs
+      this.dashBufferedUntil = 0
+      if (!body.blocked.down) {
+        this.airDashUsed = true
+      }
+      body.setAllowGravity(false)
+      this.player.setVelocity(this.facing * DASH.speed, 0)
     }
 
     let nearLitLantern = false

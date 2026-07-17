@@ -9,6 +9,20 @@ export const GLOW = {
   durationMs: 30000, // time for a full glow to fade to minimum
 } as const
 
+// Dash (KAN-114) — all tunable
+export const DASH = {
+  speed: 400,
+  durationMs: 100, // 40px = 5 tiles of travel
+  cooldownMs: 400,
+  bufferMs: 120, // presses this early still fire when the cooldown ends
+} as const
+
+// Jump feel (KAN-112 tuning note)
+export const JUMP_ASSIST = {
+  coyoteMs: 80,
+  bufferMs: 100,
+} as const
+
 // GBC-inspired 4-color palette
 export const PAL = {
   darkest: 0x0f1a12,
