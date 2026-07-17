@@ -459,6 +459,22 @@ export class PlayScene extends Phaser.Scene {
       this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 500)
       this.toast('THE HEART TREE IS RESTORED', 0)
       
+      // Spawn hanging lanterns in the canopy
+      for (let i = 0; i < 15; i++) {
+        const lx = lantern.sprite.x + Phaser.Math.Between(-26, 26)
+        const ly = lantern.sprite.y + Phaser.Math.Between(-28, 4)
+        const l = this.add.image(lx, ly, 'lanternLit').setDepth(lantern.sprite.depth + 1)
+        this.tweens.add({
+          targets: l,
+          y: ly - 2,
+          yoyo: true,
+          repeat: -1,
+          duration: Phaser.Math.Between(1000, 2000),
+          ease: 'Sine.easeInOut',
+          delay: Phaser.Math.Between(0, 1000)
+        })
+      }
+      
       this.tweens.add({
         targets: this.darkness,
         alpha: 0,
