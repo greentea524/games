@@ -38,10 +38,9 @@ export class PlayScene extends Phaser.Scene {
   private facing = 1
   private won = false
   
-  private levelKey = 'level1'
-
+  private marshEntered = false
+  
   init(data: any) {
-    this.levelKey = data?.levelKey || 'level1'
     this.hasDoubleJump = data?.hasDoubleJump || false
     this.hasDash = data?.hasDash || false
     this.hasWallCling = data?.hasWallCling || false
@@ -81,8 +80,9 @@ export class PlayScene extends Phaser.Scene {
     this.dashingUntil = 0
     this.dashCooldownUntil = 0
     this.airDashUsed = false
+    this.marshEntered = false
 
-    const map = this.make.tilemap({ key: this.levelKey })
+    const map = this.make.tilemap({ key: 'world' })
     const tileset = map.addTilesetImage('tiles', 'tiles')!
     const ground = map.createLayer('ground', tileset)!
     ground.setCollisionBetween(1, 6)
@@ -178,27 +178,24 @@ export class PlayScene extends Phaser.Scene {
       const isMobile = window.matchMedia('(pointer: coarse)').matches
       this.toast(isMobile ? 'DASH! (B)' : 'DASH! (X)')
       
-      if (this.levelKey === 'level2') {
-         this.won = true
-         sfx.win()
-         this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
-         this.toast('THE MARSH CLEARED', 0)
-         this.tweens.add({ targets: this.darkness, alpha: 0, duration: 3000 })
-         this.time.delayedCall(4000, () => {
-           this.cameras.main.fadeOut(1000, 0, 0, 0)
-           this.cameras.main.once('camerafadeoutcomplete', () => {
-             this.scene.start('menu')
-           })
-         })
-      }
+      this.won = true
+      sfx.win()
+      this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
+      this.toast('THE MARSH CLEARED', 0)
+      this.tweens.add({ targets: this.darkness, alpha: 0, duration: 3000 })
+      this.time.delayedCall(4000, () => {
+        this.cameras.main.fadeOut(1000, 0, 0, 0)
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.start('menu')
+        })
+      })
     } else if (lantern.name === 'root') {
       this.hasWallCling = true
       this.toast('WALL CLING!')
     } else if (lantern.name === 'crown') {
-      this.won = true
       sfx.win()
       this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
-      this.toast('THE FOREST GLOWS AGAIN', 0)
+      this.toast('THE FOREST GLOWS AGAIN', 3000)
       
       this.tweens.add({
         targets: this.darkness,
@@ -206,17 +203,13 @@ export class PlayScene extends Phaser.Scene {
         duration: 3000
       })
       
-      this.time.delayedCall(4000, () => {
-        this.cameras.main.fadeOut(1000, 0, 0, 0)
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          this.scene.start('play', { 
-            levelKey: 'level2',
-            hasDoubleJump: this.hasDoubleJump,
-            hasDash: this.hasDash,
-            hasWallCling: this.hasWallCling
-          })
-        })
-      })
+      // Remove the root barrier at X=96, 97 between Y=7 and Y=15
+      for (let y = 7; y <= 15; y++) {
+        this.groundLayer.removeTileAt(96, y)
+        this.groundLayer.removeTileAt(97, y)
+        this.sparkParticles.emitParticleAt(96 * 8 + 4, y * 8 + 4, 3)
+        this.sparkParticles.emitParticleAt(97 * 8 + 4, y * 8 + 4, 3)
+      }
     }
   }
 
@@ -249,6 +242,16 @@ export class PlayScene extends Phaser.Scene {
 
   update(time: number, delta: number) {
     const body = this.player.body
+
+    if (body.center.x > 96 * 8 && !this.marshEntered) {
+      this.marshEntered = true
+      this.toast('THE MARSH', 3000)
+      this.tweens.add({
+        targets: this.darkness,
+        alpha: 0.95,
+        duration: 2000
+      })
+    }
 
     const tileInside = this.groundLayer.getTileAtWorldXY(body.center.x, body.center.y, true)
     const tileBelow = this.groundLayer.getTileAtWorldXY(body.center.x, body.bottom - 1, true)

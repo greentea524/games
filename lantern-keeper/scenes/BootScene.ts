@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { TILE_SIZE, PAL } from '../constants'
 import level1Url from '../assets/level1.json?url'
 import level2Url from '../assets/level2.json?url'
+import worldUrl from '../assets/world.json?url'
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -11,6 +12,7 @@ export class BootScene extends Phaser.Scene {
   preload() {
     this.load.tilemapTiledJSON('level1', level1Url)
     this.load.tilemapTiledJSON('level2', level2Url)
+    this.load.tilemapTiledJSON('world', worldUrl)
   }
 
   create() {
