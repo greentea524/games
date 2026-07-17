@@ -37,10 +37,10 @@ export const JUMP_ASSIST = {
 // outlines stay faintly visible even without direct lantern light.
 // Later levels stay darker, but never fully opaque.
 export const DARKNESS_ALPHA: Record<string, number> = {
-  level1: 0.84,
-  level2: 0.88,
-  level3: 0.88,
-  level4: 0.9,
+  level1: 0.76,
+  level2: 0.80,
+  level3: 0.80,
+  level4: 0.82,
 }
 
 // Procedural stage decorations (issue #7) — density per exposed surface
