@@ -41,11 +41,10 @@ export class PlayScene extends Phaser.Scene {
   private facing = 1
   private won = false
   
-  private marshEntered = false
-  private canopyEntered = false
-  private hollowEntered = false
+  private levelKey = 'level1'
   
   init(data: any) {
+    this.levelKey = data?.levelKey || 'level1'
     this.hasDoubleJump = data?.hasDoubleJump || false
     this.hasDash = data?.hasDash || false
     this.hasWallCling = data?.hasWallCling || false
@@ -87,17 +86,33 @@ export class PlayScene extends Phaser.Scene {
     this.dashingUntil = 0
     this.dashCooldownUntil = 0
     this.airDashUsed = false
-    this.marshEntered = false
-    this.canopyEntered = false
-    this.hollowEntered = false
 
-    const map = this.make.tilemap({ key: 'world' })
+    const map = this.make.tilemap({ key: this.levelKey })
     const tileset = map.addTilesetImage('tiles', 'tiles')!
     const ground = map.createLayer('ground', tileset)!
-    ground.setCollisionBetween(1, 6)
+    ground.setCollisionBetween(1, 8)
     this.groundLayer = ground
 
-    this.player = this.physics.add.sprite(SPAWN_POINT.x, SPAWN_POINT.y, 'player_idle')
+    let spawnX = 32
+    let spawnY = 72
+    let initialDarkness = 0.9
+    let title = 'THE FOREST'
+
+    if (this.levelKey === 'level2') {
+      spawnY = 72
+      initialDarkness = 0.95
+      title = 'THE MARSH'
+    } else if (this.levelKey === 'level3') {
+      spawnY = 384
+      initialDarkness = 0.95
+      title = 'THE CANOPY'
+    } else if (this.levelKey === 'level4') {
+      spawnY = 128
+      initialDarkness = 0.99
+      title = 'THE HOLLOW'
+    }
+
+    this.player = this.physics.add.sprite(spawnX, spawnY, 'player_idle')
     this.player.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, ground)
 
@@ -182,18 +197,19 @@ export class PlayScene extends Phaser.Scene {
       .setOrigin(0)
       .setScrollFactor(0)
       .setDepth(10)
+    this.darkness.alpha = initialDarkness
     this.brush = new Phaser.GameObjects.Image(this, 0, 0, 'brush')
     this.brushBig = new Phaser.GameObjects.Image(this, 0, 0, 'brushBig')
 
     this.glow = 1
-    this.respawnPoint = { ...SPAWN_POINT }
+    this.respawnPoint = { x: spawnX, y: spawnY }
     this.lastGroundedAt = 0
     this.jumpBufferedUntil = 0
     this.dashingUntil = 0
     this.dashCooldownUntil = 0
     this.dashBufferedUntil = 0
 
-    this.toast('THE FOREST', 3000)
+    this.toast(title, 3000)
   }
 
   private lightLantern(lantern: Lantern) {
@@ -213,23 +229,33 @@ export class PlayScene extends Phaser.Scene {
       this.hasDash = true
       const isMobile = window.matchMedia('(pointer: coarse)').matches
       this.toast(isMobile ? 'DASH! (B)' : 'DASH! (X)')
-    } else if (lantern.name === 'marsh_grand') {
-      sfx.win()
-      this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
-      this.toast('THE MARSH GLOWS AGAIN', 3000)
       
-      this.tweens.add({
-        targets: this.darkness,
-        alpha: 0,
-        duration: 3000
-      })
+      if (this.levelKey === 'level2') {
+        this.won = true
+        sfx.win()
+        this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
+        this.toast('THE MARSH CLEARED', 0)
+        this.tweens.add({ targets: this.darkness, alpha: 0, duration: 3000 })
+        this.time.delayedCall(4000, () => {
+          this.cameras.main.fadeOut(1000, 0, 0, 0)
+          this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.scene.start('play', { 
+              levelKey: 'level3',
+              hasDoubleJump: this.hasDoubleJump,
+              hasDash: this.hasDash,
+              hasWallCling: this.hasWallCling
+            })
+          })
+        })
+      }
     } else if (lantern.name === 'root') {
       this.hasWallCling = true
       this.toast('WALL CLING!')
     } else if (lantern.name === 'crown') {
+      this.won = true
       sfx.win()
       this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
-      this.toast('THE FOREST GLOWS AGAIN', 3000)
+      this.toast('THE FOREST GLOWS AGAIN', 0)
       
       this.tweens.add({
         targets: this.darkness,
@@ -237,23 +263,26 @@ export class PlayScene extends Phaser.Scene {
         duration: 3000
       })
       
-      // Remove the root barrier at X=96, 97 between Y=7 and Y=15
-      for (let y = 7; y <= 15; y++) {
-        this.groundLayer.removeTileAt(96, y)
-        this.groundLayer.removeTileAt(97, y)
-        this.sparkParticles.emitParticleAt(96 * 8 + 4, y * 8 + 4, 3)
-        this.sparkParticles.emitParticleAt(97 * 8 + 4, y * 8 + 4, 3)
-      }
+      this.time.delayedCall(4000, () => {
+        this.cameras.main.fadeOut(1000, 0, 0, 0)
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.start('play', { 
+            levelKey: 'level2',
+            hasDoubleJump: this.hasDoubleJump,
+            hasDash: this.hasDash,
+            hasWallCling: this.hasWallCling
+          })
+        })
+      })
     } else if (lantern.name === 'canopy_grand') {
-      this.won = true
       sfx.win()
       this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 100)
       this.toast('BRIDGE TO THE HOLLOW REVEALED', 0)
       
       this.time.delayedCall(1000, () => {
         // Spawn bridge across bottomless pit
-        for (let x = 290; x <= 299; x++) {
-          this.time.delayedCall((x - 290) * 100, () => {
+        for (let x = 90; x <= 99; x++) {
+          this.time.delayedCall((x - 90) * 100, () => {
             this.groundLayer.putTileAt(5, x, 16)
             this.sparkParticles.emitParticleAt(x * 8 + 4, 16 * 8 + 4, 10)
             sfx.lantern()
@@ -262,7 +291,7 @@ export class PlayScene extends Phaser.Scene {
       })
       
       this.time.delayedCall(4000, () => {
-        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'LEVEL 3 CLEARED. MORE TO COME!', {
+        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'LEVEL 3 CLEARED. PROCEED RIGHT!', {
           fontFamily: 'monospace', fontSize: '10px', color: '#e0f8cf',
           stroke: '#0f1a12', strokeThickness: 2, padding: { x: 4, y: 4 }
         }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
@@ -360,33 +389,16 @@ export class PlayScene extends Phaser.Scene {
 
     const body = this.player.body
 
-    if (body.center.x > 96 * 8 && !this.marshEntered && body.center.x < 196 * 8) {
-      this.marshEntered = true
-      this.toast('THE MARSH', 3000)
-      this.tweens.add({
-        targets: this.darkness,
-        alpha: 0.95,
-        duration: 2000
-      })
-    }
-    
-    if (body.center.x > 196 * 8 && body.center.x < 205 * 8 && !this.canopyEntered) {
-      this.canopyEntered = true
-      this.toast('THE CANOPY', 3000)
-      this.tweens.add({
-        targets: this.darkness,
-        alpha: 0.95,
-        duration: 2000
-      })
-    }
-
-    if (body.center.x > 295 * 8 && !this.hollowEntered) {
-      this.hollowEntered = true
-      this.toast('THE HOLLOW', 3000)
-      this.tweens.add({
-        targets: this.darkness,
-        alpha: 0.99,
-        duration: 3000
+    if (this.levelKey === 'level3' && body.center.x > 98 * 8 && !this.won) {
+      this.won = true
+      this.cameras.main.fadeOut(1000, 0, 0, 0)
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('play', {
+          levelKey: 'level4',
+          hasDoubleJump: this.hasDoubleJump,
+          hasDash: this.hasDash,
+          hasWallCling: this.hasWallCling
+        })
       })
     }
 
