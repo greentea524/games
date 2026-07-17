@@ -204,6 +204,8 @@ setupSysBtn('btn-start', 'Enter')
 setupSysBtn('btn-select', 'Shift')
 
 window.addEventListener('keydown', (e) => {
+  if (e.repeat) return
+
   if (overlayMode === 'pause') {
     if (e.key === 'ArrowUp') {
       pauseSelectedIndex = (pauseSelectedIndex - 1 + 3) % 3
