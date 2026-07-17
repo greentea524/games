@@ -47,6 +47,7 @@ const dispatchSimulatedKey = (type: 'keydown' | 'keyup', key: string) => {
     ArrowRight: 39,
     ArrowDown: 40,
     KeyX: 88,
+    KeyZ: 90,
     Enter: 13,
     Shift: 16,
   }
@@ -83,6 +84,23 @@ const overlay = document.getElementById('overlay')
 const overlayText = document.getElementById('overlay-text')
 let overlayMode: 'pause' | 'info' | null = null
 
+let pauseSelectedIndex = 0
+const updatePauseMenuSelection = () => {
+  const buttons = ['btn-pause-resume', 'btn-pause-controls', 'btn-pause-exit']
+  buttons.forEach((id, index) => {
+    const btn = document.getElementById(id)
+    if (btn) {
+      if (index === pauseSelectedIndex) {
+        btn.style.color = '#e0f8cf'
+        if (!btn.innerText.startsWith('> ')) btn.innerText = '> ' + btn.innerText.replace('> ', '')
+      } else {
+        btn.style.color = '#86b06a'
+        btn.innerText = btn.innerText.replace('> ', '')
+      }
+    }
+  })
+}
+
 function toggleOverlay(mode: 'pause' | 'info') {
   if (!overlay || !overlayText) return
   if (game.scene.isActive('menu')) return
@@ -118,6 +136,9 @@ function toggleOverlay(mode: 'pause' | 'info') {
         game.scene.stop('play')
         game.scene.start('menu')
       })
+      
+      pauseSelectedIndex = 0
+      updatePauseMenuSelection()
     } else {
       overlayText.innerHTML = `
         <h2>LANTERN KEEPER</h2>
@@ -161,8 +182,27 @@ setupSysBtn('btn-start', 'Enter')
 setupSysBtn('btn-select', 'Shift')
 
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === 'Escape') toggleOverlay('pause')
-  if (e.key === 'Shift') toggleOverlay('info')
+  if (overlayMode === 'pause') {
+    if (e.key === 'ArrowUp') {
+      pauseSelectedIndex = (pauseSelectedIndex - 1 + 3) % 3
+      updatePauseMenuSelection()
+    } else if (e.key === 'ArrowDown') {
+      pauseSelectedIndex = (pauseSelectedIndex + 1) % 3
+      updatePauseMenuSelection()
+    } else if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z' || e.key === 'KeyZ') {
+       const buttons = ['btn-pause-resume', 'btn-pause-controls', 'btn-pause-exit']
+       document.getElementById(buttons[pauseSelectedIndex])?.click()
+    } else if (e.key === 'Escape') {
+       toggleOverlay('pause')
+    }
+  } else if (overlayMode === 'info') {
+    if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Shift' || e.key === 'z' || e.key === 'Z' || e.key === 'KeyZ' || e.key === 'x' || e.key === 'X' || e.key === 'KeyX') {
+       toggleOverlay('info')
+    }
+  } else {
+    if (e.key === 'Enter' || e.key === 'Escape') toggleOverlay('pause')
+    if (e.key === 'Shift') toggleOverlay('info')
+  }
 })
 
 // Prevent zooming via double-tap and pinch on iOS
