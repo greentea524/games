@@ -292,18 +292,19 @@ export class PlayScene extends Phaser.Scene {
     const radius = this.playerLightRadius()
     this.darkness.clear()
     this.darkness.fill(0x000000, 1)
+    // erase() honors the brush's center origin: pass the light's center
     this.brush.setDisplaySize(radius * 2, radius * 2)
     this.darkness.erase(
       this.brush,
-      this.player.x - cam.scrollX - radius,
-      this.player.y - cam.scrollY - radius,
+      this.player.x - cam.scrollX,
+      this.player.y - cam.scrollY,
     )
     for (const lantern of this.lanterns) {
       if (lantern.lit) {
         this.darkness.erase(
           this.brushBig,
-          lantern.sprite.x - cam.scrollX - LANTERN_LIGHT_RADIUS,
-          lantern.sprite.y - cam.scrollY - LANTERN_LIGHT_RADIUS,
+          lantern.sprite.x - cam.scrollX,
+          lantern.sprite.y - cam.scrollY,
         )
       }
     }
