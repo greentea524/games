@@ -17,10 +17,10 @@ export class MenuScene extends Phaser.Scene {
 
     // Title
     this.add.text(GBC_WIDTH / 2, 20, 'LANTERN KEEPER', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '12px',
-      fontStyle: 'bold',
+      fontFamily: '"Press Start 2P"',
+      fontSize: '8px',
       color: '#e0f8cf',
+      resolution: 1,
     }).setOrigin(0.5)
 
     // Player and Lantern Sneak Peek
@@ -29,27 +29,30 @@ export class MenuScene extends Phaser.Scene {
 
     // Menu Options
     const startText = this.add.text(GBC_WIDTH / 2, 85, 'Start Game', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '10px',
+      fontFamily: '"Press Start 2P"',
+      fontSize: '8px',
       color: '#86b06a',
+      resolution: 1,
     }).setOrigin(0.5);
 
     const controlsText = this.add.text(GBC_WIDTH / 2, 105, 'Controls', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '10px',
+      fontFamily: '"Press Start 2P"',
+      fontSize: '8px',
       color: '#86b06a',
+      resolution: 1,
     }).setOrigin(0.5);
 
     this.options = [startText, controlsText];
     this.selectedIndex = 0;
     
     // Controls View
-    this.controlsText = this.add.text(GBC_WIDTH / 2, 90, 
+    this.controlsText = this.add.text(GBC_WIDTH / 2, 90,
       'Arrows: Move & Jump\nX/B: Dash\n\nPress X to return', {
-      fontFamily: '"Courier New", Courier, monospace',
+      fontFamily: '"Press Start 2P"',
       fontSize: '8px',
       color: '#86b06a',
       align: 'center',
+      resolution: 1,
     }).setOrigin(0.5).setVisible(false);
 
     this.input.keyboard!.on('keydown', this.handleKey, this);

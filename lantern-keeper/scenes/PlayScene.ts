@@ -455,10 +455,10 @@ export class PlayScene extends Phaser.Scene {
       })
       
       this.time.delayedCall(5000, () => {
-        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT / 2, 'GAME CLEARED\nTHANK YOU FOR PLAYING', {
-          fontFamily: 'monospace', fontSize: '12px', color: '#e0f8cf',
-          stroke: '#0f1a12', strokeThickness: 4, padding: { x: 4, y: 4 },
-          align: 'center'
+        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT / 2, 'GAME CLEARED\nTHANKS FOR PLAYING', {
+          fontFamily: '"Press Start 2P"', fontSize: '8px', color: '#e0f8cf',
+          backgroundColor: '#0f1a12', padding: { x: 4, y: 4 },
+          align: 'center', resolution: 1, lineSpacing: 4,
         }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
       })
     }
@@ -507,13 +507,15 @@ export class PlayScene extends Phaser.Scene {
   private toast(message: string, duration = 2000) {
     const text = this.add
       .text(GBC_WIDTH / 2, 28, message, {
-        fontFamily: '"Courier New", Courier, monospace',
-        fontSize: '10px',
-        fontStyle: 'bold',
+        fontFamily: '"Press Start 2P"',
+        fontSize: '8px',
         color: '#e0f8cf',
         backgroundColor: '#0f1a12',
-        padding: { x: 3, y: 2 },
+        padding: { x: 3, y: 3 },
         resolution: 1,
+        align: 'center',
+        lineSpacing: 4,
+        wordWrap: { width: GBC_WIDTH - 16 },
       })
       .setOrigin(0.5)
       .setScrollFactor(0)

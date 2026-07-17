@@ -15,29 +15,39 @@ function integerZoom(): number {
   )
 }
 
-const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'game',
-  width: GBC_WIDTH,
-  height: GBC_HEIGHT,
-  zoom: integerZoom(),
-  pixelArt: true,
-  backgroundColor: '#0f1a12',
-  physics: {
-    default: 'arcade',
-    arcade: { gravity: { x: 0, y: 500 } },
-  },
-  scene: [BootScene, MenuScene, PlayScene],
-})
-
-window.addEventListener('resize', () => game.scale.setZoom(integerZoom()))
-
 declare global {
   interface Window {
     __game?: Phaser.Game
   }
 }
-window.__game = game
+
+let game: Phaser.Game
+
+function createGame() {
+  game = new Phaser.Game({
+    type: Phaser.AUTO,
+    parent: 'game',
+    width: GBC_WIDTH,
+    height: GBC_HEIGHT,
+    zoom: integerZoom(),
+    pixelArt: true,
+    backgroundColor: '#0f1a12',
+    physics: {
+      default: 'arcade',
+      arcade: { gravity: { x: 0, y: 500 } },
+    },
+    scene: [BootScene, MenuScene, PlayScene],
+  })
+  window.addEventListener('resize', () => game.scale.setZoom(integerZoom()))
+  window.__game = game
+}
+
+// Load the pixel font before booting so canvas text renders with it from
+// the first frame; boot anyway if the font fails (offline etc.).
+document.fonts
+  .load('8px "Press Start 2P"')
+  .catch(() => {})
+  .finally(createGame)
 
 const dispatchSimulatedKey = (type: 'keydown' | 'keyup', key: string) => {
   const KEY_CODES: Record<string, number> = {
