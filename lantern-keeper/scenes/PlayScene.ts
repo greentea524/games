@@ -161,7 +161,7 @@ export class PlayScene extends Phaser.Scene {
     
     for (const obj of mapObjects) {
       if (obj.name === 'mushroom') {
-        const m = this.add.image(obj.x!, obj.y!, 'bouncy_shroom').setOrigin(0, 1)
+        const m = this.add.image(obj.x! + 6, obj.y! - 4, 'bouncy_shroom')
         this.mushrooms.add(m)
       } else if (obj.name === 'crumble') {
         const c = this.add.rectangle(obj.x!, obj.y!, obj.width!, obj.height!, 0x553311).setOrigin(0, 1)
