@@ -40,7 +40,7 @@ export const DARKNESS_ALPHA: Record<string, number> = {
   level1: 0.84,
   level2: 0.88,
   level3: 0.88,
-  level4: 0.92,
+  level4: 0.9,
 }
 
 // Procedural stage decorations (issue #7) — density per exposed surface
