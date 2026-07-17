@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { TILE_SIZE, PAL } from '../constants'
+import { TILE_SIZE, PAL, GBC_WIDTH } from '../constants'
 import level1Url from '../assets/level1.json?url'
 import level2Url from '../assets/level2.json?url'
 import level3Url from '../assets/level3.json?url'
@@ -18,6 +18,80 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    this.cameras.main.setBackgroundColor('#0f1a12')
+
+    // Generate procedural textures first so preview sprites can be used
+    this.generateProceduralTextures()
+
+    // Title / Header
+    this.add.text(GBC_WIDTH / 2, 24, 'RETRO PAD', {
+      fontFamily: '"Press Start 2P"',
+      fontSize: '9px',
+      color: '#e0f8cf',
+      resolution: 1,
+    }).setOrigin(0.5)
+
+    this.add.text(GBC_WIDTH / 2, 38, 'LANTERN KEEPER', {
+      fontFamily: '"Press Start 2P"',
+      fontSize: '6px',
+      color: '#86b06a',
+      resolution: 1,
+    }).setOrigin(0.5)
+
+    // Animated glowing lantern preview icon
+    const icon = this.add.sprite(GBC_WIDTH / 2, 62, 'lanternLit').setScale(3)
+    this.tweens.add({
+      targets: icon,
+      alpha: { from: 0.6, to: 1 },
+      scale: { from: 2.8, to: 3.2 },
+      duration: 400,
+      yoyo: true,
+      repeat: -1,
+    })
+
+    // Progress Bar Border
+    const barBox = this.add.graphics()
+    barBox.fillStyle(0x0f1a12, 1)
+    barBox.fillRect(28, 90, 104, 10)
+    barBox.lineStyle(1, 0x86b06a, 1)
+    barBox.strokeRect(28, 90, 104, 10)
+
+    // Progress Fill
+    const barFill = this.add.graphics()
+
+    // Progress Text
+    const progressText = this.add.text(GBC_WIDTH / 2, 112, 'SYSTEM INIT... 0%', {
+      fontFamily: '"Press Start 2P"',
+      fontSize: '6px',
+      color: '#86b06a',
+      resolution: 1,
+    }).setOrigin(0.5)
+
+    // Smooth Progress Bar Animation
+    this.tweens.addCounter({
+      from: 0,
+      to: 100,
+      duration: 1000,
+      onUpdate: (tween) => {
+        const val = tween.getValue() ?? 0
+        const fillW = Math.floor((100 * val) / 100)
+        barFill.clear()
+        if (fillW > 0) {
+          barFill.fillStyle(0xe0f8cf, 1)
+          barFill.fillRect(30, 92, fillW, 6)
+        }
+        progressText.setText(`SYSTEM INIT... ${Math.floor(val)}%`)
+      },
+      onComplete: () => {
+        this.cameras.main.fadeOut(300, 0, 0, 0)
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.start('menu')
+        })
+      },
+    })
+  }
+
+  private generateProceduralTextures() {
     const g = this.make.graphics({}, false)
 
     // Tileset texture: 6 tiles (Glade, Mossy Hollows, Rootspire)
@@ -299,7 +373,5 @@ export class BootScene extends Phaser.Scene {
     g.fillCircle(28, 28, 28)
     g.generateTexture('brushBig', 56, 56)
     g.destroy()
-
-    this.scene.start('menu')
   }
 }
