@@ -162,7 +162,7 @@ function toggleOverlay(mode: 'pause' | 'info') {
     } else {
       overlayText.innerHTML = `
         <h2>LANTERN KEEPER</h2>
-        <p style="font-size:10px; font-family:'Courier New', Courier, monospace; color:#86b06a;">Light lanterns to unlock abilities.<br/><br/>
+        <p style="font-size:9px; color:#86b06a;">Light lanterns to unlock abilities.<br/><br/>
         <b>Controls</b><br/>
         Arrows / D-Pad: Move & Jump<br/>
         Z / A Button: Jump<br/>
