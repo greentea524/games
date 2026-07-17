@@ -38,7 +38,14 @@ function createGame() {
     },
     scene: [BootScene, MenuScene, PlayScene],
   })
-  window.addEventListener('resize', () => game.scale.setZoom(integerZoom()))
+  window.addEventListener('resize', () => {
+    const zoom = integerZoom()
+    game.scale.setZoom(zoom)
+    const preStyle = document.getElementById('pre-init-game-style')
+    if (preStyle) {
+      preStyle.innerHTML = `#game { width: ${GBC_WIDTH * zoom}px; height: ${GBC_HEIGHT * zoom}px; }`
+    }
+  })
   window.__game = game
 }
 

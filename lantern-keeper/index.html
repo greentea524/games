@@ -16,6 +16,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <script>
+      (function() {
+        var gbcW = 160, gbcH = 144;
+        var availH = window.innerHeight - 290;
+        var zoom = Math.max(1, Math.min(
+          Math.floor((window.innerWidth - 40) / gbcW),
+          Math.floor(availH / gbcH)
+        ));
+        var style = document.createElement('style');
+        style.id = 'pre-init-game-style';
+        style.innerHTML = '#game { width: ' + (gbcW * zoom) + 'px; height: ' + (gbcH * zoom) + 'px; }';
+        document.head.appendChild(style);
+      })();
+    </script>
     <style>
       html, body { margin: 0; height: 100%; background: #0b0f0c; user-select: none; -webkit-user-select: none; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
       body { display: flex; align-items: center; justify-content: center; }
