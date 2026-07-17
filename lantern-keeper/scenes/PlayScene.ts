@@ -43,6 +43,7 @@ export class PlayScene extends Phaser.Scene {
   
   private marshEntered = false
   private canopyEntered = false
+  private hollowEntered = false
   
   init(data: any) {
     this.hasDoubleJump = data?.hasDoubleJump || false
@@ -72,6 +73,7 @@ export class PlayScene extends Phaser.Scene {
   private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private groundLayer!: Phaser.Tilemaps.TilemapLayer
   private mushrooms!: Phaser.Physics.Arcade.StaticGroup
+  private crumbleGroup!: Phaser.Physics.Arcade.StaticGroup
 
   constructor() {
     super('play')
@@ -87,6 +89,7 @@ export class PlayScene extends Phaser.Scene {
     this.airDashUsed = false
     this.marshEntered = false
     this.canopyEntered = false
+    this.hollowEntered = false
 
     const map = this.make.tilemap({ key: 'world' })
     const tileset = map.addTilesetImage('tiles', 'tiles')!
@@ -134,6 +137,7 @@ export class PlayScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true)
 
     this.mushrooms = this.physics.add.staticGroup()
+    this.crumbleGroup = this.physics.add.staticGroup()
     this.lanterns = []
     const mapObjects = map.getObjectLayer('lanterns')?.objects ?? []
     
@@ -141,6 +145,9 @@ export class PlayScene extends Phaser.Scene {
       if (obj.name === 'mushroom') {
         const m = this.add.rectangle(obj.x!, obj.y! - 4, 12, 8, 0xffaadd)
         this.mushrooms.add(m)
+      } else if (obj.name === 'crumble') {
+        const c = this.add.rectangle(obj.x!, obj.y!, obj.width!, obj.height!, 0x553311).setOrigin(0, 1)
+        this.crumbleGroup.add(c)
       } else {
         this.lanterns.push({
           name: obj.name,
@@ -149,6 +156,8 @@ export class PlayScene extends Phaser.Scene {
         })
       }
     }
+
+    this.physics.add.collider(this.player, this.crumbleGroup, this.onCrumbleTouch, undefined, this)
 
     this.physics.add.overlap(this.player, this.mushrooms, (_, m) => {
       if (this.player.body.velocity.y >= 0) {
@@ -260,6 +269,53 @@ export class PlayScene extends Phaser.Scene {
           stroke: '#0f1a12', strokeThickness: 2, padding: { x: 4, y: 4 }
         }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
       })
+    } else if (lantern.name === 'heart_tree') {
+      this.won = true
+      sfx.win()
+      this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 500)
+      this.toast('THE HEART TREE IS RESTORED', 0)
+      
+      this.tweens.add({
+        targets: this.darkness,
+        alpha: 0,
+        duration: 4000
+      })
+      
+      this.time.delayedCall(5000, () => {
+        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT / 2, 'GAME CLEARED\nTHANK YOU FOR PLAYING', {
+          fontFamily: 'monospace', fontSize: '12px', color: '#e0f8cf',
+          stroke: '#0f1a12', strokeThickness: 4, padding: { x: 4, y: 4 },
+          align: 'center'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
+      })
+    }
+  }
+
+  private onCrumbleTouch(player: any, platform: any) {
+    if (player.body.bottom <= platform.body.top && player.body.velocity.y >= 0) {
+      if (!platform.getData('crumbling')) {
+        platform.setData('crumbling', true)
+        
+        this.tweens.add({
+          targets: platform,
+          alpha: 0.2,
+          duration: 100,
+          yoyo: true,
+          repeat: 4,
+          onComplete: () => {
+            platform.body.enable = false
+            platform.setVisible(false)
+            this.sparkParticles.emitParticleAt(platform.x + platform.width/2, platform.y - platform.height/2, 20)
+            
+            this.time.delayedCall(3000, () => {
+              platform.body.enable = true
+              platform.setVisible(true)
+              platform.alpha = 1
+              platform.setData('crumbling', false)
+            })
+          }
+        })
+      }
     }
   }
 
@@ -319,6 +375,16 @@ export class PlayScene extends Phaser.Scene {
     if (body.center.x > 196 * 8 && body.center.x < 205 * 8 && !this.canopyEntered) {
       this.canopyEntered = true
       this.toast('THE CANOPY', 3000)
+    }
+
+    if (body.center.x > 295 * 8 && !this.hollowEntered) {
+      this.hollowEntered = true
+      this.toast('THE HOLLOW', 3000)
+      this.tweens.add({
+        targets: this.darkness,
+        alpha: 0.99,
+        duration: 3000
+      })
     }
 
     const tileInside = this.groundLayer.getTileAtWorldXY(body.center.x, body.center.y, true)
