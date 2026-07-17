@@ -491,7 +491,7 @@ export class PlayScene extends Phaser.Scene {
       this.time.delayedCall(5000, () => {
         if (treeToast) treeToast.destroy()
         
-        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 32, `GAME CLEARED\nTHANKS FOR PLAYING\n\nLANTERNS COLLECTED:\n${this.totalLanternsLit}`, {
+        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 32, 'GAME CLEARED\nTHANKS FOR PLAYING', {
           fontFamily: '"Press Start 2P"', fontSize: '8px', color: '#e0f8cf',
           backgroundColor: '#0f1a12', padding: { x: 4, y: 4 },
           align: 'center', resolution: 1, lineSpacing: 4,
@@ -509,7 +509,7 @@ export class PlayScene extends Phaser.Scene {
       return
     }
     const litCount = regularLanterns.filter(l => l.lit).length
-    this.hudText.setText(`Lanterns: ${litCount}/${regularLanterns.length}`)
+    this.hudText.setText(`Stage: ${litCount}/${regularLanterns.length}\nTotal: ${this.totalLanternsLit}`)
   }
 
   private onCrumbleTouch(player: any, platform: any) {
