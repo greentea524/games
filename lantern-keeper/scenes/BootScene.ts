@@ -181,6 +181,14 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('heart_tree_graphic', 64, 64)
     g.clear()
 
+    // Guidance Arrow (8x8)
+    g.fillStyle(PAL.warm)
+    g.fillTriangle(0, 0, 8, 4, 0, 8)
+    g.fillStyle(PAL.lightest)
+    g.fillTriangle(2, 2, 6, 4, 2, 6)
+    g.generateTexture('guidance_arrow', 8, 8)
+    g.clear()
+
     // Parallax background textures
     // Background Tree Trunk (8x24)
     g.fillStyle(PAL.darkest)

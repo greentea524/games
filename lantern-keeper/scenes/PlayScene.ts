@@ -70,6 +70,8 @@ export class PlayScene extends Phaser.Scene {
   private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private groundLayer!: Phaser.Tilemaps.TilemapLayer
   private crumbleGroup!: Phaser.Physics.Arcade.StaticGroup
+  private hudText!: Phaser.GameObjects.Text
+  private guidanceArrow!: Phaser.GameObjects.Image
 
   constructor() {
     super('play')
@@ -184,6 +186,21 @@ export class PlayScene extends Phaser.Scene {
     this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER)
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
+
+    this.hudText = this.add.text(4, 4, '', {
+      fontFamily: '"Press Start 2P"',
+      fontSize: '8px',
+      color: '#e0f8cf',
+      resolution: 4,
+      stroke: '#0f1a12',
+      strokeThickness: 2,
+    })
+    this.hudText.setScrollFactor(0).setDepth(30)
+    
+    this.guidanceArrow = this.add.image(0, 0, 'guidance_arrow')
+    this.guidanceArrow.setOrigin(0.5, 0.5).setDepth(15).setVisible(false)
+
+    this.updateHud()
 
     this.darkness = this.add
       .renderTexture(0, 0, GBC_WIDTH, GBC_HEIGHT)
@@ -441,6 +458,18 @@ export class PlayScene extends Phaser.Scene {
         }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
       })
     }
+    
+    this.updateHud()
+  }
+
+  private updateHud() {
+    const regularLanterns = this.lanterns.filter(l => l.name !== 'heart_tree')
+    if (regularLanterns.length === 0) {
+      this.hudText.setText('') // no regular lanterns to collect
+      return
+    }
+    const litCount = regularLanterns.filter(l => l.lit).length
+    this.hudText.setText(`Lanterns: ${litCount}/${regularLanterns.length}`)
   }
 
   private onCrumbleTouch(player: any, platform: any) {
@@ -661,6 +690,43 @@ export class PlayScene extends Phaser.Scene {
       ) {
         this.lightLantern(lantern)
       }
+    }
+
+    // Guidance logic
+    let target = null
+    let minDistSq = Infinity
+    const regularLanterns = this.lanterns.filter(l => l.name !== 'heart_tree')
+    const allRegularLit = regularLanterns.length > 0 && regularLanterns.every(l => l.lit)
+
+    if (allRegularLit || regularLanterns.length === 0) {
+      const exit = this.lanterns.find(l => l.name === 'heart_tree')
+      if (exit) {
+        target = exit
+      }
+    } else {
+      for (const l of regularLanterns) {
+        if (!l.lit) {
+          const distSq = Phaser.Math.Distance.Squared(this.player.x, this.player.y, l.sprite.x, l.sprite.y)
+          if (distSq < minDistSq) {
+            minDistSq = distSq
+            target = l
+          }
+        }
+      }
+    }
+
+    if (target && !this.won) {
+      const dist = Math.sqrt(minDistSq)
+      if (dist > 60) {
+        this.guidanceArrow.setVisible(true)
+        const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y - 8, target.sprite.x, target.sprite.y - 8)
+        this.guidanceArrow.setPosition(this.player.x + Math.cos(angle) * 28, this.player.y - 8 + Math.sin(angle) * 28)
+        this.guidanceArrow.setRotation(angle)
+      } else {
+        this.guidanceArrow.setVisible(false)
+      }
+    } else {
+      this.guidanceArrow.setVisible(false)
     }
 
     this.redrawDarkness()
