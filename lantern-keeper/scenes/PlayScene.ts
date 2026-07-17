@@ -213,17 +213,15 @@ export class PlayScene extends Phaser.Scene {
       this.hasDash = true
       const isMobile = window.matchMedia('(pointer: coarse)').matches
       this.toast(isMobile ? 'DASH! (B)' : 'DASH! (X)')
-      
-      this.won = true
+    } else if (lantern.name === 'marsh_grand') {
       sfx.win()
       this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
-      this.toast('THE MARSH CLEARED', 0)
-      this.tweens.add({ targets: this.darkness, alpha: 0, duration: 3000 })
-      this.time.delayedCall(4000, () => {
-        this.cameras.main.fadeOut(1000, 0, 0, 0)
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          this.scene.start('menu')
-        })
+      this.toast('THE MARSH GLOWS AGAIN', 3000)
+      
+      this.tweens.add({
+        targets: this.darkness,
+        alpha: 0,
+        duration: 3000
       })
     } else if (lantern.name === 'root') {
       this.hasWallCling = true
@@ -375,6 +373,11 @@ export class PlayScene extends Phaser.Scene {
     if (body.center.x > 196 * 8 && body.center.x < 205 * 8 && !this.canopyEntered) {
       this.canopyEntered = true
       this.toast('THE CANOPY', 3000)
+      this.tweens.add({
+        targets: this.darkness,
+        alpha: 0.95,
+        duration: 2000
+      })
     }
 
     if (body.center.x > 295 * 8 && !this.hollowEntered) {
