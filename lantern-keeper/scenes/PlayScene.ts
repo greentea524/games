@@ -558,7 +558,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private playerLightRadius(): number {
-    return GLOW.minRadius + (GLOW.maxRadius - GLOW.minRadius) * Math.max(0, this.glow)
+    return GLOW.maxRadius
   }
 
   private redrawDarkness() {
