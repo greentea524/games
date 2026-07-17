@@ -178,6 +178,17 @@ export class PlayScene extends Phaser.Scene {
           sprite: sprite,
           lit: false,
         })
+        
+        if (!isHeartTree) {
+          this.tweens.add({
+            targets: sprite,
+            y: sprite.y - 3,
+            yoyo: true,
+            repeat: -1,
+            duration: Phaser.Math.Between(1200, 1600),
+            ease: 'Sine.easeInOut'
+          })
+        }
       }
     }
 
