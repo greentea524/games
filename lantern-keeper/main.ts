@@ -93,9 +93,9 @@ function toggleOverlay(mode: 'pause' | 'info') {
     overlayMode = mode
     
     if (mode === 'pause') {
-      overlayText.innerHTML = '<h2>PAUSED</h2><p>Press START to resume</p>'
+      overlayText.innerHTML = '<h2>PAUSED</h2><p>Press START or Enter to resume</p>'
     } else {
-      overlayText.innerHTML = '<h2>LANTERN KEEPER</h2><p>A GBC-style puzzle platformer.<br/><br/>Light the lanterns to reveal the path and unlock new abilities.<br/><br/>Press SELECT to resume.</p>'
+      overlayText.innerHTML = '<h2>LANTERN KEEPER</h2><p>Light lanterns to unlock abilities.<br/><br/><b>Controls</b><br/>Arrows / D-Pad: Move & Jump<br/>X / B Button: Dash<br/><br/>Press SELECT or Shift to resume.</p>'
     }
   }
 }
