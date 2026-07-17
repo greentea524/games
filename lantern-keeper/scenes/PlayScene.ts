@@ -187,13 +187,17 @@ export class PlayScene extends Phaser.Scene {
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
 
-    this.hudText = this.add.text(4, 4, '', {
+    this.hudText = this.add.text(4, 12, '', {
       fontFamily: '"Press Start 2P"',
       fontSize: '8px',
       color: '#e0f8cf',
       resolution: 1,
-      stroke: '#0f1a12',
-      strokeThickness: 2,
+      shadow: {
+        offsetX: 1,
+        offsetY: 1,
+        color: '#0f1a12',
+        fill: true
+      }
     })
     this.hudText.setScrollFactor(0).setDepth(30)
     
