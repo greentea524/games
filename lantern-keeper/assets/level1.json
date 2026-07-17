@@ -1827,19 +1827,19 @@
    "y": 0
   }
  ],
- "tilesets": [
-  {
-   "columns": 6,
-   "firstgid": 1,
-   "image": "tiles.png",
-   "imageheight": 8,
-   "imagewidth": 48,
-   "margin": 0,
-   "name": "tiles",
-   "spacing": 0,
-   "tilecount": 6,
-   "tileheight": 8,
-   "tilewidth": 8
-  }
- ]
+  "tilesets": [
+   {
+    "columns": 8,
+    "firstgid": 1,
+    "image": "tiles.png",
+    "imageheight": 8,
+    "imagewidth": 64,
+    "margin": 0,
+    "name": "tiles",
+    "spacing": 0,
+    "tilecount": 8,
+    "tileheight": 8,
+    "tilewidth": 8
+   }
+  ]
 }
