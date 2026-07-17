@@ -64,10 +64,6 @@ export class PlayScene extends Phaser.Scene {
   private dashCooldownUntil = 0
   private dashBufferedUntil = 0
   private airDashUsed = false
-  // Fading glow (KAN-113): fraction 1 -> 0; kept on the instance so it
-  // stays tunable at runtime alongside the GLOW config.
-  private glow = 1
-  private glowDurationMs = GLOW.durationMs
   private respawnPoint = { ...SPAWN_POINT }
   
   private dashParticles!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -179,7 +175,8 @@ export class PlayScene extends Phaser.Scene {
 
     this.physics.add.overlap(this.player, this.mushrooms, (_, m) => {
       if (this.player.body.velocity.y >= 0) {
-        this.player.setVelocityY(-JUMP_VELOCITY * 1.4)
+        this.player.y = (m as any).y - 8
+        this.player.setVelocityY(-JUMP_VELOCITY * 1.5)
         this.jumpsLeft = this.hasDoubleJump ? 1 : 0
         this.dashCooldownUntil = 0
         this.airDashUsed = false
@@ -204,7 +201,6 @@ export class PlayScene extends Phaser.Scene {
     this.brush = new Phaser.GameObjects.Image(this, 0, 0, 'brush')
     this.brushBig = new Phaser.GameObjects.Image(this, 0, 0, 'brushBig')
 
-    this.glow = 1
     this.respawnPoint = { x: spawnX, y: spawnY }
     this.lastGroundedAt = 0
     this.jumpBufferedUntil = 0
@@ -504,12 +500,11 @@ export class PlayScene extends Phaser.Scene {
   private respawn() {
     this.player.setPosition(this.respawnPoint.x, this.respawnPoint.y)
     this.player.setVelocity(0, 0)
-    this.glow = 1
     sfx.die()
     this.toast('THE DARK CLOSES IN...', 1500)
   }
 
-  update(time: number, delta: number) {
+  update(time: number) {
     if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.escKey)) {
       if (typeof (window as any).toggleOverlay === 'function') {
         (window as any).toggleOverlay('pause')
@@ -537,6 +532,17 @@ export class PlayScene extends Phaser.Scene {
 
     if (this.won) {
       this.player.setVelocityX(0)
+      this.redrawDarkness()
+      return
+    }
+
+    // Instant hazard respawn (replaces the old 30s glow-timeout death —
+    // no more waiting in the dark): landing on the bare world-bounds
+    // floor after falling past all terrain, or the Hollow's mud pit.
+    const onVoidFloor =
+      body.blocked.down && body.bottom >= this.physics.world.bounds.bottom
+    if (onVoidFloor || (inMud && this.levelKey === 'level4')) {
+      this.respawn()
       this.redrawDarkness()
       return
     }
@@ -650,31 +656,17 @@ export class PlayScene extends Phaser.Scene {
       this.player.stop()
     }
 
-    let nearLitLantern = false
     for (const lantern of this.lanterns) {
-      const touching =
+      if (
+        !lantern.lit &&
         Phaser.Math.Distance.Between(
           this.player.x,
           this.player.y,
           lantern.sprite.x,
           lantern.sprite.y,
         ) < LIGHT_TOUCH_DISTANCE
-      if (touching && !lantern.lit) {
+      ) {
         this.lightLantern(lantern)
-      }
-      if (touching && lantern.lit) {
-        nearLitLantern = true
-      }
-    }
-
-    // Fading glow (KAN-113): decays over time, refills at lit lanterns,
-    // full depletion sends the keeper back to the last lit lantern.
-    if (nearLitLantern) {
-      this.glow = 1
-    } else {
-      this.glow -= delta / this.glowDurationMs
-      if (this.glow <= 0) {
-        this.respawn()
       }
     }
 
