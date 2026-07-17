@@ -161,6 +161,26 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('bouncy_shroom', 12, 8)
     g.clear()
 
+    // Background Tree Trunk (8x24)
+    g.fillStyle(PAL.darkest)
+    g.fillRect(3, 0, 2, 24) // trunk
+    g.fillStyle(PAL.dark) // texture highlights
+    g.fillRect(3, 4, 1, 3)
+    g.fillRect(4, 12, 1, 5)
+    g.generateTexture('bg_tree_trunk', 8, 24)
+    g.clear()
+
+    // Background Tree Canopy (24x24)
+    g.fillStyle(PAL.dark) // round canopy shape
+    g.fillCircle(12, 12, 11)
+    g.fillStyle(PAL.darkest)
+    g.fillCircle(10, 10, 8)
+    g.fillStyle(PAL.light) // highlight top leaf layers
+    g.fillRect(8, 2, 8, 2)
+    g.fillRect(6, 4, 12, 2)
+    g.generateTexture('bg_tree_canopy', 24, 24)
+    g.clear()
+
     // Particles
     g.fillStyle(PAL.lightest)
     g.fillRect(0, 0, 2, 2)

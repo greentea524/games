@@ -111,6 +111,7 @@ export class PlayScene extends Phaser.Scene {
     }
     const initialDarkness = DARKNESS_ALPHA[this.levelKey] ?? 0.85
 
+    this.createBackground(map)
     this.decorate(map, ground)
 
     this.player = this.physics.add.sprite(spawnX, spawnY, 'player_idle')
@@ -212,6 +213,31 @@ export class PlayScene extends Phaser.Scene {
     this.dashBufferedUntil = 0
 
     this.toast(title, 3000)
+  }
+
+  private createBackground(map: Phaser.Tilemaps.Tilemap) {
+    if (this.levelKey !== 'level1') return
+
+    const treeCount = 18
+    const levelWidth = map.widthInPixels
+    const rng = new Phaser.Math.RandomDataGenerator([this.levelKey + '_bg'])
+    
+    for (let i = 0; i < treeCount; i++) {
+      const x = rng.between(20, levelWidth - 40)
+      const canopyY = rng.between(20, 60)
+      
+      const canopy = this.add.image(x, canopyY, 'bg_tree_canopy')
+      canopy.setDepth(0.2)
+      canopy.setScrollFactor(0.7, 1)
+      
+      let trunkY = canopyY + 12
+      while (trunkY < 144) {
+        const trunk = this.add.image(x, trunkY + 12, 'bg_tree_trunk')
+        trunk.setDepth(0.1)
+        trunk.setScrollFactor(0.7, 1)
+        trunkY += 24
+      }
+    }
   }
 
   // Stage decorations (issue #7): derived from the tilemap itself, so
