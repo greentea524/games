@@ -14,8 +14,14 @@
       .overlay.hidden { display: none; }
       .overlay h2 { margin-top: 0; color: #fff; font-size: 14px; margin-bottom: 5px; }
       .overlay p { line-height: 1.4; margin: 5px 0; }
+      
+      .desktop-instructions { margin-top: 20px; color: #888; font-family: sans-serif; font-size: 14px; text-align: center; line-height: 1.5; }
+      .desktop-instructions h3 { margin: 0 0 10px 0; color: #aaa; text-transform: uppercase; letter-spacing: 1px; font-size: 12px; }
+      .desktop-instructions p { margin: 5px 0; }
+      .desktop-instructions b { color: #ccc; background: #222; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
 
       @media (pointer: coarse) {
+        .desktop-instructions { display: none; }
         body { flex-direction: column; background: #e0e0e0; justify-content: center; gap: 20px; }
         .gb-shell { width: 100%; max-width: 500px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; padding: 20px 10px; box-sizing: border-box; }
         .gb-logo { font-family: sans-serif; font-style: italic; font-weight: bold; color: #888; margin-bottom: 15px; font-size: 1.2rem; letter-spacing: 2px; }
@@ -52,6 +58,13 @@
         <div id="overlay" class="overlay hidden">
           <div id="overlay-text"></div>
         </div>
+      </div>
+      <div class="desktop-instructions">
+        <h3>Keyboard Controls</h3>
+        <p><b>Arrows</b> Move & Jump</p>
+        <p><b>X</b> Dash</p>
+        <p><b>Enter</b> Pause</p>
+        <p><b>Shift</b> Info</p>
       </div>
       <div class="gb-controls">
         <div class="d-pad">
