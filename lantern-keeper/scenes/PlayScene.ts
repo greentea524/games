@@ -150,7 +150,8 @@ export class PlayScene extends Phaser.Scene {
     this.physics.world.TILE_BIAS = 8
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
-    this.cameras.main.startFollow(this.player, true)
+    const cameraOffsetY = this.levelKey === 'level3' ? -30 : 0
+    this.cameras.main.startFollow(this.player, true, 0.1, 0.1, 0, cameraOffsetY)
 
     this.mushrooms = this.physics.add.staticGroup()
     this.crumbleGroup = this.physics.add.staticGroup()
