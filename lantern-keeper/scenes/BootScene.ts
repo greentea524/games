@@ -114,6 +114,38 @@ export class BootScene extends Phaser.Scene {
       g.fillRect(1, 4, 1, 1)
     })
 
+    // Stage decorations (issue #7)
+    g.fillStyle(PAL.light) // grass tuft: three blades
+    g.fillRect(1, 1, 1, 3)
+    g.fillRect(3, 0, 1, 4)
+    g.fillRect(5, 2, 1, 2)
+    g.generateTexture('deco_grass', 8, 4)
+    g.clear()
+
+    g.fillStyle(PAL.dark) // fern: stem + fronds
+    g.fillRect(3, 0, 1, 5)
+    g.fillStyle(PAL.light)
+    g.fillRect(1, 1, 2, 1)
+    g.fillRect(4, 2, 2, 1)
+    g.fillRect(1, 3, 2, 1)
+    g.generateTexture('deco_fern', 7, 5)
+    g.clear()
+
+    g.fillStyle(PAL.lightest) // tiny mushroom
+    g.fillRect(1, 0, 3, 2)
+    g.fillStyle(PAL.light)
+    g.fillRect(2, 2, 1, 2)
+    g.generateTexture('deco_shroom', 5, 4)
+    g.clear()
+
+    g.fillStyle(PAL.dark) // hanging vine segment with a leaf
+    g.fillRect(1, 0, 1, 8)
+    g.fillStyle(PAL.light)
+    g.fillRect(0, 3, 1, 1)
+    g.fillRect(2, 6, 1, 1)
+    g.generateTexture('deco_vine', 3, 8)
+    g.clear()
+
     // Particles
     g.fillStyle(PAL.lightest)
     g.fillRect(0, 0, 2, 2)

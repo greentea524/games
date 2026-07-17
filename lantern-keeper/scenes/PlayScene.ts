@@ -7,6 +7,8 @@ import {
   DASH,
   JUMP_ASSIST,
   WALL,
+  DARKNESS_ALPHA,
+  DECO,
 } from '../constants'
 
 // Tuned to the KAN-110 movement budget: single jump ~2.8 tiles,
@@ -95,22 +97,21 @@ export class PlayScene extends Phaser.Scene {
 
     let spawnX = 32
     let spawnY = 72
-    let initialDarkness = 0.9
     let title = 'THE FOREST'
 
     if (this.levelKey === 'level2') {
       spawnY = 72
-      initialDarkness = 0.95
       title = 'THE MARSH'
     } else if (this.levelKey === 'level3') {
       spawnY = 384
-      initialDarkness = 0.95
       title = 'THE CANOPY'
     } else if (this.levelKey === 'level4') {
       spawnY = 128
-      initialDarkness = 0.99
       title = 'THE HOLLOW'
     }
+    const initialDarkness = DARKNESS_ALPHA[this.levelKey] ?? 0.85
+
+    this.decorate(map, ground)
 
     this.player = this.physics.add.sprite(spawnX, spawnY, 'player_idle')
     this.player.setCollideWorldBounds(true)
@@ -210,6 +211,42 @@ export class PlayScene extends Phaser.Scene {
     this.dashBufferedUntil = 0
 
     this.toast(title, 3000)
+  }
+
+  // Stage decorations (issue #7): derived from the tilemap itself, so
+  // every level gets dressed without touching the level JSONs. Seeded by
+  // levelKey so the layout is stable between plays.
+  private decorate(
+    map: Phaser.Tilemaps.Tilemap,
+    ground: Phaser.Tilemaps.TilemapLayer,
+  ) {
+    const rng = new Phaser.Math.RandomDataGenerator([this.levelKey])
+    const solid = (x: number, y: number) => {
+      if (x < 0 || y < 0 || x >= map.width || y >= map.height) return false
+      const t = ground.getTileAt(x, y)
+      return !!t && t.index >= 1
+    }
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        if (!solid(x, y)) continue
+        const px = x * 8 + 4
+        // exposed top surface: plant something
+        if (!solid(x, y - 1) && rng.frac() < DECO.topDensity) {
+          const r = rng.frac()
+          const key =
+            r < 0.5 ? 'deco_grass' : r < 0.8 ? 'deco_fern' : 'deco_shroom'
+          const h = key === 'deco_fern' ? 5 : 4
+          this.add.image(px + rng.between(-2, 2), y * 8 - h / 2, key)
+        }
+        // exposed underside: hang a vine (1-2 segments)
+        if (!solid(x, y + 1) && rng.frac() < DECO.vineDensity) {
+          this.add.image(px, y * 8 + 12, 'deco_vine')
+          if (rng.frac() < 0.4 && !solid(x, y + 2)) {
+            this.add.image(px, y * 8 + 20, 'deco_vine')
+          }
+        }
+      }
+    }
   }
 
   private lightLantern(lantern: Lantern) {

@@ -33,6 +33,22 @@ export const JUMP_ASSIST = {
   bufferMs: 100,
 } as const
 
+// Darkness overlay per level (issue #7) — kept below 1 so terrain
+// outlines stay faintly visible even without direct lantern light.
+// Later levels stay darker, but never fully opaque.
+export const DARKNESS_ALPHA: Record<string, number> = {
+  level1: 0.84,
+  level2: 0.88,
+  level3: 0.88,
+  level4: 0.92,
+}
+
+// Procedural stage decorations (issue #7) — density per exposed surface
+export const DECO = {
+  topDensity: 0.35, // chance of a plant on an exposed tile top
+  vineDensity: 0.22, // chance of a vine under an exposed tile bottom
+} as const
+
 // GBC-inspired 4-color palette
 export const PAL = {
   darkest: 0x0f1a12,
