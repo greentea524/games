@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { BootScene } from './scenes/BootScene'
+import { MenuScene } from './scenes/MenuScene'
 import { PlayScene } from './scenes/PlayScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 
@@ -27,7 +28,7 @@ const game = new Phaser.Game({
     default: 'arcade',
     arcade: { gravity: { x: 0, y: 500 } },
   },
-  scene: [BootScene, PlayScene],
+  scene: [BootScene, MenuScene, PlayScene],
 })
 
 window.addEventListener('resize', () => game.scale.setZoom(integerZoom()))
@@ -83,6 +84,7 @@ let overlayMode: 'pause' | 'info' | null = null
 
 function toggleOverlay(mode: 'pause' | 'info') {
   if (!overlay || !overlayText) return
+  if (game.scene.isActive('menu')) return
   if (overlayMode === mode) {
     game.scene.resume('play')
     overlay.classList.add('hidden')
@@ -93,7 +95,7 @@ function toggleOverlay(mode: 'pause' | 'info') {
     overlayMode = mode
     
     if (mode === 'pause') {
-      overlayText.innerHTML = '<h2>PAUSED</h2><p>Press START or Enter to resume</p>'
+      overlayText.innerHTML = '<h2>PAUSED</h2><p>Press START, Enter, or Esc to resume</p>'
     } else {
       overlayText.innerHTML = '<h2>LANTERN KEEPER</h2><p>Light lanterns to unlock abilities.<br/><br/><b>Controls</b><br/>Arrows / D-Pad: Move & Jump<br/>X / B Button: Dash<br/><br/>Press SELECT or Shift to resume.</p>'
     }
@@ -111,7 +113,7 @@ document.getElementById('btn-select')?.addEventListener('pointerdown', (e) => {
 })
 
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') toggleOverlay('pause')
+  if (e.key === 'Enter' || e.key === 'Escape') toggleOverlay('pause')
   if (e.key === 'Shift') toggleOverlay('info')
 })
 

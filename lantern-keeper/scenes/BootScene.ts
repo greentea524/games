@@ -130,6 +130,6 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('brushBig', 56, 56)
     g.destroy()
 
-    this.scene.start('play')
+    this.scene.start('menu')
   }
 }
