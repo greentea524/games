@@ -69,7 +69,6 @@ export class PlayScene extends Phaser.Scene {
   private dashParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private groundLayer!: Phaser.Tilemaps.TilemapLayer
-  private mushrooms!: Phaser.Physics.Arcade.StaticGroup
   private crumbleGroup!: Phaser.Physics.Arcade.StaticGroup
 
   constructor() {
@@ -150,7 +149,6 @@ export class PlayScene extends Phaser.Scene {
     const cameraOffsetY = this.levelKey === 'level3' ? -30 : 0
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1, 0, cameraOffsetY)
 
-    this.mushrooms = this.physics.add.staticGroup()
     this.crumbleGroup = this.physics.add.staticGroup()
     this.lanterns = []
     const mapObjects = map.getObjectLayer('lanterns')?.objects ?? []
@@ -158,7 +156,7 @@ export class PlayScene extends Phaser.Scene {
     for (const obj of mapObjects) {
       if (obj.name === 'mushroom') {
         const m = this.add.image(obj.x! + 6, obj.y! - 4, 'bouncy_shroom')
-        this.mushrooms.add(m)
+        m.setDepth(-0.1) // drawn as decoration behind player but in front of background
       } else if (obj.name === 'crumble') {
         const c = this.add.rectangle(obj.x!, obj.y!, obj.width!, obj.height!, 0x553311).setOrigin(0, 1)
         this.crumbleGroup.add(c)
@@ -172,18 +170,6 @@ export class PlayScene extends Phaser.Scene {
     }
 
     this.physics.add.collider(this.player, this.crumbleGroup, this.onCrumbleTouch, undefined, this)
-
-    this.physics.add.overlap(this.player, this.mushrooms, (_, m) => {
-      if (this.player.body.velocity.y >= 0) {
-        this.player.y = (m as any).y - 8
-        this.player.setVelocityY(-JUMP_VELOCITY * 1.5)
-        this.jumpsLeft = this.hasDoubleJump ? 1 : 0
-        this.dashCooldownUntil = 0
-        this.airDashUsed = false
-        sfx.jump()
-        this.sparkParticles.emitParticleAt((m as any).x, (m as any).y, 20)
-      }
-    })
 
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.dashKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X)
@@ -222,13 +208,13 @@ export class PlayScene extends Phaser.Scene {
         const x = rng.between(20, levelWidth - 40)
         const canopyY = rng.between(20, 60)
         const canopy = this.add.image(x, canopyY, 'bg_tree_canopy')
-        canopy.setDepth(0.2)
+        canopy.setDepth(-2)
         canopy.setScrollFactor(0.7, 1)
         
         let trunkY = canopyY + 12
         while (trunkY < levelHeight) {
           const trunk = this.add.image(x, trunkY + 12, 'bg_tree_trunk')
-          trunk.setDepth(0.1)
+          trunk.setDepth(-1)
           trunk.setScrollFactor(0.7, 1)
           trunkY += 24
         }
@@ -241,7 +227,7 @@ export class PlayScene extends Phaser.Scene {
         let trunkY = treeY - 12
         while (trunkY > 40) {
           const trunk = this.add.image(x, trunkY, 'bg_swamp_trunk')
-          trunk.setDepth(0.1)
+          trunk.setDepth(-1)
           trunk.setScrollFactor(0.6, 1)
           trunkY -= 24
         }
@@ -250,11 +236,11 @@ export class PlayScene extends Phaser.Scene {
           const mossX = x + rng.between(-10, 10)
           const mossY = rng.between(10, 30)
           const moss = this.add.image(mossX, mossY, 'bg_moss')
-          moss.setDepth(0.15)
+          moss.setDepth(-1.5)
           moss.setScrollFactor(0.6, 1)
           if (rng.frac() < 0.3) {
             const moss2 = this.add.image(mossX, mossY + 16, 'bg_moss')
-            moss2.setDepth(0.15)
+            moss2.setDepth(-1.5)
             moss2.setScrollFactor(0.6, 1)
           }
         }
@@ -267,7 +253,7 @@ export class PlayScene extends Phaser.Scene {
         const scale = rng.between(7, 13) / 10
         
         const cloud = this.add.image(x, y, 'bg_leaf_cloud')
-        cloud.setDepth(0.1)
+        cloud.setDepth(-1)
         cloud.setScale(scale)
         cloud.setScrollFactor(0.5, 0.7)
       }
@@ -278,7 +264,7 @@ export class PlayScene extends Phaser.Scene {
         let rootY = rng.between(10, 50)
         while (rootY < levelHeight) {
           const root = this.add.image(x, rootY, 'bg_hollow_root')
-          root.setDepth(0.1)
+          root.setDepth(-1)
           root.setScrollFactor(0.4, 0.4)
           rootY += 24
         }
@@ -290,7 +276,7 @@ export class PlayScene extends Phaser.Scene {
         const y = rng.between(10, 40)
         
         const stalactite = this.add.image(x, y, 'bg_stalactite')
-        stalactite.setDepth(0.15)
+        stalactite.setDepth(-1.5)
         stalactite.setScrollFactor(0.4, 0.4)
       }
     }
