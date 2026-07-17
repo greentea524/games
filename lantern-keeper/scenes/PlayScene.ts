@@ -56,6 +56,7 @@ export class PlayScene extends Phaser.Scene {
   
   private dashParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter
+  private groundLayer!: Phaser.Tilemaps.TilemapLayer
 
   constructor() {
     super('play')
@@ -65,7 +66,8 @@ export class PlayScene extends Phaser.Scene {
     const map = this.make.tilemap({ key: 'level1' })
     const tileset = map.addTilesetImage('tiles', 'tiles')!
     const ground = map.createLayer('ground', tileset)!
-    ground.setCollisionBetween(1, 2)
+    ground.setCollisionBetween(1, 6)
+    this.groundLayer = ground
 
     this.player = this.physics.add.sprite(SPAWN_POINT.x, SPAWN_POINT.y, 'player_idle')
     this.player.setCollideWorldBounds(true)
@@ -227,6 +229,15 @@ export class PlayScene extends Phaser.Scene {
   update(time: number, delta: number) {
     const body = this.player.body
 
+    const tileInside = this.groundLayer.getTileAtWorldXY(body.center.x, body.center.y, true)
+    const tileBelow = this.groundLayer.getTileAtWorldXY(body.center.x, body.bottom - 1, true)
+    const inMud = (tileInside && (tileInside.index === 7 || tileInside.index === 8)) ||
+                  (tileBelow && (tileBelow.index === 7 || tileBelow.index === 8))
+
+    if (inMud && body.velocity.y > 20) {
+      this.player.setVelocityY(20)
+    }
+
     if (this.won) {
       this.player.setVelocityX(0)
       this.redrawDarkness()
@@ -251,8 +262,8 @@ export class PlayScene extends Phaser.Scene {
     }
 
     const maxJumps = this.hasDoubleJump ? 2 : 1
-    if (body.blocked.down) {
-      if (this.jumpsLeft !== maxJumps && body.velocity.y > 0) {
+    if (body.blocked.down || inMud) {
+      if (this.jumpsLeft !== maxJumps && body.velocity.y > 0 && !inMud) {
         sfx.land()
       }
       this.jumpsLeft = maxJumps
@@ -296,7 +307,7 @@ export class PlayScene extends Phaser.Scene {
       sfx.wallKick()
       this.dashParticles.emitParticleAt(this.player.x, this.player.y, 5)
     } else if (!dashing && time < this.jumpBufferedUntil && this.jumpsLeft > 0) {
-      this.player.setVelocityY(JUMP_VELOCITY)
+      this.player.setVelocityY(inMud ? -110 : JUMP_VELOCITY)
       this.jumpsLeft === maxJumps ? sfx.jump() : sfx.doubleJump()
       this.jumpsLeft--
       this.jumpBufferedUntil = 0

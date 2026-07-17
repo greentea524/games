@@ -53,7 +53,20 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(PAL.dark)
     g.fillRect(TILE_SIZE * 5 + 3, 0, 2, TILE_SIZE)
 
-    g.generateTexture('tiles', TILE_SIZE * 6, TILE_SIZE)
+    // The Marsh (tiles 7, 8) - Mud and Water
+    g.fillStyle(PAL.dark)
+    g.fillRect(TILE_SIZE * 6, 0, TILE_SIZE, TILE_SIZE)
+    g.fillStyle(PAL.darkest) // Mud ripples
+    g.fillRect(TILE_SIZE * 6 + 1, 2, 4, 1)
+    g.fillRect(TILE_SIZE * 6 + 3, 5, 3, 1)
+    
+    g.fillStyle(PAL.darkest)
+    g.fillRect(TILE_SIZE * 7, 0, TILE_SIZE, TILE_SIZE)
+    g.fillStyle(PAL.dark)
+    g.fillRect(TILE_SIZE * 7 + 2, 1, 4, 1)
+    g.fillRect(TILE_SIZE * 7 + 0, 6, 3, 1)
+
+    g.generateTexture('tiles', TILE_SIZE * 8, TILE_SIZE)
     g.clear()
 
     // Player Textures (Idle, Walk1, Walk2, Cling)

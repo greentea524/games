@@ -95,9 +95,44 @@ function toggleOverlay(mode: 'pause' | 'info') {
     overlayMode = mode
     
     if (mode === 'pause') {
-      overlayText.innerHTML = '<h2>PAUSED</h2><p>Press START, Enter, or Esc to resume</p>'
+      overlayText.innerHTML = `
+        <h2>PAUSED</h2>
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px; align-items:center;">
+          <button id="btn-pause-resume" style="background:transparent;border:none;color:#e0f8cf;font-family:monospace;font-size:14px;cursor:pointer;text-decoration:underline;">Resume</button>
+          <button id="btn-pause-controls" style="background:transparent;border:none;color:#e0f8cf;font-family:monospace;font-size:14px;cursor:pointer;text-decoration:underline;">Controls</button>
+          <button id="btn-pause-exit" style="background:transparent;border:none;color:#e0f8cf;font-family:monospace;font-size:14px;cursor:pointer;text-decoration:underline;">Exit Game</button>
+        </div>
+      `
+      
+      document.getElementById('btn-pause-resume')?.addEventListener('click', () => {
+        toggleOverlay('pause')
+      })
+      
+      document.getElementById('btn-pause-controls')?.addEventListener('click', () => {
+        toggleOverlay('info')
+      })
+      
+      document.getElementById('btn-pause-exit')?.addEventListener('click', () => {
+        toggleOverlay('pause') // close overlay
+        game.scene.stop('play')
+        game.scene.start('menu')
+      })
     } else {
-      overlayText.innerHTML = '<h2>LANTERN KEEPER</h2><p>Light lanterns to unlock abilities.<br/><br/><b>Controls</b><br/>Arrows / D-Pad: Move & Jump<br/>X / B Button: Dash<br/><br/>Press SELECT or Shift to resume.</p>'
+      overlayText.innerHTML = `
+        <h2>LANTERN KEEPER</h2>
+        <p>Light lanterns to unlock abilities.<br/><br/>
+        <b>Controls</b><br/>
+        Arrows / D-Pad: Move & Jump<br/>
+        X / B Button: Dash<br/><br/>
+        Press SELECT or Shift to resume.</p>
+        <div style="margin-top:15px;">
+          <button id="btn-info-back" style="background:transparent;border:none;color:#e0f8cf;font-family:monospace;font-size:12px;cursor:pointer;text-decoration:underline;">Back</button>
+        </div>
+      `
+      
+      document.getElementById('btn-info-back')?.addEventListener('click', () => {
+        toggleOverlay('info')
+      })
     }
   }
 }
