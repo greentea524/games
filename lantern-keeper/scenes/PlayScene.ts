@@ -39,6 +39,7 @@ export class PlayScene extends Phaser.Scene {
   private hasDoubleJump = false
   private hasDash = false
   private hasWallCling = false
+  private totalLanternsLit = 0
   private jumpsLeft = 0
   private facing = 1
   private won = false
@@ -51,6 +52,7 @@ export class PlayScene extends Phaser.Scene {
     this.hasDoubleJump = data?.hasDoubleJump || false
     this.hasDash = data?.hasDash || false
     this.hasWallCling = data?.hasWallCling || false
+    this.totalLanternsLit = data?.totalLanternsLit || 0
   }
   
   // Wall-cling state (KAN-115)
@@ -356,9 +358,11 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private lightLantern(lantern: Lantern) {
+    if (lantern.lit) return
     lantern.lit = true
     if (lantern.name !== 'heart_tree') {
       lantern.sprite.setTexture('lanternLit')
+      this.totalLanternsLit++
     }
     this.respawnPoint = { x: lantern.sprite.x, y: lantern.sprite.y - 6 }
     
@@ -388,7 +392,8 @@ export class PlayScene extends Phaser.Scene {
               levelKey: 'level3',
               hasDoubleJump: this.hasDoubleJump,
               hasDash: this.hasDash,
-              hasWallCling: this.hasWallCling
+              hasWallCling: this.hasWallCling,
+              totalLanternsLit: this.totalLanternsLit
             })
           })
         })
@@ -415,7 +420,8 @@ export class PlayScene extends Phaser.Scene {
             levelKey: 'level2',
             hasDoubleJump: this.hasDoubleJump,
             hasDash: this.hasDash,
-            hasWallCling: this.hasWallCling
+            hasWallCling: this.hasWallCling,
+            totalLanternsLit: this.totalLanternsLit
           })
         })
       })
@@ -449,7 +455,8 @@ export class PlayScene extends Phaser.Scene {
             levelKey: 'level4',
             hasDoubleJump: this.hasDoubleJump,
             hasDash: this.hasDash,
-            hasWallCling: this.hasWallCling
+            hasWallCling: this.hasWallCling,
+            totalLanternsLit: this.totalLanternsLit
           })
         })
       })
@@ -457,10 +464,10 @@ export class PlayScene extends Phaser.Scene {
       this.won = true
       sfx.win()
       this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 500)
-      this.toast('THE HEART TREE IS RESTORED', 0)
+      const treeToast = this.toast('THE HEART TREE IS RESTORED', 0)
       
       // Spawn hanging lanterns in the canopy
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < this.totalLanternsLit; i++) {
         const lx = lantern.sprite.x + Phaser.Math.Between(-26, 26)
         const ly = lantern.sprite.y + Phaser.Math.Between(-28, 4)
         const l = this.add.image(lx, ly, 'lanternLit').setDepth(lantern.sprite.depth + 1)
@@ -482,7 +489,9 @@ export class PlayScene extends Phaser.Scene {
       })
       
       this.time.delayedCall(5000, () => {
-        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 16, 'GAME CLEARED\nTHANKS FOR PLAYING', {
+        if (treeToast) treeToast.destroy()
+        
+        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 32, `GAME CLEARED\nTHANKS FOR PLAYING\n\nLANTERNS COLLECTED:\n${this.totalLanternsLit}`, {
           fontFamily: '"Press Start 2P"', fontSize: '8px', color: '#e0f8cf',
           backgroundColor: '#0f1a12', padding: { x: 4, y: 4 },
           align: 'center', resolution: 1, lineSpacing: 4,
@@ -531,7 +540,7 @@ export class PlayScene extends Phaser.Scene {
     }
   }
 
-  private toast(message: string, duration = 2000) {
+  private toast(message: string, duration = 2000): Phaser.GameObjects.Text {
     const text = this.add
       .text(GBC_WIDTH / 2, GBC_HEIGHT - 32, message, {
         fontFamily: '"Press Start 2P"',
@@ -548,8 +557,16 @@ export class PlayScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(20)
     if (duration > 0) {
-      this.time.delayedCall(duration, () => text.destroy())
+      this.time.delayedCall(duration, () => {
+        this.tweens.add({
+          targets: text,
+          alpha: 0,
+          duration: 500,
+          onComplete: () => text.destroy(),
+        })
+      })
     }
+    return text
   }
 
   private respawn() {
