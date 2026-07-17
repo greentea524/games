@@ -39,8 +39,8 @@
         .gb-controls { display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 400px; padding: 10px; margin-bottom: 15px; }
         
         .d-pad { position: relative; width: 120px; height: 120px; }
-        .d-btn { position: absolute; background: #333; border-radius: 4px; touch-action: none; transition: background 0.1s; }
-        .d-btn:active, .d-btn.active-kb { background: #111; }
+        .d-btn { position: absolute; background: #333; border-radius: 4px; touch-action: none; transition: background 0.1s; display: flex; align-items: center; justify-content: center; color: #1c1c1c; font-size: 12px; user-select: none; }
+        .d-btn:active, .d-btn.active-kb { background: #111; color: #000; }
         .d-up { top: 0; left: 40px; width: 40px; height: 40px; border-radius: 4px 4px 0 0; }
         .d-down { bottom: 0; left: 40px; width: 40px; height: 40px; border-radius: 0 0 4px 4px; }
         .d-left { top: 40px; left: 0; width: 40px; height: 40px; border-radius: 4px 0 0 4px; }
@@ -70,10 +70,10 @@
       <div class="gb-controls">
         <div class="d-pad">
           <div class="d-center"></div>
-          <div class="d-btn d-up" data-key="ArrowUp"></div>
-          <div class="d-btn d-down" data-key="ArrowDown"></div>
-          <div class="d-btn d-left" data-key="ArrowLeft"></div>
-          <div class="d-btn d-right" data-key="ArrowRight"></div>
+          <div class="d-btn d-up" data-key="ArrowUp">▲</div>
+          <div class="d-btn d-down" data-key="ArrowDown">▼</div>
+          <div class="d-btn d-left" data-key="ArrowLeft">◀</div>
+          <div class="d-btn d-right" data-key="ArrowRight">▶</div>
         </div>
         <div class="action-btns">
           <div class="a-btn" data-key="KeyX">B</div>
