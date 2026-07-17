@@ -74,6 +74,8 @@ export class PlayScene extends Phaser.Scene {
   }
 
   create() {
+    this.cameras.main.fadeIn(500, 0, 0, 0)
+    
     this.won = false
     this.jumpsLeft = 0
     this.dashingUntil = 0
@@ -182,13 +184,11 @@ export class PlayScene extends Phaser.Scene {
          this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
          this.toast('THE MARSH CLEARED', 0)
          this.tweens.add({ targets: this.darkness, alpha: 0, duration: 3000 })
-         this.time.delayedCall(3000, () => {
-           this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'PRESS ENTER TO RETURN TO MENU', {
-             fontFamily: 'monospace', fontSize: '10px', color: '#e0f8cf',
-             stroke: '#0f1a12', strokeThickness: 2, padding: { x: 4, y: 4 }
-           }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
-           const enterKey = this.input.keyboard!.addKey('ENTER')
-           enterKey.once('down', () => this.scene.start('menu'))
+         this.time.delayedCall(4000, () => {
+           this.cameras.main.fadeOut(1000, 0, 0, 0)
+           this.cameras.main.once('camerafadeoutcomplete', () => {
+             this.scene.start('menu')
+           })
          })
       }
     } else if (lantern.name === 'root') {
@@ -206,19 +206,9 @@ export class PlayScene extends Phaser.Scene {
         duration: 3000
       })
       
-      this.time.delayedCall(3000, () => {
-        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 20, 'PRESS ENTER FOR LEVEL 2', {
-          fontFamily: '"Courier New", Courier, monospace',
-          fontSize: '10px',
-          fontStyle: 'bold',
-          color: '#ffffff',
-          backgroundColor: '#000000',
-          padding: { x: 3, y: 2 },
-          resolution: 4,
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
-
-        const enterKey = this.input.keyboard!.addKey('ENTER')
-        enterKey.once('down', () => {
+      this.time.delayedCall(4000, () => {
+        this.cameras.main.fadeOut(1000, 0, 0, 0)
+        this.cameras.main.once('camerafadeoutcomplete', () => {
           this.scene.start('play', { 
             levelKey: 'level2',
             hasDoubleJump: this.hasDoubleJump,
