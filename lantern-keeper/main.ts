@@ -45,13 +45,20 @@ document.querySelectorAll('.d-btn, .a-btn').forEach((btn) => {
   if (!key) return
 
   const dispatchKey = (type: 'keydown' | 'keyup') => {
-    window.dispatchEvent(
-      new KeyboardEvent(type, {
-        code: key,
-        key: key.replace('Arrow', ''),
-        bubbles: true,
-      }),
-    )
+    const KEY_CODES: Record<string, number> = {
+      ArrowLeft: 37,
+      ArrowUp: 38,
+      ArrowRight: 39,
+      ArrowDown: 40,
+      KeyX: 88,
+    }
+    const event = new KeyboardEvent(type, {
+      code: key,
+      key: key,
+      bubbles: true,
+    })
+    Object.defineProperty(event, 'keyCode', { get: () => KEY_CODES[key] })
+    window.dispatchEvent(event)
   }
 
   btn.addEventListener('pointerdown', (e) => {

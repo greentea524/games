@@ -124,7 +124,8 @@ export class PlayScene extends Phaser.Scene {
       this.toast('DOUBLE JUMP!')
     } else if (lantern.name === 'gale') {
       this.hasDash = true
-      this.toast('DASH! (X)')
+      const isMobile = window.matchMedia('(pointer: coarse)').matches
+      this.toast(isMobile ? 'DASH! (B)' : 'DASH! (X)')
     } else if (lantern.name === 'root') {
       this.hasWallCling = true
       this.toast('WALL CLING!')
