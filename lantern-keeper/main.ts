@@ -65,19 +65,30 @@ document.querySelectorAll('.d-btn, .a-btn').forEach((btn) => {
   const key = btn.getAttribute('data-key')
   if (!key) return
 
-  btn.addEventListener('pointerdown', (e) => {
+  let isDown = false
+  const press = (e: Event) => {
     e.preventDefault()
-    dispatchSimulatedKey('keydown', key)
-  })
+    if (!isDown) {
+      isDown = true
+      dispatchSimulatedKey('keydown', key)
+    }
+  }
 
   const release = (e: Event) => {
     e.preventDefault()
-    dispatchSimulatedKey('keyup', key)
+    if (isDown) {
+      isDown = false
+      dispatchSimulatedKey('keyup', key)
+    }
   }
 
+  btn.addEventListener('pointerdown', press)
   btn.addEventListener('pointerup', release)
   btn.addEventListener('pointercancel', release)
   btn.addEventListener('pointerout', release)
+  btn.addEventListener('pointerleave', release)
+  btn.addEventListener('touchend', release)
+  btn.addEventListener('touchcancel', release)
 })
 // Overlay logic for Pause and Info
 const overlay = document.getElementById('overlay')
@@ -164,19 +175,30 @@ const setupSysBtn = (id: string, key: string) => {
   const btn = document.getElementById(id)
   if (!btn) return
   
-  btn.addEventListener('pointerdown', (e) => {
+  let isDown = false
+  const press = (e: Event) => {
     e.preventDefault()
-    dispatchSimulatedKey('keydown', key)
-  })
+    if (!isDown) {
+      isDown = true
+      dispatchSimulatedKey('keydown', key)
+    }
+  }
 
   const release = (e: Event) => {
     e.preventDefault()
-    dispatchSimulatedKey('keyup', key)
+    if (isDown) {
+      isDown = false
+      dispatchSimulatedKey('keyup', key)
+    }
   }
 
+  btn.addEventListener('pointerdown', press)
   btn.addEventListener('pointerup', release)
   btn.addEventListener('pointercancel', release)
   btn.addEventListener('pointerout', release)
+  btn.addEventListener('pointerleave', release)
+  btn.addEventListener('touchend', release)
+  btn.addEventListener('touchcancel', release)
 }
 
 setupSysBtn('btn-start', 'Enter')
