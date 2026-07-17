@@ -1842,6 +1842,54 @@
      "visible": true,
      "height": 0,
      "width": 0
+    },
+    {
+     "id": 2,
+     "name": "",
+     "x": 180,
+     "y": 92,
+     "point": true,
+     "rotation": 0,
+     "type": "",
+     "visible": true,
+     "height": 0,
+     "width": 0
+    },
+    {
+     "id": 3,
+     "name": "",
+     "x": 232,
+     "y": 76,
+     "point": true,
+     "rotation": 0,
+     "type": "",
+     "visible": true,
+     "height": 0,
+     "width": 0
+    },
+    {
+     "id": 4,
+     "name": "",
+     "x": 396,
+     "y": 60,
+     "point": true,
+     "rotation": 0,
+     "type": "",
+     "visible": true,
+     "height": 0,
+     "width": 0
+    },
+    {
+     "id": 5,
+     "name": "",
+     "x": 528,
+     "y": 116,
+     "point": true,
+     "rotation": 0,
+     "type": "",
+     "visible": true,
+     "height": 0,
+     "width": 0
     }
    ],
    "opacity": 1,
