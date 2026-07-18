@@ -40,26 +40,26 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
-    const boxH = 46
-    const boxY = GBC_HEIGHT - boxH
+    const boxH = 50
+    const boxY = GBC_HEIGHT - boxH - 2
 
     this.box = this.add.graphics().setDepth(1000)
-    this.box.fillStyle(PAL.darkest, 0.92)
-    this.box.fillRoundedRect(3, boxY, GBC_WIDTH - 6, boxH - 3, 3)
+    this.box.fillStyle(PAL.darkest, 0.94)
+    this.box.fillRoundedRect(3, boxY, GBC_WIDTH - 6, boxH, 3)
     this.box.lineStyle(1, PAL.light, 1)
-    this.box.strokeRoundedRect(3, boxY, GBC_WIDTH - 6, boxH - 3, 3)
+    this.box.strokeRoundedRect(3, boxY, GBC_WIDTH - 6, boxH, 3)
 
     this.nameText = this.add
-      .text(8, boxY + 4, '', { fontFamily: FONT, fontSize: '8px', color: CSS_MID, resolution: 2 })
+      .text(8, boxY + 4, '', { fontFamily: FONT, fontSize: '7px', color: CSS_MID, resolution: 2 })
       .setDepth(1001)
     this.bodyText = this.add
-      .text(8, boxY + 16, '', {
+      .text(8, boxY + 15, '', {
         fontFamily: FONT,
-        fontSize: '8px',
+        fontSize: '7px',
         color: CSS_LIGHT,
         resolution: 2,
-        lineSpacing: 3,
-        wordWrap: { width: GBC_WIDTH - 20 },
+        lineSpacing: 2,
+        wordWrap: { width: GBC_WIDTH - 16 },
       })
       .setDepth(1001)
     this.arrow = this.add
@@ -276,7 +276,7 @@ export class UIScene extends Phaser.Scene {
     })
   }
 
-  private toggleInventory() {
+  public toggleInventory() {
     if (GameState.dialogueActive) return
     GameState.inventoryOpen = !GameState.inventoryOpen
     if (GameState.inventoryOpen) {

@@ -48,15 +48,19 @@ export const NPCS: Record<string, NpcDef> = {
         excludes: 'got_flashlight',
         lines: [
           { text: "Oh, you're finally up, sleepyhead." },
+          { text: 'The power keeps flickering.' },
           {
-            text: 'The power keeps flickering. Take this flashlight, just in case.',
+            text: 'Take this flashlight, just in case.',
             give: 'flashlight',
             setFlag: 'got_flashlight',
           },
         ],
       },
       {
-        lines: [{ text: 'Stay close to home, okay? Something feels off today.' }],
+        lines: [
+          { text: 'Stay close to home, okay?' },
+          { text: 'Something feels off today.' },
+        ],
       },
     ],
   },
@@ -69,11 +73,9 @@ export const NPCS: Record<string, NpcDef> = {
       {
         excludes: 'heard_about_house',
         lines: [
-          { text: 'Hey! You see the Bakers’ place?' },
-          {
-            text: 'It was RIGHT there. Now it’s just... grass.',
-            setFlag: 'heard_about_house',
-          },
+          { text: 'Hey! Did you see the Bakers’ place?' },
+          { text: 'It was RIGHT there. Now it’s just grass.' },
+          { text: 'It completely disappeared!', setFlag: 'heard_about_house' },
         ],
       },
       {
@@ -93,10 +95,10 @@ export const NPCS: Record<string, NpcDef> = {
       {
         excludes: 'gus_flower',
         lines: [
-          { text: 'Found this by the pond. Feels… wrong, somehow.' },
+          { text: 'Found this by the pond. Feels wrong, somehow.' },
           { text: 'Here, kid. You take it.', give: 'flower', setFlag: 'gus_flower' },
           {
-            text: 'Say— you believe the static shows another world?',
+            text: 'Say— do you believe static shows another world?',
             choice: [
               { label: 'Yes', setFlag: 'believer' },
               { label: 'No', setFlag: 'skeptic' },
@@ -105,7 +107,7 @@ export const NPCS: Record<string, NpcDef> = {
         ],
       },
       {
-        lines: [{ text: 'Some nights, I still see faces in the snow.' }],
+        lines: [{ text: 'Some nights, I still see faces in the static.' }],
       },
     ],
   },

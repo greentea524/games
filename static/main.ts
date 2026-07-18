@@ -113,7 +113,38 @@ window.addEventListener('keyup', (e) => {
   if (btn) btn.classList.remove('active-kb')
 })
 
-// ---- Pause menu (Esc on desktop, START button on mobile) ----
+// ---- System buttons (START and SELECT) ----
+const setupSysBtn = (id: string, key: string) => {
+  const btn = document.getElementById(id)
+  if (!btn) return
+  let isDown = false
+  const press = (e: Event) => {
+    e.preventDefault()
+    if (!isDown) {
+      isDown = true
+      dispatchSimulatedKey('keydown', key)
+    }
+  }
+  const release = (e: Event) => {
+    e.preventDefault()
+    if (isDown) {
+      isDown = false
+      dispatchSimulatedKey('keyup', key)
+    }
+  }
+  btn.addEventListener('pointerdown', press)
+  btn.addEventListener('pointerup', release)
+  btn.addEventListener('pointercancel', release)
+  btn.addEventListener('pointerout', release)
+  btn.addEventListener('pointerleave', release)
+  btn.addEventListener('touchend', release)
+  btn.addEventListener('touchcancel', release)
+}
+
+setupSysBtn('btn-start', 'Enter')
+setupSysBtn('btn-select', 'Shift')
+
+// ---- Pause menu (Esc / Enter / Shift / START / SELECT) ----
 const overlay = document.getElementById('overlay')
 const overlayText = document.getElementById('overlay-text')
 const isDesktop = () =>
@@ -122,7 +153,7 @@ const isDesktop = () =>
 let paused = false
 let view: 'pause' | 'controls' = 'pause'
 let controlsMode: 'keyboard' | 'touch' = 'keyboard'
-const pauseItems = ['Resume', 'Controls']
+const pauseItems = ['Resume', 'Inventory', 'Controls']
 let selected = 0
 
 function pauseButtonsMarkup(): string {
@@ -168,16 +199,15 @@ function renderControls() {
     <p style="font-size:8px; color:#9bbc0f; text-align:left; line-height:2;">
       Arrows / WASD&nbsp;&nbsp;Move<br/>
       Z&nbsp;&nbsp;Talk / Confirm<br/>
-      Shift&nbsp;&nbsp;Inventory<br/>
-      Esc&nbsp;&nbsp;Pause
+      Shift&nbsp;&nbsp;Inventory / Pause<br/>
+      Esc / Enter&nbsp;&nbsp;Pause Menu
     </p>`
   const touch = `
     <h2>TOUCH</h2>
     <p style="font-size:8px; color:#9bbc0f; text-align:left; line-height:2;">
       D-Pad&nbsp;&nbsp;Move<br/>
       A Button&nbsp;&nbsp;Talk / Confirm<br/>
-      SELECT&nbsp;&nbsp;Inventory<br/>
-      START&nbsp;&nbsp;Pause
+      SELECT / START&nbsp;&nbsp;Pause Menu
     </p>`
   overlayText.innerHTML =
     (controlsMode === 'keyboard' ? kb : touch) +
@@ -197,8 +227,15 @@ function renderControls() {
 }
 
 function activateSelected() {
-  if (pauseItems[selected] === 'Resume') closePause()
-  else if (pauseItems[selected] === 'Controls') renderControls()
+  if (pauseItems[selected] === 'Resume') {
+    closePause()
+  } else if (pauseItems[selected] === 'Inventory') {
+    closePause()
+    const uiScene = game?.scene?.getScene('ui') as UIScene
+    if (uiScene) uiScene.toggleInventory()
+  } else if (pauseItems[selected] === 'Controls') {
+    renderControls()
+  }
 }
 
 function openPause() {
@@ -223,7 +260,7 @@ function closePause() {
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return
   if (!paused) {
-    if (e.key === 'Escape' || e.key === 'Enter') {
+    if (e.key === 'Escape' || e.key === 'Enter' || e.key === 'Shift') {
       e.preventDefault()
       openPause()
     }
@@ -231,7 +268,6 @@ window.addEventListener('keydown', (e) => {
   }
   e.preventDefault()
   if (view === 'controls') {
-    // Esc/back key returns to the pause list.
     if (['Escape', 'Enter', 'z', 'Z', 'x', 'X'].includes(e.key)) renderPause()
     return
   }
@@ -243,7 +279,39 @@ window.addEventListener('keydown', (e) => {
     updateSelection()
   } else if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') {
     activateSelected()
-  } else if (e.key === 'Escape') {
+  } else if (e.key === 'Escape' || e.key === 'Shift') {
     closePause()
   }
 })
+
+// Prevent double-tap zoom and multi-touch pinch zoom on mobile
+document.addEventListener(
+  'dblclick',
+  (event) => {
+    event.preventDefault()
+  },
+  { passive: false },
+)
+
+document.addEventListener(
+  'touchstart',
+  (event) => {
+    if (event.touches.length > 1) {
+      event.preventDefault()
+    }
+  },
+  { passive: false },
+)
+
+let lastTouchEnd = 0
+document.addEventListener(
+  'touchend',
+  (event) => {
+    const now = Date.now()
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault()
+    }
+    lastTouchEnd = now
+  },
+  { passive: false },
+)
