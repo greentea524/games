@@ -34,6 +34,7 @@ export class UIScene extends Phaser.Scene {
   private cancelKey!: Phaser.Input.Keyboard.Key
   private up!: Phaser.Input.Keyboard.Key
   private down!: Phaser.Input.Keyboard.Key
+  private escKey!: Phaser.Input.Keyboard.Key
 
   constructor() {
     super('ui')
@@ -102,6 +103,7 @@ export class UIScene extends Phaser.Scene {
     this.cancelKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.X)
     this.up = kb.addKey(Phaser.Input.Keyboard.KeyCodes.UP)
     this.down = kb.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN)
+    this.escKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
 
     // Tap anywhere to advance readable text (not during a choice).
     this.input.on('pointerdown', () => {
@@ -375,7 +377,8 @@ export class UIScene extends Phaser.Scene {
       if (this.time.now > this.inputLockUntil) {
         if (
           Phaser.Input.Keyboard.JustDown(this.cancelKey) ||
-          Phaser.Input.Keyboard.JustDown(this.advanceKey)
+          Phaser.Input.Keyboard.JustDown(this.advanceKey) ||
+          Phaser.Input.Keyboard.JustDown(this.escKey)
         ) {
           this.toggleInventory()
         }

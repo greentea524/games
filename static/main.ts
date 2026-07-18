@@ -284,6 +284,14 @@ function closePause() {
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return
   if (!paused) {
+    if (GameState.inventoryOpen) {
+      if (['Escape'].includes(e.key) || ['Escape'].includes(e.code)) {
+        e.preventDefault()
+        const uiScene = game?.scene?.getScene('ui') as UIScene
+        if (uiScene) uiScene.closeInventory()
+        return
+      }
+    }
     if (
       ['Escape', 'Enter'].includes(e.key) ||
       ['Escape', 'Enter'].includes(e.code)
