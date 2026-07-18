@@ -1,5 +1,13 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, TILE, PLAYER_SPEED, SOLID_TILES } from '../constants'
+import {
+  GBC_WIDTH,
+  GBC_HEIGHT,
+  TILE,
+  PLAYER_SPEED,
+  SOLID_TILES,
+  TILES,
+  PAL,
+} from '../constants'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -17,6 +25,12 @@ export class WorldScene extends Phaser.Scene {
   private doors: DoorData[] = []
   private facing: Facing = 'down'
   private transitioning = false
+
+  // Minimap (only on maps larger than one screen)
+  private blip?: Phaser.GameObjects.Graphics
+  private miniScale = 0
+  private miniOX = 0
+  private miniOY = 0
 
   private mapKey = 'town'
   private spawnTX?: number
@@ -94,6 +108,71 @@ export class WorldScene extends Phaser.Scene {
       string,
       Phaser.Input.Keyboard.Key
     >
+
+    this.buildMinimap(map, ground)
+  }
+
+  // A corner minimap showing buildings/water/trees + a blinking player
+  // blip. Skipped on maps that already fit one screen (e.g. interiors).
+  private buildMinimap(
+    map: Phaser.Tilemaps.Tilemap,
+    ground: Phaser.Tilemaps.TilemapLayer,
+  ) {
+    this.blip = undefined
+    const mapW = map.width
+    const mapH = map.height
+    if (mapW * TILE <= GBC_WIDTH && mapH * TILE <= GBC_HEIGHT) return
+
+    const pad = 2
+    const scale = 40 / Math.max(mapW, mapH)
+    const panelW = mapW * scale + pad * 2
+    const panelH = mapH * scale + pad * 2
+    const ox = GBC_WIDTH - panelW - 3
+    const oy = 3
+    this.miniScale = scale
+    this.miniOX = ox + pad
+    this.miniOY = oy + pad
+
+    const gfx = this.add.graphics().setScrollFactor(0).setDepth(1000)
+    gfx.fillStyle(PAL.darkest, 0.72)
+    gfx.fillRoundedRect(ox, oy, panelW, panelH, 2)
+    gfx.lineStyle(1, PAL.light, 0.9)
+    gfx.strokeRoundedRect(ox, oy, panelW, panelH, 2)
+
+    const cell = Math.max(1, Math.ceil(scale))
+    for (let r = 0; r < mapH; r++) {
+      for (let c = 0; c < mapW; c++) {
+        const t = ground.getTileAt(c, r)
+        if (!t || t.index < 1) continue
+        let color: number | null = null
+        if (
+          t.index === TILES.WALL ||
+          t.index === TILES.ROOF ||
+          t.index === TILES.DOOR
+        ) {
+          color = PAL.light // buildings pop brightest
+        } else if (t.index === TILES.TREE || t.index === TILES.WATER) {
+          color = PAL.dark // natural obstacles, dimmer
+        }
+        if (color === null) continue
+        gfx.fillStyle(color, 0.95)
+        gfx.fillRect(this.miniOX + c * scale, this.miniOY + r * scale, cell, cell)
+      }
+    }
+
+    this.blip = this.add.graphics().setScrollFactor(0).setDepth(1001)
+  }
+
+  private updateMinimap() {
+    if (!this.blip) return
+    this.blip.clear()
+    // Blink so the player reads clearly against static building pixels.
+    if (Math.floor(this.time.now / 280) % 2 === 0) {
+      const bx = this.miniOX + (this.player.x / TILE) * this.miniScale
+      const by = this.miniOY + (this.player.y / TILE) * this.miniScale
+      this.blip.fillStyle(PAL.lightest, 1)
+      this.blip.fillRect(Math.round(bx) - 1, Math.round(by) - 1, 3, 3)
+    }
   }
 
   private enterDoor(target: string, tx: number, ty: number) {
@@ -108,6 +187,8 @@ export class WorldScene extends Phaser.Scene {
 
   update() {
     if (this.transitioning) return
+
+    this.updateMinimap()
 
     const left = this.cursors.left.isDown || this.wasd.A.isDown
     const right = this.cursors.right.isDown || this.wasd.D.isDown
