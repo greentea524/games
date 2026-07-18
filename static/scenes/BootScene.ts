@@ -30,7 +30,7 @@ export class BootScene extends Phaser.Scene {
 
   private buildTileset(mode: 'dmg' | 'gbc') {
     const tileKey = `tiles_${mode}`
-    if (this.textures.exists(tileKey)) this.textures.remove(tileKey)
+    if (this.textures.exists(tileKey)) return
     const g = this.make.graphics({}, false)
     const T = TILE
     const at = (i: number) => i * T
@@ -117,7 +117,7 @@ export class BootScene extends Phaser.Scene {
       for (let x = 0; x < T; x += 8) g.fillRect(at(7) + x, 0, 1, T)
     }
 
-    g.generateTexture(`tiles_${mode}`, T * 8, T)
+    g.generateTexture(tileKey, T * 8, T)
     g.destroy()
   }
 
@@ -131,7 +131,7 @@ export class BootScene extends Phaser.Scene {
     hairColor: number,
     skinColor: number,
   ) {
-    if (this.textures.exists(key)) this.textures.remove(key)
+    if (this.textures.exists(key)) return
     g.clear()
     const cx = 8
     g.fillStyle(pantsColor)
@@ -162,13 +162,14 @@ export class BootScene extends Phaser.Scene {
     g.destroy()
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
       const animKey = `walk_${mode}_${f}`
-      if (this.anims.exists(animKey)) this.anims.remove(animKey)
-      this.anims.create({
-        key: animKey,
-        frames: [{ key: `kid_${mode}_${f}_0` }, { key: `kid_${mode}_${f}_1` }],
-        frameRate: 6,
-        repeat: -1,
-      })
+      if (!this.anims.exists(animKey)) {
+        this.anims.create({
+          key: animKey,
+          frames: [{ key: `kid_${mode}_${f}_0` }, { key: `kid_${mode}_${f}_1` }],
+          frameRate: 6,
+          repeat: -1,
+        })
+      }
     })
   }
 
@@ -213,40 +214,44 @@ export class BootScene extends Phaser.Scene {
   private buildItems(mode: 'dmg' | 'gbc') {
     if (mode === 'dmg') {
       const keyFlash = 'item_dmg_flashlight'
-      if (this.textures.exists(keyFlash)) this.textures.remove(keyFlash)
-      const g1 = this.make.graphics({}, false)
-      g1.fillStyle(PAL.darkest); g1.fillRect(2, 5, 8, 4)
-      g1.fillStyle(PAL.light); g1.fillRect(9, 4, 4, 6)
-      g1.fillStyle(PAL.lightest); g1.fillRect(12, 5, 2, 4)
-      g1.generateTexture(keyFlash, 16, 16)
-      g1.destroy()
+      if (!this.textures.exists(keyFlash)) {
+        const g1 = this.make.graphics({}, false)
+        g1.fillStyle(PAL.darkest); g1.fillRect(2, 5, 8, 4)
+        g1.fillStyle(PAL.light); g1.fillRect(9, 4, 4, 6)
+        g1.fillStyle(PAL.lightest); g1.fillRect(12, 5, 2, 4)
+        g1.generateTexture(keyFlash, 16, 16)
+        g1.destroy()
+      }
 
       const keyFlower = 'item_dmg_flower'
-      if (this.textures.exists(keyFlower)) this.textures.remove(keyFlower)
-      const g2 = this.make.graphics({}, false)
-      g2.fillStyle(PAL.dark); g2.fillRect(7, 6, 2, 8)
-      g2.fillStyle(PAL.darkest); g2.fillCircle(8, 5, 3)
-      g2.fillStyle(PAL.light); g2.fillRect(4, 9, 2, 1); g2.fillRect(10, 10, 2, 1)
-      g2.generateTexture(keyFlower, 16, 16)
-      g2.destroy()
+      if (!this.textures.exists(keyFlower)) {
+        const g2 = this.make.graphics({}, false)
+        g2.fillStyle(PAL.dark); g2.fillRect(7, 6, 2, 8)
+        g2.fillStyle(PAL.darkest); g2.fillCircle(8, 5, 3)
+        g2.fillStyle(PAL.light); g2.fillRect(4, 9, 2, 1); g2.fillRect(10, 10, 2, 1)
+        g2.generateTexture(keyFlower, 16, 16)
+        g2.destroy()
+      }
     } else {
       const keyFlash = 'item_gbc_flashlight'
-      if (this.textures.exists(keyFlash)) this.textures.remove(keyFlash)
-      const g1 = this.make.graphics({}, false)
-      g1.fillStyle(GBC_PAL.flashlightBody); g1.fillRect(2, 5, 8, 4)
-      g1.fillStyle(GBC_PAL.flashlightGlow); g1.fillRect(9, 4, 4, 6)
-      g1.fillStyle(0xffffff); g1.fillRect(12, 5, 2, 4)
-      g1.generateTexture(keyFlash, 16, 16)
-      g1.destroy()
+      if (!this.textures.exists(keyFlash)) {
+        const g1 = this.make.graphics({}, false)
+        g1.fillStyle(GBC_PAL.flashlightBody); g1.fillRect(2, 5, 8, 4)
+        g1.fillStyle(GBC_PAL.flashlightGlow); g1.fillRect(9, 4, 4, 6)
+        g1.fillStyle(0xffffff); g1.fillRect(12, 5, 2, 4)
+        g1.generateTexture(keyFlash, 16, 16)
+        g1.destroy()
+      }
 
       const keyFlower = 'item_gbc_flower'
-      if (this.textures.exists(keyFlower)) this.textures.remove(keyFlower)
-      const g2 = this.make.graphics({}, false)
-      g2.fillStyle(GBC_PAL.flowerStem); g2.fillRect(7, 6, 2, 8)
-      g2.fillStyle(GBC_PAL.flowerBloom); g2.fillCircle(8, 5, 3)
-      g2.fillStyle(GBC_PAL.grassBg); g2.fillRect(4, 9, 2, 1); g2.fillRect(10, 10, 2, 1)
-      g2.generateTexture(keyFlower, 16, 16)
-      g2.destroy()
+      if (!this.textures.exists(keyFlower)) {
+        const g2 = this.make.graphics({}, false)
+        g2.fillStyle(GBC_PAL.flowerStem); g2.fillRect(7, 6, 2, 8)
+        g2.fillStyle(GBC_PAL.flowerBloom); g2.fillCircle(8, 5, 3)
+        g2.fillStyle(GBC_PAL.grassBg); g2.fillRect(4, 9, 2, 1); g2.fillRect(10, 10, 2, 1)
+        g2.generateTexture(keyFlower, 16, 16)
+        g2.destroy()
+      }
     }
   }
 }
