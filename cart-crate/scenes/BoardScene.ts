@@ -1,8 +1,17 @@
 import Phaser from 'phaser'
 import { TILE, GBC_WIDTH, GBC_HEIGHT } from '../constants'
 import { GameState } from '../state'
+import type { UIScene } from './UIScene'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
+
+export interface CrateInstance {
+  id: number
+  sprite: Phaser.GameObjects.Sprite
+  tx: number
+  ty: number
+  docked: boolean
+}
 
 export class BoardScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite
@@ -12,21 +21,21 @@ export class BoardScene extends Phaser.Scene {
   private isMoving = false
   private mapWidth = 10
   private mapHeight = 9
-  private grid: string[] = [
-    '##########',
-    '#........#',
-    '#.P......#',
-    '#...C....#',
-    '#...T....#',
-    '#........#',
-    '#........#',
-    '#........#',
-    '##########',
+
+  // Base floor tilemap grid (# wall, . floor, T target)
+  private floorGrid: string[][] = [
+    ['#','#','#','#','#','#','#','#','#','#'],
+    ['#','.','.','.','.','.','.','.','.','#'],
+    ['#','.','.','.','.','.','.','.','.','#'],
+    ['#','.','.','.','.','.','.','.','.','#'],
+    ['#','.','.','.','.','.','.','.','.','#'],
+    ['#','.','.','.','.','.','.','.','.','#'],
+    ['#','.','.','.','.','.','.','.','.','#'],
+    ['#','.','.','.','.','.','.','.','.','#'],
+    ['#','#','#','#','#','#','#','#','#','#'],
   ]
 
-  private wallsLayer!: Phaser.GameObjects.Group
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
-  private wasd!: Record<string, Phaser.Input.Keyboard.Key>
+  private crates: CrateInstance[] = []
 
   constructor() {
     super('board')
@@ -36,23 +45,47 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0b0f0c')
     this.cameras.main.setBounds(0, 0, GBC_WIDTH, GBC_HEIGHT)
 
+    this.setupLevelLayout()
     this.renderBoard()
 
-    this.cursors = this.input.keyboard!.createCursorKeys()
-    this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<string, Phaser.Input.Keyboard.Key>
+    this.input.keyboard!.createCursorKeys()
+    this.input.keyboard!.addKeys('W,A,S,D')
 
     if (!this.scene.isActive('ui')) {
       this.scene.launch('ui')
     }
   }
 
+  setupLevelLayout() {
+    // Initial Level Layout:
+    // P at (2, 2), Crate 1 at (4, 3) -> Target at (7, 3)
+    // Crate 2 at (4, 5) -> Target at (7, 5)
+    this.playerTX = 2
+    this.playerTY = 2
+    this.facing = 'down'
+    this.isMoving = false
+
+    this.floorGrid = [
+      ['#','#','#','#','#','#','#','#','#','#'],
+      ['#','.','.','.','.','.','.','.','.','#'],
+      ['#','.','.','.','.','.','.','.','.','#'],
+      ['#','.','.','C','.','.','.','T','.','#'],
+      ['#','.','.','.','.','.','.','.','.','#'],
+      ['#','.','.','C','.','.','.','T','.','#'],
+      ['#','.','.','.','.','.','.','.','.','#'],
+      ['#','.','.','.','.','.','.','.','.','#'],
+      ['#','#','#','#','#','#','#','#','#','#'],
+    ]
+  }
+
   renderBoard() {
     const mode = GameState.paletteMode
+    this.crates = []
+    let crateIdCounter = 1
 
-    // Draw background grid tiles
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
-        const char = this.grid[y][x]
+        const char = this.floorGrid[y][x]
         const px = x * TILE + TILE / 2
         const py = y * TILE + TILE / 2
 
@@ -64,9 +97,17 @@ export class BoardScene extends Phaser.Scene {
           this.add.image(px, py, `tiles_${mode}`, 0)
         }
 
-        if (char === 'P') {
-          this.playerTX = x
-          this.playerTY = y
+        if (char === 'C') {
+          // Normalize floorGrid to '.' and place Crate entity
+          this.floorGrid[y][x] = '.'
+          const crateSprite = this.add.sprite(px, py, `crate_${mode}`).setDepth(5)
+          this.crates.push({
+            id: crateIdCounter++,
+            sprite: crateSprite,
+            tx: x,
+            ty: y,
+            docked: false,
+          })
         }
       }
     }
@@ -74,12 +115,10 @@ export class BoardScene extends Phaser.Scene {
     // Spawn player sprite
     const px = this.playerTX * TILE + TILE / 2
     const py = this.playerTY * TILE + TILE / 2
-    this.player = this.add.sprite(px, py, `player_${mode}_${this.facing}`)
-    this.player.setDepth(10)
+    this.player = this.add.sprite(px, py, `player_${mode}_${this.facing}`).setDepth(10)
   }
 
   reloadPalette() {
-    const mode = GameState.paletteMode
     this.children.removeAll()
     this.renderBoard()
   }
@@ -87,20 +126,26 @@ export class BoardScene extends Phaser.Scene {
   update() {
     if (this.isMoving || GameState.uiBlocking) return
 
+    const kb = this.input.keyboard!
     let dx = 0
     let dy = 0
     let nextFacing = this.facing
 
-    if (this.cursors.left.isDown || this.wasd.A.isDown) {
+    const left = kb.addKey('LEFT').isDown || kb.addKey('A').isDown
+    const right = kb.addKey('RIGHT').isDown || kb.addKey('D').isDown
+    const up = kb.addKey('UP').isDown || kb.addKey('W').isDown
+    const down = kb.addKey('DOWN').isDown || kb.addKey('S').isDown
+
+    if (left) {
       dx = -1
       nextFacing = 'left'
-    } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
+    } else if (right) {
       dx = 1
       nextFacing = 'right'
-    } else if (this.cursors.up.isDown || this.wasd.W.isDown) {
+    } else if (up) {
       dy = -1
       nextFacing = 'up'
-    } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
+    } else if (down) {
       dy = 1
       nextFacing = 'down'
     }
@@ -116,20 +161,92 @@ export class BoardScene extends Phaser.Scene {
     const targetTY = this.playerTY + dy
     const mode = GameState.paletteMode
 
-    // Check map boundaries
+    // Map boundary check
     if (targetTX < 0 || targetTX >= this.mapWidth || targetTY < 0 || targetTY >= this.mapHeight) {
       this.player.setTexture(`player_${mode}_${this.facing}`)
       return
     }
 
-    // Check wall collision
-    const targetTile = this.grid[targetTY][targetTX]
-    if (targetTile === '#') {
+    // Wall collision check
+    if (this.floorGrid[targetTY][targetTX] === '#') {
       this.player.setTexture(`player_${mode}_${this.facing}`)
       return
     }
 
-    // Execute smooth 16x16 tile step move
+    // Crate collision check
+    const crateAtTarget = this.crates.find((c) => c.tx === targetTX && c.ty === targetTY)
+
+    if (crateAtTarget) {
+      const pushTX = targetTX + dx
+      const pushTY = targetTY + dy
+
+      // Check push space boundaries & walls
+      if (pushTX < 0 || pushTX >= this.mapWidth || pushTY < 0 || pushTY >= this.mapHeight) {
+        this.player.setTexture(`player_${mode}_${this.facing}`)
+        return
+      }
+      if (this.floorGrid[pushTY][pushTX] === '#') {
+        this.player.setTexture(`player_${mode}_${this.facing}`)
+        return
+      }
+
+      // Check if another crate blocks the push (cannot push 2 crates)
+      const crateAtPush = this.crates.find((c) => c.tx === pushTX && c.ty === pushTY)
+      if (crateAtPush) {
+        this.player.setTexture(`player_${mode}_${this.facing}`)
+        return
+      }
+
+      // PUSH IS VALID!
+      this.isMoving = true
+      this.playerTX = targetTX
+      this.playerTY = targetTY
+      crateAtTarget.tx = pushTX
+      crateAtTarget.ty = pushTY
+
+      // Check if crate lands on target tile
+      const isTarget = this.floorGrid[pushTY][pushTX] === 'T'
+      crateAtTarget.docked = isTarget
+      if (isTarget) {
+        crateAtTarget.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : 0xffff44)
+      } else {
+        crateAtTarget.sprite.clearTint()
+      }
+
+      this.player.setTexture(`player_${mode}_${this.facing}`)
+
+      const playerPX = targetTX * TILE + TILE / 2
+      const playerPY = targetTY * TILE + TILE / 2
+      const cratePX = pushTX * TILE + TILE / 2
+      const cratePY = pushTY * TILE + TILE / 2
+
+      // Animate player move
+      this.tweens.add({
+        targets: this.player,
+        x: playerPX,
+        y: playerPY,
+        duration: 120,
+        ease: 'Linear',
+      })
+
+      // Animate crate push
+      this.tweens.add({
+        targets: crateAtTarget.sprite,
+        x: cratePX,
+        y: cratePY,
+        duration: 120,
+        ease: 'Linear',
+        onComplete: () => {
+          this.isMoving = false
+          GameState.movesCount++
+          GameState.pushesCount++
+          this.checkWinCondition()
+        },
+      })
+      return
+    }
+
+    // Standard player step move (no crate push)
     this.isMoving = true
     this.playerTX = targetTX
     this.playerTY = targetTY
@@ -149,5 +266,18 @@ export class BoardScene extends Phaser.Scene {
         GameState.movesCount++
       },
     })
+  }
+
+  private checkWinCondition() {
+    const totalTargets = this.floorGrid.flat().filter((tile) => tile === 'T').length
+    const dockedCrates = this.crates.filter((c) => c.docked).length
+
+    if (totalTargets > 0 && dockedCrates === totalTargets) {
+      GameState.uiBlocking = true
+      const uiScene = this.scene.get('ui') as UIScene
+      if (uiScene) {
+        uiScene.showVictoryBanner()
+      }
+    }
   }
 }
