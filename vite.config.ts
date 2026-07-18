@@ -13,6 +13,9 @@ export default defineConfig({
         'lantern-keeper': fileURLToPath(
           new URL('./lantern-keeper/index.html', import.meta.url),
         ),
+        'static': fileURLToPath(
+          new URL('./static/index.html', import.meta.url),
+        ),
       },
     },
   },

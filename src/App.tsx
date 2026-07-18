@@ -6,6 +6,11 @@ import './App.css'
 
 const WEB_GAMES = [
   {
+    title: "Static",
+    href: `${import.meta.env.BASE_URL}static/`,
+    description: "A GBC-style top-down mystery/adventure game. Explore a small town where an old TV works like a portal.",
+  },
+  {
     title: "Lantern Keeper",
     href: `${import.meta.env.BASE_URL}lantern-keeper/`,
     description:

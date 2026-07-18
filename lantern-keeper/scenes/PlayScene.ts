@@ -209,7 +209,7 @@ export class PlayScene extends Phaser.Scene {
       this.justResumed = true
     })
 
-    this.hudText = this.add.text(4, 3, '', {
+    this.hudText = this.add.text(4, 8, '', {
       fontFamily: '"Press Start 2P"',
       fontSize: '8px',
       color: '#e0f8cf',
