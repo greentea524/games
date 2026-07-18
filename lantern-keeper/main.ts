@@ -57,23 +57,21 @@ document.fonts
   .catch(() => {})
   .finally(createGame)
 
-const dispatchSimulatedKey = (type: 'keydown' | 'keyup', key: string) => {
-  const KEY_CODES: Record<string, number> = {
-    ArrowLeft: 37,
-    ArrowUp: 38,
-    ArrowRight: 39,
-    ArrowDown: 40,
-    KeyX: 88,
-    KeyZ: 90,
-    Enter: 13,
-    Shift: 16,
-  }
-  const event = new KeyboardEvent(type, {
-    code: key,
-    key: key,
-    bubbles: true,
-  })
-  Object.defineProperty(event, 'keyCode', { get: () => KEY_CODES[key] })
+const SIMULATED_KEYS: Record<string, { key: string; code: string; keyCode: number }> = {
+  ArrowLeft: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
+  ArrowUp: { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 },
+  ArrowRight: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
+  ArrowDown: { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40 },
+  KeyX: { key: 'x', code: 'KeyX', keyCode: 88 },
+  KeyZ: { key: 'z', code: 'KeyZ', keyCode: 90 },
+  Enter: { key: 'Enter', code: 'Enter', keyCode: 13 },
+  Shift: { key: 'Shift', code: 'Shift', keyCode: 16 },
+}
+
+const dispatchSimulatedKey = (type: 'keydown' | 'keyup', keyName: string) => {
+  const info = SIMULATED_KEYS[keyName] ?? { key: keyName, code: keyName, keyCode: 0 }
+  const event = new KeyboardEvent(type, { code: info.code, key: info.key, bubbles: true })
+  Object.defineProperty(event, 'keyCode', { get: () => info.keyCode })
   window.dispatchEvent(event)
 }
 

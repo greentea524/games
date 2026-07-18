@@ -59,20 +59,21 @@ document.fonts
   .finally(createGame)
 
 // ---- Touch controls: on-screen d-pad dispatches arrow keys ----
-const KEY_CODES: Record<string, number> = {
-  ArrowLeft: 37,
-  ArrowUp: 38,
-  ArrowRight: 39,
-  ArrowDown: 40,
-  KeyX: 88,
-  KeyZ: 90,
-  Enter: 13,
-  Shift: 16,
+const SIMULATED_KEYS: Record<string, { key: string; code: string; keyCode: number }> = {
+  ArrowLeft: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
+  ArrowUp: { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 },
+  ArrowRight: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
+  ArrowDown: { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40 },
+  KeyX: { key: 'x', code: 'KeyX', keyCode: 88 },
+  KeyZ: { key: 'z', code: 'KeyZ', keyCode: 90 },
+  Enter: { key: 'Enter', code: 'Enter', keyCode: 13 },
+  Shift: { key: 'Shift', code: 'Shift', keyCode: 16 },
 }
 
-const dispatchSimulatedKey = (type: 'keydown' | 'keyup', key: string) => {
-  const event = new KeyboardEvent(type, { code: key, key, bubbles: true })
-  Object.defineProperty(event, 'keyCode', { get: () => KEY_CODES[key] })
+const dispatchSimulatedKey = (type: 'keydown' | 'keyup', keyName: string) => {
+  const info = SIMULATED_KEYS[keyName] ?? { key: keyName, code: keyName, keyCode: 0 }
+  const event = new KeyboardEvent(type, { code: info.code, key: info.key, bubbles: true })
+  Object.defineProperty(event, 'keyCode', { get: () => info.keyCode })
   window.dispatchEvent(event)
 }
 
@@ -280,7 +281,10 @@ function closePause() {
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return
   if (!paused) {
-    if (e.key === 'Escape' || e.key === 'Enter' || e.key === 'Shift') {
+    if (
+      ['Escape', 'Enter', 'Shift'].includes(e.key) ||
+      ['Escape', 'Enter', 'ShiftLeft', 'ShiftRight'].includes(e.code)
+    ) {
       e.preventDefault()
       openPause()
     }
@@ -288,18 +292,29 @@ window.addEventListener('keydown', (e) => {
   }
   e.preventDefault()
   if (view === 'controls' || view === 'about') {
-    if (['Escape', 'Enter', 'z', 'Z', 'x', 'X'].includes(e.key)) renderPause()
+    if (
+      ['Escape', 'Enter', 'z', 'Z', 'x', 'X', 'KeyZ', 'KeyX'].includes(e.key) ||
+      ['Escape', 'Enter', 'KeyZ', 'KeyX'].includes(e.code)
+    ) {
+      renderPause()
+    }
     return
   }
-  if (e.key === 'ArrowUp') {
+  if (e.key === 'ArrowUp' || e.code === 'ArrowUp') {
     selected = (selected - 1 + pauseItems.length) % pauseItems.length
     updateSelection()
-  } else if (e.key === 'ArrowDown') {
+  } else if (e.key === 'ArrowDown' || e.code === 'ArrowDown') {
     selected = (selected + 1) % pauseItems.length
     updateSelection()
-  } else if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') {
+  } else if (
+    ['Enter', 'z', 'Z', 'KeyZ'].includes(e.key) ||
+    ['Enter', 'KeyZ'].includes(e.code)
+  ) {
     activateSelected()
-  } else if (e.key === 'Escape' || e.key === 'Shift') {
+  } else if (
+    ['Escape', 'Shift', 'x', 'X', 'KeyX'].includes(e.key) ||
+    ['Escape', 'ShiftLeft', 'ShiftRight', 'KeyX'].includes(e.code)
+  ) {
     closePause()
   }
 })
