@@ -7,6 +7,7 @@ import {
   SOLID_TILES,
   TILES,
   PAL,
+  GBC_PAL,
 } from '../constants'
 import { GameState } from '../state'
 import { NPCS } from '../dialogue'
@@ -268,9 +269,11 @@ export class WorldScene extends Phaser.Scene {
           t.index === TILES.ROOF ||
           t.index === TILES.DOOR
         ) {
-          color = PAL.light // buildings pop brightest
-        } else if (t.index === TILES.TREE || t.index === TILES.WATER) {
-          color = PAL.dark // natural obstacles, dimmer
+          color = GBC_PAL.roofBg // buildings pop in terracotta red
+        } else if (t.index === TILES.WATER) {
+          color = GBC_PAL.waterBg // water in GBC azure blue
+        } else if (t.index === TILES.TREE) {
+          color = GBC_PAL.treeDark // trees in deep evergreen
         }
         if (color === null) continue
         gfx.fillStyle(color, 0.95)
