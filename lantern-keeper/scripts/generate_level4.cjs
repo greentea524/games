@@ -136,7 +136,7 @@ const levelJson = {
       "data": data,
       "height": HEIGHT,
       "id": 1,
-      "name": "Tile Layer 1",
+      "name": "ground",
       "opacity": 1,
       "type": "tilelayer",
       "visible": true,
