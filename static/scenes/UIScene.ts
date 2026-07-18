@@ -236,18 +236,26 @@ export class UIScene extends Phaser.Scene {
       color: '#e0f8cf',
       resolution: 2,
     })
-    const hint = this.add.text(10, GBC_HEIGHT - 16, 'SELECT: close', {
+    const hint = this.add.text(10, GBC_HEIGHT - 16, 'A / SELECT: close', {
       fontFamily: FONT,
       fontSize: '7px',
       color: CSS_MID,
       resolution: 2,
     })
-    this.inv.add([bg, title, hint])
+    const tapZone = this.add
+      .zone(GBC_WIDTH / 2, GBC_HEIGHT / 2, GBC_WIDTH, GBC_HEIGHT)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        if (GameState.inventoryOpen && this.time.now > this.inputLockUntil) {
+          this.toggleInventory()
+        }
+      })
+    this.inv.add([bg, title, hint, tapZone])
   }
 
   private refreshInventory() {
-    // clear previous item rows (keep first 3 children: bg, title, hint)
-    while (this.inv.length > 3) {
+    // clear previous item rows (keep first 4 children: bg, title, hint, tapZone)
+    while (this.inv.length > 4) {
       const c = this.inv.getAt(this.inv.length - 1) as Phaser.GameObjects.GameObject
       this.inv.remove(c, true)
     }
@@ -279,6 +287,7 @@ export class UIScene extends Phaser.Scene {
   public toggleInventory() {
     if (GameState.dialogueActive) return
     GameState.inventoryOpen = !GameState.inventoryOpen
+    this.inputLockUntil = this.time.now + 200
     if (GameState.inventoryOpen) {
       this.refreshInventory()
       this.inv.setVisible(true)
@@ -294,14 +303,18 @@ export class UIScene extends Phaser.Scene {
       this.arrow.setAlpha(Math.floor(this.time.now / 350) % 2 ? 1 : 0.25)
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.invKey)) this.toggleInventory()
+    if (Phaser.Input.Keyboard.JustDown(this.invKey)) {
+      if (this.time.now > this.inputLockUntil) this.toggleInventory()
+    }
 
     if (GameState.inventoryOpen) {
-      if (
-        Phaser.Input.Keyboard.JustDown(this.cancelKey) ||
-        Phaser.Input.Keyboard.JustDown(this.advanceKey)
-      ) {
-        this.toggleInventory()
+      if (this.time.now > this.inputLockUntil) {
+        if (
+          Phaser.Input.Keyboard.JustDown(this.cancelKey) ||
+          Phaser.Input.Keyboard.JustDown(this.advanceKey)
+        ) {
+          this.toggleInventory()
+        }
       }
       return
     }

@@ -282,11 +282,18 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat) return
   if (!paused) {
     if (
-      ['Escape', 'Enter', 'Shift'].includes(e.key) ||
-      ['Escape', 'Enter', 'ShiftLeft', 'ShiftRight'].includes(e.code)
+      ['Escape', 'Enter'].includes(e.key) ||
+      ['Escape', 'Enter'].includes(e.code)
     ) {
       e.preventDefault()
       openPause()
+    } else if (
+      ['Shift'].includes(e.key) ||
+      ['ShiftLeft', 'ShiftRight'].includes(e.code)
+    ) {
+      e.preventDefault()
+      const uiScene = game?.scene?.getScene('ui') as UIScene
+      if (uiScene) uiScene.toggleInventory()
     }
     return
   }
