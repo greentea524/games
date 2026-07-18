@@ -7,6 +7,12 @@ class GameStateClass {
   inventoryOpen = false
   uiClosedAt = 0
 
+  // Dual-world (Phase 3). In-memory for now; #16 persists it.
+  world: 'normal' | 'static' = 'normal'
+  toggleWorld() {
+    this.world = this.world === 'normal' ? 'static' : 'normal'
+  }
+
   paletteMode: 'dmg' | 'gbc' =
     (localStorage.getItem('static_palette') as 'dmg' | 'gbc') || 'dmg'
 

@@ -36,6 +36,7 @@ export class WorldScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
   private doors: DoorData[] = []
+  private tvPos?: { x: number; y: number }
   private facing: Facing = 'down'
   private transitioning = false
 
@@ -162,6 +163,24 @@ export class WorldScene extends Phaser.Scene {
     }
     this.physics.add.collider(this.player, npcGroup)
 
+    // Dual-world (thin slice): the Static-side is the same map with a cold
+    // desaturated wash. World is a global flag; no separate map files yet.
+    this.ensureExtraTextures()
+    if (GameState.world === 'static') {
+      this.add
+        .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, 0x5a6a9a)
+        .setOrigin(0)
+        .setScrollFactor(0)
+        .setDepth(50)
+        .setAlpha(0.42)
+    }
+    // TV portal in the player's house.
+    this.tvPos = undefined
+    if (this.mapKey === 'house') {
+      const tv = this.add.image(7 * TILE + TILE / 2, 1 * TILE + TILE / 2, 'tv')
+      this.tvPos = { x: tv.x, y: tv.y }
+    }
+
     const promptLabel = window.matchMedia('(hover: hover) and (pointer: fine)')
       .matches
       ? 'Z'
@@ -194,6 +213,58 @@ export class WorldScene extends Phaser.Scene {
     this.buildMinimap(map, ground)
 
     if (!this.scene.isActive('ui')) this.scene.launch('ui')
+  }
+
+  private ensureExtraTextures() {
+    if (!this.textures.exists('tv')) {
+      const g = this.make.graphics({}, false)
+      g.fillStyle(PAL.darkest, 1); g.fillRect(1, 3, 14, 11)
+      g.fillStyle(PAL.light, 1); g.fillRect(3, 5, 8, 7)
+      g.fillStyle(PAL.lightest, 1); g.fillRect(3, 5, 8, 3)
+      g.fillStyle(PAL.darkest, 1); g.fillRect(12, 6, 2, 5)
+      g.generateTexture('tv', 16, 16); g.destroy()
+    }
+    if (!this.textures.exists('noise')) {
+      const g = this.make.graphics({}, false)
+      for (let y = 0; y < 32; y++)
+        for (let x = 0; x < 32; x++) {
+          g.fillStyle(Math.random() < 0.5 ? 0x1a2438 : 0xaab4cc, 1)
+          g.fillRect(x, y, 1, 1)
+        }
+      g.generateTexture('noise', 32, 32); g.destroy()
+    }
+  }
+
+  private facingTV(): boolean {
+    if (!this.tvPos) return false
+    const f = this.frontPoint()
+    return (
+      Phaser.Math.Distance.Between(f.x, f.y, this.tvPos.x, this.tvPos.y) <
+      TILE * 0.9
+    )
+  }
+
+  private switchWorld() {
+    if (this.transitioning) return
+    this.transitioning = true
+    this.player.setVelocity(0, 0)
+    if (this.prompt) this.prompt.setVisible(false)
+    const noise = this.add
+      .image(0, 0, 'noise')
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(2000)
+      .setDisplaySize(GBC_WIDTH, GBC_HEIGHT)
+    this.tweens.add({ targets: noise, alpha: 0.5, duration: 120, yoyo: true, repeat: 1 })
+    this.time.delayedCall(260, () => {
+      GameState.toggleWorld()
+      this.scene.restart({
+        mapKey: this.mapKey,
+        tx: Math.floor(this.player.x / TILE),
+        ty: Math.floor(this.player.y / TILE),
+        facing: this.facing,
+      })
+    })
   }
 
   // The tile-center point directly in front of the player.
@@ -357,26 +428,32 @@ export class WorldScene extends Phaser.Scene {
     }
 
     const near = this.facingNpc()
+    const onTV = !near && this.facingTV()
     if (this.prompt) {
       if (near) {
         this.prompt.setVisible(true)
         this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE / 2)
+      } else if (onTV) {
+        this.prompt.setVisible(true)
+        this.prompt.setPosition(this.tvPos!.x, this.tvPos!.y - TILE / 2)
       } else {
         this.prompt.setVisible(false)
       }
     }
 
     // Interact (ignore briefly after a dialogue closes).
-    if (
-      interactPressed &&
-      near &&
-      this.time.now - GameState.uiClosedAt > 150
-    ) {
-      this.faceNpcToward(near)
-      GameState.dialogueActive = true
-      ;(this.scene.get('ui') as UIScene).startDialogue(near.def)
-      this.player.setVelocity(0, 0)
-      return
+    if (interactPressed && this.time.now - GameState.uiClosedAt > 150) {
+      if (near) {
+        this.faceNpcToward(near)
+        GameState.dialogueActive = true
+        ;(this.scene.get('ui') as UIScene).startDialogue(near.def)
+        this.player.setVelocity(0, 0)
+        return
+      }
+      if (onTV) {
+        this.switchWorld()
+        return
+      }
     }
 
     const left = this.cursors.left.isDown || this.wasd.A.isDown
