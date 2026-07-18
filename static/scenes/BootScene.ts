@@ -122,6 +122,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   private drawCharacter(
+    g: Phaser.GameObjects.Graphics,
     key: string,
     facing: Facing,
     step: number,
@@ -131,7 +132,7 @@ export class BootScene extends Phaser.Scene {
     skinColor: number,
   ) {
     if (this.textures.exists(key)) this.textures.remove(key)
-    const g = this.make.graphics({}, false)
+    g.clear()
     const cx = 8
     g.fillStyle(pantsColor)
     g.fillRect(cx - 3 + step, 13, 2, 3)
@@ -145,19 +146,20 @@ export class BootScene extends Phaser.Scene {
     else if (facing === 'left') { g.fillRect(cx - 3, 5, 1, 1) }
     else { g.fillRect(cx + 2, 5, 1, 1) }
     g.generateTexture(key, 16, 16)
-    g.destroy()
   }
 
   private buildPlayer(mode: 'dmg' | 'gbc') {
+    const g = this.make.graphics({}, false)
     const shirt = mode === 'dmg' ? PAL.dark : GBC_PAL.shirtHero
     const pants = mode === 'dmg' ? PAL.darkest : GBC_PAL.pantsHero
     const hair = mode === 'dmg' ? PAL.darkest : GBC_PAL.hairDark
     const skin = mode === 'dmg' ? PAL.lightest : GBC_PAL.skin
 
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
-      this.drawCharacter(`kid_${mode}_${f}_0`, f, 0, shirt, pants, hair, skin)
-      this.drawCharacter(`kid_${mode}_${f}_1`, f, 1, shirt, pants, hair, skin)
+      this.drawCharacter(g, `kid_${mode}_${f}_0`, f, 0, shirt, pants, hair, skin)
+      this.drawCharacter(g, `kid_${mode}_${f}_1`, f, 1, shirt, pants, hair, skin)
     })
+    g.destroy()
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
       const animKey = `walk_${mode}_${f}`
       if (this.anims.exists(animKey)) this.anims.remove(animKey)
@@ -171,6 +173,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   private buildNpcs(mode: 'dmg' | 'gbc') {
+    const g = this.make.graphics({}, false)
     const npcConfigs =
       mode === 'dmg'
         ? {
@@ -193,6 +196,7 @@ export class BootScene extends Phaser.Scene {
       }
       ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
         this.drawCharacter(
+          g,
           `npc_${mode}_${npc.id}_${f}`,
           f,
           0,
@@ -203,6 +207,7 @@ export class BootScene extends Phaser.Scene {
         )
       })
     }
+    g.destroy()
   }
 
   private buildItems(mode: 'dmg' | 'gbc') {
