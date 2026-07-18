@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { TILE, GBC_WIDTH, GBC_HEIGHT } from '../constants'
 import { GameState } from '../state'
+import { CAMPAIGN_LEVELS } from '../levels'
+import { SaveSystem } from '../save'
 import { MoveCommand, StepRecord } from '../commands'
 import type { UIScene } from './UIScene'
 
@@ -72,7 +74,7 @@ export class BoardScene extends Phaser.Scene {
           }
         }
       } else {
-        if (Math.abs(dy) > minDistance) {
+        if (Math.abs(dy) > Math.abs(dy)) {
           if (dy > 0) {
             this.facing = 'down'
             this.tryMovePlayer(0, 1)
@@ -90,24 +92,25 @@ export class BoardScene extends Phaser.Scene {
   }
 
   setupLevelLayout() {
-    this.playerTX = 1
-    this.playerTY = 2
+    const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
     this.facing = 'down'
     this.isMoving = false
     this.undoStack = []
+    GameState.resetStats()
 
-    // Level Layout introducing Ice ('I'), Cracked ('X'), and Target ('T')
-    this.floorGrid = [
-      ['#','#','#','#','#','#','#','#','#','#'],
-      ['#','.','.','.','.','.','.','.','.','#'],
-      ['#','.','.','I','I','C','.','.','.','#'],
-      ['#','.','.','.','.','.','.','T','.','#'],
-      ['#','.','.','X','.','.','.','.','.','#'],
-      ['#','.','.','C','.','.','.','T','.','#'],
-      ['#','.','.','.','.','.','.','.','.','#'],
-      ['#','.','.','.','.','.','.','.','.','#'],
-      ['#','#','#','#','#','#','#','#','#','#'],
-    ]
+    this.floorGrid = levelConfig.grid.map((row) => row.split(''))
+    this.mapHeight = this.floorGrid.length
+    this.mapWidth = this.floorGrid[0].length
+
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        if (this.floorGrid[y][x] === 'P') {
+          this.playerTX = x
+          this.playerTY = y
+          this.floorGrid[y][x] = '.'
+        }
+      }
+    }
   }
 
   renderBoard() {
@@ -191,14 +194,20 @@ export class BoardScene extends Phaser.Scene {
     this.children.removeAll()
     this.setupLevelLayout()
     this.renderBoard()
-    GameState.movesCount = 0
-    GameState.pushesCount = 0
-    GameState.uiBlocking = false
 
     const uiScene = this.scene.get('ui') as UIScene
     if (uiScene) {
       uiScene.hideVictoryBanner()
     }
+  }
+
+  nextLevel() {
+    if (GameState.currentLevelIndex < CAMPAIGN_LEVELS.length - 1) {
+      GameState.currentLevelIndex++
+    } else {
+      GameState.currentLevelIndex = 0
+    }
+    this.resetLevel()
   }
 
   update() {
@@ -277,7 +286,6 @@ export class BoardScene extends Phaser.Scene {
         return
       }
 
-      // Check ice sliding for pushed crate
       while (pushTile === 'I') {
         const nextTX = pushTX + dx
         const nextTY = pushTY + dy
@@ -295,19 +303,17 @@ export class BoardScene extends Phaser.Scene {
         return
       }
 
-      // Check Ice sliding for player after pushing crate
       while (this.floorGrid[finalPlayerTY][finalPlayerTX] === 'I') {
         const nextTX = finalPlayerTX + dx
         const nextTY = finalPlayerTY + dy
         if (nextTX < 0 || nextTX >= this.mapWidth || nextTY < 0 || nextTY >= this.mapHeight) break
-        if (nextTX === pushTX && nextTY === pushTY) break // Cannot slide into crate's new position
+        if (nextTX === pushTX && nextTY === pushTY) break
         const nextTile = this.floorGrid[nextTY][nextTX]
         if (nextTile === '#' || nextTile === 'O') break
         finalPlayerTX = nextTX
         finalPlayerTY = nextTY
       }
 
-      // Record step command for UNDO
       const record: StepRecord = {
         playerPrevTX: this.playerTX,
         playerPrevTY: this.playerTY,
@@ -369,7 +375,6 @@ export class BoardScene extends Phaser.Scene {
       return
     }
 
-    // Ice sliding momentum for player step
     while (this.floorGrid[finalPlayerTY][finalPlayerTX] === 'I') {
       const nextTX = finalPlayerTX + dx
       const nextTY = finalPlayerTY + dy
@@ -423,9 +428,12 @@ export class BoardScene extends Phaser.Scene {
 
     if (totalTargets > 0 && dockedCrates === totalTargets) {
       GameState.uiBlocking = true
+      const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
+      const stars = SaveSystem.saveLevelCompletion(levelConfig.id, GameState.movesCount, levelConfig.parMoves)
+
       const uiScene = this.scene.get('ui') as UIScene
       if (uiScene) {
-        uiScene.showVictoryBanner()
+        uiScene.showVictoryBanner(stars)
       }
     }
   }
