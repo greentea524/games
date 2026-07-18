@@ -4,8 +4,11 @@ import { WorldScene } from './scenes/WorldScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 
 function integerZoom(): number {
+  // Must match the #game box sizing in index.html's pre-init script, or
+  // the canvas is rendered larger than its container and overflow:hidden
+  // crops the edges (which was clipping the top-right minimap on desktop).
   const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches
-  const availableHeight = window.innerHeight - (isDesktop ? 110 : 380)
+  const availableHeight = window.innerHeight - (isDesktop ? 250 : 380)
   return Math.max(
     1,
     Math.min(
