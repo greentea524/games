@@ -348,9 +348,10 @@ export class WorldScene extends Phaser.Scene {
 
     // Frozen while a dialogue or menu is open.
     if (GameState.uiBlocking) {
+      const mode = GameState.paletteMode
       this.player.setVelocity(0, 0)
       this.player.anims.stop()
-      this.player.setTexture(`kid_${this.facing}_0`)
+      this.player.setTexture(`kid_${mode}_${this.facing}_0`)
       if (this.prompt) this.prompt.setVisible(false)
       return
     }
