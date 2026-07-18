@@ -7,6 +7,7 @@ export default defineConfig({
   base: '/games/',
   plugins: [react()],
   build: {
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
