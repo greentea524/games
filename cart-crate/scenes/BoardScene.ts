@@ -133,9 +133,9 @@ export class BoardScene extends Phaser.Scene {
         const py = y * TILE + TILE / 2
 
         if (char === '#') {
-          this.add.image(px, py, `tiles_${mode}`, 1)
+          this.add.image(px, py, `wall_${mode}`)
         } else if (char === 'T') {
-          this.add.image(px, py, `tiles_${mode}`, 0)
+          this.add.image(px, py, `floor_${mode}`)
           const targetSprite = this.add.image(px, py, `target_${mode}`)
           this.tweens.add({
             targets: targetSprite,
@@ -151,7 +151,7 @@ export class BoardScene extends Phaser.Scene {
         } else if (char === 'O') {
           this.add.image(px, py, `hole_${mode}`)
         } else {
-          this.add.image(px, py, `tiles_${mode}`, 0)
+          this.add.image(px, py, `floor_${mode}`)
         }
 
         if (char === 'C') {
@@ -179,7 +179,8 @@ export class BoardScene extends Phaser.Scene {
     this.children.each((child: Phaser.GameObjects.GameObject) => {
       if (child instanceof Phaser.GameObjects.Image) {
         const key = child.texture.key
-        if (key.startsWith('tiles_')) child.setTexture(`tiles_${mode}`, child.frame.name)
+        if (key.startsWith('floor_')) child.setTexture(`floor_${mode}`)
+        else if (key.startsWith('wall_')) child.setTexture(`wall_${mode}`)
         else if (key.startsWith('target_')) child.setTexture(`target_${mode}`)
         else if (key.startsWith('ice_')) child.setTexture(`ice_${mode}`)
         else if (key.startsWith('cracked_')) child.setTexture(`cracked_${mode}`)

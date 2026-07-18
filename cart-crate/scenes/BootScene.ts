@@ -20,47 +20,35 @@ export class BootScene extends Phaser.Scene {
   }
 
   private buildTileset(mode: 'dmg' | 'gbc') {
-    const key = `tiles_${mode}`
-    if (this.textures.exists(key)) return
-    const g = this.make.graphics({}, false)
-    const T = TILE
-    const at = (i: number) => i * T
+    if (this.textures.exists(`floor_${mode}`)) return
 
+    // Floor
+    const gFloor = this.make.graphics({}, false)
     if (mode === 'dmg') {
-      // 0: Floor
-      g.fillStyle(PAL.lightest); g.fillRect(at(0), 0, T, T)
-      g.fillStyle(PAL.light); g.fillRect(at(0) + 2, 2, 1, 1); g.fillRect(at(0) + 12, 10, 1, 1)
-
-      // 1: Wall
-      g.fillStyle(PAL.dark); g.fillRect(at(1), 0, T, T)
-      g.fillStyle(PAL.darkest)
-      for (let y = 0; y < T; y += 4) g.fillRect(at(1), y, T, 1)
-      for (let x = 0; x < T; x += 8) g.fillRect(at(1) + x, 0, 1, T)
-
-      // 2: Target Dot
-      g.fillStyle(PAL.lightest); g.fillRect(at(2), 0, T, T)
-      g.fillStyle(PAL.dark); g.fillCircle(at(2) + 8, 8, 4)
-      g.fillStyle(PAL.darkest); g.fillCircle(at(2) + 8, 8, 2)
+      gFloor.fillStyle(PAL.lightest); gFloor.fillRect(0, 0, TILE, TILE)
+      gFloor.fillStyle(PAL.light); gFloor.fillRect(2, 2, 1, 1); gFloor.fillRect(12, 10, 1, 1)
     } else {
-      // GBC COLOR
-      // 0: Floor
-      g.fillStyle(GBC_PAL.bgPath); g.fillRect(at(0), 0, T, T)
-      g.fillStyle(GBC_PAL.detailPath); g.fillRect(at(0) + 2, 2, 1, 1); g.fillRect(at(0) + 12, 10, 1, 1)
-
-      // 1: Wall
-      g.fillStyle(GBC_PAL.wallBg); g.fillRect(at(1), 0, T, T)
-      g.fillStyle(GBC_PAL.wallLine)
-      for (let y = 0; y < T; y += 4) g.fillRect(at(1), y, T, 1)
-      for (let x = 0; x < T; x += 8) g.fillRect(at(1) + x, 0, 1, T)
-
-      // 2: Target Dot
-      g.fillStyle(GBC_PAL.bgPath); g.fillRect(at(2), 0, T, T)
-      g.fillStyle(GBC_PAL.targetBg); g.fillCircle(at(2) + 8, 8, 4)
-      g.fillStyle(GBC_PAL.targetBorder); g.strokeCircle(at(2) + 8, 8, 4)
+      gFloor.fillStyle(GBC_PAL.bgPath); gFloor.fillRect(0, 0, TILE, TILE)
+      gFloor.fillStyle(GBC_PAL.detailPath); gFloor.fillRect(2, 2, 1, 1); gFloor.fillRect(12, 10, 1, 1)
     }
+    gFloor.generateTexture(`floor_${mode}`, TILE, TILE)
+    gFloor.destroy()
 
-    g.generateTexture(key, T * 4, T)
-    g.destroy()
+    // Wall
+    const gWall = this.make.graphics({}, false)
+    if (mode === 'dmg') {
+      gWall.fillStyle(PAL.dark); gWall.fillRect(0, 0, TILE, TILE)
+      gWall.fillStyle(PAL.darkest)
+      for (let y = 0; y < TILE; y += 4) gWall.fillRect(0, y, TILE, 1)
+      for (let x = 0; x < TILE; x += 8) gWall.fillRect(x, 0, 1, TILE)
+    } else {
+      gWall.fillStyle(GBC_PAL.wallBg); gWall.fillRect(0, 0, TILE, TILE)
+      gWall.fillStyle(GBC_PAL.wallLine)
+      for (let y = 0; y < TILE; y += 4) gWall.fillRect(0, y, TILE, 1)
+      for (let x = 0; x < TILE; x += 8) gWall.fillRect(x, 0, 1, TILE)
+    }
+    gWall.generateTexture(`wall_${mode}`, TILE, TILE)
+    gWall.destroy()
   }
 
   private buildSpecialTerrain(mode: 'dmg' | 'gbc') {
