@@ -252,8 +252,10 @@ function activateSelected() {
     renderAbout()
   } else if (pauseItems[selected] === 'Inventory') {
     closePause()
-    const uiScene = game?.scene?.getScene('ui') as UIScene
-    if (uiScene) uiScene.toggleInventory()
+    setTimeout(() => {
+      const uiScene = game?.scene?.getScene('ui') as UIScene
+      if (uiScene) uiScene.openInventory()
+    }, 50)
   } else if (pauseItems[selected] === 'Controls') {
     renderControls()
   }

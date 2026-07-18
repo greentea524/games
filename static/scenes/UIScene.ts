@@ -284,16 +284,26 @@ export class UIScene extends Phaser.Scene {
     })
   }
 
+  public openInventory() {
+    if (GameState.dialogueActive) return
+    GameState.inventoryOpen = true
+    this.inputLockUntil = this.time.now + 300
+    this.refreshInventory()
+    this.inv.setVisible(true)
+  }
+
+  public closeInventory() {
+    GameState.inventoryOpen = false
+    this.inv.setVisible(false)
+    GameState.uiClosedAt = this.time.now
+  }
+
   public toggleInventory() {
     if (GameState.dialogueActive) return
-    GameState.inventoryOpen = !GameState.inventoryOpen
-    this.inputLockUntil = this.time.now + 200
     if (GameState.inventoryOpen) {
-      this.refreshInventory()
-      this.inv.setVisible(true)
+      this.closeInventory()
     } else {
-      this.inv.setVisible(false)
-      GameState.uiClosedAt = this.time.now
+      this.openInventory()
     }
   }
 
