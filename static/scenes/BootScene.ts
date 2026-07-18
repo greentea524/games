@@ -29,6 +29,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   private buildTileset(mode: 'dmg' | 'gbc') {
+    const tileKey = `tiles_${mode}`
+    if (this.textures.exists(tileKey)) this.textures.remove(tileKey)
     const g = this.make.graphics({}, false)
     const T = TILE
     const at = (i: number) => i * T
@@ -120,7 +122,6 @@ export class BootScene extends Phaser.Scene {
   }
 
   private drawCharacter(
-    g: Phaser.GameObjects.Graphics,
     key: string,
     facing: Facing,
     step: number,
@@ -129,7 +130,8 @@ export class BootScene extends Phaser.Scene {
     hairColor: number,
     skinColor: number,
   ) {
-    g.clear()
+    if (this.textures.exists(key)) this.textures.remove(key)
+    const g = this.make.graphics({}, false)
     const cx = 8
     g.fillStyle(pantsColor)
     g.fillRect(cx - 3 + step, 13, 2, 3)
@@ -143,23 +145,24 @@ export class BootScene extends Phaser.Scene {
     else if (facing === 'left') { g.fillRect(cx - 3, 5, 1, 1) }
     else { g.fillRect(cx + 2, 5, 1, 1) }
     g.generateTexture(key, 16, 16)
+    g.destroy()
   }
 
   private buildPlayer(mode: 'dmg' | 'gbc') {
-    const g = this.make.graphics({}, false)
     const shirt = mode === 'dmg' ? PAL.dark : GBC_PAL.shirtHero
     const pants = mode === 'dmg' ? PAL.darkest : GBC_PAL.pantsHero
     const hair = mode === 'dmg' ? PAL.darkest : GBC_PAL.hairDark
     const skin = mode === 'dmg' ? PAL.lightest : GBC_PAL.skin
 
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
-      this.drawCharacter(g, `kid_${mode}_${f}_0`, f, 0, shirt, pants, hair, skin)
-      this.drawCharacter(g, `kid_${mode}_${f}_1`, f, 1, shirt, pants, hair, skin)
+      this.drawCharacter(`kid_${mode}_${f}_0`, f, 0, shirt, pants, hair, skin)
+      this.drawCharacter(`kid_${mode}_${f}_1`, f, 1, shirt, pants, hair, skin)
     })
-    g.destroy()
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
+      const animKey = `walk_${mode}_${f}`
+      if (this.anims.exists(animKey)) this.anims.remove(animKey)
       this.anims.create({
-        key: `walk_${mode}_${f}`,
+        key: animKey,
         frames: [{ key: `kid_${mode}_${f}_0` }, { key: `kid_${mode}_${f}_1` }],
         frameRate: 6,
         repeat: -1,
@@ -168,7 +171,6 @@ export class BootScene extends Phaser.Scene {
   }
 
   private buildNpcs(mode: 'dmg' | 'gbc') {
-    const g = this.make.graphics({}, false)
     const npcConfigs =
       mode === 'dmg'
         ? {
@@ -191,7 +193,6 @@ export class BootScene extends Phaser.Scene {
       }
       ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
         this.drawCharacter(
-          g,
           `npc_${mode}_${npc.id}_${f}`,
           f,
           0,
@@ -202,36 +203,45 @@ export class BootScene extends Phaser.Scene {
         )
       })
     }
-    g.destroy()
   }
 
   private buildItems(mode: 'dmg' | 'gbc') {
-    const g = this.make.graphics({}, false)
     if (mode === 'dmg') {
-      // Flashlight DMG
-      g.fillStyle(PAL.darkest); g.fillRect(2, 5, 8, 4)
-      g.fillStyle(PAL.light); g.fillRect(9, 4, 4, 6)
-      g.fillStyle(PAL.lightest); g.fillRect(12, 5, 2, 4)
-      g.generateTexture(`item_dmg_flashlight`, 16, 16)
-      g.clear()
-      // Flower DMG
-      g.fillStyle(PAL.dark); g.fillRect(7, 6, 2, 8)
-      g.fillStyle(PAL.darkest); g.fillCircle(8, 5, 3)
-      g.fillStyle(PAL.light); g.fillRect(4, 9, 2, 1); g.fillRect(10, 10, 2, 1)
-      g.generateTexture(`item_dmg_flower`, 16, 16)
+      const keyFlash = 'item_dmg_flashlight'
+      if (this.textures.exists(keyFlash)) this.textures.remove(keyFlash)
+      const g1 = this.make.graphics({}, false)
+      g1.fillStyle(PAL.darkest); g1.fillRect(2, 5, 8, 4)
+      g1.fillStyle(PAL.light); g1.fillRect(9, 4, 4, 6)
+      g1.fillStyle(PAL.lightest); g1.fillRect(12, 5, 2, 4)
+      g1.generateTexture(keyFlash, 16, 16)
+      g1.destroy()
+
+      const keyFlower = 'item_dmg_flower'
+      if (this.textures.exists(keyFlower)) this.textures.remove(keyFlower)
+      const g2 = this.make.graphics({}, false)
+      g2.fillStyle(PAL.dark); g2.fillRect(7, 6, 2, 8)
+      g2.fillStyle(PAL.darkest); g2.fillCircle(8, 5, 3)
+      g2.fillStyle(PAL.light); g2.fillRect(4, 9, 2, 1); g2.fillRect(10, 10, 2, 1)
+      g2.generateTexture(keyFlower, 16, 16)
+      g2.destroy()
     } else {
-      // Flashlight GBC
-      g.fillStyle(GBC_PAL.flashlightBody); g.fillRect(2, 5, 8, 4)
-      g.fillStyle(GBC_PAL.flashlightGlow); g.fillRect(9, 4, 4, 6)
-      g.fillStyle(0xffffff); g.fillRect(12, 5, 2, 4)
-      g.generateTexture(`item_gbc_flashlight`, 16, 16)
-      g.clear()
-      // Flower GBC
-      g.fillStyle(GBC_PAL.flowerStem); g.fillRect(7, 6, 2, 8)
-      g.fillStyle(GBC_PAL.flowerBloom); g.fillCircle(8, 5, 3)
-      g.fillStyle(GBC_PAL.grassBg); g.fillRect(4, 9, 2, 1); g.fillRect(10, 10, 2, 1)
-      g.generateTexture(`item_gbc_flower`, 16, 16)
+      const keyFlash = 'item_gbc_flashlight'
+      if (this.textures.exists(keyFlash)) this.textures.remove(keyFlash)
+      const g1 = this.make.graphics({}, false)
+      g1.fillStyle(GBC_PAL.flashlightBody); g1.fillRect(2, 5, 8, 4)
+      g1.fillStyle(GBC_PAL.flashlightGlow); g1.fillRect(9, 4, 4, 6)
+      g1.fillStyle(0xffffff); g1.fillRect(12, 5, 2, 4)
+      g1.generateTexture(keyFlash, 16, 16)
+      g1.destroy()
+
+      const keyFlower = 'item_gbc_flower'
+      if (this.textures.exists(keyFlower)) this.textures.remove(keyFlower)
+      const g2 = this.make.graphics({}, false)
+      g2.fillStyle(GBC_PAL.flowerStem); g2.fillRect(7, 6, 2, 8)
+      g2.fillStyle(GBC_PAL.flowerBloom); g2.fillCircle(8, 5, 3)
+      g2.fillStyle(GBC_PAL.grassBg); g2.fillRect(4, 9, 2, 1); g2.fillRect(10, 10, 2, 1)
+      g2.generateTexture(keyFlower, 16, 16)
+      g2.destroy()
     }
-    g.destroy()
   }
 }

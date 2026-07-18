@@ -229,7 +229,10 @@ export class WorldScene extends Phaser.Scene {
           ? 'up'
           : 'down'
     const mode = GameState.paletteMode
-    n.sprite.setTexture(`npc_${mode}_${n.def.id}_${n.facing}`)
+    const key = `npc_${mode}_${n.def.id}_${n.facing}`
+    if (this.textures.exists(key)) {
+      n.sprite.setTexture(key)
+    }
   }
 
   public reloadPalette() {
