@@ -47,6 +47,42 @@ export class BoardScene extends Phaser.Scene {
     this.undoKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
     this.resetKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R)
 
+    // Touch Swipe Gestures
+    let touchStartX = 0
+    let touchStartY = 0
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      touchStartX = pointer.x
+      touchStartY = pointer.y
+    })
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (this.isMoving || GameState.uiBlocking) return
+      const dx = pointer.x - touchStartX
+      const dy = pointer.y - touchStartY
+      const minDistance = 15
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (Math.abs(dx) > minDistance) {
+          if (dx > 0) {
+            this.facing = 'right'
+            this.tryMovePlayer(1, 0)
+          } else {
+            this.facing = 'left'
+            this.tryMovePlayer(-1, 0)
+          }
+        }
+      } else {
+        if (Math.abs(dy) > minDistance) {
+          if (dy > 0) {
+            this.facing = 'down'
+            this.tryMovePlayer(0, 1)
+          } else {
+            this.facing = 'up'
+            this.tryMovePlayer(0, -1)
+          }
+        }
+      }
+    })
+
     if (!this.scene.isActive('ui')) {
       this.scene.launch('ui')
     }
