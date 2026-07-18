@@ -22,6 +22,7 @@ export class UIScene extends Phaser.Scene {
   private nameText!: Phaser.GameObjects.Text
   private bodyText!: Phaser.GameObjects.Text
   private arrow!: Phaser.GameObjects.Text
+  private choiceBox!: Phaser.GameObjects.Graphics
   private choiceTexts: Phaser.GameObjects.Text[] = []
 
   // inventory
@@ -70,15 +71,19 @@ export class UIScene extends Phaser.Scene {
       })
       .setDepth(1001)
 
+    // Choices show in their own small box (top-right) so the question text
+    // in the main dialogue box stays visible.
+    this.choiceBox = this.add.graphics().setDepth(1001).setVisible(false)
     this.choiceTexts = [0, 1].map((i) =>
       this.add
-        .text(14, boxY + 16 + i * 12, '', {
+        .text(0, 0, '', {
           fontFamily: FONT,
           fontSize: '8px',
           color: CSS_LIGHT,
           resolution: 2,
         })
         .setDepth(1002)
+        .setVisible(false)
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => {
           if (!this.choiceMode) return
@@ -152,21 +157,34 @@ export class UIScene extends Phaser.Scene {
 
   private exitChoice() {
     this.choiceMode = false
+    this.choiceBox.setVisible(false)
     this.choiceTexts.forEach((t) => t.setVisible(false))
   }
 
   private renderChoices() {
+    const n = this.choices.length
+    const lineH = 11
+    const boxW = 58
+    const boxH = n * lineH + 6
+    const bx = GBC_WIDTH - boxW - 4
+    const by = 4
+    this.choiceBox.clear()
+    this.choiceBox.fillStyle(PAL.darkest, 0.95)
+    this.choiceBox.fillRoundedRect(bx, by, boxW, boxH, 3)
+    this.choiceBox.lineStyle(1, PAL.light, 1)
+    this.choiceBox.strokeRoundedRect(bx, by, boxW, boxH, 3)
+    this.choiceBox.setVisible(true)
+
     this.choiceTexts.forEach((t, i) => {
-      if (i < this.choices.length) {
+      if (i < n) {
         t.setVisible(true)
+        t.setPosition(bx + 5, by + 4 + i * lineH)
         t.setText((i === this.choiceIndex ? '▶ ' : '  ') + this.choices[i].label)
         t.setColor(i === this.choiceIndex ? '#e0f8cf' : CSS_LIGHT)
       } else {
         t.setVisible(false)
       }
     })
-    // choices replace the body text row
-    this.bodyText.setVisible(false)
   }
 
   private moveChoice(dir: number) {
@@ -194,7 +212,10 @@ export class UIScene extends Phaser.Scene {
     this.nameText.setVisible(v)
     this.bodyText.setVisible(v)
     this.arrow.setVisible(v)
-    if (!v) this.choiceTexts.forEach((t) => t.setVisible(false))
+    if (!v) {
+      this.choiceBox.setVisible(false)
+      this.choiceTexts.forEach((t) => t.setVisible(false))
+    }
   }
 
   private hideDialogue() {
