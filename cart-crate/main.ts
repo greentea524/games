@@ -71,6 +71,18 @@ document.querySelectorAll('[data-key]').forEach((btn) => {
   btn.addEventListener('mouseleave', handleRelease)
 })
 
+// SELECT button (Reset Level)
+const btnSelect = document.getElementById('btn-select')
+if (btnSelect) {
+  const triggerReset = (e: Event) => {
+    e.preventDefault()
+    const boardScene = game?.scene?.getScene('board') as BoardScene
+    if (boardScene) boardScene.resetLevel()
+  }
+  btnSelect.addEventListener('click', triggerReset)
+  btnSelect.addEventListener('touchstart', triggerReset, { passive: false })
+}
+
 // Palette Toggle Switch
 const paletteBtn = document.getElementById('palette-toggle')
 if (paletteBtn) {

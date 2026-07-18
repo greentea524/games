@@ -65,4 +65,8 @@ export class UIScene extends Phaser.Scene {
       ease: 'Back.out',
     })
   }
+
+  hideVictoryBanner() {
+    this.victoryContainer.setVisible(false)
+  }
 }
