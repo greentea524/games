@@ -22,5 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "lantern-keeper"]
+  "include": ["src", "lantern-keeper", "static"]
 }
