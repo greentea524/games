@@ -84,8 +84,9 @@ export class WorldScene extends Phaser.Scene {
     this.doorLockUntil = this.time.now + 800
     this.cameras.main.fadeIn(250, 15, 56, 15)
 
+    const mode = GameState.paletteMode
     const map = this.make.tilemap({ key: this.mapKey })
-    const tileset = map.addTilesetImage('tiles', 'tiles')!
+    const tileset = map.addTilesetImage('tiles', `tiles_${mode}`)!
     const ground = map.createLayer('ground', tileset)!
     ground.setCollision(SOLID_TILES)
 
@@ -108,7 +109,7 @@ export class WorldScene extends Phaser.Scene {
     }
     this.facing = facing
 
-    this.player = this.physics.add.sprite(sx, sy, `kid_${facing}_0`)
+    this.player = this.physics.add.sprite(sx, sy, `kid_${mode}_${facing}_0`)
     this.player.setCollideWorldBounds(true)
     // A slightly slimmer body than the sprite so movement feels roomy.
     this.player.body.setSize(10, 10).setOffset(3, 5)
@@ -143,7 +144,6 @@ export class WorldScene extends Phaser.Scene {
       )
     }
 
-
     // NPCs from the object layer (solid; block the player).
     this.npcs = []
     const npcGroup = this.physics.add.staticGroup()
@@ -155,7 +155,7 @@ export class WorldScene extends Phaser.Scene {
       const sprite = npcGroup.create(
         o.x! + TILE / 2,
         o.y! + TILE / 2,
-        `npc_${def.id}_down`,
+        `npc_${mode}_${def.id}_down`,
       ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
       sprite.body.setSize(12, 12).setOffset(2, 3)
       this.npcs.push({ sprite, def, facing: 'down' })
@@ -228,7 +228,19 @@ export class WorldScene extends Phaser.Scene {
         : dy < 0
           ? 'up'
           : 'down'
-    n.sprite.setTexture(`npc_${n.def.id}_${n.facing}`)
+    const mode = GameState.paletteMode
+    n.sprite.setTexture(`npc_${mode}_${n.def.id}_${n.facing}`)
+  }
+
+  public reloadPalette() {
+    this.scene.restart({
+      mapKey: this.mapKey,
+      tx: Math.floor(this.player.x / TILE),
+      ty: Math.floor(this.player.y / TILE),
+      facing: this.facing,
+      returnTX: this.returnTX,
+      returnTY: this.returnTY,
+    })
   }
 
   // A corner minimap showing buildings/water/trees + a blinking player
@@ -381,11 +393,13 @@ export class WorldScene extends Phaser.Scene {
       else if (vy > 0) this.facing = 'down'
       else if (vx < 0) this.facing = 'left'
       else if (vx > 0) this.facing = 'right'
-      this.player.anims.play(`walk_${this.facing}`, true)
+      const mode = GameState.paletteMode
+      this.player.anims.play(`walk_${mode}_${this.facing}`, true)
     } else {
+      const mode = GameState.paletteMode
       this.player.setVelocity(0, 0)
       this.player.anims.stop()
-      this.player.setTexture(`kid_${this.facing}_0`)
+      this.player.setTexture(`kid_${mode}_${this.facing}_0`)
     }
   }
 }

@@ -144,7 +144,8 @@ export class UIScene extends Phaser.Scene {
   public showItemToast(itemId: string) {
     const def = ITEMS[itemId]
     const itemName = def ? def.name : itemId
-    const iconKey = def ? def.icon : ''
+    const mode = GameState.paletteMode
+    const iconKey = def ? `item_${mode}_${def.id}` : ''
 
     if (this.toastContainer) this.toastContainer.destroy()
 
@@ -324,7 +325,9 @@ export class UIScene extends Phaser.Scene {
     GameState.inventory.forEach((id, i) => {
       const def = ITEMS[id]
       const y = 28 + i * 20
-      const icon = this.add.image(20, y + 4, def ? def.icon : '').setOrigin(0.5)
+      const mode = GameState.paletteMode
+      const iconKey = def ? `item_${mode}_${def.id}` : ''
+      const icon = this.add.image(20, y + 4, iconKey).setOrigin(0.5)
       const label = this.add.text(34, y, def ? def.name : id, {
         fontFamily: FONT,
         fontSize: '8px',

@@ -5,9 +5,15 @@ class GameStateClass {
   inventory: string[] = []
   dialogueActive = false
   inventoryOpen = false
-  // Game-clock time (ms) a dialogue/menu last closed; used to debounce the
-  // shared interact key so closing a box doesn't immediately reopen it.
   uiClosedAt = 0
+
+  paletteMode: 'dmg' | 'gbc' =
+    (localStorage.getItem('static_palette') as 'dmg' | 'gbc') || 'dmg'
+
+  setPaletteMode(mode: 'dmg' | 'gbc') {
+    this.paletteMode = mode
+    localStorage.setItem('static_palette', mode)
+  }
 
   get uiBlocking(): boolean {
     return this.dialogueActive || this.inventoryOpen

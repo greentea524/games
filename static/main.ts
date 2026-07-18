@@ -3,6 +3,7 @@ import { BootScene } from './scenes/BootScene'
 import { WorldScene } from './scenes/WorldScene'
 import { UIScene } from './scenes/UIScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
+import { GameState } from './state'
 
 function integerZoom(): number {
   // Must match the #game box sizing in index.html's pre-init script, or
@@ -327,6 +328,25 @@ window.addEventListener('keydown', (e) => {
     closePause()
   }
 })
+
+const paletteBtn = document.getElementById('palette-toggle')
+if (paletteBtn) {
+  const updatePaletteBtn = () => {
+    const isGbc = GameState.paletteMode === 'gbc'
+    paletteBtn.innerText = isGbc ? 'COLOR' : 'MONO'
+    paletteBtn.style.color = isGbc ? '#f8e050' : '#9bbc0f'
+    paletteBtn.style.borderColor = isGbc ? '#c84838' : '#8bac0f'
+    paletteBtn.style.background = isGbc ? '#381818' : '#1e281d'
+  }
+  updatePaletteBtn()
+  paletteBtn.addEventListener('click', () => {
+    const nextMode = GameState.paletteMode === 'gbc' ? 'dmg' : 'gbc'
+    GameState.setPaletteMode(nextMode)
+    updatePaletteBtn()
+    const worldScene = game?.scene?.getScene('world') as WorldScene
+    if (worldScene) worldScene.reloadPalette()
+  })
+}
 
 // Prevent double-tap zoom and multi-touch pinch zoom on mobile
 document.addEventListener(
