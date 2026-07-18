@@ -120,9 +120,14 @@ export class UIScene extends Phaser.Scene {
     this.showLine()
   }
 
+  private toastContainer?: Phaser.GameObjects.Container
+
   private showLine() {
     const line = this.lines[this.lineIndex]
-    if (line.give) GameState.addItem(line.give)
+    if (line.give) {
+      const added = GameState.addItem(line.give)
+      if (added) this.showItemToast(line.give)
+    }
     if (line.setFlag) GameState.setFlag(line.setFlag)
 
     this.nameText.setText(this.activeNpc?.name ?? '')
@@ -134,6 +139,52 @@ export class UIScene extends Phaser.Scene {
       this.exitChoice()
       this.arrow.setVisible(true)
     }
+  }
+
+  public showItemToast(itemId: string) {
+    const def = ITEMS[itemId]
+    const itemName = def ? def.name : itemId
+    const iconKey = def ? def.icon : ''
+
+    if (this.toastContainer) this.toastContainer.destroy()
+
+    const w = GBC_WIDTH - 16
+    const h = 22
+    const cx = GBC_WIDTH / 2
+    const startY = -h - 2
+    const endY = 4
+
+    const bg = this.add.graphics()
+    bg.fillStyle(PAL.darkest, 0.96)
+    bg.fillRoundedRect(-w / 2, 0, w, h, 3)
+    bg.lineStyle(1, PAL.light, 1)
+    bg.strokeRoundedRect(-w / 2, 0, w, h, 3)
+
+    const icon = this.add.image(-w / 2 + 12, h / 2, iconKey).setOrigin(0.5)
+    const text = this.add.text(-w / 2 + 24, 3, `Obtained ${itemName}!\nStored into inventory.`, {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: '#e0f8cf',
+      resolution: 2,
+      lineSpacing: 2,
+    })
+
+    this.toastContainer = this.add.container(cx, startY, [bg, icon, text]).setDepth(2000)
+
+    this.tweens.add({
+      targets: this.toastContainer,
+      y: endY,
+      duration: 300,
+      ease: 'Back.easeOut',
+      hold: 2400,
+      yoyo: true,
+      onComplete: () => {
+        if (this.toastContainer) {
+          this.toastContainer.destroy()
+          this.toastContainer = undefined
+        }
+      },
+    })
   }
 
   private advance() {

@@ -20,8 +20,12 @@ class GameStateClass {
     return !!this.flags[key]
   }
 
-  addItem(id: string) {
-    if (!this.inventory.includes(id)) this.inventory.push(id)
+  addItem(id: string): boolean {
+    if (!this.inventory.includes(id)) {
+      this.inventory.push(id)
+      return true
+    }
+    return false
   }
   hasItem(id: string): boolean {
     return this.inventory.includes(id)
