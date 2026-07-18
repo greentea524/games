@@ -58,7 +58,11 @@ export class BoardScene extends Phaser.Scene {
       touchStartY = pointer.y
     })
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (this.isMoving || GameState.uiBlocking) return
+      if (GameState.uiBlocking) {
+        this.nextLevel()
+        return
+      }
+      if (this.isMoving) return
       const dx = pointer.x - touchStartX
       const dy = pointer.y - touchStartY
       const minDistance = 15
@@ -74,7 +78,7 @@ export class BoardScene extends Phaser.Scene {
           }
         }
       } else {
-        if (Math.abs(dy) > Math.abs(dy)) {
+        if (Math.abs(dy) > minDistance) {
           if (dy > 0) {
             this.facing = 'down'
             this.tryMovePlayer(0, 1)
@@ -211,6 +215,27 @@ export class BoardScene extends Phaser.Scene {
   }
 
   update() {
+    if (GameState.uiBlocking) {
+      const kb = this.input.keyboard!
+      if (
+        Phaser.Input.Keyboard.JustDown(this.undoKey) ||
+        Phaser.Input.Keyboard.JustDown(this.resetKey) ||
+        kb.addKey('SPACE').isDown ||
+        kb.addKey('ENTER').isDown ||
+        kb.addKey('UP').isDown ||
+        kb.addKey('DOWN').isDown ||
+        kb.addKey('LEFT').isDown ||
+        kb.addKey('RIGHT').isDown ||
+        kb.addKey('W').isDown ||
+        kb.addKey('S').isDown ||
+        kb.addKey('A').isDown ||
+        kb.addKey('D').isDown
+      ) {
+        this.nextLevel()
+      }
+      return
+    }
+
     if (Phaser.Input.Keyboard.JustDown(this.undoKey)) {
       this.undoMove()
       return
@@ -221,7 +246,7 @@ export class BoardScene extends Phaser.Scene {
       return
     }
 
-    if (this.isMoving || GameState.uiBlocking) return
+    if (this.isMoving) return
 
     const kb = this.input.keyboard!
     let dx = 0

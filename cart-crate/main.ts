@@ -20,16 +20,6 @@ const config: Phaser.Types.Core.GameConfig = {
 
 export const game = new Phaser.Game(config)
 
-// Simulated Key Presses for On-Screen Controls
-const SIMULATED_KEYS: Record<string, string> = {
-  ArrowUp: 'ArrowUp',
-  ArrowDown: 'ArrowDown',
-  ArrowLeft: 'ArrowLeft',
-  ArrowRight: 'ArrowRight',
-  KeyZ: 'KeyZ',
-  KeyX: 'KeyX',
-}
-
 const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
   const keyMap: Record<string, string> = {
     ArrowUp: 'ArrowUp',
@@ -81,6 +71,22 @@ if (btnSelect) {
   }
   btnSelect.addEventListener('click', triggerReset)
   btnSelect.addEventListener('touchstart', triggerReset, { passive: false })
+}
+
+// START button (Next Stage / Confirm)
+const btnStart = document.getElementById('btn-start')
+if (btnStart) {
+  const triggerStart = (e: Event) => {
+    e.preventDefault()
+    const boardScene = game?.scene?.getScene('board') as BoardScene
+    if (boardScene) {
+      if (GameState.uiBlocking) {
+        boardScene.nextLevel()
+      }
+    }
+  }
+  btnStart.addEventListener('click', triggerStart)
+  btnStart.addEventListener('touchstart', triggerStart, { passive: false })
 }
 
 // Palette Toggle Switch
