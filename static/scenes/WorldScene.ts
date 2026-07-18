@@ -20,6 +20,8 @@ interface DoorData {
   target: string
   tx: number
   ty: number
+  returnTX?: number
+  returnTY?: number
 }
 
 interface NpcInstance {
@@ -55,16 +57,30 @@ export class WorldScene extends Phaser.Scene {
     super('world')
   }
 
-  init(data: { mapKey?: string; tx?: number; ty?: number; facing?: Facing }) {
+  private returnTX?: number
+  private returnTY?: number
+  private doorLockUntil = 0
+
+  init(data: {
+    mapKey?: string
+    tx?: number
+    ty?: number
+    facing?: Facing
+    returnTX?: number
+    returnTY?: number
+  }) {
     this.mapKey = data.mapKey ?? 'town'
     this.spawnTX = data.tx
     this.spawnTY = data.ty
     this.spawnFacing = data.facing
+    this.returnTX = data.returnTX
+    this.returnTY = data.returnTY
   }
 
   create() {
     this.transitioning = false
     this.doors = []
+    this.doorLockUntil = this.time.now + 800
     this.cameras.main.fadeIn(250, 15, 56, 15)
 
     const map = this.make.tilemap({ key: this.mapKey })
@@ -107,15 +123,25 @@ export class WorldScene extends Phaser.Scene {
       if (o.name !== 'door') continue
       const target = o.properties?.find((p: any) => p.name === 'target')?.value
       if (!target) continue
-      const tx = o.properties?.find((p: any) => p.name === 'tx')?.value ?? 0
-      const ty = o.properties?.find((p: any) => p.name === 'ty')?.value ?? 0
+      let tx = o.properties?.find((p: any) => p.name === 'tx')?.value ?? 0
+      let ty = o.properties?.find((p: any) => p.name === 'ty')?.value ?? 0
+      const returnTX = o.properties?.find((p: any) => p.name === 'returnTX')?.value
+      const returnTY = o.properties?.find((p: any) => p.name === 'returnTY')?.value
+
+      // If returning to town and we have a dynamic return position from the door entered
+      if (target === 'town' && this.returnTX !== undefined && this.returnTY !== undefined) {
+        tx = this.returnTX
+        ty = this.returnTY
+      }
+
       const zone = this.add.zone(o.x! + TILE / 2, o.y! + TILE / 2, TILE, TILE)
       this.physics.add.existing(zone, true)
-      this.doors.push({ zone, target, tx, ty })
+      this.doors.push({ zone, target, tx, ty, returnTX, returnTY })
       this.physics.add.overlap(this.player, zone, () =>
-        this.enterDoor(target, tx, ty),
+        this.enterDoor(target, tx, ty, returnTX, returnTY),
       )
     }
+
 
     // NPCs from the object layer (solid; block the player).
     this.npcs = []
@@ -267,13 +293,26 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private enterDoor(target: string, tx: number, ty: number) {
-    if (this.transitioning) return
+  private enterDoor(
+    target: string,
+    tx: number,
+    ty: number,
+    returnTX?: number,
+    returnTY?: number,
+  ) {
+    if (this.transitioning || this.time.now < this.doorLockUntil) return
     this.transitioning = true
     this.player.setVelocity(0, 0)
     this.cameras.main.fadeOut(250, 15, 56, 15)
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.restart({ mapKey: target, tx, ty, facing: this.facing })
+      this.scene.restart({
+        mapKey: target,
+        tx,
+        ty,
+        facing: this.facing,
+        returnTX,
+        returnTY,
+      })
     })
   }
 

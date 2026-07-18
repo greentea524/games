@@ -588,6 +588,53 @@
        "name": "ty",
        "type": "int",
        "value": 7
+      },
+      {
+       "name": "returnTX",
+       "type": "int",
+       "value": 6
+      },
+      {
+       "name": "returnTY",
+       "type": "int",
+       "value": 9
+      }
+     ]
+    },
+    {
+     "name": "door",
+     "type": "door",
+     "x": 272,
+     "y": 192,
+     "width": 16,
+     "height": 16,
+     "visible": true,
+     "rotation": 0,
+     "properties": [
+      {
+       "name": "target",
+       "type": "string",
+       "value": "house2"
+      },
+      {
+       "name": "tx",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "name": "ty",
+       "type": "int",
+       "value": 7
+      },
+      {
+       "name": "returnTX",
+       "type": "int",
+       "value": 17
+      },
+      {
+       "name": "returnTY",
+       "type": "int",
+       "value": 14
       }
      ]
     },
@@ -645,7 +692,7 @@
     {
      "name": "npc",
      "type": "npc",
-     "x": 288,
+     "x": 240,
      "y": 128,
      "width": 16,
      "height": 16,

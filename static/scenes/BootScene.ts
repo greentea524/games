@@ -3,6 +3,7 @@ import { TILE, PAL } from '../constants'
 import { NPCS } from '../dialogue'
 import townUrl from '../assets/town.json?url'
 import houseUrl from '../assets/house.json?url'
+import house2Url from '../assets/house2.json?url'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 type Shade = 'lightest' | 'light' | 'dark' | 'darkest'
@@ -15,6 +16,7 @@ export class BootScene extends Phaser.Scene {
   preload() {
     this.load.tilemapTiledJSON('town', townUrl)
     this.load.tilemapTiledJSON('house', houseUrl)
+    this.load.tilemapTiledJSON('house2', house2Url)
   }
 
   create() {
