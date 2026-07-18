@@ -151,15 +151,15 @@ const isDesktop = () =>
   window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
 let paused = false
-let view: 'pause' | 'controls' = 'pause'
+let view: 'pause' | 'controls' | 'about' = 'pause'
 let controlsMode: 'keyboard' | 'touch' = 'keyboard'
-const pauseItems = ['Resume', 'Inventory', 'Controls']
+const pauseItems = ['Resume', 'About', 'Inventory', 'Controls']
 let selected = 0
 
 function pauseButtonsMarkup(): string {
   return `
     <h2>PAUSED</h2>
-    <div style="display:flex; flex-direction:column; gap:12px; margin-top:16px; align-items:center;">
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:12px; align-items:center;">
       ${pauseItems
         .map(
           (label, i) =>
@@ -188,6 +188,24 @@ function updateSelection() {
     if (!btn) return
     btn.style.color = i === selected ? '#e0f8cf' : '#86b06a'
     btn.innerText = (i === selected ? '> ' : '') + label
+  })
+}
+
+function renderAbout() {
+  if (!overlayText) return
+  view = 'about'
+  overlayText.innerHTML = `
+    <h2>ABOUT STATIC</h2>
+    <p style="font-size:8px; color:#8bac0f; text-align:center; line-height:1.7; margin-top:8px;">
+      A GBC top-down mystery.<br/><br/>
+      Houses are vanishing from town, but nobody else remembers.<br/><br/>
+      Explore the Static-side world through retro TV portals to uncover clues.
+    </p>
+    <div style="margin-top:12px;">
+      <button id="about-back" class="overlay-btn">Back</button>
+    </div>`
+  document.getElementById('about-back')?.addEventListener('click', () => {
+    renderPause()
   })
 }
 
@@ -229,6 +247,8 @@ function renderControls() {
 function activateSelected() {
   if (pauseItems[selected] === 'Resume') {
     closePause()
+  } else if (pauseItems[selected] === 'About') {
+    renderAbout()
   } else if (pauseItems[selected] === 'Inventory') {
     closePause()
     const uiScene = game?.scene?.getScene('ui') as UIScene
@@ -267,7 +287,7 @@ window.addEventListener('keydown', (e) => {
     return
   }
   e.preventDefault()
-  if (view === 'controls') {
+  if (view === 'controls' || view === 'about') {
     if (['Escape', 'Enter', 'z', 'Z', 'x', 'X'].includes(e.key)) renderPause()
     return
   }
