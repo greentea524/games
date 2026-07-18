@@ -6,7 +6,7 @@ import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 
 function integerZoom(): number {
   const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-  const availableHeight = window.innerHeight - (isDesktop ? 300 : 380)
+  const availableHeight = window.innerHeight - (isDesktop ? 250 : 380)
   return Math.max(
     1,
     Math.min(

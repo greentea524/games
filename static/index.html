@@ -21,7 +21,7 @@
       (function() {
         var gbcW = 160, gbcH = 144;
         var isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-        var availH = window.innerHeight - (isDesktop ? 300 : 380);
+        var availH = window.innerHeight - (isDesktop ? 250 : 380);
         var zoom = Math.max(1, Math.min(
           Math.floor((window.innerWidth - 40) / gbcW),
           Math.floor(availH / gbcH)
@@ -74,6 +74,10 @@
 
       @media (hover: hover) and (pointer: fine) {
         .sys-btns { display: none !important; }
+        .gb-shell { padding: 10px !important; }
+        .gb-logo { margin-bottom: 5px !important; }
+        #game { margin-bottom: 10px !important; }
+        .gb-controls { margin-bottom: 0 !important; padding: 5px !important; }
       }
     </style>
   </head>
