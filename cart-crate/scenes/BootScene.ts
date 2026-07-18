@@ -14,6 +14,7 @@ export class BootScene extends Phaser.Scene {
       this.buildPlayer(mode)
       this.buildCrate(mode)
       this.buildTarget(mode)
+      this.buildSpecialTerrain(mode)
     })
     this.scene.start('board')
   }
@@ -62,6 +63,42 @@ export class BootScene extends Phaser.Scene {
     g.destroy()
   }
 
+  private buildSpecialTerrain(mode: 'dmg' | 'gbc') {
+    const g = this.make.graphics({}, false)
+    const light = mode === 'dmg' ? PAL.lightest : 0xa0d8ef
+    const dark = mode === 'dmg' ? PAL.dark : 0x4080a0
+    const pitColor = mode === 'dmg' ? PAL.darkest : 0x141018
+
+    // Ice Tile
+    if (!this.textures.exists(`ice_${mode}`)) {
+      g.clear()
+      g.fillStyle(light); g.fillRect(0, 0, 16, 16)
+      g.fillStyle(dark)
+      g.fillRect(3, 4, 10, 1); g.fillRect(2, 9, 8, 1); g.fillRect(6, 13, 7, 1)
+      g.generateTexture(`ice_${mode}`, 16, 16)
+    }
+
+    // Cracked Floor Tile
+    if (!this.textures.exists(`cracked_${mode}`)) {
+      g.clear()
+      const floorBg = mode === 'dmg' ? PAL.lightest : GBC_PAL.bgPath
+      g.fillStyle(floorBg); g.fillRect(0, 0, 16, 16)
+      g.fillStyle(dark)
+      g.fillRect(4, 2, 2, 6); g.fillRect(6, 8, 5, 2); g.fillRect(11, 10, 2, 4)
+      g.generateTexture(`cracked_${mode}`, 16, 16)
+    }
+
+    // Hole Pit Tile
+    if (!this.textures.exists(`hole_${mode}`)) {
+      g.clear()
+      g.fillStyle(pitColor); g.fillRect(0, 0, 16, 16)
+      g.fillStyle(0x000000); g.fillRect(2, 2, 12, 12)
+      g.generateTexture(`hole_${mode}`, 16, 16)
+    }
+
+    g.destroy()
+  }
+
   private drawFoxPlayer(
     g: Phaser.GameObjects.Graphics,
     key: string,
@@ -90,18 +127,18 @@ export class BootScene extends Phaser.Scene {
     // Snout / Face
     if (facing === 'down') {
       g.fillStyle(whiteColor); g.fillRect(cx - 3, 6, 6, 3)
-      g.fillStyle(darkColor); g.fillRect(cx - 1, 6, 2, 2) // nose
-      g.fillRect(cx - 3, 4, 1, 1); g.fillRect(cx + 2, 4, 1, 1) // eyes
+      g.fillStyle(darkColor); g.fillRect(cx - 1, 6, 2, 2)
+      g.fillRect(cx - 3, 4, 1, 1); g.fillRect(cx + 2, 4, 1, 1)
     } else if (facing === 'up') {
       g.fillStyle(furColor); g.fillRect(cx - 5, 3, 10, 6)
     } else if (facing === 'left') {
       g.fillStyle(whiteColor); g.fillRect(cx - 6, 6, 4, 3)
-      g.fillStyle(darkColor); g.fillRect(cx - 6, 6, 2, 2) // nose
-      g.fillRect(cx - 3, 4, 1, 1) // eye
+      g.fillStyle(darkColor); g.fillRect(cx - 6, 6, 2, 2)
+      g.fillRect(cx - 3, 4, 1, 1)
     } else {
       g.fillStyle(whiteColor); g.fillRect(cx + 2, 6, 4, 3)
-      g.fillStyle(darkColor); g.fillRect(cx + 4, 6, 2, 2) // nose
-      g.fillRect(cx + 2, 4, 1, 1) // eye
+      g.fillStyle(darkColor); g.fillRect(cx + 4, 6, 2, 2)
+      g.fillRect(cx + 2, 4, 1, 1)
     }
 
     // Shirt / Body

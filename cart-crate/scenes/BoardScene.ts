@@ -12,6 +12,7 @@ export interface CrateInstance {
   tx: number
   ty: number
   docked: boolean
+  destroyed?: boolean
 }
 
 export class BoardScene extends Phaser.Scene {
@@ -89,18 +90,19 @@ export class BoardScene extends Phaser.Scene {
   }
 
   setupLevelLayout() {
-    this.playerTX = 2
+    this.playerTX = 1
     this.playerTY = 2
     this.facing = 'down'
     this.isMoving = false
     this.undoStack = []
 
+    // Level Layout introducing Ice ('I'), Cracked ('X'), and Target ('T')
     this.floorGrid = [
       ['#','#','#','#','#','#','#','#','#','#'],
       ['#','.','.','.','.','.','.','.','.','#'],
-      ['#','.','.','.','.','.','.','.','.','#'],
-      ['#','.','.','C','.','.','.','T','.','#'],
-      ['#','.','.','.','.','.','.','.','.','#'],
+      ['#','.','.','I','I','C','.','.','.','#'],
+      ['#','.','.','.','.','.','.','T','.','#'],
+      ['#','.','.','X','.','.','.','.','.','#'],
       ['#','.','.','C','.','.','.','T','.','#'],
       ['#','.','.','.','.','.','.','.','.','#'],
       ['#','.','.','.','.','.','.','.','.','#'],
@@ -123,6 +125,12 @@ export class BoardScene extends Phaser.Scene {
           this.add.image(px, py, `tiles_${mode}`, 1)
         } else if (char === 'T') {
           this.add.image(px, py, `target_${mode}`)
+        } else if (char === 'I') {
+          this.add.image(px, py, `ice_${mode}`)
+        } else if (char === 'X') {
+          this.add.image(px, py, `cracked_${mode}`)
+        } else if (char === 'O') {
+          this.add.image(px, py, `hole_${mode}`)
         } else {
           this.add.image(px, py, `tiles_${mode}`, 0)
         }
@@ -237,47 +245,74 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private tryMovePlayer(dx: number, dy: number) {
-    const targetTX = this.playerTX + dx
-    const targetTY = this.playerTY + dy
+    let finalPlayerTX = this.playerTX + dx
+    let finalPlayerTY = this.playerTY + dy
     const mode = GameState.paletteMode
 
-    if (targetTX < 0 || targetTX >= this.mapWidth || targetTY < 0 || targetTY >= this.mapHeight) {
+    if (finalPlayerTX < 0 || finalPlayerTX >= this.mapWidth || finalPlayerTY < 0 || finalPlayerTY >= this.mapHeight) {
       this.player.setTexture(`player_${mode}_${this.facing}`)
       return
     }
 
-    if (this.floorGrid[targetTY][targetTX] === '#') {
+    const destTile = this.floorGrid[finalPlayerTY][finalPlayerTX]
+    if (destTile === '#' || destTile === 'O') {
       this.player.setTexture(`player_${mode}_${this.facing}`)
       return
     }
 
-    const crateAtTarget = this.crates.find((c) => c.tx === targetTX && c.ty === targetTY)
+    const crateAtTarget = this.crates.find((c) => !c.destroyed && c.tx === finalPlayerTX && c.ty === finalPlayerTY)
 
     if (crateAtTarget) {
-      const pushTX = targetTX + dx
-      const pushTY = targetTY + dy
+      let pushTX = finalPlayerTX + dx
+      let pushTY = finalPlayerTY + dy
 
       if (pushTX < 0 || pushTX >= this.mapWidth || pushTY < 0 || pushTY >= this.mapHeight) {
         this.player.setTexture(`player_${mode}_${this.facing}`)
         return
       }
-      if (this.floorGrid[pushTY][pushTX] === '#') {
+
+      let pushTile = this.floorGrid[pushTY][pushTX]
+      if (pushTile === '#') {
         this.player.setTexture(`player_${mode}_${this.facing}`)
         return
       }
 
-      const crateAtPush = this.crates.find((c) => c.tx === pushTX && c.ty === pushTY)
+      // Check ice sliding for pushed crate
+      while (pushTile === 'I') {
+        const nextTX = pushTX + dx
+        const nextTY = pushTY + dy
+        if (nextTX < 0 || nextTX >= this.mapWidth || nextTY < 0 || nextTY >= this.mapHeight) break
+        const nextTile = this.floorGrid[nextTY][nextTX]
+        if (nextTile === '#' || this.crates.some((c) => !c.destroyed && c.tx === nextTX && c.ty === nextTY)) break
+        pushTX = nextTX
+        pushTY = nextTY
+        pushTile = nextTile
+      }
+
+      const crateAtPush = this.crates.find((c) => !c.destroyed && c.tx === pushTX && c.ty === pushTY)
       if (crateAtPush) {
         this.player.setTexture(`player_${mode}_${this.facing}`)
         return
+      }
+
+      // Check Ice sliding for player after pushing crate
+      while (this.floorGrid[finalPlayerTY][finalPlayerTX] === 'I') {
+        const nextTX = finalPlayerTX + dx
+        const nextTY = finalPlayerTY + dy
+        if (nextTX < 0 || nextTX >= this.mapWidth || nextTY < 0 || nextTY >= this.mapHeight) break
+        if (nextTX === pushTX && nextTY === pushTY) break // Cannot slide into crate's new position
+        const nextTile = this.floorGrid[nextTY][nextTX]
+        if (nextTile === '#' || nextTile === 'O') break
+        finalPlayerTX = nextTX
+        finalPlayerTY = nextTY
       }
 
       // Record step command for UNDO
       const record: StepRecord = {
         playerPrevTX: this.playerTX,
         playerPrevTY: this.playerTY,
-        playerNextTX: targetTX,
-        playerNextTY: targetTY,
+        playerNextTX: finalPlayerTX,
+        playerNextTY: finalPlayerTY,
         facing: this.facing,
         crate: crateAtTarget,
         cratePrevTX: crateAtTarget.tx,
@@ -289,8 +324,8 @@ export class BoardScene extends Phaser.Scene {
       }
 
       this.isMoving = true
-      this.playerTX = targetTX
-      this.playerTY = targetTY
+      this.playerTX = finalPlayerTX
+      this.playerTY = finalPlayerTY
       crateAtTarget.tx = pushTX
       crateAtTarget.ty = pushTY
 
@@ -304,8 +339,8 @@ export class BoardScene extends Phaser.Scene {
 
       this.player.setTexture(`player_${mode}_${this.facing}`)
 
-      const playerPX = targetTX * TILE + TILE / 2
-      const playerPY = targetTY * TILE + TILE / 2
+      const playerPX = finalPlayerTX * TILE + TILE / 2
+      const playerPY = finalPlayerTY * TILE + TILE / 2
       const cratePX = pushTX * TILE + TILE / 2
       const cratePY = pushTY * TILE + TILE / 2
 
@@ -313,7 +348,7 @@ export class BoardScene extends Phaser.Scene {
         targets: this.player,
         x: playerPX,
         y: playerPY,
-        duration: 120,
+        duration: 140,
         ease: 'Linear',
       })
 
@@ -321,7 +356,7 @@ export class BoardScene extends Phaser.Scene {
         targets: crateAtTarget.sprite,
         x: cratePX,
         y: cratePY,
-        duration: 120,
+        duration: 140,
         ease: 'Linear',
         onComplete: () => {
           this.isMoving = false
@@ -334,12 +369,22 @@ export class BoardScene extends Phaser.Scene {
       return
     }
 
-    // Standard player step move (no crate push)
+    // Ice sliding momentum for player step
+    while (this.floorGrid[finalPlayerTY][finalPlayerTX] === 'I') {
+      const nextTX = finalPlayerTX + dx
+      const nextTY = finalPlayerTY + dy
+      if (nextTX < 0 || nextTX >= this.mapWidth || nextTY < 0 || nextTY >= this.mapHeight) break
+      const nextTile = this.floorGrid[nextTY][nextTX]
+      if (nextTile === '#' || nextTile === 'O' || this.crates.some((c) => !c.destroyed && c.tx === nextTX && c.ty === nextTY)) break
+      finalPlayerTX = nextTX
+      finalPlayerTY = nextTY
+    }
+
     const record: StepRecord = {
       playerPrevTX: this.playerTX,
       playerPrevTY: this.playerTY,
-      playerNextTX: targetTX,
-      playerNextTY: targetTY,
+      playerNextTX: finalPlayerTX,
+      playerNextTY: finalPlayerTY,
       facing: this.facing,
       crate: null,
       cratePrevTX: null,
@@ -351,18 +396,18 @@ export class BoardScene extends Phaser.Scene {
     }
 
     this.isMoving = true
-    this.playerTX = targetTX
-    this.playerTY = targetTY
+    this.playerTX = finalPlayerTX
+    this.playerTY = finalPlayerTY
     this.player.setTexture(`player_${mode}_${this.facing}`)
 
-    const targetPX = targetTX * TILE + TILE / 2
-    const targetPY = targetTY * TILE + TILE / 2
+    const targetPX = finalPlayerTX * TILE + TILE / 2
+    const targetPY = finalPlayerTY * TILE + TILE / 2
 
     this.tweens.add({
       targets: this.player,
       x: targetPX,
       y: targetPY,
-      duration: 120,
+      duration: 140,
       ease: 'Linear',
       onComplete: () => {
         this.isMoving = false
@@ -374,7 +419,7 @@ export class BoardScene extends Phaser.Scene {
 
   private checkWinCondition() {
     const totalTargets = this.floorGrid.flat().filter((tile) => tile === 'T').length
-    const dockedCrates = this.crates.filter((c) => c.docked).length
+    const dockedCrates = this.crates.filter((c) => !c.destroyed && c.docked).length
 
     if (totalTargets > 0 && dockedCrates === totalTargets) {
       GameState.uiBlocking = true
