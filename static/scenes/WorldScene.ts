@@ -41,7 +41,7 @@ export class WorldScene extends Phaser.Scene {
 
   private npcs: NpcInstance[] = []
   private interactKey!: Phaser.Input.Keyboard.Key
-  private prompt?: Phaser.GameObjects.Text
+  private prompt?: Phaser.GameObjects.Container
 
   // Minimap (only on maps larger than one screen)
   private blip?: Phaser.GameObjects.Graphics
@@ -166,18 +166,21 @@ export class WorldScene extends Phaser.Scene {
       .matches
       ? 'Z'
       : 'A'
-    this.prompt = this.add
-      .text(0, 0, promptLabel, {
-        fontFamily: '"Press Start 2P"',
-        fontSize: '8px',
-        color: '#0f380f',
-        backgroundColor: '#9bbc0f',
-        padding: { x: 2, y: 2 },
-        resolution: 2,
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(900)
-      .setVisible(false)
+
+    const boxGfx = this.add.graphics()
+    boxGfx.fillStyle(PAL.lightest, 1)
+    boxGfx.fillRoundedRect(-6, -11, 12, 11, 2)
+    boxGfx.lineStyle(1, PAL.darkest, 1)
+    boxGfx.strokeRoundedRect(-6, -11, 12, 11, 2)
+
+    const labelTxt = this.add.text(0, -6, promptLabel, {
+      fontFamily: 'monospace',
+      fontSize: '8px',
+      fontStyle: 'bold',
+      color: '#0f380f',
+    }).setOrigin(0.5)
+
+    this.prompt = this.add.container(0, 0, [boxGfx, labelTxt]).setDepth(2000).setVisible(false)
 
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<
