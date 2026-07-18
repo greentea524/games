@@ -135,8 +135,12 @@ export class WorldScene extends Phaser.Scene {
     }
     this.physics.add.collider(this.player, npcGroup)
 
+    const promptLabel = window.matchMedia('(hover: hover) and (pointer: fine)')
+      .matches
+      ? 'Z'
+      : 'A'
     this.prompt = this.add
-      .text(0, 0, 'A', {
+      .text(0, 0, promptLabel, {
         fontFamily: '"Press Start 2P"',
         fontSize: '8px',
         color: '#0f380f',

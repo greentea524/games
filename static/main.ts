@@ -112,3 +112,138 @@ window.addEventListener('keyup', (e) => {
   const btn = document.querySelector(`[data-key="${e.code}"]`)
   if (btn) btn.classList.remove('active-kb')
 })
+
+// ---- Pause menu (Esc on desktop, START button on mobile) ----
+const overlay = document.getElementById('overlay')
+const overlayText = document.getElementById('overlay-text')
+const isDesktop = () =>
+  window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
+let paused = false
+let view: 'pause' | 'controls' = 'pause'
+let controlsMode: 'keyboard' | 'touch' = 'keyboard'
+const pauseItems = ['Resume', 'Controls']
+let selected = 0
+
+function pauseButtonsMarkup(): string {
+  return `
+    <h2>PAUSED</h2>
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:16px; align-items:center;">
+      ${pauseItems
+        .map(
+          (label, i) =>
+            `<button id="pause-item-${i}" class="overlay-btn">${label}</button>`,
+        )
+        .join('')}
+    </div>`
+}
+
+function renderPause() {
+  if (!overlayText) return
+  view = 'pause'
+  overlayText.innerHTML = pauseButtonsMarkup()
+  pauseItems.forEach((_, i) => {
+    document.getElementById(`pause-item-${i}`)?.addEventListener('click', () => {
+      selected = i
+      activateSelected()
+    })
+  })
+  updateSelection()
+}
+
+function updateSelection() {
+  pauseItems.forEach((label, i) => {
+    const btn = document.getElementById(`pause-item-${i}`)
+    if (!btn) return
+    btn.style.color = i === selected ? '#e0f8cf' : '#86b06a'
+    btn.innerText = (i === selected ? '> ' : '') + label
+  })
+}
+
+function renderControls() {
+  if (!overlayText) return
+  view = 'controls'
+  const kb = `
+    <h2>KEYBOARD</h2>
+    <p style="font-size:8px; color:#9bbc0f; text-align:left; line-height:2;">
+      Arrows / WASD&nbsp;&nbsp;Move<br/>
+      Z&nbsp;&nbsp;Talk / Confirm<br/>
+      Shift&nbsp;&nbsp;Inventory<br/>
+      Esc&nbsp;&nbsp;Pause
+    </p>`
+  const touch = `
+    <h2>TOUCH</h2>
+    <p style="font-size:8px; color:#9bbc0f; text-align:left; line-height:2;">
+      D-Pad&nbsp;&nbsp;Move<br/>
+      A Button&nbsp;&nbsp;Talk / Confirm<br/>
+      SELECT&nbsp;&nbsp;Inventory<br/>
+      START&nbsp;&nbsp;Pause
+    </p>`
+  overlayText.innerHTML =
+    (controlsMode === 'keyboard' ? kb : touch) +
+    `<div style="display:flex; flex-direction:column; gap:10px; margin-top:14px; align-items:center;">
+      <button id="ctrl-toggle" class="overlay-btn">${
+        controlsMode === 'keyboard' ? 'Show Touch' : 'Show Keyboard'
+      }</button>
+      <button id="ctrl-back" class="overlay-btn">Back</button>
+    </div>`
+  document.getElementById('ctrl-toggle')?.addEventListener('click', () => {
+    controlsMode = controlsMode === 'keyboard' ? 'touch' : 'keyboard'
+    renderControls()
+  })
+  document.getElementById('ctrl-back')?.addEventListener('click', () => {
+    renderPause()
+  })
+}
+
+function activateSelected() {
+  if (pauseItems[selected] === 'Resume') closePause()
+  else if (pauseItems[selected] === 'Controls') renderControls()
+}
+
+function openPause() {
+  if (!overlay || !game || !game.scene.isActive('world')) return
+  paused = true
+  selected = 0
+  controlsMode = isDesktop() ? 'keyboard' : 'touch'
+  game.scene.pause('world')
+  game.scene.pause('ui')
+  overlay.classList.remove('hidden')
+  renderPause()
+}
+
+function closePause() {
+  if (!overlay) return
+  paused = false
+  overlay.classList.add('hidden')
+  game.scene.resume('world')
+  game.scene.resume('ui')
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.repeat) return
+  if (!paused) {
+    if (e.key === 'Escape' || e.key === 'Enter') {
+      e.preventDefault()
+      openPause()
+    }
+    return
+  }
+  e.preventDefault()
+  if (view === 'controls') {
+    // Esc/back key returns to the pause list.
+    if (['Escape', 'Enter', 'z', 'Z', 'x', 'X'].includes(e.key)) renderPause()
+    return
+  }
+  if (e.key === 'ArrowUp') {
+    selected = (selected - 1 + pauseItems.length) % pauseItems.length
+    updateSelection()
+  } else if (e.key === 'ArrowDown') {
+    selected = (selected + 1) % pauseItems.length
+    updateSelection()
+  } else if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') {
+    activateSelected()
+  } else if (e.key === 'Escape') {
+    closePause()
+  }
+})
