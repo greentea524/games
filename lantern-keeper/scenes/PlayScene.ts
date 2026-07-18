@@ -106,7 +106,7 @@ export class PlayScene extends Phaser.Scene {
       spawnY = 384
       title = 'THE CANOPY'
     } else if (this.levelKey === 'level4') {
-      spawnY = 128
+      spawnY = 104 // land on the floor top (row 15) of the redesigned Hollow
       title = 'THE HOLLOW'
     }
     const initialDarkness = DARKNESS_ALPHA[this.levelKey] ?? 0.85
