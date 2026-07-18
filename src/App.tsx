@@ -22,6 +22,12 @@ const WEB_GAMES = [
       "A GBC-style turn-based roguelite dungeon crawler. Explore floors, fight monsters, and survive the depth.",
   },
   {
+    title: "Windup",
+    href: `${import.meta.env.BASE_URL}windup/`,
+    description:
+      "A GBC-style energy platformer. Guide the windup toy across platforms before its key runs out of power.",
+  },
+  {
     title: "Lantern Keeper",
     href: `${import.meta.env.BASE_URL}lantern-keeper/`,
     description:

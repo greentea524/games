@@ -23,6 +23,9 @@ export default defineConfig({
         'pocket-dungeon': fileURLToPath(
           new URL('./pocket-dungeon/index.html', import.meta.url),
         ),
+        'windup': fileURLToPath(
+          new URL('./windup/index.html', import.meta.url),
+        ),
       },
     },
   },
