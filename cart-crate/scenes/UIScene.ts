@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST, PAL } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT, FONT, PAL } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import type { BoardScene } from './BoardScene'
@@ -11,33 +11,53 @@ export class UIScene extends Phaser.Scene {
   private victoryContainer!: Phaser.GameObjects.Container
   private starsText!: Phaser.GameObjects.Text
 
+  private pauseContainer!: Phaser.GameObjects.Container
+  private helpContainer!: Phaser.GameObjects.Container
+  private pauseOpen = false
+  private helpOpen = false
+
   constructor() {
     super('ui')
   }
 
   create() {
     const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
-    
-    // Top Bar
-    this.levelTitleText = this.add.text(6, 4, `STAGE ${levelConfig.id}: ${levelConfig.title.toUpperCase()}`, {
+
+    // Top Bar Pill Background for High Contrast in MONO and COLOR modes
+    const topBarGfx = this.add.graphics()
+    topBarGfx.fillStyle(0x0f380f, 0.85)
+    topBarGfx.fillRect(0, 0, GBC_WIDTH, 14)
+
+    // Top Bar Level Title Text with stroke contour
+    this.levelTitleText = this.add.text(4, 3, `STG ${levelConfig.id}: ${levelConfig.title.toUpperCase()}`, {
       fontFamily: FONT,
       fontSize: '6px',
-      color: CSS_LIGHTEST,
+      color: '#e0f8cf',
+      stroke: '#0f380f',
+      strokeThickness: 1,
       resolution: 2,
     })
 
-    this.movesText = this.add.text(GBC_WIDTH - 6, 4, 'MOVES: 0', {
+    this.movesText = this.add.text(GBC_WIDTH - 4, 3, 'MOVES: 0', {
       fontFamily: FONT,
       fontSize: '6px',
-      color: CSS_LIGHTEST,
+      color: '#e0f8cf',
+      stroke: '#0f380f',
+      strokeThickness: 1,
       resolution: 2,
     }).setOrigin(1, 0)
 
-    // Bottom Objective Banner (Clear instructions for player)
-    this.objectiveTickerText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 6, 'GOAL: PUSH CRATES ONTO TARGET DOTS', {
+    // Bottom Bar Pill Background for Objective
+    const bottomBarGfx = this.add.graphics()
+    bottomBarGfx.fillStyle(0x0f380f, 0.85)
+    bottomBarGfx.fillRect(0, GBC_HEIGHT - 12, GBC_WIDTH, 12)
+
+    this.objectiveTickerText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'GOAL: PUSH CRATES ONTO TARGET DOTS', {
       fontFamily: FONT,
       fontSize: '5px',
-      color: '#8bac0f',
+      color: '#9bbc0f',
+      stroke: '#0f380f',
+      strokeThickness: 1,
       resolution: 2,
     }).setOrigin(0.5, 1)
 
@@ -51,7 +71,7 @@ export class UIScene extends Phaser.Scene {
     const vicText = this.add.text(0, -20, 'STAGE CLEARED!', {
       fontFamily: FONT,
       fontSize: '8px',
-      color: CSS_LIGHTEST,
+      color: '#9bbc0f',
       resolution: 2,
     }).setOrigin(0.5)
 
@@ -72,7 +92,7 @@ export class UIScene extends Phaser.Scene {
     const nextBtnText = this.add.text(0, 22, '[ TAP / PRESS ANY KEY ]', {
       fontFamily: FONT,
       fontSize: '5px',
-      color: CSS_LIGHTEST,
+      color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0.5)
 
@@ -86,18 +106,149 @@ export class UIScene extends Phaser.Scene {
       .setDepth(2000)
       .setVisible(false)
 
+    // Build Pause Menu & How-To-Play Overlay
+    this.createPauseMenu()
+    this.createHelpModal()
+
     // Advance level on pointer/touch click anywhere when victory banner is showing
     this.input.on('pointerdown', () => {
-      if (GameState.uiBlocking) {
+      if (GameState.uiBlocking && !this.pauseOpen && !this.helpOpen) {
         const boardScene = this.scene.get('board') as BoardScene
         if (boardScene) boardScene.nextLevel()
       }
     })
   }
 
+  private createPauseMenu() {
+    const bgGfx = this.add.graphics()
+    bgGfx.fillStyle(PAL.darkest, 0.96)
+    bgGfx.fillRoundedRect(-65, -45, 130, 90, 6)
+    bgGfx.lineStyle(1.5, PAL.lightest, 1)
+    bgGfx.strokeRoundedRect(-65, -45, 130, 90, 6)
+
+    const titleText = this.add.text(0, -32, 'PAUSED', {
+      fontFamily: FONT,
+      fontSize: '9px',
+      color: '#9bbc0f',
+      resolution: 2,
+    }).setOrigin(0.5)
+
+    const btnResume = this.add.text(0, -12, '1. RESUME GAME', {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: '#e0f8cf',
+      resolution: 2,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+
+    const btnHelp = this.add.text(0, 4, '2. HOW TO PLAY', {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: '#e0f8cf',
+      resolution: 2,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+
+    const btnRestart = this.add.text(0, 20, '3. RESTART STAGE', {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: '#e0f8cf',
+      resolution: 2,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+
+    btnResume.on('pointerdown', () => this.togglePauseMenu())
+    btnHelp.on('pointerdown', () => {
+      this.pauseContainer.setVisible(false)
+      this.helpContainer.setVisible(true)
+      this.helpOpen = true
+    })
+    btnRestart.on('pointerdown', () => {
+      this.togglePauseMenu()
+      const boardScene = this.scene.get('board') as BoardScene
+      if (boardScene) boardScene.resetLevel()
+    })
+
+    this.pauseContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2, [
+      bgGfx,
+      titleText,
+      btnResume,
+      btnHelp,
+      btnRestart,
+    ])
+      .setDepth(3000)
+      .setVisible(false)
+  }
+
+  private createHelpModal() {
+    const bgGfx = this.add.graphics()
+    bgGfx.fillStyle(PAL.darkest, 0.98)
+    bgGfx.fillRoundedRect(-72, -60, 144, 120, 6)
+    bgGfx.lineStyle(1.5, PAL.lightest, 1)
+    bgGfx.strokeRoundedRect(-72, -60, 144, 120, 6)
+
+    const titleText = this.add.text(0, -48, 'HOW TO PLAY', {
+      fontFamily: FONT,
+      fontSize: '8px',
+      color: '#ffcc00',
+      resolution: 2,
+    }).setOrigin(0.5)
+
+    const rulesLines = [
+      '• MOVE: D-Pad / WASD / Swipe',
+      '• OBJECTIVE: Push crates [C]',
+      '  onto target dots [T]',
+      '• ICE: Crates slide until wall',
+      '• UNDO STEP: B Button / Z key',
+      '• RESET: SELECT / R key',
+    ]
+
+    const textObjs = rulesLines.map((line, idx) => {
+      return this.add.text(0, -32 + idx * 12, line, {
+        fontFamily: FONT,
+        fontSize: '4.5px',
+        color: '#e0f8cf',
+        resolution: 2,
+      }).setOrigin(0.5)
+    })
+
+    const closeBtn = this.add.text(0, 46, '[ BACK TO PAUSE ]', {
+      fontFamily: FONT,
+      fontSize: '5px',
+      color: '#9bbc0f',
+      resolution: 2,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+
+    closeBtn.on('pointerdown', () => {
+      this.helpContainer.setVisible(false)
+      this.helpOpen = false
+      this.pauseContainer.setVisible(true)
+    })
+
+    this.helpContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2, [
+      bgGfx,
+      titleText,
+      ...textObjs,
+      closeBtn,
+    ])
+      .setDepth(3500)
+      .setVisible(false)
+  }
+
+  isPauseOpen() {
+    return this.pauseOpen || this.helpOpen
+  }
+
+  togglePauseMenu() {
+    if (this.helpOpen) {
+      this.helpContainer.setVisible(false)
+      this.helpOpen = false
+    }
+    this.pauseOpen = !this.pauseOpen
+    this.pauseContainer.setVisible(this.pauseOpen)
+    GameState.uiBlocking = this.pauseOpen
+  }
+
   update() {
     const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
-    this.levelTitleText.setText(`STAGE ${levelConfig.id}: ${levelConfig.title.toUpperCase()}`)
+    this.levelTitleText.setText(`STG ${levelConfig.id}: ${levelConfig.title.toUpperCase()}`)
     this.movesText.setText(`MOVES: ${GameState.movesCount}`)
   }
 

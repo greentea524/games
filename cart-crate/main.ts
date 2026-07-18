@@ -73,16 +73,17 @@ if (btnSelect) {
   btnSelect.addEventListener('touchstart', triggerReset, { passive: false })
 }
 
-// START button (Next Stage / Confirm)
+// START button (Pause Menu / Confirm)
 const btnStart = document.getElementById('btn-start')
 if (btnStart) {
   const triggerStart = (e: Event) => {
     e.preventDefault()
+    const uiScene = game?.scene?.getScene('ui') as UIScene
     const boardScene = game?.scene?.getScene('board') as BoardScene
-    if (boardScene) {
-      if (GameState.uiBlocking) {
-        boardScene.nextLevel()
-      }
+    if (GameState.uiBlocking && uiScene && !uiScene.isPauseOpen()) {
+      if (boardScene) boardScene.nextLevel()
+    } else if (uiScene) {
+      uiScene.togglePauseMenu()
     }
   }
   btnStart.addEventListener('click', triggerStart)

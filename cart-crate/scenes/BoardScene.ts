@@ -32,6 +32,7 @@ export class BoardScene extends Phaser.Scene {
 
   private undoKey!: Phaser.Input.Keyboard.Key
   private resetKey!: Phaser.Input.Keyboard.Key
+  private escKey!: Phaser.Input.Keyboard.Key
 
   constructor() {
     super('board')
@@ -49,6 +50,7 @@ export class BoardScene extends Phaser.Scene {
 
     this.undoKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
     this.resetKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R)
+    this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
 
     // Touch Swipe Gestures
     let touchStartX = 0
@@ -59,6 +61,8 @@ export class BoardScene extends Phaser.Scene {
     })
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (GameState.uiBlocking) {
+        const uiScene = this.scene.get('ui') as UIScene
+        if (uiScene && uiScene.isPauseOpen()) return
         this.nextLevel()
         return
       }
@@ -162,8 +166,33 @@ export class BoardScene extends Phaser.Scene {
   }
 
   reloadPalette() {
-    this.children.removeAll()
-    this.renderBoard()
+    const mode = GameState.paletteMode
+
+    this.children.each((child: Phaser.GameObjects.GameObject) => {
+      if (child instanceof Phaser.GameObjects.Image) {
+        const key = child.texture.key
+        if (key.startsWith('tiles_')) child.setTexture(`tiles_${mode}`, child.frame.name)
+        else if (key.startsWith('target_')) child.setTexture(`target_${mode}`)
+        else if (key.startsWith('ice_')) child.setTexture(`ice_${mode}`)
+        else if (key.startsWith('cracked_')) child.setTexture(`cracked_${mode}`)
+        else if (key.startsWith('hole_')) child.setTexture(`hole_${mode}`)
+      } else if (child instanceof Phaser.GameObjects.Sprite) {
+        const key = child.texture.key
+        if (key.startsWith('crate_')) {
+          child.setTexture(`crate_${mode}`)
+        } else if (key.startsWith('player_')) {
+          child.setTexture(`player_${mode}_${this.facing}`)
+        }
+      }
+    })
+
+    this.crates.forEach((c) => {
+      if (c.docked && !c.destroyed) {
+        c.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : 0xffff44)
+      } else {
+        c.sprite.clearTint()
+      }
+    })
   }
 
   setPlayerPos(tx: number, ty: number, facing: Facing) {
@@ -215,21 +244,22 @@ export class BoardScene extends Phaser.Scene {
   }
 
   update() {
+    if (Phaser.Input.Keyboard.JustDown(this.escKey)) {
+      const uiScene = this.scene.get('ui') as UIScene
+      if (uiScene) uiScene.togglePauseMenu()
+      return
+    }
+
     if (GameState.uiBlocking) {
+      const uiScene = this.scene.get('ui') as UIScene
+      if (uiScene && uiScene.isPauseOpen()) return
+
       const kb = this.input.keyboard!
       if (
         Phaser.Input.Keyboard.JustDown(this.undoKey) ||
         Phaser.Input.Keyboard.JustDown(this.resetKey) ||
         kb.addKey('SPACE').isDown ||
-        kb.addKey('ENTER').isDown ||
-        kb.addKey('UP').isDown ||
-        kb.addKey('DOWN').isDown ||
-        kb.addKey('LEFT').isDown ||
-        kb.addKey('RIGHT').isDown ||
-        kb.addKey('W').isDown ||
-        kb.addKey('S').isDown ||
-        kb.addKey('A').isDown ||
-        kb.addKey('D').isDown
+        kb.addKey('ENTER').isDown
       ) {
         this.nextLevel()
       }
