@@ -246,6 +246,20 @@
   text-overflow: ellipsis;
 }
 
+.wip-badge {
+  font-size: 8px;
+  font-family: 'Press Start 2P', monospace;
+  background: #ffaa00;
+  color: #1a1000;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
 .game-link-description {
   font-size: 14px;
   font-weight: 500;
