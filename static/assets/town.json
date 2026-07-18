@@ -11,7 +11,7 @@
  "version": "1.10",
  "tiledversion": "1.10.2",
  "nextlayerid": 3,
- "nextobjectid": 3,
+ "nextobjectid": 6,
  "layers": [
   {
    "data": [
@@ -605,6 +605,57 @@
        "name": "facing",
        "type": "string",
        "value": "up"
+      }
+     ]
+    },
+    {
+     "name": "npc",
+     "type": "npc",
+     "x": 144,
+     "y": 128,
+     "width": 16,
+     "height": 16,
+     "visible": true,
+     "rotation": 0,
+     "properties": [
+      {
+       "name": "id",
+       "type": "string",
+       "value": "mom"
+      }
+     ]
+    },
+    {
+     "name": "npc",
+     "type": "npc",
+     "x": 160,
+     "y": 208,
+     "width": 16,
+     "height": 16,
+     "visible": true,
+     "rotation": 0,
+     "properties": [
+      {
+       "name": "id",
+       "type": "string",
+       "value": "ren"
+      }
+     ]
+    },
+    {
+     "name": "npc",
+     "type": "npc",
+     "x": 288,
+     "y": 128,
+     "width": 16,
+     "height": 16,
+     "visible": true,
+     "rotation": 0,
+     "properties": [
+      {
+       "name": "id",
+       "type": "string",
+       "value": "gus"
       }
      ]
     }

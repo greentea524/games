@@ -1,7 +1,11 @@
 import Phaser from 'phaser'
 import { TILE, PAL } from '../constants'
+import { NPCS } from '../dialogue'
 import townUrl from '../assets/town.json?url'
 import houseUrl from '../assets/house.json?url'
+
+type Facing = 'down' | 'up' | 'left' | 'right'
+type Shade = 'lightest' | 'light' | 'dark' | 'darkest'
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -16,6 +20,8 @@ export class BootScene extends Phaser.Scene {
   create() {
     this.buildTileset()
     this.buildPlayer()
+    this.buildNpcs()
+    this.buildItems()
     this.scene.start('world', { mapKey: 'town' })
   }
 
@@ -73,36 +79,39 @@ export class BootScene extends Phaser.Scene {
     g.destroy()
   }
 
-  // A 16x16 kid, 4 facings x 2 walk frames.
+  // Draws one 16x16 character frame with the given shirt/hair shades.
+  private drawCharacter(
+    g: Phaser.GameObjects.Graphics,
+    key: string,
+    facing: Facing,
+    step: number,
+    shirt: Shade,
+    hair: Shade,
+  ) {
+    g.clear()
+    const cx = 8
+    g.fillStyle(PAL.darkest)
+    g.fillRect(cx - 3 + step, 13, 2, 3)
+    g.fillRect(cx + 1 - step, 13, 2, 3)
+    g.fillStyle(PAL[shirt]); g.fillRect(cx - 3, 7, 6, 6)
+    g.fillStyle(PAL.lightest); g.fillRect(cx - 3, 2, 6, 5)
+    g.fillStyle(PAL[hair]); g.fillRect(cx - 3, 2, 6, 2)
+    g.fillStyle(PAL.darkest)
+    if (facing === 'down') { g.fillRect(cx - 2, 5, 1, 1); g.fillRect(cx + 1, 5, 1, 1) }
+    else if (facing === 'up') { g.fillStyle(PAL[hair]); g.fillRect(cx - 3, 2, 6, 3) }
+    else if (facing === 'left') { g.fillRect(cx - 3, 5, 1, 1) }
+    else { g.fillRect(cx + 2, 5, 1, 1) }
+    g.generateTexture(key, 16, 16)
+  }
+
+  // The player kid: 4 facings x 2 walk frames + walk anims.
   private buildPlayer() {
     const g = this.make.graphics({}, false)
-    const draw = (key: string, facing: 'down' | 'up' | 'left' | 'right', step: number) => {
-      g.clear()
-      const cx = 8
-      // legs (alternate with step)
-      g.fillStyle(PAL.darkest)
-      g.fillRect(cx - 3 + step, 13, 2, 3)
-      g.fillRect(cx + 1 - step, 13, 2, 3)
-      // body / shirt
-      g.fillStyle(PAL.dark); g.fillRect(cx - 3, 7, 6, 6)
-      // head
-      g.fillStyle(PAL.lightest); g.fillRect(cx - 3, 2, 6, 5)
-      // hair
-      g.fillStyle(PAL.darkest); g.fillRect(cx - 3, 2, 6, 2)
-      // face detail per facing
-      g.fillStyle(PAL.darkest)
-      if (facing === 'down') { g.fillRect(cx - 2, 5, 1, 1); g.fillRect(cx + 1, 5, 1, 1) }
-      else if (facing === 'up') { g.fillStyle(PAL.darkest); g.fillRect(cx - 3, 2, 6, 3) }
-      else if (facing === 'left') { g.fillRect(cx - 3, 5, 1, 1) }
-      else { g.fillRect(cx + 2, 5, 1, 1) }
-      g.generateTexture(key, 16, 16)
-    }
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
-      draw(`kid_${f}_0`, f, 0)
-      draw(`kid_${f}_1`, f, 1)
+      this.drawCharacter(g, `kid_${f}_0`, f, 0, 'dark', 'darkest')
+      this.drawCharacter(g, `kid_${f}_1`, f, 1, 'dark', 'darkest')
     })
     g.destroy()
-
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
       this.anims.create({
         key: `walk_${f}`,
@@ -111,5 +120,33 @@ export class BootScene extends Phaser.Scene {
         repeat: -1,
       })
     })
+  }
+
+  // Static idle facings for each NPC (no walk cycle needed).
+  private buildNpcs() {
+    const g = this.make.graphics({}, false)
+    for (const npc of Object.values(NPCS)) {
+      ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
+        this.drawCharacter(g, `npc_${npc.id}_${f}`, f, 0, npc.shirt, npc.hair)
+      })
+    }
+    g.destroy()
+  }
+
+  // Small inventory icons.
+  private buildItems() {
+    const g = this.make.graphics({}, false)
+    // flashlight
+    g.fillStyle(PAL.darkest); g.fillRect(2, 5, 8, 4)
+    g.fillStyle(PAL.light); g.fillRect(9, 4, 4, 6)
+    g.fillStyle(PAL.lightest); g.fillRect(12, 5, 2, 4)
+    g.generateTexture('item_flashlight', 16, 16)
+    g.clear()
+    // wilted flower
+    g.fillStyle(PAL.dark); g.fillRect(7, 6, 2, 8) // stem
+    g.fillStyle(PAL.darkest); g.fillCircle(8, 5, 3) // drooping bloom
+    g.fillStyle(PAL.light); g.fillRect(4, 9, 2, 1); g.fillRect(10, 10, 2, 1)
+    g.generateTexture('item_flower', 16, 16)
+    g.destroy()
   }
 }

@@ -8,6 +8,10 @@ import {
   TILES,
   PAL,
 } from '../constants'
+import { GameState } from '../state'
+import { NPCS } from '../dialogue'
+import type { NpcDef } from '../dialogue'
+import type { UIScene } from './UIScene'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -18,6 +22,12 @@ interface DoorData {
   ty: number
 }
 
+interface NpcInstance {
+  sprite: Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+  def: NpcDef
+  facing: Facing
+}
+
 export class WorldScene extends Phaser.Scene {
   private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
@@ -25,6 +35,10 @@ export class WorldScene extends Phaser.Scene {
   private doors: DoorData[] = []
   private facing: Facing = 'down'
   private transitioning = false
+
+  private npcs: NpcInstance[] = []
+  private interactKey!: Phaser.Input.Keyboard.Key
+  private prompt?: Phaser.GameObjects.Text
 
   // Minimap (only on maps larger than one screen)
   private blip?: Phaser.GameObjects.Graphics
@@ -103,13 +117,87 @@ export class WorldScene extends Phaser.Scene {
       )
     }
 
+    // NPCs from the object layer (solid; block the player).
+    this.npcs = []
+    const npcGroup = this.physics.add.staticGroup()
+    for (const o of objects) {
+      if (o.name !== 'npc') continue
+      const id = o.properties?.find((p: any) => p.name === 'id')?.value
+      const def = id ? NPCS[id] : undefined
+      if (!def) continue
+      const sprite = npcGroup.create(
+        o.x! + TILE / 2,
+        o.y! + TILE / 2,
+        `npc_${def.id}_down`,
+      ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      sprite.body.setSize(12, 12).setOffset(2, 3)
+      this.npcs.push({ sprite, def, facing: 'down' })
+    }
+    this.physics.add.collider(this.player, npcGroup)
+
+    this.prompt = this.add
+      .text(0, 0, 'A', {
+        fontFamily: '"Press Start 2P"',
+        fontSize: '8px',
+        color: '#0f380f',
+        backgroundColor: '#9bbc0f',
+        padding: { x: 2, y: 2 },
+        resolution: 2,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(900)
+      .setVisible(false)
+
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<
       string,
       Phaser.Input.Keyboard.Key
     >
+    this.interactKey = this.input.keyboard!.addKey(
+      Phaser.Input.Keyboard.KeyCodes.Z,
+    )
 
     this.buildMinimap(map, ground)
+
+    if (!this.scene.isActive('ui')) this.scene.launch('ui')
+  }
+
+  // The tile-center point directly in front of the player.
+  private frontPoint(): { x: number; y: number } {
+    const p = this.player
+    if (this.facing === 'up') return { x: p.x, y: p.y - TILE }
+    if (this.facing === 'down') return { x: p.x, y: p.y + TILE }
+    if (this.facing === 'left') return { x: p.x - TILE, y: p.y }
+    return { x: p.x + TILE, y: p.y }
+  }
+
+  // NPC standing on the tile the player faces, if any.
+  private facingNpc(): NpcInstance | undefined {
+    const f = this.frontPoint()
+    let best: NpcInstance | undefined
+    let bestD = TILE * 0.9
+    for (const n of this.npcs) {
+      const d = Phaser.Math.Distance.Between(f.x, f.y, n.sprite.x, n.sprite.y)
+      if (d < bestD) {
+        bestD = d
+        best = n
+      }
+    }
+    return best
+  }
+
+  private faceNpcToward(n: NpcInstance) {
+    const dx = this.player.x - n.sprite.x
+    const dy = this.player.y - n.sprite.y
+    n.facing =
+      Math.abs(dx) > Math.abs(dy)
+        ? dx < 0
+          ? 'left'
+          : 'right'
+        : dy < 0
+          ? 'up'
+          : 'down'
+    n.sprite.setTexture(`npc_${n.def.id}_${n.facing}`)
   }
 
   // A corner minimap showing buildings/water/trees + a blinking player
@@ -189,6 +277,42 @@ export class WorldScene extends Phaser.Scene {
     if (this.transitioning) return
 
     this.updateMinimap()
+
+    // Consume the interact key every frame so a held key can't double-fire
+    // across the dialogue open/close boundary.
+    const interactPressed = Phaser.Input.Keyboard.JustDown(this.interactKey)
+
+    // Frozen while a dialogue or menu is open.
+    if (GameState.uiBlocking) {
+      this.player.setVelocity(0, 0)
+      this.player.anims.stop()
+      this.player.setTexture(`kid_${this.facing}_0`)
+      if (this.prompt) this.prompt.setVisible(false)
+      return
+    }
+
+    const near = this.facingNpc()
+    if (this.prompt) {
+      if (near) {
+        this.prompt.setVisible(true)
+        this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE / 2)
+      } else {
+        this.prompt.setVisible(false)
+      }
+    }
+
+    // Interact (ignore briefly after a dialogue closes).
+    if (
+      interactPressed &&
+      near &&
+      this.time.now - GameState.uiClosedAt > 150
+    ) {
+      this.faceNpcToward(near)
+      GameState.dialogueActive = true
+      ;(this.scene.get('ui') as UIScene).startDialogue(near.def)
+      this.player.setVelocity(0, 0)
+      return
+    }
 
     const left = this.cursors.left.isDown || this.wasd.A.isDown
     const right = this.cursors.right.isDown || this.wasd.D.isDown

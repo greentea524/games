@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { BootScene } from './scenes/BootScene'
 import { WorldScene } from './scenes/WorldScene'
+import { UIScene } from './scenes/UIScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 
 function integerZoom(): number {
@@ -39,7 +40,7 @@ function createGame() {
       default: 'arcade',
       arcade: { gravity: { x: 0, y: 0 } },
     },
-    scene: [BootScene, WorldScene],
+    scene: [BootScene, WorldScene, UIScene],
   })
   window.addEventListener('resize', () => {
     const zoom = integerZoom()
