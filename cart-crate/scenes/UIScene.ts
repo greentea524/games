@@ -32,7 +32,7 @@ export class UIScene extends Phaser.Scene {
     topBarGfx.fillRect(0, 0, GBC_WIDTH, 14)
 
     // Top Bar Level Title Text with stroke contour
-    this.levelTitleText = this.add.text(4, 3, `STG ${levelConfig.id}: ${levelConfig.title.toUpperCase()}`, {
+    this.levelTitleText = this.add.text(4, 3, `STG ${levelConfig.id}`, {
       fontFamily: FONT,
       fontSize: '6px',
       color: '#e0f8cf',
@@ -55,7 +55,7 @@ export class UIScene extends Phaser.Scene {
     bottomBarGfx.fillStyle(0x0f380f, 0.85)
     bottomBarGfx.fillRect(0, GBC_HEIGHT - 12, GBC_WIDTH, 12)
 
-    this.objectiveTickerText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'GOAL: PUSH CRATES ONTO TARGET DOTS', {
+    this.objectiveTickerText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'GOAL: DELIVER CRATES TO TARGETS', {
       fontFamily: FONT,
       fontSize: '5px',
       color: '#9bbc0f',
@@ -191,7 +191,7 @@ export class UIScene extends Phaser.Scene {
     const rulesLines = [
       'MOVE: D-Pad / WASD / Swipe',
       'GOAL: Push crates [C]',
-      '      onto target dots [T]',
+      '      onto target X marks',
       'ICE : Crates slide to wall',
       'UNDO: B Button / Z key',
       'RSET: SELECT / R key',
@@ -278,7 +278,7 @@ export class UIScene extends Phaser.Scene {
 
   update() {
     const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
-    this.levelTitleText.setText(`STG ${levelConfig.id}: ${levelConfig.title.toUpperCase()}`)
+    this.levelTitleText.setText(`STG ${levelConfig.id}`)
     this.movesText.setText(`MOVES: ${GameState.movesCount}`)
 
     if (this.pauseOpen && !this.helpOpen) {
