@@ -184,14 +184,17 @@ export class BootScene extends Phaser.Scene {
     if (this.textures.exists(key)) return
     const g = this.make.graphics({}, false)
     if (mode === 'dmg') {
-      g.fillStyle(PAL.lightest); g.fillRect(0, 0, 16, 16)
-      g.fillStyle(PAL.dark); g.fillCircle(8, 8, 5)
-      g.fillStyle(PAL.darkest); g.fillCircle(8, 8, 2)
+      g.fillStyle(PAL.dark)
+      g.fillRect(3, 6, 10, 4)
+      g.fillRect(6, 3, 4, 10)
+      g.fillStyle(PAL.light)
+      g.fillCircle(8, 8, 2)
     } else {
-      g.fillStyle(GBC_PAL.bgPath); g.fillRect(0, 0, 16, 16)
-      g.fillStyle(GBC_PAL.targetBg); g.fillCircle(8, 8, 5)
-      g.fillStyle(GBC_PAL.targetBorder); g.strokeCircle(8, 8, 5)
-      g.fillStyle(0xffffff); g.fillCircle(8, 8, 2)
+      g.fillStyle(0xd84040) // vibrant red
+      g.fillRect(3, 6, 10, 4)
+      g.fillRect(6, 3, 4, 10)
+      g.fillStyle(0xffffff)
+      g.fillCircle(8, 8, 2)
     }
     g.generateTexture(key, 16, 16)
     g.destroy()

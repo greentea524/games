@@ -135,7 +135,15 @@ export class BoardScene extends Phaser.Scene {
         if (char === '#') {
           this.add.image(px, py, `tiles_${mode}`, 1)
         } else if (char === 'T') {
-          this.add.image(px, py, `target_${mode}`)
+          this.add.image(px, py, `tiles_${mode}`, 0)
+          const targetSprite = this.add.image(px, py, `target_${mode}`)
+          this.tweens.add({
+            targets: targetSprite,
+            alpha: 0.2,
+            duration: 800,
+            yoyo: true,
+            repeat: -1,
+          })
         } else if (char === 'I') {
           this.add.image(px, py, `ice_${mode}`)
         } else if (char === 'X') {
