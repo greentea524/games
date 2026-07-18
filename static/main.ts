@@ -331,12 +331,25 @@ window.addEventListener('keydown', (e) => {
 
 const paletteBtn = document.getElementById('palette-toggle')
 if (paletteBtn) {
+  const labelEl = document.getElementById('palette-label')
+  const trackEl = document.getElementById('palette-track')
+  const knobEl = document.getElementById('palette-knob')
+
   const updatePaletteBtn = () => {
     const isGbc = GameState.paletteMode === 'gbc'
-    paletteBtn.innerText = isGbc ? 'COLOR' : 'MONO'
-    paletteBtn.style.color = isGbc ? '#f8e050' : '#9bbc0f'
+    if (labelEl) {
+      labelEl.innerText = isGbc ? 'COLOR' : 'MONO'
+      labelEl.style.color = isGbc ? '#f8e050' : '#9bbc0f'
+    }
+    if (trackEl) {
+      trackEl.style.borderColor = isGbc ? '#c84838' : '#306230'
+    }
+    if (knobEl) {
+      knobEl.style.transform = isGbc ? 'translateX(12px)' : 'translateX(0px)'
+      knobEl.style.background = isGbc ? '#f8e050' : '#9bbc0f'
+    }
     paletteBtn.style.borderColor = isGbc ? '#c84838' : '#8bac0f'
-    paletteBtn.style.background = isGbc ? '#381818' : '#1e281d'
+    paletteBtn.style.background = isGbc ? '#2a1a1a' : '#182018'
   }
   updatePaletteBtn()
   paletteBtn.addEventListener('click', () => {
