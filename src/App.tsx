@@ -10,6 +10,12 @@ const WEB_GAMES = [
     description: "A GBC-style top-down mystery/adventure game. Explore a small town where an old TV works like a portal.",
   },
   {
+    title: "Cart & Crate",
+    href: `${import.meta.env.BASE_URL}cart-crate/`,
+    description:
+      "A GBC-style Sokoban puzzle game. Help the courier animal push delivery carts and crates onto target tiles.",
+  },
+  {
     title: "Lantern Keeper",
     href: `${import.meta.env.BASE_URL}lantern-keeper/`,
     description:

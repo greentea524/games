@@ -17,6 +17,9 @@ export default defineConfig({
         'static': fileURLToPath(
           new URL('./static/index.html', import.meta.url),
         ),
+        'cart-crate': fileURLToPath(
+          new URL('./cart-crate/index.html', import.meta.url),
+        ),
       },
     },
   },
