@@ -16,6 +16,12 @@ const WEB_GAMES = [
       "A GBC-style Sokoban puzzle game. Help the courier animal push delivery carts and crates onto target tiles.",
   },
   {
+    title: "Pocket Dungeon",
+    href: `${import.meta.env.BASE_URL}pocket-dungeon/`,
+    description:
+      "A GBC-style turn-based roguelite dungeon crawler. Explore floors, fight monsters, and survive the depth.",
+  },
+  {
     title: "Lantern Keeper",
     href: `${import.meta.env.BASE_URL}lantern-keeper/`,
     description:

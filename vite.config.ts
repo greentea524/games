@@ -20,6 +20,9 @@ export default defineConfig({
         'cart-crate': fileURLToPath(
           new URL('./cart-crate/index.html', import.meta.url),
         ),
+        'pocket-dungeon': fileURLToPath(
+          new URL('./pocket-dungeon/index.html', import.meta.url),
+        ),
       },
     },
   },
