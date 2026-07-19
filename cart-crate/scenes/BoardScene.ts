@@ -280,7 +280,7 @@ export class BoardScene extends Phaser.Scene {
 
     const uiScene = this.scene.get('ui') as UIScene
     if (uiScene) {
-      uiScene.hideVictoryBanner()
+      // no-op, victory banner removed
     }
   }
 
@@ -292,7 +292,7 @@ export class BoardScene extends Phaser.Scene {
 
     const uiScene = this.scene.get('ui') as UIScene
     if (uiScene) {
-      uiScene.hideVictoryBanner()
+      // no-op
     }
   }
 
@@ -501,7 +501,7 @@ export class BoardScene extends Phaser.Scene {
       x: playerPX,
       y: playerPY,
       duration: 140,
-      ease: 'Linear',
+      ease: 'Quad.easeOut',
     })
 
     if (crateAtTarget) {
@@ -513,10 +513,11 @@ export class BoardScene extends Phaser.Scene {
         x: cratePX,
         y: cratePY,
         duration: 140,
-        ease: 'Linear',
+        ease: 'Quad.easeOut',
         onComplete: () => {
           if (crateFell) {
             import('../audio').then(a => a.playFall())
+            this.cameras.main.shake(150, 0.01)
             this.tweens.add({
               targets: crateAtTarget.sprite,
               scale: 0,
@@ -531,6 +532,13 @@ export class BoardScene extends Phaser.Scene {
           } else {
             if (crateAtTarget.docked) {
               import('../audio').then(a => a.playDock())
+              this.tweens.add({
+                targets: crateAtTarget.sprite,
+                scale: 1.2,
+                duration: 80,
+                yoyo: true,
+                ease: 'Sine.easeInOut'
+              })
             }
             this.finishMove(record)
           }

@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, FONT, PAL } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
+import { SaveSystem } from '../save'
 import type { BoardScene } from './BoardScene'
 
 export class UIScene extends Phaser.Scene {
@@ -39,7 +40,7 @@ export class UIScene extends Phaser.Scene {
       resolution: 2,
     })
 
-    this.movesText = this.add.text(GBC_WIDTH - 4, 3, 'MOVES: 0', {
+    this.movesText = this.add.text(GBC_WIDTH - 4, 3, `0 / ${levelConfig.parMoves}`, {
       fontFamily: FONT,
       fontSize: '6px',
       color: '#e0f8cf',
@@ -65,6 +66,42 @@ export class UIScene extends Phaser.Scene {
     // Build Pause Menu & How-To-Play Overlay
     this.createPauseMenu()
     this.createHelpModal()
+
+    // Level Intro Flash
+    const bestData = SaveSystem.getLevelData(levelConfig.id)
+    const bestText = bestData.bestMoves > 0 && bestData.bestMoves < 999 ? `BEST: ${bestData.bestMoves}` : `PAR: ${levelConfig.parMoves}`
+    
+    const introContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2).setDepth(100)
+    
+    const introBg = this.add.graphics()
+    introBg.fillStyle(0x0f380f, 0.9)
+    introBg.fillRoundedRect(-50, -15, 100, 30, 4)
+    
+    const stageTitle = this.add.text(0, -5, `STAGE ${levelConfig.id}`, {
+      fontFamily: FONT,
+      fontSize: '8px',
+      color: '#ffcc00',
+      resolution: 2,
+    }).setOrigin(0.5)
+
+    const stageBest = this.add.text(0, 7, bestText, {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: '#e0f8cf',
+      resolution: 2,
+    }).setOrigin(0.5)
+
+    introContainer.add([introBg, stageTitle, stageBest])
+
+    this.tweens.add({
+      targets: introContainer,
+      alpha: 0,
+      delay: 1500,
+      duration: 500,
+      onComplete: () => {
+        introContainer.destroy()
+      }
+    })
   }
 
   private createPauseMenu() {
@@ -243,7 +280,7 @@ export class UIScene extends Phaser.Scene {
   update() {
     const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
     this.levelTitleText.setText(`STG ${levelConfig.id}`)
-    this.movesText.setText(`MOVES: ${GameState.movesCount}`)
+    this.movesText.setText(`${GameState.movesCount} / ${levelConfig.parMoves}`)
 
     if (this.pauseOpen && !this.helpOpen) {
       const kb = this.input.keyboard!
