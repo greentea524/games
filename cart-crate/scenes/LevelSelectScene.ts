@@ -16,6 +16,8 @@ export class LevelSelectScene extends Phaser.Scene {
   }
 
   create() {
+    this.pages = []
+    this.levelNodes = []
     this.cameras.main.setBackgroundColor('#081820')
 
     const savedStr = localStorage.getItem('cart-crate-level')
