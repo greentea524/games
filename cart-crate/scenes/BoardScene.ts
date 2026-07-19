@@ -658,11 +658,11 @@ export class BoardScene extends Phaser.Scene {
 
     // Build the string of moves the player has made
     let path = ''
-    for (const record of this.undoStack) {
-      if (record.playerNextTX > record.playerPrevTX) path += 'R'
-      else if (record.playerNextTX < record.playerPrevTX) path += 'L'
-      else if (record.playerNextTY > record.playerPrevTY) path += 'D'
-      else if (record.playerNextTY < record.playerPrevTY) path += 'U'
+    for (const cmd of this.undoStack) {
+      if (cmd.record.playerNextTX > cmd.record.playerPrevTX) path += 'R'
+      else if (cmd.record.playerNextTX < cmd.record.playerPrevTX) path += 'L'
+      else if (cmd.record.playerNextTY > cmd.record.playerPrevTY) path += 'D'
+      else if (cmd.record.playerNextTY < cmd.record.playerPrevTY) path += 'U'
     }
 
     if (!levelConfig.solution.startsWith(path)) {
