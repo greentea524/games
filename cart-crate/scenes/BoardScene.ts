@@ -32,6 +32,7 @@ export class BoardScene extends Phaser.Scene {
   private undoStack: MoveCommand[] = []
 
   private undoKey!: Phaser.Input.Keyboard.Key
+  private undoKeyAlt!: Phaser.Input.Keyboard.Key
   private resetKey!: Phaser.Input.Keyboard.Key
   private escKey!: Phaser.Input.Keyboard.Key
   private hintKey!: Phaser.Input.Keyboard.Key
@@ -51,6 +52,7 @@ export class BoardScene extends Phaser.Scene {
     this.input.keyboard!.addKeys('W,A,S,D')
 
     this.undoKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
+    this.undoKeyAlt = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X)
     this.resetKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R)
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     this.hintKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.H)
@@ -334,6 +336,7 @@ export class BoardScene extends Phaser.Scene {
       const kb = this.input.keyboard!
       if (
         Phaser.Input.Keyboard.JustDown(this.undoKey) ||
+        Phaser.Input.Keyboard.JustDown(this.undoKeyAlt) ||
         Phaser.Input.Keyboard.JustDown(this.resetKey) ||
         kb.addKey('SPACE').isDown ||
         kb.addKey('ENTER').isDown
@@ -343,7 +346,7 @@ export class BoardScene extends Phaser.Scene {
       return
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.undoKey)) {
+    if (Phaser.Input.Keyboard.JustDown(this.undoKey) || Phaser.Input.Keyboard.JustDown(this.undoKeyAlt)) {
       this.undoMove()
       return
     }
