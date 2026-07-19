@@ -3,6 +3,7 @@ import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 import { GameState } from './state'
 import { BootScene } from './scenes/BootScene'
 import { MainMenuScene } from './scenes/MainMenuScene'
+import { LevelSelectScene } from './scenes/LevelSelectScene'
 import { BoardScene } from './scenes/BoardScene'
 import { UIScene } from './scenes/UIScene'
 
@@ -16,7 +17,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, MainMenuScene, BoardScene, UIScene],
+  scene: [BootScene, MainMenuScene, LevelSelectScene, BoardScene, UIScene],
 }
 
 export const game = new Phaser.Game(config)

@@ -312,10 +312,10 @@ export class BoardScene extends Phaser.Scene {
   nextLevel() {
     if (GameState.currentLevelIndex < CAMPAIGN_LEVELS.length - 1) {
       GameState.currentLevelIndex++
+      this.resetLevel()
     } else {
-      GameState.currentLevelIndex = 0
+      this.scene.start('levelselect')
     }
-    this.resetLevel()
   }
 
   update() {

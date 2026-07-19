@@ -3,18 +3,14 @@ import { GBC_WIDTH, GBC_HEIGHT, FONT, PAL } from '../constants'
 import { GameState } from '../state'
 
 export class MainMenuScene extends Phaser.Scene {
-  private optionsText: Phaser.GameObjects.Text[] = []
-  private selectedIndex = 0
-  private savedLevel = 0
+  private blinkText!: Phaser.GameObjects.Text
+  private canStart = false
 
   constructor() {
     super('mainmenu')
   }
 
   create() {
-    const savedStr = localStorage.getItem('cart-crate-level')
-    this.savedLevel = savedStr ? parseInt(savedStr, 10) : 0
-
     this.cameras.main.setBackgroundColor('#081820')
 
     this.add.text(GBC_WIDTH / 2, 40, 'CART CRATE', {
@@ -33,81 +29,43 @@ export class MainMenuScene extends Phaser.Scene {
       resolution: 2,
     }).setOrigin(0.5)
 
-    const newGameBtn = this.add.text(GBC_WIDTH / 2, 90, 'NEW GAME', {
+    this.blinkText = this.add.text(GBC_WIDTH / 2, 100, 'PRESS START', {
       fontFamily: FONT,
       fontSize: '8px',
-      color: '#e0f8cf',
+      color: '#ffcc00',
       resolution: 2,
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setData('action', 'new')
+    }).setOrigin(0.5)
 
-    const continueBtn = this.add.text(GBC_WIDTH / 2, 110, 'CONTINUE', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: this.savedLevel > 0 ? '#e0f8cf' : '#306230',
-      resolution: 2,
-    }).setOrigin(0.5).setInteractive({ useHandCursor: this.savedLevel > 0 }).setData('action', 'continue')
-
-    this.optionsText = [newGameBtn, continueBtn]
-    
-    // Default select Continue if there's a save, else New Game
-    this.selectedIndex = this.savedLevel > 0 ? 1 : 0
-    this.updateSelection()
-
-    newGameBtn.on('pointerdown', () => {
-      this.selectedIndex = 0
-      this.executeAction()
+    this.tweens.add({
+      targets: this.blinkText,
+      alpha: 0,
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
     })
 
-    continueBtn.on('pointerdown', () => {
-      if (this.savedLevel > 0) {
-        this.selectedIndex = 1
-        this.executeAction()
-      }
+    this.time.delayedCall(500, () => {
+      this.canStart = true
     })
+
+    this.input.on('pointerdown', () => this.startGame())
   }
 
   update() {
     const kb = this.input.keyboard!
-    if (Phaser.Input.Keyboard.JustDown(kb.addKey('UP')) || Phaser.Input.Keyboard.JustDown(kb.addKey('W'))) {
-      this.selectedIndex = 0
-      this.updateSelection(true)
-    } else if (Phaser.Input.Keyboard.JustDown(kb.addKey('DOWN')) || Phaser.Input.Keyboard.JustDown(kb.addKey('S'))) {
-      if (this.savedLevel > 0) {
-        this.selectedIndex = 1
-        this.updateSelection(true)
-      }
-    } else if (
+    if (
       Phaser.Input.Keyboard.JustDown(kb.addKey('SPACE')) ||
       Phaser.Input.Keyboard.JustDown(kb.addKey('ENTER')) ||
       Phaser.Input.Keyboard.JustDown(kb.addKey('Z')) ||
       Phaser.Input.Keyboard.JustDown(kb.addKey('X'))
     ) {
-      this.executeAction()
+      this.startGame()
     }
   }
 
-  private updateSelection(playAudio = false) {
-    if (playAudio) import('../audio').then(a => a.playMenuSelect())
-    this.optionsText.forEach((txt, idx) => {
-      if (idx === this.selectedIndex) {
-        txt.setText(`> ${txt.getData('action') === 'new' ? 'NEW GAME' : 'CONTINUE'} <`)
-        txt.setColor('#ffcc00')
-      } else {
-        txt.setText(txt.getData('action') === 'new' ? 'NEW GAME' : 'CONTINUE')
-        txt.setColor(txt.getData('action') === 'continue' && this.savedLevel === 0 ? '#306230' : '#e0f8cf')
-      }
-    })
-  }
-
-  private executeAction() {
+  private startGame() {
+    if (!this.canStart) return
     import('../audio').then(a => a.playMenuConfirm())
-    if (this.selectedIndex === 0) {
-      GameState.currentLevelIndex = 0
-      localStorage.setItem('cart-crate-level', '0')
-    } else {
-      GameState.currentLevelIndex = this.savedLevel
-    }
-    
-    this.scene.start('board')
+    this.scene.start('levelselect')
   }
 }
