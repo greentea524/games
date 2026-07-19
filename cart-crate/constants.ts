@@ -30,6 +30,15 @@ export const GBC_PAL = {
   shirtBlue: 0x3068c8,
 }
 
+// World-specific GBC palettes (Overrides base GBC_PAL colors)
+export const WORLD_PALS = [
+  GBC_PAL, // World 1: Warehouse (Default)
+  { ...GBC_PAL, bgGrass: 0x58a8c0, detailGrass: 0x386890, wallBg: 0x608090, wallLine: 0x405060, targetBg: 0x80c0d0 }, // World 2: Ice (Cyan/Blue)
+  { ...GBC_PAL, bgGrass: 0xc0a060, detailGrass: 0x907040, wallBg: 0xa08050, wallLine: 0x604030, targetBg: 0xd0b070 }, // World 3: Ruins (Sandy/Sepia)
+  { ...GBC_PAL, bgGrass: 0x604080, detailGrass: 0x402060, wallBg: 0x503060, wallLine: 0x301040, targetBg: 0x8060a0 }, // World 4: Labyrinth (Purple)
+  { ...GBC_PAL, bgGrass: 0xa04040, detailGrass: 0x702020, wallBg: 0x803030, wallLine: 0x501010, targetBg: 0xc06060 }, // World 5: Master Class (Crimson)
+]
+
 export const CSS_LIGHTEST = '#9bbc0f'
 export const CSS_LIGHT = '#8bac0f'
 export const CSS_MID = '#306230'

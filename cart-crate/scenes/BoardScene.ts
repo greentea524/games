@@ -125,7 +125,14 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
+  getTextureKey(base: string) {
+    const mode = GameState.paletteMode
+    const world = CAMPAIGN_LEVELS[GameState.currentLevelIndex]?.world || 1
+    return mode === 'gbc' ? `${base}_${mode}_w${world}` : `${base}_${mode}`
+  }
+
   renderBoard() {
+    const tKey = this.getTextureKey.bind(this)
     const mode = GameState.paletteMode
     this.crates = []
     let crateIdCounter = 1
@@ -137,10 +144,10 @@ export class BoardScene extends Phaser.Scene {
         const py = y * TILE + TILE / 2
 
         if (char === '#') {
-          this.add.image(px, py, `wall_${mode}`)
+          this.add.image(px, py, tKey('wall'))
         } else if (char === 'T') {
-          this.add.image(px, py, `floor_${mode}`)
-          const targetSprite = this.add.image(px, py, `target_${mode}`)
+          this.add.image(px, py, tKey('floor'))
+          const targetSprite = this.add.image(px, py, tKey('target'))
           this.tweens.add({
             targets: targetSprite,
             alpha: 0.2,
@@ -149,13 +156,13 @@ export class BoardScene extends Phaser.Scene {
             repeat: -1,
           })
         } else if (char === 'I') {
-          this.add.image(px, py, `ice_${mode}`)
+          this.add.image(px, py, tKey('ice'))
         } else if (char === 'X') {
-          this.add.image(px, py, `cracked_${mode}`)
+          this.add.image(px, py, tKey('cracked'))
         } else if (char === 'O') {
-          this.add.image(px, py, `hole_${mode}`)
+          this.add.image(px, py, tKey('hole'))
         } else {
-          this.add.image(px, py, `floor_${mode}`)
+          this.add.image(px, py, tKey('floor'))
         }
 
         if (char === 'C' || char === '*') {
@@ -163,8 +170,8 @@ export class BoardScene extends Phaser.Scene {
           this.floorGrid[y][x] = isTarget ? 'T' : '.'
           
           if (isTarget) {
-            this.add.image(px, py, `floor_${mode}`)
-            const targetSprite = this.add.image(px, py, `target_${mode}`)
+            this.add.image(px, py, tKey('floor'))
+            const targetSprite = this.add.image(px, py, tKey('target'))
             this.tweens.add({
               targets: targetSprite,
               alpha: 0.2,
@@ -174,7 +181,7 @@ export class BoardScene extends Phaser.Scene {
             })
           }
           
-          const crateSprite = this.add.sprite(px, py, `crate_${mode}`).setDepth(5)
+          const crateSprite = this.add.sprite(px, py, tKey('crate')).setDepth(5)
           this.crates.push({
             tx: x,
             ty: y,
@@ -187,36 +194,42 @@ export class BoardScene extends Phaser.Scene {
       }
     }
 
-    const px = this.playerTX * TILE + TILE / 2
-    const py = this.playerTY * TILE + TILE / 2
-    this.player = this.add.sprite(px, py, `player_${mode}_${this.facing}`).setDepth(10)
+    this.player = this.add.sprite(
+      this.playerTX * TILE + TILE / 2,
+      this.playerTY * TILE + TILE / 2,
+      `player_${mode}_` + this.facing
+    ).setDepth(10)
   }
 
   reloadPalette() {
     const mode = GameState.paletteMode
+    const tKey = this.getTextureKey.bind(this)
 
     this.children.each((child: Phaser.GameObjects.GameObject) => {
       if (child instanceof Phaser.GameObjects.Image) {
         const key = child.texture.key
-        if (key.startsWith('floor_')) child.setTexture(`floor_${mode}`)
-        else if (key.startsWith('wall_')) child.setTexture(`wall_${mode}`)
-        else if (key.startsWith('target_')) child.setTexture(`target_${mode}`)
-        else if (key.startsWith('ice_')) child.setTexture(`ice_${mode}`)
-        else if (key.startsWith('cracked_')) child.setTexture(`cracked_${mode}`)
-        else if (key.startsWith('hole_')) child.setTexture(`hole_${mode}`)
+        if (key.startsWith('floor_')) child.setTexture(tKey('floor'))
+        else if (key.startsWith('wall_')) child.setTexture(tKey('wall'))
+        else if (key.startsWith('target_')) child.setTexture(tKey('target'))
+        else if (key.startsWith('ice_')) child.setTexture(tKey('ice'))
+        else if (key.startsWith('cracked_')) child.setTexture(tKey('cracked'))
+        else if (key.startsWith('hole_')) child.setTexture(tKey('hole'))
       } else if (child instanceof Phaser.GameObjects.Sprite) {
         const key = child.texture.key
         if (key.startsWith('crate_')) {
-          child.setTexture(`crate_${mode}`)
+          child.setTexture(tKey('crate'))
         } else if (key.startsWith('player_')) {
           child.setTexture(`player_${mode}_${this.facing}`)
         }
       }
     })
 
+    const world = CAMPAIGN_LEVELS[GameState.currentLevelIndex]?.world || 1
+    const pal = mode === 'gbc' ? (WORLD_PALS[world - 1] || GBC_PAL) : GBC_PAL
+
     this.crates.forEach((c) => {
       if (c.docked && !c.destroyed) {
-        c.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : 0xffff44)
+        c.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : pal.crateLight)
       } else {
         c.sprite.clearTint()
       }
@@ -520,12 +533,29 @@ export class BoardScene extends Phaser.Scene {
     if (totalTargets > 0 && dockedCrates === totalTargets) {
       GameState.uiBlocking = true
       const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
-      const stars = SaveSystem.saveLevelCompletion(levelConfig.id, GameState.movesCount, levelConfig.parMoves)
+      SaveSystem.saveLevelCompletion(levelConfig.id, GameState.movesCount, levelConfig.parMoves)
+
+      const nextLevel = GameState.currentLevelIndex + 1
+      const savedStr = localStorage.getItem('cart-crate-level')
+      const savedLvl = savedStr ? parseInt(savedStr, 10) : 0
+      if (nextLevel > savedLvl && nextLevel < CAMPAIGN_LEVELS.length) {
+        localStorage.setItem('cart-crate-level', nextLevel.toString())
+      }
 
       const uiScene = this.scene.get('ui') as UIScene
       if (uiScene) {
-        uiScene.showVictoryBanner(stars)
+        uiScene.showStageCleared()
       }
+
+      this.time.delayedCall(2000, () => {
+        GameState.currentLevelIndex++
+        if (GameState.currentLevelIndex >= CAMPAIGN_LEVELS.length) {
+          GameState.currentLevelIndex = 0
+          this.scene.start('mainmenu')
+        } else {
+          this.scene.restart()
+        }
+      })
     }
   }
 }

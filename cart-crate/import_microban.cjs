@@ -6,7 +6,7 @@ const rawLevels = content.split(/; \d+/).slice(1);
 const microbanLevels = [];
 
 for (let i = 0; i < 40; i++) {
-  const raw = rawLevels[i].split('\\n').filter(l => l.trim().length > 0);
+  const raw = rawLevels[i].split(/\r?\n/).filter(l => l.trim().length > 0);
   
   // Convert characters
   const grid = raw.map(row => {

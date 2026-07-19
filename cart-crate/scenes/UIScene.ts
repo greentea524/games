@@ -64,62 +64,26 @@ export class UIScene extends Phaser.Scene {
       resolution: 2,
     }).setOrigin(0.5, 1)
 
-    // Victory Banner Container
-    const bgGfx = this.add.graphics()
-    bgGfx.fillStyle(PAL.darkest, 0.95)
-    bgGfx.fillRoundedRect(-72, -35, 144, 70, 6)
-    bgGfx.lineStyle(1.5, PAL.lightest, 1)
-    bgGfx.strokeRoundedRect(-72, -35, 144, 70, 6)
-
-    const vicText = this.add.text(0, -20, 'STAGE CLEARED!', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#9bbc0f',
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    this.starsText = this.add.text(0, -5, '★★★', {
-      fontFamily: FONT,
-      fontSize: '10px',
-      color: '#ffcc00',
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    const subText = this.add.text(0, 8, 'ALL CRATES DELIVERED!', {
-      fontFamily: FONT,
-      fontSize: '5px',
-      color: '#8bac0f',
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    const nextBtnText = this.add.text(0, 22, '[ TAP / PRESS ANY KEY ]', {
-      fontFamily: FONT,
-      fontSize: '5px',
-      color: '#e0f8cf',
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    this.victoryContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2, [
-      bgGfx,
-      vicText,
-      this.starsText,
-      subText,
-      nextBtnText,
-    ])
+    // Victory Banner Container (Simplified)
+    this.victoryContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2)
       .setDepth(2000)
       .setVisible(false)
+
+    this.starsText = this.add.text(0, 0, 'STAGE CLEARED!', {
+      fontFamily: FONT,
+      fontSize: '8px',
+      color: '#ffcc00',
+      stroke: '#0f380f',
+      strokeThickness: 2,
+      resolution: 2,
+    }).setOrigin(0.5)
+
+    this.victoryContainer.add(this.starsText)
 
     // Build Pause Menu & How-To-Play Overlay
     this.createPauseMenu()
     this.createHelpModal()
 
-    // Advance level on pointer/touch click anywhere when victory banner is showing
-    this.input.on('pointerdown', () => {
-      if (GameState.uiBlocking && !this.pauseOpen && !this.helpOpen) {
-        const boardScene = this.scene.get('board') as BoardScene
-        if (boardScene) boardScene.nextLevel()
-      }
-    })
   }
 
   private createPauseMenu() {
@@ -316,9 +280,7 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
-  showVictoryBanner(stars: number = 3) {
-    const starStr = '★'.repeat(stars) + '☆'.repeat(3 - stars)
-    this.starsText.setText(starStr)
+  showStageCleared() {
     this.victoryContainer.setScale(0).setVisible(true)
     this.tweens.add({
       targets: this.victoryContainer,
