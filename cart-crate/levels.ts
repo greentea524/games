@@ -13,6 +13,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "First Delivery",
     "world": 1,
     "parMoves": 10,
+    "solution": "RRRR",
     "grid": [
       "##########",
       "#........#",
@@ -30,6 +31,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Double Crate",
     "world": 1,
     "parMoves": 14,
+    "solution": "DRRRRLLLDRRR",
     "grid": [
       "##########",
       "#........#",
@@ -47,6 +49,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Slippery Ice",
     "world": 1,
     "parMoves": 14,
+    "solution": "RRRR",
     "grid": [
       "##########",
       "#........#",
@@ -64,6 +67,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Cracked Floor",
     "world": 1,
     "parMoves": 10,
+    "solution": "RRRRR",
     "grid": [
       "##########",
       "#........#",
@@ -81,6 +85,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Warehouse Master",
     "world": 1,
     "parMoves": 11,
+    "solution": "RRRRRLLLDRRRR",
     "grid": [
       "##########",
       "#..#.....#",
@@ -98,6 +103,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Tight Corner",
     "world": 1,
     "parMoves": 17,
+    "solution": "RRU",
     "grid": [
       "##########",
       "###.T.####",
@@ -115,6 +121,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Backtrack",
     "world": 1,
     "parMoves": 15,
+    "solution": "LLLLDDRR",
     "grid": [
       "##########",
       "#.T.C..P.#",
@@ -132,6 +139,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Blocker",
     "world": 1,
     "parMoves": 10,
+    "solution": "ULLRRRR",
     "grid": [
       "##########",
       "#T.C.C.T.#",
@@ -149,6 +157,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Hallway",
     "world": 1,
     "parMoves": 19,
+    "solution": "RRDRURR",
     "grid": [
       "##########",
       "#...T....#",
@@ -166,6 +175,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Storage Room",
     "world": 1,
     "parMoves": 17,
+    "solution": "DRRRUDRRRULLLLDLU",
     "grid": [
       "##########",
       "#..T.T...#",
@@ -183,6 +193,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Ice Slide",
     "world": 2,
     "parMoves": 20,
+    "solution": "DLURRRDLULLDDRULURUULDRDDRRULDLUU",
     "grid": [
       "####..",
       "#.T#..",
@@ -198,6 +209,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Ricochet",
     "world": 2,
     "parMoves": 22,
+    "solution": "RDDLRUULDUULLDDR",
     "grid": [
       "######",
       "#....#",
@@ -213,6 +225,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Ice Corner",
     "world": 2,
     "parMoves": 24,
+    "solution": "RUULLLULDRRRRDDLURULLLDDLLLUURRDRDLUUURDD",
     "grid": [
       "..####...",
       "###..####",
@@ -227,6 +240,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Stop And Go",
     "world": 2,
     "parMoves": 26,
+    "solution": "ULLDLDRUURRDLLRRDDLURUL",
     "grid": [
       "########",
       "#......#",
@@ -241,6 +255,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Slip And Slide",
     "world": 2,
     "parMoves": 28,
+    "solution": "LURLLDRDRDRRUULLDLUDDLLUR",
     "grid": [
       ".#######",
       ".#.....#",
@@ -256,6 +271,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Ice Blocks",
     "world": 2,
     "parMoves": 30,
+    "solution": "ULLDLLLLULDULLDRRRRRRDRRRUULLDURRDDLLLLULLLLLDDRULURRRRRRDRRRUULLDURRDDLLLULLLLLDDRULURRRRRDRRRUULLDURRDDLL",
     "grid": [
       "######.#####",
       "#....###...#",
@@ -286,6 +302,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Glacier",
     "world": 2,
     "parMoves": 34,
+    "solution": "LLDDDDDDLDDDRRUULUUUUUUURRDLULDDDDDDLLLDDRRUDLLUURRDDDRRUULUUUUUULURDDDDDDDRDDLLUUDLLUURRDRUUUUUU",
     "grid": [
       "..######",
       "..#.TTP#",
@@ -306,6 +323,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Frozen Lake",
     "world": 2,
     "parMoves": 36,
+    "solution": "URRDULLDRDRLUURDRDDLURULDLURUL",
     "grid": [
       "#####.",
       "#T..##",
@@ -321,6 +339,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Deep Freeze",
     "world": 2,
     "parMoves": 38,
+    "solution": "RDDRRUULLDDRRRRUUUUURRDDDLRUUULLDDDLLDDRRUUUUDDDDLLLLUURRRLDDRRUUUDDDLLLLLLUURRRRRLDDRRUU",
     "grid": [
       "......#####",
       "......#T..#",
@@ -337,6 +356,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Watch Your Step",
     "world": 3,
     "parMoves": 40,
+    "solution": "ULLLDDDDRRRRULULDRDLLLUUUURRRDDDLDLLULLDDRULURDRRRURRDLLLLULLDDRURRRUURUULLLDD",
     "grid": [
       "..######.",
       "..#....#.",
@@ -353,6 +373,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Pitfall",
     "world": 3,
     "parMoves": 42,
+    "solution": "UULULLDRDRLUURDRDDRDDLLURUUULLDRURDDRRRDDLLUDLLUR",
     "grid": [
       "#####....",
       "#...##...",
@@ -369,6 +390,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Fragile Bridge",
     "world": 3,
     "parMoves": 44,
+    "solution": "RDLDDRDDLUUUURULDDDDRRRULLDLUUULUDRRDDRDLDLUUURULRUL",
     "grid": [
       "####...",
       "#T.##..",
@@ -386,6 +408,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Crumble",
     "world": 3,
     "parMoves": 46,
+    "solution": "UULLLLDDDRRULLUURRRRDDLLLRRRUULLDURRDDLLDLLURRUULLD",
     "grid": [
       "#######",
       "#.....#",
@@ -400,6 +423,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Hole In One",
     "world": 3,
     "parMoves": 48,
+    "solution": "DRDDDLLUUDDRRUULULLLDLLURRRRDRRDDLLUU",
     "grid": [
       ".....###.",
       "######P##",
@@ -415,6 +439,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Ruin Maze",
     "world": 3,
     "parMoves": 50,
+    "solution": "LDDRUDRRULLDLUUURULLLULDDDLDRUUURRRDRRDLDLUURULLLULDDDLDDRRULDLURUUURRRDDDDRRRULLDLUUURULLLULDDDDLDR",
     "grid": [
       ".####.....",
       ".#..####..",
@@ -431,6 +456,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Shatter",
     "world": 3,
     "parMoves": 52,
+    "solution": "DRDULLDRDDRRULUDDLUUDDLUU",
     "grid": [
       "#####.",
       "#.P.#.",
@@ -446,6 +472,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Abyss",
     "world": 3,
     "parMoves": 54,
+    "solution": "RUUUULLLDDRRDRUUDLLLUUURRRRDLDDDDDLUURUUULULLDDDRRDRUUDLLLUUURRDLURRRDL",
     "grid": [
       "#######",
       "#.....#",
@@ -463,6 +490,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Leap Of Faith",
     "world": 3,
     "parMoves": 56,
+    "solution": "URRDDDLDDRUUUURULLLDRURDDDLDDRUUUULLLLURR",
     "grid": [
       "########",
       "#...TT.#",
@@ -479,6 +507,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Temple of Cracks",
     "world": 3,
     "parMoves": 58,
+    "solution": "URDDDRRRUULLLLRDDLDDRUUUDRRRUULLULLDRRRLULLLLDRRRR",
     "grid": [
       "#######..",
       "#.....###",
@@ -495,6 +524,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Maze Start",
     "world": 4,
     "parMoves": 60,
+    "solution": "DLLUDLULUURDRDDLU",
     "grid": [
       "####...",
       "#..####",
@@ -509,6 +539,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Corridors",
     "world": 4,
     "parMoves": 62,
+    "solution": "DRRRUULDLDLUUULURRDLDDRRRDLLDLUUUURULDDDRRURUUL",
     "grid": [
       "#####..",
       "#...###",
@@ -526,6 +557,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Twisty",
     "world": 4,
     "parMoves": 64,
+    "solution": "RUULLURDRDDDLLUUDRRUULULLDRDDRRUURULLRDDDLLUURURDDULLLUR",
     "grid": [
       "#######",
       "#..*..#",
@@ -541,6 +573,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Dead End",
     "world": 4,
     "parMoves": 66,
+    "solution": "ULLDDLDDRRULUUURRDLULDDDULLDDRRUULD",
     "grid": [
       "#.#####",
       "..#...#",
@@ -556,6 +589,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Zig Zag",
     "world": 4,
     "parMoves": 68,
+    "solution": "URRDLULLUURDLDRLDDRURRUULLULD",
     "grid": [
       ".####..",
       ".#..###",
@@ -571,6 +605,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Tight Squeeze",
     "world": 4,
     "parMoves": 70,
+    "solution": "DRDDLUDRDDLUULLDRURRDDLURULRUUULLDRDUURDD",
     "grid": [
       ".#####",
       ".#.P.#",
@@ -587,6 +622,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Four Rooms",
     "world": 4,
     "parMoves": 72,
+    "solution": "DLULDDLLUUUURRRDULLLDDDDRRUULRDRRULUULLLDDDURRDRUU",
     "grid": [
       "######.",
       "#...T#.",
@@ -602,6 +638,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Spiral",
     "world": 4,
     "parMoves": 74,
+    "solution": "RDULLDRDDRRULDLUULUURRDDLDRUUULDD",
     "grid": [
       "#####..",
       "#...#..",
@@ -617,6 +654,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Hidden Target",
     "world": 4,
     "parMoves": 76,
+    "solution": "ULLLDRURRDRRDDLLLLLLLUURURRDRRRLULLLLDLDDRRRRRRRUUUUDDLLULLLLDRRRRRLLLLLLDDRRRRRRRUUURUULDDDUUUULLDRURDD",
     "grid": [
       ".....#####.",
       ".....#...##",
@@ -634,6 +672,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Labyrinth End",
     "world": 4,
     "parMoves": 78,
+    "solution": "ULUURDLDDDRRURUULLULD",
     "grid": [
       "####..",
       "#..###",
@@ -649,6 +688,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Ice And Fire",
     "world": 5,
     "parMoves": 80,
+    "solution": "DURURDDRDDLLUULUR",
     "grid": [
       "..####.",
       ".##..#.",
@@ -664,6 +704,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Tricky Floor",
     "world": 5,
     "parMoves": 82,
+    "solution": "ULLDULLDDRURURRDLLLDDRULURUULDRRRDL",
     "grid": [
       ".####..",
       "##..###",
@@ -679,6 +720,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Sliding Pit",
     "world": 5,
     "parMoves": 84,
+    "solution": "ULLRRDDLLUDLULUURDLDDRRRRUULLLRDDLLUURRDL",
     "grid": [
       "#######",
       "#T.#..#",
@@ -694,6 +736,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Combo 1",
     "world": 5,
     "parMoves": 86,
+    "solution": "DRUDRRURLLUURDLDRDLLLURLURRURD",
     "grid": [
       "..####...",
       "###..####",
@@ -708,6 +751,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Combo 2",
     "world": 5,
     "parMoves": 88,
+    "solution": "LLULUURDRDLDDRRULDLUURULULUURDRDLRDDLDDRRULDLUUUURULUURDDDDDLDDRRULDLUUUUURUL",
     "grid": [
       "..####.",
       ".##..#.",
@@ -739,6 +783,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Brain Teaser",
     "world": 5,
     "parMoves": 92,
+    "solution": "DRRUULLULLDRRRLDDRRUUUUDDLLULLULLDDRRRRRLDDRRUUUDLLULLULDLDRRRRRLDDRRUU",
     "grid": [
       "......###",
       "#####.#T#",
@@ -755,6 +800,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "The Gauntlet",
     "world": 5,
     "parMoves": 94,
+    "solution": "LLLUUURRRDDUURRRRDDLLLRRRDDLLLULLRURR",
     "grid": [
       "##########",
       "#........#",
@@ -770,6 +816,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Penultimate",
     "world": 5,
     "parMoves": 96,
+    "solution": "RUULLLUULLDDRLUURRDDRRRDDLURULLLUULLDDRRDDLLDDRRUUUURRURDLLLLLUURRDULLDDRRRRDRUDDRRUL",
     "grid": [
       "#####.....",
       "#...####..",
@@ -787,6 +834,7 @@ export const CAMPAIGN_LEVELS: LevelConfig[] = [
     "title": "Final Exam",
     "world": 5,
     "parMoves": 98,
+    "solution": "UDLLURUURRDDULDUULDD",
     "grid": [
       ".#####.",
       ".#...#.",
