@@ -221,6 +221,14 @@ export class BoardScene extends Phaser.Scene {
         c.sprite.clearTint()
       }
     })
+
+    const mapPixelWidth = this.mapWidth * TILE
+    const mapPixelHeight = this.mapHeight * TILE
+    const offsetX = Math.max(0, (160 - mapPixelWidth) / 2)
+    const offsetY = Math.max(0, (144 - mapPixelHeight) / 2)
+    
+    this.cameras.main.setScroll(-offsetX, -offsetY)
+    this.cameras.main.setBackgroundColor(mode === 'dmg' ? '#0f380f' : '#181818')
   }
 
   setPlayerPos(tx: number, ty: number, facing: Facing) {
