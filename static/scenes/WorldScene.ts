@@ -11,6 +11,7 @@ import {
 } from '../constants'
 import { GameState } from '../state'
 import { StaticWorldFX } from '../fx/StaticWorldFX'
+import { sfx } from '../audio'
 import { NPCS } from '../dialogue'
 import type { NpcDef } from '../dialogue'
 import type { UIScene } from './UIScene'
@@ -38,6 +39,7 @@ export class WorldScene extends Phaser.Scene {
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
   private doors: DoorData[] = []
   private tvPos?: { x: number; y: number }
+  private lastStepAt = 0
   private facing: Facing = 'down'
   private transitioning = false
 
@@ -256,6 +258,7 @@ export class WorldScene extends Phaser.Scene {
   private switchWorld() {
     if (this.transitioning) return
     this.transitioning = true
+    sfx.switchWorld()
     this.player.setVelocity(0, 0)
     if (this.prompt) this.prompt.setVisible(false)
     const noise = this.add
@@ -403,6 +406,7 @@ export class WorldScene extends Phaser.Scene {
   ) {
     if (this.transitioning || this.time.now < this.doorLockUntil) return
     this.transitioning = true
+    sfx.door()
     this.player.setVelocity(0, 0)
     this.cameras.main.fadeOut(250, 15, 56, 15)
     this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -488,6 +492,11 @@ export class WorldScene extends Phaser.Scene {
       else if (vx > 0) this.facing = 'right'
       const mode = GameState.paletteMode
       this.player.anims.play(`walk_${mode}_${this.facing}`, true)
+      // Subtle footstep taps in time with the walk cycle.
+      if (this.time.now - this.lastStepAt > 260) {
+        sfx.footstep()
+        this.lastStepAt = this.time.now
+      }
     } else {
       const mode = GameState.paletteMode
       this.player.setVelocity(0, 0)

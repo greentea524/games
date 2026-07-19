@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, PAL } from '../constants'
 import { GameState } from '../state'
 import { ITEMS, resolveDialogue } from '../dialogue'
+import { sfx } from '../audio'
 import type { NpcDef, DialogueLine, ChoiceOption } from '../dialogue'
 
 const FONT = '"Press Start 2P"'
@@ -126,9 +127,13 @@ export class UIScene extends Phaser.Scene {
 
   private showLine() {
     const line = this.lines[this.lineIndex]
+    sfx.blip()
     if (line.give) {
       const added = GameState.addItem(line.give)
-      if (added) this.showItemToast(line.give)
+      if (added) {
+        this.showItemToast(line.give)
+        sfx.pickup()
+      }
     }
     if (line.setFlag) GameState.setFlag(line.setFlag)
 
@@ -244,12 +249,14 @@ export class UIScene extends Phaser.Scene {
   private moveChoice(dir: number) {
     this.choiceIndex =
       (this.choiceIndex + dir + this.choices.length) % this.choices.length
+    sfx.menuMove()
     this.renderChoices()
   }
 
   private confirmChoice() {
     const opt = this.choices[this.choiceIndex]
     if (opt.setFlag) GameState.setFlag(opt.setFlag)
+    sfx.sting()
     this.endDialogue()
   }
 
@@ -356,6 +363,7 @@ export class UIScene extends Phaser.Scene {
 
   public toggleInventory() {
     if (GameState.dialogueActive) return
+    sfx.menuSelect()
     if (GameState.inventoryOpen) {
       this.closeInventory()
     } else {

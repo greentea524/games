@@ -3,6 +3,7 @@ import { BootScene } from './scenes/BootScene'
 import { WorldScene } from './scenes/WorldScene'
 import { UIScene } from './scenes/UIScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
+import { sfx, isMuted, setMuted } from './audio'
 import { GameState } from './state'
 
 function integerZoom(): number {
@@ -155,8 +156,13 @@ const isDesktop = () =>
 let paused = false
 let view: 'pause' | 'controls' | 'about' = 'pause'
 let controlsMode: 'keyboard' | 'touch' = 'keyboard'
-const pauseItems = ['Resume', 'About', 'Inventory', 'Controls']
+const pauseItems = ['Resume', 'About', 'Inventory', 'Sound', 'Controls']
 let selected = 0
+
+// 'Sound' shows its live state in the label.
+function labelFor(item: string): string {
+  return item === 'Sound' ? `Sound: ${isMuted() ? 'OFF' : 'ON'}` : item
+}
 
 function pauseButtonsMarkup(): string {
   return `
@@ -165,7 +171,7 @@ function pauseButtonsMarkup(): string {
       ${pauseItems
         .map(
           (label, i) =>
-            `<button id="pause-item-${i}" class="overlay-btn">${label}</button>`,
+            `<button id="pause-item-${i}" class="overlay-btn">${labelFor(label)}</button>`,
         )
         .join('')}
     </div>`
@@ -189,7 +195,7 @@ function updateSelection() {
     const btn = document.getElementById(`pause-item-${i}`)
     if (!btn) return
     btn.style.color = i === selected ? '#e0f8cf' : '#86b06a'
-    btn.innerText = (i === selected ? '> ' : '') + label
+    btn.innerText = (i === selected ? '> ' : '') + labelFor(label)
   })
 }
 
@@ -247,8 +253,13 @@ function renderControls() {
 }
 
 function activateSelected() {
+  sfx.menuSelect()
   if (pauseItems[selected] === 'Resume') {
     closePause()
+  } else if (pauseItems[selected] === 'Sound') {
+    setMuted(!isMuted())
+    if (!isMuted()) sfx.menuSelect() // audible confirmation when unmuting
+    updateSelection()
   } else if (pauseItems[selected] === 'About') {
     renderAbout()
   } else if (pauseItems[selected] === 'Inventory') {
@@ -320,9 +331,11 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'ArrowUp' || e.code === 'ArrowUp') {
     selected = (selected - 1 + pauseItems.length) % pauseItems.length
+    sfx.menuMove()
     updateSelection()
   } else if (e.key === 'ArrowDown' || e.code === 'ArrowDown') {
     selected = (selected + 1) % pauseItems.length
+    sfx.menuMove()
     updateSelection()
   } else if (
     ['Enter', 'z', 'Z', 'KeyZ'].includes(e.key) ||
