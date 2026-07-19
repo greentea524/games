@@ -201,6 +201,8 @@ export class BoardScene extends Phaser.Scene {
       this.playerTY * TILE + TILE / 2,
       `player_${mode}_` + this.facing
     ).setDepth(10)
+
+    this.updateCamera()
   }
 
   setTile(tx: number, ty: number, char: string) {
@@ -247,6 +249,12 @@ export class BoardScene extends Phaser.Scene {
       }
     })
 
+    this.updateCamera()
+    
+    this.cameras.main.setBackgroundColor(mode === 'dmg' ? '#0f380f' : '#181818')
+  }
+
+  private updateCamera() {
     const mapPixelWidth = this.mapWidth * TILE
     const mapPixelHeight = this.mapHeight * TILE
 
@@ -260,8 +268,6 @@ export class BoardScene extends Phaser.Scene {
       this.cameras.main.stopFollow()
       this.cameras.main.setScroll(-offsetX, -offsetY)
     }
-    
-    this.cameras.main.setBackgroundColor(mode === 'dmg' ? '#0f380f' : '#181818')
   }
 
   setPlayerPos(tx: number, ty: number, facing: Facing) {
