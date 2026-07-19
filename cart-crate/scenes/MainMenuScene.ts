@@ -70,11 +70,11 @@ export class MainMenuScene extends Phaser.Scene {
     const kb = this.input.keyboard!
     if (Phaser.Input.Keyboard.JustDown(kb.addKey('UP')) || Phaser.Input.Keyboard.JustDown(kb.addKey('W'))) {
       this.selectedIndex = 0
-      this.updateSelection()
+      this.updateSelection(true)
     } else if (Phaser.Input.Keyboard.JustDown(kb.addKey('DOWN')) || Phaser.Input.Keyboard.JustDown(kb.addKey('S'))) {
       if (this.savedLevel > 0) {
         this.selectedIndex = 1
-        this.updateSelection()
+        this.updateSelection(true)
       }
     } else if (
       Phaser.Input.Keyboard.JustDown(kb.addKey('SPACE')) ||
@@ -86,7 +86,8 @@ export class MainMenuScene extends Phaser.Scene {
     }
   }
 
-  private updateSelection() {
+  private updateSelection(playAudio = false) {
+    if (playAudio) import('../audio').then(a => a.playMenuSelect())
     this.optionsText.forEach((txt, idx) => {
       if (idx === this.selectedIndex) {
         txt.setText(`> ${txt.getData('action') === 'new' ? 'NEW GAME' : 'CONTINUE'} <`)
@@ -99,6 +100,7 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private executeAction() {
+    import('../audio').then(a => a.playMenuConfirm())
     if (this.selectedIndex === 0) {
       GameState.currentLevelIndex = 0
       localStorage.setItem('cart-crate-level', '0')

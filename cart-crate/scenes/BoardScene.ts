@@ -27,6 +27,7 @@ export class BoardScene extends Phaser.Scene {
   private mapHeight = 9
 
   private floorGrid: string[][] = []
+  private floorSprites: Phaser.GameObjects.Image[][] = []
   private crates: CrateInstance[] = []
   private undoStack: MoveCommand[] = []
 
@@ -136,6 +137,7 @@ export class BoardScene extends Phaser.Scene {
     const tKey = this.getTextureKey.bind(this)
     const mode = GameState.paletteMode
     this.crates = []
+    this.floorSprites = Array(this.mapHeight).fill(null).map(() => Array(this.mapWidth).fill(null))
     let crateIdCounter = 1
 
     for (let y = 0; y < this.mapHeight; y++) {
@@ -145,9 +147,9 @@ export class BoardScene extends Phaser.Scene {
         const py = y * TILE + TILE / 2
 
         if (char === '#') {
-          this.add.image(px, py, tKey('wall'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('wall'))
         } else if (char === 'T') {
-          this.add.image(px, py, tKey('floor'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'))
           const targetSprite = this.add.image(px, py, tKey('target'))
           this.tweens.add({
             targets: targetSprite,
@@ -157,13 +159,13 @@ export class BoardScene extends Phaser.Scene {
             repeat: -1,
           })
         } else if (char === 'I') {
-          this.add.image(px, py, tKey('ice'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('ice'))
         } else if (char === 'X') {
-          this.add.image(px, py, tKey('cracked'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('cracked'))
         } else if (char === 'O') {
-          this.add.image(px, py, tKey('hole'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('hole'))
         } else {
-          this.add.image(px, py, tKey('floor'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'))
         }
 
         if (char === 'C' || char === '*') {
@@ -200,6 +202,16 @@ export class BoardScene extends Phaser.Scene {
       this.playerTY * TILE + TILE / 2,
       `player_${mode}_` + this.facing
     ).setDepth(10)
+  }
+
+  setTile(tx: number, ty: number, char: string) {
+    this.floorGrid[ty][tx] = char
+    const img = this.floorSprites[ty][tx]
+    if (img) {
+      if (char === 'O') img.setTexture(this.getTextureKey('hole'))
+      else if (char === 'X') img.setTexture(this.getTextureKey('cracked'))
+      else if (char === '.') img.setTexture(this.getTextureKey('floor'))
+    }
   }
 
   reloadPalette() {
@@ -375,10 +387,14 @@ export class BoardScene extends Phaser.Scene {
     }
 
     const crateAtTarget = this.crates.find((c) => !c.destroyed && c.tx === finalPlayerTX && c.ty === finalPlayerTY)
+    
+    let crateFell = false
+    let pushTX = -1
+    let pushTY = -1
 
     if (crateAtTarget) {
-      let pushTX = finalPlayerTX + dx
-      let pushTY = finalPlayerTY + dy
+      pushTX = finalPlayerTX + dx
+      pushTY = finalPlayerTY + dy
 
       if (pushTX < 0 || pushTX >= this.mapWidth || pushTY < 0 || pushTY >= this.mapHeight) {
         this.player.setTexture(`player_${mode}_${this.facing}`)
@@ -400,6 +416,7 @@ export class BoardScene extends Phaser.Scene {
         pushTX = nextTX
         pushTY = nextTY
         pushTile = nextTile
+        if (pushTile === 'O') break // Slide into hole
       }
 
       const crateAtPush = this.crates.find((c) => !c.destroyed && c.tx === pushTX && c.ty === pushTY)
@@ -408,86 +425,32 @@ export class BoardScene extends Phaser.Scene {
         return
       }
 
-      while (this.floorGrid[finalPlayerTY][finalPlayerTX] === 'I') {
-        const nextTX = finalPlayerTX + dx
-        const nextTY = finalPlayerTY + dy
-        if (nextTX < 0 || nextTX >= this.mapWidth || nextTY < 0 || nextTY >= this.mapHeight) break
-        if (nextTX === pushTX && nextTY === pushTY) break
-        const nextTile = this.floorGrid[nextTY][nextTX]
-        if (nextTile === '#' || nextTile === 'O') break
-        finalPlayerTX = nextTX
-        finalPlayerTY = nextTY
+      if (pushTile === 'O') {
+        crateFell = true
       }
-
-      const record: StepRecord = {
-        playerPrevTX: this.playerTX,
-        playerPrevTY: this.playerTY,
-        playerNextTX: finalPlayerTX,
-        playerNextTY: finalPlayerTY,
-        facing: this.facing,
-        crate: crateAtTarget,
-        cratePrevTX: crateAtTarget.tx,
-        cratePrevTY: crateAtTarget.ty,
-        crateNextTX: pushTX,
-        crateNextTY: pushTY,
-        cratePrevDocked: crateAtTarget.docked,
-        crateNextDocked: this.floorGrid[pushTY][pushTX] === 'T',
-      }
-
-      this.isMoving = true
-      this.playerTX = finalPlayerTX
-      this.playerTY = finalPlayerTY
-      crateAtTarget.tx = pushTX
-      crateAtTarget.ty = pushTY
-
-      const isTarget = this.floorGrid[pushTY][pushTX] === 'T'
-      crateAtTarget.docked = isTarget
-      if (isTarget) {
-        crateAtTarget.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : 0xffff44)
-      } else {
-        crateAtTarget.sprite.clearTint()
-      }
-
-      this.player.setTexture(`player_${mode}_${this.facing}`)
-
-      const playerPX = finalPlayerTX * TILE + TILE / 2
-      const playerPY = finalPlayerTY * TILE + TILE / 2
-      const cratePX = pushTX * TILE + TILE / 2
-      const cratePY = pushTY * TILE + TILE / 2
-
-      this.tweens.add({
-        targets: this.player,
-        x: playerPX,
-        y: playerPY,
-        duration: 140,
-        ease: 'Linear',
-      })
-
-      this.tweens.add({
-        targets: crateAtTarget.sprite,
-        x: cratePX,
-        y: cratePY,
-        duration: 140,
-        ease: 'Linear',
-        onComplete: () => {
-          this.isMoving = false
-          GameState.movesCount++
-          GameState.pushesCount++
-          this.undoStack.push(new MoveCommand(this, record))
-          this.checkWinCondition()
-        },
-      })
-      return
     }
 
     while (this.floorGrid[finalPlayerTY][finalPlayerTX] === 'I') {
       const nextTX = finalPlayerTX + dx
       const nextTY = finalPlayerTY + dy
       if (nextTX < 0 || nextTX >= this.mapWidth || nextTY < 0 || nextTY >= this.mapHeight) break
+      if (crateAtTarget && nextTX === pushTX && nextTY === pushTY && !crateFell) break
       const nextTile = this.floorGrid[nextTY][nextTX]
-      if (nextTile === '#' || nextTile === 'O' || this.crates.some((c) => !c.destroyed && c.tx === nextTX && c.ty === nextTY)) break
+      if (nextTile === '#' || nextTile === 'O' || this.crates.some(c => !c.destroyed && c.tx === nextTX && c.ty === nextTY)) break
       finalPlayerTX = nextTX
       finalPlayerTY = nextTY
+    }
+
+    const crackedTiles: { tx: number; ty: number }[] = []
+    
+    if (this.floorGrid[this.playerTY][this.playerTX] === 'X') {
+      this.setTile(this.playerTX, this.playerTY, 'O')
+      crackedTiles.push({ tx: this.playerTX, ty: this.playerTY })
+    }
+
+    if (crateAtTarget && this.floorGrid[crateAtTarget.ty][crateAtTarget.tx] === 'X') {
+      this.setTile(crateAtTarget.tx, crateAtTarget.ty, 'O')
+      crackedTiles.push({ tx: crateAtTarget.tx, ty: crateAtTarget.ty })
     }
 
     const record: StepRecord = {
@@ -496,35 +459,96 @@ export class BoardScene extends Phaser.Scene {
       playerNextTX: finalPlayerTX,
       playerNextTY: finalPlayerTY,
       facing: this.facing,
-      crate: null,
-      cratePrevTX: null,
-      cratePrevTY: null,
-      crateNextTX: null,
-      crateNextTY: null,
-      cratePrevDocked: null,
-      crateNextDocked: null,
+      crate: crateAtTarget || null,
+      cratePrevTX: crateAtTarget ? crateAtTarget.tx : null,
+      cratePrevTY: crateAtTarget ? crateAtTarget.ty : null,
+      crateNextTX: crateAtTarget ? pushTX : null,
+      crateNextTY: crateAtTarget ? pushTY : null,
+      cratePrevDocked: crateAtTarget ? crateAtTarget.docked : null,
+      crateNextDocked: crateAtTarget ? (this.floorGrid[pushTY][pushTX] === 'T' && !crateFell) : null,
+      crackedTiles,
+      crateDestroyed: crateFell,
     }
 
     this.isMoving = true
     this.playerTX = finalPlayerTX
     this.playerTY = finalPlayerTY
+    
+    if (crateAtTarget) {
+      crateAtTarget.tx = pushTX
+      crateAtTarget.ty = pushTY
+
+      if (!crateFell) {
+        const isTarget = this.floorGrid[pushTY][pushTX] === 'T'
+        crateAtTarget.docked = isTarget
+        if (isTarget) {
+          crateAtTarget.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : 0xffff44)
+        } else {
+          crateAtTarget.sprite.clearTint()
+        }
+      }
+    }
+
     this.player.setTexture(`player_${mode}_${this.facing}`)
 
-    const targetPX = finalPlayerTX * TILE + TILE / 2
-    const targetPY = finalPlayerTY * TILE + TILE / 2
+    const playerPX = finalPlayerTX * TILE + TILE / 2
+    const playerPY = finalPlayerTY * TILE + TILE / 2
+
+    import('../audio').then(a => crateAtTarget ? a.playPush() : a.playMove())
 
     this.tweens.add({
       targets: this.player,
-      x: targetPX,
-      y: targetPY,
+      x: playerPX,
+      y: playerPY,
       duration: 140,
       ease: 'Linear',
-      onComplete: () => {
-        this.isMoving = false
-        GameState.movesCount++
-        this.undoStack.push(new MoveCommand(this, record))
-      },
     })
+
+    if (crateAtTarget) {
+      const cratePX = pushTX * TILE + TILE / 2
+      const cratePY = pushTY * TILE + TILE / 2
+
+      this.tweens.add({
+        targets: crateAtTarget.sprite,
+        x: cratePX,
+        y: cratePY,
+        duration: 140,
+        ease: 'Linear',
+        onComplete: () => {
+          if (crateFell) {
+            import('../audio').then(a => a.playFall())
+            this.tweens.add({
+              targets: crateAtTarget.sprite,
+              scale: 0,
+              duration: 200,
+              onComplete: () => {
+                crateAtTarget.sprite.setVisible(false)
+                crateAtTarget.destroyed = true
+                this.setTile(pushTX, pushTY, '.')
+                this.finishMove(record)
+              }
+            })
+          } else {
+            if (crateAtTarget.docked) {
+              import('../audio').then(a => a.playDock())
+            }
+            this.finishMove(record)
+          }
+        },
+      })
+    } else {
+      this.time.delayedCall(140, () => {
+        this.finishMove(record)
+      })
+    }
+  }
+
+  private finishMove(record: StepRecord) {
+    this.isMoving = false
+    GameState.movesCount++
+    if (record.crate) GameState.pushesCount++
+    this.undoStack.push(new MoveCommand(this, record))
+    this.checkWinCondition()
   }
 
   private checkWinCondition() {
@@ -542,6 +566,8 @@ export class BoardScene extends Phaser.Scene {
       if (nextLevel > savedLvl && nextLevel < CAMPAIGN_LEVELS.length) {
         localStorage.setItem('cart-crate-level', nextLevel.toString())
       }
+
+      import('../audio').then(a => a.playWin())
 
       // 3 bouncy jumps for joy
       this.tweens.add({

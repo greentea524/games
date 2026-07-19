@@ -153,3 +153,14 @@ if (paletteBtn) {
 
   updatePaletteBtn()
 }
+
+import { zzfxInit } from './audio'
+const initAudio = () => {
+  zzfxInit()
+  document.removeEventListener('click', initAudio)
+  document.removeEventListener('keydown', initAudio)
+  document.removeEventListener('touchstart', initAudio)
+}
+document.addEventListener('click', initAudio, { once: true })
+document.addEventListener('keydown', initAudio, { once: true })
+document.addEventListener('touchstart', initAudio, { once: true, passive: true })

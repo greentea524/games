@@ -206,7 +206,10 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
-  private updatePauseSelection() {
+  private updatePauseSelection(playAudio = false) {
+    if (playAudio) {
+      import('../audio').then(a => a.playMenuSelect())
+    }
     this.pauseOptionsText.forEach((txt, idx) => {
       if (idx === this.pauseSelectedIndex) {
         txt.setText('> ' + txt.getData('label'))
@@ -219,6 +222,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private executePauseAction(idx: number) {
+    import('../audio').then(a => a.playMenuConfirm())
     if (idx === 0) { // Resume
       this.togglePauseMenu()
     } else if (idx === 1) { // Help
@@ -245,10 +249,10 @@ export class UIScene extends Phaser.Scene {
       const kb = this.input.keyboard!
       if (Phaser.Input.Keyboard.JustDown(kb.addKey('DOWN')) || Phaser.Input.Keyboard.JustDown(kb.addKey('S'))) {
         this.pauseSelectedIndex = (this.pauseSelectedIndex + 1) % this.pauseOptionsText.length
-        this.updatePauseSelection()
+        this.updatePauseSelection(true)
       } else if (Phaser.Input.Keyboard.JustDown(kb.addKey('UP')) || Phaser.Input.Keyboard.JustDown(kb.addKey('W'))) {
         this.pauseSelectedIndex = (this.pauseSelectedIndex - 1 + this.pauseOptionsText.length) % this.pauseOptionsText.length
-        this.updatePauseSelection()
+        this.updatePauseSelection(true)
       } else if (
         Phaser.Input.Keyboard.JustDown(kb.addKey('SPACE')) ||
         Phaser.Input.Keyboard.JustDown(kb.addKey('ENTER')) ||

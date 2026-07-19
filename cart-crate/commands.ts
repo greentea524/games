@@ -20,6 +20,8 @@ export interface StepRecord {
   crateNextTY: number | null
   cratePrevDocked: boolean | null
   crateNextDocked: boolean | null
+  crackedTiles: { tx: number; ty: number }[]
+  crateDestroyed: boolean
 }
 
 export class MoveCommand implements ICommand {
@@ -36,7 +38,16 @@ export class MoveCommand implements ICommand {
     const mode = GameState.paletteMode
     this.scene.setPlayerPos(this.record.playerPrevTX, this.record.playerPrevTY, this.record.facing)
 
+    this.record.crackedTiles.forEach((t) => {
+      this.scene.setTile(t.tx, t.ty, 'X')
+    })
+
     if (this.record.crate && this.record.cratePrevTX !== null && this.record.cratePrevTY !== null) {
+      if (this.record.crateDestroyed) {
+        this.record.crate.destroyed = false
+        this.record.crate.sprite.setVisible(true).setScale(1)
+        this.scene.setTile(this.record.crateNextTX!, this.record.crateNextTY!, 'O')
+      }
       this.record.crate.tx = this.record.cratePrevTX
       this.record.crate.ty = this.record.cratePrevTY
       this.record.crate.docked = !!this.record.cratePrevDocked
