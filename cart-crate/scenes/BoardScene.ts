@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { TILE, GBC_WIDTH, GBC_HEIGHT } from '../constants'
+import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem } from '../save'
