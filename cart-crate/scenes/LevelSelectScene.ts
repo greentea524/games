@@ -10,6 +10,9 @@ export class LevelSelectScene extends Phaser.Scene {
   private currentPage = 0
   private highestUnlocked = 0
   private levelNodes: { id: number, text: Phaser.GameObjects.Text, bg: Phaser.GameObjects.Graphics, locked: boolean }[] = []
+  private leftArrowText!: Phaser.GameObjects.Text
+  private rightArrowText!: Phaser.GameObjects.Text
+  private numPages = 0
 
   constructor() {
     super('levelselect')
@@ -34,14 +37,28 @@ export class LevelSelectScene extends Phaser.Scene {
     const cols = 4
     const rows = 3
     const levelsPerPage = cols * rows
-    const numPages = Math.ceil(CAMPAIGN_LEVELS.length / levelsPerPage)
+    this.numPages = Math.ceil(CAMPAIGN_LEVELS.length / levelsPerPage)
+
+    this.leftArrowText = this.add.text(4, GBC_HEIGHT / 2, '<', {
+      fontFamily: FONT,
+      fontSize: '8px',
+      color: '#ffcc00',
+      resolution: 2,
+    }).setOrigin(0, 0.5).setScrollFactor(0).setVisible(false)
+
+    this.rightArrowText = this.add.text(GBC_WIDTH - 4, GBC_HEIGHT / 2, '>', {
+      fontFamily: FONT,
+      fontSize: '8px',
+      color: '#ffcc00',
+      resolution: 2,
+    }).setOrigin(1, 0.5).setScrollFactor(0).setVisible(false)
 
     const startX = 28
     const startY = 36
     const spacingX = 34
     const spacingY = 32
 
-    for (let p = 0; p < numPages; p++) {
+    for (let p = 0; p < this.numPages; p++) {
       const pageContainer = this.add.container(p * GBC_WIDTH, 0)
       this.pages.push(pageContainer)
 
@@ -96,6 +113,7 @@ export class LevelSelectScene extends Phaser.Scene {
     // Jump camera to current page
     this.cameras.main.scrollX = this.currentPage * GBC_WIDTH
     this.updateSelection()
+    this.updateArrows()
   }
 
   update() {
@@ -134,6 +152,7 @@ export class LevelSelectScene extends Phaser.Scene {
             duration: 250,
             ease: 'Quad.easeOut'
           })
+          this.updateArrows()
         }
       }
     }
@@ -174,8 +193,13 @@ export class LevelSelectScene extends Phaser.Scene {
       } else {
         node.bg.lineStyle(1, node.locked ? 0x306230 : 0x8bac0f, 1)
         node.bg.strokeRoundedRect(nx - 14, ny - 12, 28, 24, 4)
-        node.text.setColor(node.locked ? '#306230' : '#8bac0f')
+        node.text.setColor(isSelected ? '#0f380f' : (node.locked ? '#8b9bb4' : '#e0f8cf'))
       }
     })
+  }
+
+  private updateArrows() {
+    this.leftArrowText.setVisible(this.currentPage > 0)
+    this.rightArrowText.setVisible(this.currentPage < this.numPages - 1)
   }
 }
