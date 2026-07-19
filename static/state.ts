@@ -11,6 +11,17 @@ class GameStateClass {
   world: 'normal' | 'static' = 'normal'
   toggleWorld() {
     this.world = this.world === 'normal' ? 'static' : 'normal'
+    // Item crossover (#15): carried items transform between worlds.
+    // Pairs are [normal-form, static-form]; kept here (not dialogue.ts)
+    // to avoid an import cycle.
+    const transforms: [string, string][] = [['flower', 'flower_fresh']]
+    this.inventory = this.inventory.map(id => {
+      for (const [normal, statik] of transforms) {
+        if (this.world === 'static' && id === normal) return statik
+        if (this.world === 'normal' && id === statik) return normal
+      }
+      return id
+    })
   }
 
   paletteMode: 'dmg' | 'gbc' =
@@ -41,6 +52,9 @@ class GameStateClass {
   }
   hasItem(id: string): boolean {
     return this.inventory.includes(id)
+  }
+  removeItem(id: string) {
+    this.inventory = this.inventory.filter(i => i !== id)
   }
 }
 

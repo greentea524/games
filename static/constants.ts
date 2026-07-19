@@ -73,7 +73,22 @@ export const TILES = {
   DOOR: 6,
   WATER: 7,
   FLOOR: 8,
+  // Worn Static-side variants (#15): same tileset texture, extra columns.
+  // Structural decay reads through the #47 duotone where color wouldn't.
+  DEAD_TREE: 9,
+  CRACKED_WALL: 10,
+  ROTTED_FLOOR: 11,
+  CRACKED_GRASS: 12,
 } as const
 
+export const TILESET_COLUMNS = 12
+
 // Tiles the player cannot walk through.
-export const SOLID_TILES = [TILES.TREE, TILES.WALL, TILES.ROOF, TILES.WATER]
+export const SOLID_TILES = [
+  TILES.TREE,
+  TILES.WALL,
+  TILES.ROOF,
+  TILES.WATER,
+  TILES.DEAD_TREE,
+  TILES.CRACKED_WALL,
+]

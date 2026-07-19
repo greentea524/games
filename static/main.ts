@@ -53,6 +53,7 @@ function createGame() {
     }
   })
   window.__game = game
+  ;(window as any).__state = GameState
 }
 
 document.fonts

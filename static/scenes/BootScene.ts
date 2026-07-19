@@ -4,6 +4,8 @@ import { NPCS } from '../dialogue'
 import townUrl from '../assets/town.json?url'
 import houseUrl from '../assets/house.json?url'
 import house2Url from '../assets/house2.json?url'
+import townStaticUrl from '../assets/town_static.json?url'
+import cellarUrl from '../assets/cellar.json?url'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -16,6 +18,8 @@ export class BootScene extends Phaser.Scene {
     this.load.tilemapTiledJSON('town', townUrl)
     this.load.tilemapTiledJSON('house', houseUrl)
     this.load.tilemapTiledJSON('house2', house2Url)
+    this.load.tilemapTiledJSON('town_static', townStaticUrl)
+    this.load.tilemapTiledJSON('cellar', cellarUrl)
   }
 
   create() {
@@ -24,8 +28,66 @@ export class BootScene extends Phaser.Scene {
       this.buildPlayer(mode)
       this.buildNpcs(mode)
       this.buildItems(mode)
+      this.buildProps(mode)
     })
     this.scene.start('world', { mapKey: 'town' })
+  }
+
+  // Phase 3 props: fountain (full/drained), cellar hatch, and the
+  // crossover/payoff item icons.
+  private buildProps(mode: 'dmg' | 'gbc') {
+    const p = mode === 'dmg'
+      ? { stone: PAL.dark, stoneDark: PAL.darkest, water: PAL.light, glint: PAL.lightest, wood: PAL.dark, accent: PAL.light }
+      : { stone: GBC_PAL.wallBg, stoneDark: GBC_PAL.wallLine, water: GBC_PAL.waterBg, glint: GBC_PAL.waterWave, wood: GBC_PAL.doorBg, accent: GBC_PAL.knobGlow }
+    const g = this.make.graphics({}, false)
+    const tex = (key: string, w: number, h: number) => {
+      if (!this.textures.exists(key)) g.generateTexture(key, w, h)
+      g.clear()
+    }
+
+    // fountain 32x32 (2x2 tiles): stone ring, water center
+    g.fillStyle(p.stone); g.fillCircle(16, 16, 14)
+    g.fillStyle(p.stoneDark); g.fillCircle(16, 16, 11)
+    g.fillStyle(p.water); g.fillCircle(16, 16, 8)
+    g.fillStyle(p.glint); g.fillRect(11, 12, 5, 2); g.fillRect(17, 19, 4, 2)
+    tex(`fountain_full_${mode}`, 32, 32)
+
+    // drained: same basin, dry cracked bottom + valve wheel
+    g.fillStyle(p.stone); g.fillCircle(16, 16, 14)
+    g.fillStyle(p.stoneDark); g.fillCircle(16, 16, 11)
+    g.fillStyle(p.wood); g.fillCircle(16, 16, 8)
+    g.fillStyle(p.stoneDark); g.fillRect(10, 15, 12, 1); g.fillRect(15, 10, 1, 12)
+    g.fillStyle(p.accent); g.fillCircle(24, 24, 3)
+    tex(`fountain_drained_${mode}`, 32, 32)
+
+    // hatch 16x16: wooden trapdoor with ring
+    g.fillStyle(p.wood); g.fillRect(1, 1, 14, 14)
+    g.fillStyle(p.stoneDark)
+    g.fillRect(1, 1, 14, 1); g.fillRect(1, 14, 14, 1); g.fillRect(1, 1, 1, 14); g.fillRect(14, 1, 1, 14)
+    g.fillRect(5, 5, 1, 1); g.fillRect(10, 5, 1, 1)
+    g.fillStyle(p.accent); g.fillRect(6, 8, 4, 2)
+    tex(`hatch_${mode}`, 16, 16)
+
+    // item: fresh flower (upright, bright bloom)
+    g.fillStyle(mode === 'dmg' ? PAL.dark : GBC_PAL.flowerStem); g.fillRect(7, 7, 2, 7)
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : GBC_PAL.flowerBloom); g.fillCircle(8, 4, 3)
+    g.fillStyle(mode === 'dmg' ? PAL.light : GBC_PAL.knobGlow); g.fillRect(7, 3, 2, 2)
+    g.fillStyle(mode === 'dmg' ? PAL.light : GBC_PAL.grassBg); g.fillRect(4, 9, 3, 1); g.fillRect(9, 10, 3, 1)
+    tex(`item_${mode}_flower_fresh`, 16, 16)
+
+    // item: keepsake photo (small framed picture)
+    g.fillStyle(p.wood); g.fillRect(3, 3, 10, 10)
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : 0xf0f0e0); g.fillRect(5, 5, 6, 6)
+    g.fillStyle(p.stoneDark); g.fillRect(6, 7, 2, 2); g.fillRect(9, 6, 1, 1)
+    tex(`item_${mode}_photo`, 16, 16)
+
+    // item: cellar ledger (worn book)
+    g.fillStyle(p.stoneDark); g.fillRect(3, 4, 10, 9)
+    g.fillStyle(mode === 'dmg' ? PAL.light : 0xb0a890); g.fillRect(4, 5, 8, 7)
+    g.fillStyle(p.stoneDark); g.fillRect(5, 7, 6, 1); g.fillRect(5, 9, 4, 1)
+    tex(`item_${mode}_ledger`, 16, 16)
+
+    g.destroy()
   }
 
   private buildTileset(mode: 'dmg' | 'gbc') {
@@ -117,7 +179,49 @@ export class BootScene extends Phaser.Scene {
       for (let x = 0; x < T; x += 8) g.fillRect(at(7) + x, 0, 1, T)
     }
 
-    g.generateTexture(tileKey, T * 8, T)
+    // Worn Static-side variants (#15), columns 8-11 (GIDs 9-12).
+    // Shape-level decay so it reads through the #47 duotone.
+    const c =
+      mode === 'dmg'
+        ? { bg: PAL.lightest, mid: PAL.light, dark: PAL.dark, darkest: PAL.darkest, wall: PAL.light, floor: PAL.light }
+        : { bg: GBC_PAL.grassBg, mid: GBC_PAL.grassDetail, dark: GBC_PAL.treeDark, darkest: GBC_PAL.treeOutline, wall: GBC_PAL.wallBg, floor: GBC_PAL.floorBg }
+
+    // 9 DEAD_TREE: bare trunk + skeletal branches
+    g.fillStyle(c.bg); g.fillRect(at(8), 0, T, T)
+    g.fillStyle(c.darkest)
+    g.fillRect(at(8) + 7, 4, 2, 12)
+    g.fillRect(at(8) + 3, 5, 4, 1); g.fillRect(at(8) + 3, 3, 1, 3)
+    g.fillRect(at(8) + 9, 7, 4, 1); g.fillRect(at(8) + 12, 4, 1, 4)
+    g.fillRect(at(8) + 5, 9, 2, 1)
+
+    // 10 CRACKED_WALL: wall with cracks + boarded window
+    g.fillStyle(c.wall); g.fillRect(at(9), 0, T, T)
+    g.fillStyle(mode === 'dmg' ? PAL.dark : GBC_PAL.wallLine)
+    for (let y = 0; y < T; y += 4) g.fillRect(at(9), y, T, 1)
+    g.fillStyle(c.darkest)
+    g.fillRect(at(9) + 3, 1, 1, 6); g.fillRect(at(9) + 4, 6, 1, 4)
+    g.fillRect(at(9) + 11, 8, 1, 7); g.fillRect(at(9) + 10, 3, 1, 3)
+    g.fillRect(at(9) + 5, 11, 6, 3) // boarded hole
+    g.fillStyle(c.mid)
+    g.fillRect(at(9) + 5, 12, 6, 1)
+
+    // 11 ROTTED_FLOOR: floorboards with holes and warps
+    g.fillStyle(c.floor); g.fillRect(at(10), 0, T, T)
+    g.fillStyle(mode === 'dmg' ? PAL.dark : GBC_PAL.floorLine)
+    for (let x = 0; x < T; x += 8) g.fillRect(at(10) + x, 0, 1, T)
+    g.fillStyle(c.darkest)
+    g.fillRect(at(10) + 3, 3, 4, 2); g.fillRect(at(10) + 10, 9, 3, 3)
+    g.fillRect(at(10) + 2, 12, 2, 1)
+
+    // 12 CRACKED_GRASS: dying ground, fissures
+    g.fillStyle(c.bg); g.fillRect(at(11), 0, T, T)
+    g.fillStyle(c.darkest)
+    g.fillRect(at(11) + 2, 4, 6, 1); g.fillRect(at(11) + 7, 5, 1, 4)
+    g.fillRect(at(11) + 10, 10, 4, 1); g.fillRect(at(11) + 12, 7, 1, 3)
+    g.fillStyle(c.mid)
+    g.fillRect(at(11) + 4, 12, 2, 1)
+
+    g.generateTexture(tileKey, T * 12, T)
     g.destroy()
   }
 
@@ -181,11 +285,13 @@ export class BootScene extends Phaser.Scene {
             mom: { shirt: PAL.dark, pants: PAL.darkest, hair: PAL.darkest, skin: PAL.lightest },
             ren: { shirt: PAL.darkest, pants: PAL.darkest, hair: PAL.darkest, skin: PAL.lightest },
             gus: { shirt: PAL.dark, pants: PAL.darkest, hair: PAL.light, skin: PAL.lightest },
+            baker: { shirt: PAL.light, pants: PAL.dark, hair: PAL.lightest, skin: PAL.lightest },
           }
         : {
             mom: { shirt: GBC_PAL.shirtMom, pants: 0x403050, hair: GBC_PAL.hairDark, skin: GBC_PAL.skin },
             ren: { shirt: GBC_PAL.shirtRen, pants: 0x283850, hair: GBC_PAL.hairGold, skin: GBC_PAL.skin },
             gus: { shirt: GBC_PAL.shirtGus, pants: 0x384038, hair: GBC_PAL.hairGrey, skin: GBC_PAL.skin },
+            baker: { shirt: 0xd8d8e0, pants: 0x685848, hair: GBC_PAL.hairGrey, skin: GBC_PAL.skin },
           }
 
     for (const npc of Object.values(NPCS)) {

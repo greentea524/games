@@ -135,6 +135,7 @@ export class UIScene extends Phaser.Scene {
         sfx.pickup()
       }
     }
+    if (line.take) GameState.removeItem(line.take)
     if (line.setFlag) GameState.setFlag(line.setFlag)
 
     this.nameText.setText(this.activeNpc?.name ?? '')

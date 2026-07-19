@@ -8,6 +8,7 @@ export interface ChoiceOption {
 export interface DialogueLine {
   text: string
   give?: string // item id granted when this line is shown
+  take?: string // item id removed when this line is shown
   setFlag?: string // flag set true when this line is shown
   choice?: ChoiceOption[] // terminal choice shown after the text
 }
@@ -15,6 +16,7 @@ export interface DialogueLine {
 interface DialogueBranch {
   requires?: string // flag that must be set for this branch to apply
   excludes?: string // flag that must NOT be set
+  requiresItem?: string // item the player must carry for this branch
   lines: DialogueLine[]
 }
 
@@ -23,6 +25,7 @@ export interface NpcDef {
   name: string
   shirt: 'light' | 'dark' | 'darkest'
   hair: 'light' | 'dark' | 'darkest'
+  frozen?: boolean // Static-side NPCs don't turn to face the player
   branches: DialogueBranch[]
 }
 
@@ -35,6 +38,9 @@ export interface ItemDef {
 export const ITEMS: Record<string, ItemDef> = {
   flashlight: { id: 'flashlight', name: 'Flashlight', icon: 'item_flashlight' },
   flower: { id: 'flower', name: 'Wilted Flower', icon: 'item_flower' },
+  flower_fresh: { id: 'flower_fresh', name: 'Fresh Flower', icon: 'item_flower_fresh' },
+  photo: { id: 'photo', name: 'Old Photo', icon: 'item_photo' },
+  ledger: { id: 'ledger', name: 'Water Ledger', icon: 'item_ledger' },
 }
 
 export const NPCS: Record<string, NpcDef> = {
@@ -111,6 +117,69 @@ export const NPCS: Record<string, NpcDef> = {
       },
     ],
   },
+  // The frozen Baker, found on the Static-side outside the house that
+  // vanished from the normal town (Thread A of #15).
+  baker: {
+    id: 'baker',
+    name: 'THE BAKER',
+    shirt: 'light',
+    hair: 'light',
+    frozen: true,
+    branches: [
+      {
+        requiresItem: 'flower_fresh',
+        excludes: 'flower_delivered',
+        lines: [
+          { text: 'A figure stands frozen mid-step, eyes fixed on nothing.' },
+          {
+            text: 'You tuck the fresh flower into their basket.',
+            take: 'flower_fresh',
+            setFlag: 'flower_delivered',
+          },
+          { text: 'For a heartbeat, the static seems to soften.' },
+        ],
+      },
+      {
+        excludes: 'flower_delivered',
+        lines: [
+          { text: 'A figure stands frozen mid-step. They do not see you.' },
+          { text: 'Their empty basket sways, though there is no wind.' },
+        ],
+      },
+      {
+        lines: [
+          { text: 'The flower rests in their basket, impossibly bright.' },
+          { text: 'Something in town may have changed...' },
+        ],
+      },
+    ],
+  },
+}
+
+// Not a real NPC: narration shown when the player turns the fountain
+// valve on the Static-side (Thread B of #15).
+export const VALVE_DEF: NpcDef = {
+  id: 'valve',
+  name: 'RUSTED VALVE',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      excludes: 'fountain_drained',
+      lines: [
+        { text: 'A rusted valve juts from the dry fountain basin.' },
+        {
+          text: 'You heave it around. Deep below, water drains away.',
+          setFlag: 'fountain_drained',
+        },
+        { text: 'Somewhere, something shifted.' },
+      ],
+    },
+    {
+      lines: [{ text: "The valve won't turn any further." }],
+    },
+  ],
 }
 
 // First branch whose flag conditions match the current state.
@@ -118,6 +187,7 @@ export function resolveDialogue(npc: NpcDef): DialogueLine[] {
   for (const b of npc.branches) {
     if (b.requires && !GameState.getFlag(b.requires)) continue
     if (b.excludes && GameState.getFlag(b.excludes)) continue
+    if (b.requiresItem && !GameState.hasItem(b.requiresItem)) continue
     return b.lines
   }
   return [{ text: '...' }]

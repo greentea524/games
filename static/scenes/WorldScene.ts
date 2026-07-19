@@ -14,9 +14,16 @@ import { StaticWorldFX } from '../fx/StaticWorldFX'
 import { sfx } from '../audio'
 import { NPCS } from '../dialogue'
 import type { NpcDef } from '../dialogue'
+import { VALVE_DEF } from '../dialogue'
 import type { UIScene } from './UIScene'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
+
+interface Interactable {
+  x: number
+  y: number
+  action: () => void
+}
 
 interface DoorData {
   zone: Phaser.GameObjects.Zone
@@ -38,7 +45,7 @@ export class WorldScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
   private doors: DoorData[] = []
-  private tvPos?: { x: number; y: number }
+  private interactables: Interactable[] = []
   private lastStepAt = 0
   private facing: Facing = 'down'
   private transitioning = false
@@ -89,7 +96,15 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeIn(250, 15, 56, 15)
 
     const mode = GameState.paletteMode
-    const map = this.make.tilemap({ key: this.mapKey })
+    // #15: on the Static-side, load the mirrored map variant when one
+    // exists (town_static has the standing Baker house); other maps fall
+    // back to their normal layout + the #47 post-FX.
+    const variant = `${this.mapKey}_static`
+    const resolvedKey =
+      GameState.world === 'static' && this.cache.tilemap.exists(variant)
+        ? variant
+        : this.mapKey
+    const map = this.make.tilemap({ key: resolvedKey })
     const tileset = map.addTilesetImage('tiles', `tiles_${mode}`)!
     const ground = map.createLayer('ground', tileset)!
     ground.setCollision(SOLID_TILES)
@@ -185,12 +200,14 @@ export class WorldScene extends Phaser.Scene {
           .setAlpha(0.42)
       }
     }
-    // TV portal in the player's house.
-    this.tvPos = undefined
+    // Interactables (face + press Z/A): the TV portal, and the Phase 3
+    // props (fountain valve, cellar hatch, pickups).
+    this.interactables = []
     if (this.mapKey === 'house') {
       const tv = this.add.image(7 * TILE + TILE / 2, 1 * TILE + TILE / 2, 'tv')
-      this.tvPos = { x: tv.x, y: tv.y }
+      this.interactables.push({ x: tv.x, y: tv.y, action: () => this.switchWorld() })
     }
+    this.spawnPhase3Props(mode)
 
     const promptLabel = window.matchMedia('(hover: hover) and (pointer: fine)')
       .matches
@@ -246,13 +263,95 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private facingTV(): boolean {
-    if (!this.tvPos) return false
+  private facingInteractable(): Interactable | undefined {
     const f = this.frontPoint()
-    return (
-      Phaser.Math.Distance.Between(f.x, f.y, this.tvPos.x, this.tvPos.y) <
-      TILE * 0.9
-    )
+    let best: Interactable | undefined
+    let bestD = TILE * 0.9
+    for (const it of this.interactables) {
+      const d = Phaser.Math.Distance.Between(f.x, f.y, it.x, it.y)
+      if (d < bestD) {
+        bestD = d
+        best = it
+      }
+    }
+    return best
+  }
+
+  private openNarration(def: NpcDef) {
+    GameState.dialogueActive = true
+    ;(this.scene.get('ui') as UIScene).startDialogue(def)
+    this.player.setVelocity(0, 0)
+  }
+
+  // Phase 3 (#15) conditional props: fountain (both worlds), the valve
+  // (Static-side), the cellar hatch (normal, once drained), the keepsake
+  // photo payoff (Thread A), and the cellar ledger (Thread B).
+  private spawnPhase3Props(mode: 'dmg' | 'gbc') {
+    const world = GameState.world
+    if (this.mapKey === 'town') {
+      const fx = 16 * TILE
+      const fy = 18 * TILE
+      const drained = world === 'static' || GameState.getFlag('fountain_drained')
+      const fountain = this.physics.add.staticImage(
+        fx,
+        fy,
+        drained ? `fountain_drained_${mode}` : `fountain_full_${mode}`,
+      )
+      fountain.body.setSize(28, 26)
+      this.physics.add.collider(this.player, fountain)
+
+      if (world === 'static') {
+        this.interactables.push({
+          x: fx + 8,
+          y: fy + 8,
+          action: () => this.openNarration(VALVE_DEF),
+        })
+      }
+      if (world === 'normal' && GameState.getFlag('fountain_drained')) {
+        const hx = 17 * TILE + TILE / 2
+        const hy = 17 * TILE + TILE / 2
+        this.add.image(hx, hy, `hatch_${mode}`)
+        this.interactables.push({
+          x: hx,
+          y: hy,
+          action: () => this.enterDoor('cellar', 5, 7),
+        })
+      }
+      if (
+        world === 'normal' &&
+        GameState.getFlag('flower_delivered') &&
+        !GameState.getFlag('thread_flower_done')
+      ) {
+        this.spawnPickup(5, 19, 'photo', 'thread_flower_done', mode)
+      }
+    }
+    if (this.mapKey === 'cellar' && !GameState.getFlag('thread_fountain_done')) {
+      this.spawnPickup(5, 3, 'ledger', 'thread_fountain_done', mode)
+    }
+  }
+
+  private spawnPickup(
+    tx: number,
+    ty: number,
+    itemId: string,
+    doneFlag: string,
+    mode: 'dmg' | 'gbc',
+  ) {
+    const px = tx * TILE + TILE / 2
+    const py = ty * TILE + TILE / 2
+    const img = this.add.image(px, py, `item_${mode}_${itemId}`)
+    const zone = this.add.zone(px, py, TILE, TILE)
+    this.physics.add.existing(zone, true)
+    this.physics.add.overlap(this.player, zone, () => {
+      if (GameState.getFlag(doneFlag)) return
+      GameState.setFlag(doneFlag)
+      GameState.setFlag('chapter2_done')
+      GameState.addItem(itemId)
+      sfx.pickup()
+      ;(this.scene.get('ui') as UIScene).showItemToast(itemId)
+      img.destroy()
+      zone.destroy()
+    })
   }
 
   private switchWorld() {
@@ -304,6 +403,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private faceNpcToward(n: NpcInstance) {
+    if (n.def.frozen) return // Static-side figures never react
     const dx = this.player.x - n.sprite.x
     const dy = this.player.y - n.sprite.y
     n.facing =
@@ -368,12 +468,13 @@ export class WorldScene extends Phaser.Scene {
         if (
           t.index === TILES.WALL ||
           t.index === TILES.ROOF ||
-          t.index === TILES.DOOR
+          t.index === TILES.DOOR ||
+          t.index === TILES.CRACKED_WALL
         ) {
           color = GBC_PAL.roofBg // buildings pop in terracotta red
         } else if (t.index === TILES.WATER) {
           color = GBC_PAL.waterBg // water in GBC azure blue
-        } else if (t.index === TILES.TREE) {
+        } else if (t.index === TILES.TREE || t.index === TILES.DEAD_TREE) {
           color = GBC_PAL.treeDark // trees in deep evergreen
         }
         if (color === null) continue
@@ -441,14 +542,14 @@ export class WorldScene extends Phaser.Scene {
     }
 
     const near = this.facingNpc()
-    const onTV = !near && this.facingTV()
+    const nearIt = !near ? this.facingInteractable() : undefined
     if (this.prompt) {
       if (near) {
         this.prompt.setVisible(true)
         this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE / 2)
-      } else if (onTV) {
+      } else if (nearIt) {
         this.prompt.setVisible(true)
-        this.prompt.setPosition(this.tvPos!.x, this.tvPos!.y - TILE / 2)
+        this.prompt.setPosition(nearIt.x, nearIt.y - TILE / 2)
       } else {
         this.prompt.setVisible(false)
       }
@@ -463,8 +564,8 @@ export class WorldScene extends Phaser.Scene {
         this.player.setVelocity(0, 0)
         return
       }
-      if (onTV) {
-        this.switchWorld()
+      if (nearIt) {
+        nearIt.action()
         return
       }
     }
