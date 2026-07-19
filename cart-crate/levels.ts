@@ -3,6 +3,7 @@ export interface LevelConfig {
   title: string
   world: number
   parMoves: number
+  solution?: string
   grid: string[]
 }
 
