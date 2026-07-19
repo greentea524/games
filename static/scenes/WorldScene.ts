@@ -10,6 +10,7 @@ import {
   GBC_PAL,
 } from '../constants'
 import { GameState } from '../state'
+import { StaticWorldFX } from '../fx/StaticWorldFX'
 import { NPCS } from '../dialogue'
 import type { NpcDef } from '../dialogue'
 import type { UIScene } from './UIScene'
@@ -163,16 +164,24 @@ export class WorldScene extends Phaser.Scene {
     }
     this.physics.add.collider(this.player, npcGroup)
 
-    // Dual-world (thin slice): the Static-side is the same map with a cold
-    // desaturated wash. World is a global flag; no separate map files yet.
+    // Dual-world: the Static-side runs the whole camera through a duotone
+    // + CRT grain post-process (#47). Canvas renderer falls back to the
+    // old flat tint. World is a global flag; no separate map files yet.
     this.ensureExtraTextures()
     if (GameState.world === 'static') {
-      this.add
-        .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, 0x5a6a9a)
-        .setOrigin(0)
-        .setScrollFactor(0)
-        .setDepth(50)
-        .setAlpha(0.42)
+      if (this.renderer.type === Phaser.WEBGL) {
+        const pipelines = (this.renderer as Phaser.Renderer.WebGL.WebGLRenderer)
+          .pipelines
+        pipelines.addPostPipeline('StaticWorldFX', StaticWorldFX)
+        this.cameras.main.setPostPipeline('StaticWorldFX')
+      } else {
+        this.add
+          .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, 0x5a6a9a)
+          .setOrigin(0)
+          .setScrollFactor(0)
+          .setDepth(50)
+          .setAlpha(0.42)
+      }
     }
     // TV portal in the player's house.
     this.tvPos = undefined
