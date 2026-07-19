@@ -193,7 +193,7 @@ export class LevelSelectScene extends Phaser.Scene {
       } else {
         node.bg.lineStyle(1, node.locked ? 0x306230 : 0x8bac0f, 1)
         node.bg.strokeRoundedRect(nx - 14, ny - 12, 28, 24, 4)
-        node.text.setColor(isSelected ? '#0f380f' : (node.locked ? '#8b9bb4' : '#e0f8cf'))
+        node.text.setColor(node.locked ? '#8b9bb4' : '#e0f8cf')
       }
     })
   }
