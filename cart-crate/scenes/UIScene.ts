@@ -54,7 +54,7 @@ export class UIScene extends Phaser.Scene {
     bottomBarGfx.fillStyle(0x0f380f, 0.85)
     bottomBarGfx.fillRect(0, GBC_HEIGHT - 12, GBC_WIDTH, 12)
 
-    this.objectiveTickerText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'GOAL: DELIVER CRATES TO TARGETS', {
+    this.objectiveTickerText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'Z:UNDO H:HINT R:RESTART', {
       fontFamily: FONT,
       fontSize: '5px',
       color: '#9bbc0f',

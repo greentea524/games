@@ -34,6 +34,7 @@ export class BoardScene extends Phaser.Scene {
   private undoKey!: Phaser.Input.Keyboard.Key
   private resetKey!: Phaser.Input.Keyboard.Key
   private escKey!: Phaser.Input.Keyboard.Key
+  private hintKey!: Phaser.Input.Keyboard.Key
 
   constructor() {
     super('board')
@@ -52,6 +53,7 @@ export class BoardScene extends Phaser.Scene {
     this.undoKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
     this.resetKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R)
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
+    this.hintKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.H)
 
     // Touch Swipe Gestures
     let touchStartX = 0
@@ -351,6 +353,11 @@ export class BoardScene extends Phaser.Scene {
       return
     }
 
+    if (Phaser.Input.Keyboard.JustDown(this.hintKey)) {
+      this.showHint()
+      return
+    }
+
     if (this.isMoving) return
 
     const kb = this.input.keyboard!
@@ -635,6 +642,89 @@ export class BoardScene extends Phaser.Scene {
       } else {
         this.scene.restart()
       }
+    })
+  }
+
+  showHint() {
+    if (this.isMoving || GameState.uiBlocking) return
+    const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex]
+    if (!levelConfig || !levelConfig.solution) {
+      this.showToast('NO HINT AVAILABLE')
+      return
+    }
+
+    // Build the string of moves the player has made
+    let path = ''
+    for (const record of this.undoStack) {
+      if (record.playerNextTX > record.playerPrevTX) path += 'R'
+      else if (record.playerNextTX < record.playerPrevTX) path += 'L'
+      else if (record.playerNextTY > record.playerPrevTY) path += 'D'
+      else if (record.playerNextTY < record.playerPrevTY) path += 'U'
+    }
+
+    if (!levelConfig.solution.startsWith(path)) {
+      this.showToast('UNDO TO GET BACK ON TRACK')
+      return
+    }
+
+    if (path.length >= levelConfig.solution.length) {
+      return // Already solved
+    }
+
+    const nextMove = levelConfig.solution[path.length]
+    let arrowAngle = 0
+    if (nextMove === 'R') arrowAngle = 0
+    if (nextMove === 'D') arrowAngle = 90
+    if (nextMove === 'L') arrowAngle = 180
+    if (nextMove === 'U') arrowAngle = -90
+
+    // Draw the glowing arrow on the player
+    const arrow = this.add.graphics()
+    arrow.fillStyle(0xffcc00, 1)
+    
+    // Draw a simple triangle arrow
+    arrow.beginPath()
+    arrow.moveTo(-4, -4)
+    arrow.lineTo(4, 0)
+    arrow.lineTo(-4, 4)
+    arrow.closePath()
+    arrow.fillPath()
+
+    arrow.x = this.player.x
+    arrow.y = this.player.y
+    arrow.angle = arrowAngle
+    arrow.setDepth(200)
+
+    import('../audio').then(a => a.playMenuSelect())
+
+    this.tweens.add({
+      targets: arrow,
+      alpha: 0,
+      y: arrow.y + (nextMove === 'U' ? -6 : nextMove === 'D' ? 6 : 0),
+      x: arrow.x + (nextMove === 'L' ? -6 : nextMove === 'R' ? 6 : 0),
+      duration: 1000,
+      ease: 'Quad.easeOut',
+      onComplete: () => arrow.destroy()
+    })
+  }
+
+  showToast(msg: string) {
+    const toast = this.add.text(this.cameras.main.worldView.centerX, this.cameras.main.worldView.centerY - 20, msg, {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: '#ffcc00',
+      backgroundColor: '#0f380f',
+      padding: { x: 4, y: 2 },
+      resolution: 2,
+    }).setOrigin(0.5).setDepth(300)
+
+    this.tweens.add({
+      targets: toast,
+      alpha: 0,
+      y: toast.y - 10,
+      delay: 1000,
+      duration: 500,
+      onComplete: () => toast.destroy()
     })
   }
 }
