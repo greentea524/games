@@ -23,6 +23,7 @@ export class BoardScene extends Phaser.Scene {
   private playerTY = 2
   private facing: Facing = 'down'
   private isMoving = false
+  private isHintMode = false
   private mapWidth = 10
   private mapHeight = 9
 
@@ -108,6 +109,7 @@ export class BoardScene extends Phaser.Scene {
     const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
     this.facing = 'down'
     this.isMoving = false
+    this.isHintMode = false
     this.undoStack = []
     GameState.resetStats()
 
@@ -357,7 +359,12 @@ export class BoardScene extends Phaser.Scene {
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.hintKey)) {
-      this.showHint()
+      this.isHintMode = !this.isHintMode
+      if (this.isHintMode) {
+        this.showHint()
+      } else {
+        this.showToast('HINT MODE OFF')
+      }
       return
     }
 
@@ -580,6 +587,10 @@ export class BoardScene extends Phaser.Scene {
     if (record.crate) GameState.pushesCount++
     this.undoStack.push(new MoveCommand(this, record))
     this.checkWinCondition()
+    
+    if (this.isHintMode && !this.isMoving) {
+      this.showHint()
+    }
   }
 
   private checkWinCondition() {
@@ -653,6 +664,7 @@ export class BoardScene extends Phaser.Scene {
     const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex]
     if (!levelConfig || !levelConfig.solution) {
       this.showToast('NO HINT AVAILABLE')
+      this.isHintMode = false
       return
     }
 
