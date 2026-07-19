@@ -41,7 +41,6 @@ export class BoardScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor('#0b0f0c')
-    this.cameras.main.setBounds(0, 0, GBC_WIDTH, GBC_HEIGHT)
     this.cameras.main.fadeIn(400, 0, 0, 0)
 
     this.setupLevelLayout()
@@ -250,10 +249,18 @@ export class BoardScene extends Phaser.Scene {
 
     const mapPixelWidth = this.mapWidth * TILE
     const mapPixelHeight = this.mapHeight * TILE
-    const offsetX = Math.max(0, (160 - mapPixelWidth) / 2)
-    const offsetY = Math.max(0, (144 - mapPixelHeight) / 2)
+
+    if (mapPixelWidth > 160 || mapPixelHeight > 144) {
+      this.cameras.main.setBounds(0, 0, Math.max(160, mapPixelWidth), Math.max(144, mapPixelHeight))
+      this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
+    } else {
+      const offsetX = (160 - mapPixelWidth) / 2
+      const offsetY = (144 - mapPixelHeight) / 2
+      this.cameras.main.setBounds(-offsetX, -offsetY, 160, 144)
+      this.cameras.main.stopFollow()
+      this.cameras.main.setScroll(-offsetX, -offsetY)
+    }
     
-    this.cameras.main.setScroll(-offsetX, -offsetY)
     this.cameras.main.setBackgroundColor(mode === 'dmg' ? '#0f380f' : '#181818')
   }
 
