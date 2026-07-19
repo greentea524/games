@@ -177,9 +177,9 @@ export class UIScene extends Phaser.Scene {
   private createHelpModal() {
     const bgGfx = this.add.graphics()
     bgGfx.fillStyle(PAL.darkest, 0.98)
-    bgGfx.fillRoundedRect(-72, -60, 144, 120, 6)
+    bgGfx.fillRoundedRect(-72, -65, 144, 130, 6)
     bgGfx.lineStyle(1.5, PAL.lightest, 1)
-    bgGfx.strokeRoundedRect(-72, -60, 144, 120, 6)
+    bgGfx.strokeRoundedRect(-72, -65, 144, 130, 6)
 
     const titleText = this.add.text(0, -48, 'HOW TO PLAY', {
       fontFamily: FONT,
@@ -195,6 +195,8 @@ export class UIScene extends Phaser.Scene {
       'ICE : Crates slide to wall',
       'UNDO: B Button / Z key',
       'RSET: SELECT / R key',
+      '',
+      'Lvls 11-50 by D.W. Skinner'
     ]
 
     const textObjs = rulesLines.map((line, idx) => {

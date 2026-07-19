@@ -116,6 +116,10 @@ export class BoardScene extends Phaser.Scene {
           this.playerTX = x
           this.playerTY = y
           this.floorGrid[y][x] = '.'
+        } else if (this.floorGrid[y][x] === '+') {
+          this.playerTX = x
+          this.playerTY = y
+          this.floorGrid[y][x] = 'T'
         }
       }
     }
@@ -154,15 +158,30 @@ export class BoardScene extends Phaser.Scene {
           this.add.image(px, py, `floor_${mode}`)
         }
 
-        if (char === 'C') {
-          this.floorGrid[y][x] = '.'
+        if (char === 'C' || char === '*') {
+          const isTarget = (char === '*')
+          this.floorGrid[y][x] = isTarget ? 'T' : '.'
+          
+          if (isTarget) {
+            this.add.image(px, py, `floor_${mode}`)
+            const targetSprite = this.add.image(px, py, `target_${mode}`)
+            this.tweens.add({
+              targets: targetSprite,
+              alpha: 0.2,
+              duration: 800,
+              yoyo: true,
+              repeat: -1,
+            })
+          }
+          
           const crateSprite = this.add.sprite(px, py, `crate_${mode}`).setDepth(5)
           this.crates.push({
-            id: crateIdCounter++,
-            sprite: crateSprite,
             tx: x,
             ty: y,
-            docked: false,
+            sprite: crateSprite,
+            docked: isTarget,
+            id: crateIdCounter++,
+            destroyed: false,
           })
         }
       }
