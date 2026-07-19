@@ -53,21 +53,6 @@ export class MainMenuScene extends Phaser.Scene {
     this.selectedIndex = this.savedLevel > 0 ? 1 : 0
     this.updateSelection()
 
-    this.input.keyboard?.on('keydown-UP', () => {
-      this.selectedIndex = 0
-      this.updateSelection()
-    })
-
-    this.input.keyboard?.on('keydown-DOWN', () => {
-      if (this.savedLevel > 0) {
-        this.selectedIndex = 1
-        this.updateSelection()
-      }
-    })
-
-    this.input.keyboard?.on('keydown-SPACE', () => this.executeAction())
-    this.input.keyboard?.on('keydown-ENTER', () => this.executeAction())
-
     newGameBtn.on('pointerdown', () => {
       this.selectedIndex = 0
       this.executeAction()
@@ -79,6 +64,26 @@ export class MainMenuScene extends Phaser.Scene {
         this.executeAction()
       }
     })
+  }
+
+  update() {
+    const kb = this.input.keyboard!
+    if (Phaser.Input.Keyboard.JustDown(kb.addKey('UP')) || Phaser.Input.Keyboard.JustDown(kb.addKey('W'))) {
+      this.selectedIndex = 0
+      this.updateSelection()
+    } else if (Phaser.Input.Keyboard.JustDown(kb.addKey('DOWN')) || Phaser.Input.Keyboard.JustDown(kb.addKey('S'))) {
+      if (this.savedLevel > 0) {
+        this.selectedIndex = 1
+        this.updateSelection()
+      }
+    } else if (
+      Phaser.Input.Keyboard.JustDown(kb.addKey('SPACE')) ||
+      Phaser.Input.Keyboard.JustDown(kb.addKey('ENTER')) ||
+      Phaser.Input.Keyboard.JustDown(kb.addKey('Z')) ||
+      Phaser.Input.Keyboard.JustDown(kb.addKey('X'))
+    ) {
+      this.executeAction()
+    }
   }
 
   private updateSelection() {

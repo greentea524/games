@@ -29,6 +29,7 @@ const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
     ArrowRight: 'ArrowRight',
     KeyZ: 'z',
     KeyX: 'x',
+    Enter: 'Enter',
   }
   const event = new KeyboardEvent(type, {
     key: keyMap[code] || code,
@@ -44,6 +45,7 @@ const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
     ArrowRight: 39,
     KeyZ: 90,
     KeyX: 88,
+    Enter: 13,
   }
   Object.defineProperty(event, 'keyCode', { get: () => keyCodeMap[code] || 0 })
   Object.defineProperty(event, 'which', { get: () => keyCodeMap[code] || 0 })
@@ -91,11 +93,23 @@ const btnStart = document.getElementById('btn-start')
 if (btnStart) {
   const triggerStart = (e: Event) => {
     e.preventDefault()
+    
+    // If on main menu, START acts as ENTER
+    const mainMenuScene = game?.scene?.getScene('mainmenu') as MainMenuScene
+    if (mainMenuScene && mainMenuScene.scene.isActive()) {
+      dispatchKey('Enter', 'keydown')
+      setTimeout(() => dispatchKey('Enter', 'keyup'), 50)
+      return
+    }
+
     const uiScene = game?.scene?.getScene('ui') as UIScene
     const boardScene = game?.scene?.getScene('board') as BoardScene
     if (GameState.uiBlocking && uiScene && !uiScene.isPauseOpen()) {
-      if (boardScene) boardScene.nextLevel()
-    } else if (uiScene) {
+      if (boardScene && 'nextLevel' in boardScene) {
+         // boardScene.nextLevel doesn't exist anymore, so we just toggle pause
+         uiScene.togglePauseMenu()
+      }
+    } else if (uiScene && uiScene.scene.isActive()) {
       uiScene.togglePauseMenu()
     }
   }
