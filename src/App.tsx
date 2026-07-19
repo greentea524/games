@@ -15,7 +15,6 @@ const WEB_GAMES = [
     href: `${import.meta.env.BASE_URL}cart-crate/`,
     description:
       "A GBC-style Sokoban puzzle game. Help the courier animal push delivery carts and crates onto target tiles.",
-    isWip: true,
   },
   {
     title: "Pocket Dungeon",
