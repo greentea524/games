@@ -95,28 +95,37 @@ export class UIScene extends Phaser.Scene {
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '2. HOW TO PLAY')
 
-    const btnRestart = this.add.text(-50, 20, '3. RESTART STAGE', {
+    const btnSkip = this.add.text(-50, 20, '3. SKIP STAGE', {
       fontFamily: FONT,
       fontSize: '6px',
       color: '#e0f8cf',
       resolution: 2,
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '3. RESTART STAGE')
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '3. SKIP STAGE')
+
+    const btnRestart = this.add.text(-50, 36, '4. RESTART STAGE', {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: '#e0f8cf',
+      resolution: 2,
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '4. RESTART STAGE')
 
     btnResume.on('pointerdown', () => this.executePauseAction(0))
     btnHelp.on('pointerdown', () => this.executePauseAction(1))
-    btnRestart.on('pointerdown', () => this.executePauseAction(2))
+    btnSkip.on('pointerdown', () => this.executePauseAction(2))
+    btnRestart.on('pointerdown', () => this.executePauseAction(3))
 
     this.pauseContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2, [
       bgGfx,
       titleText,
       btnResume,
       btnHelp,
+      btnSkip,
       btnRestart,
     ])
       .setDepth(3000)
       .setVisible(false)
 
-    this.pauseOptionsText = [btnResume, btnHelp, btnRestart]
+    this.pauseOptionsText = [btnResume, btnHelp, btnSkip, btnRestart]
   }
 
   private createHelpModal() {
@@ -216,7 +225,11 @@ export class UIScene extends Phaser.Scene {
       this.pauseContainer.setVisible(false)
       this.helpContainer.setVisible(true)
       this.helpOpen = true
-    } else if (idx === 2) { // Restart
+    } else if (idx === 2) { // Skip Stage
+      this.togglePauseMenu()
+      const boardScene = this.scene.get('board') as BoardScene
+      if (boardScene) boardScene.skipLevel()
+    } else if (idx === 3) { // Restart
       this.togglePauseMenu()
       const boardScene = this.scene.get('board') as BoardScene
       if (boardScene) boardScene.resetLevel()

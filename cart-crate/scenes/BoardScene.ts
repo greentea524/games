@@ -567,4 +567,27 @@ export class BoardScene extends Phaser.Scene {
       })
     }
   }
+
+  skipLevel() {
+    if (GameState.uiBlocking) return
+    GameState.uiBlocking = true
+
+    const nextLevel = GameState.currentLevelIndex + 1
+    const savedStr = localStorage.getItem('cart-crate-level')
+    const savedLvl = savedStr ? parseInt(savedStr, 10) : 0
+    if (nextLevel > savedLvl && nextLevel < CAMPAIGN_LEVELS.length) {
+      localStorage.setItem('cart-crate-level', nextLevel.toString())
+    }
+
+    this.cameras.main.fadeOut(400, 0, 0, 0)
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      GameState.currentLevelIndex++
+      if (GameState.currentLevelIndex >= CAMPAIGN_LEVELS.length) {
+        GameState.currentLevelIndex = 0
+        this.scene.start('mainmenu')
+      } else {
+        this.scene.restart()
+      }
+    })
+  }
 }
