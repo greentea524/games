@@ -8,8 +8,6 @@ export class UIScene extends Phaser.Scene {
   private levelTitleText!: Phaser.GameObjects.Text
   private movesText!: Phaser.GameObjects.Text
   private objectiveTickerText!: Phaser.GameObjects.Text
-  private victoryContainer!: Phaser.GameObjects.Container
-  private starsText!: Phaser.GameObjects.Text
 
   private pauseContainer!: Phaser.GameObjects.Container
   private helpContainer!: Phaser.GameObjects.Container
@@ -64,26 +62,9 @@ export class UIScene extends Phaser.Scene {
       resolution: 2,
     }).setOrigin(0.5, 1)
 
-    // Victory Banner Container (Simplified)
-    this.victoryContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2)
-      .setDepth(2000)
-      .setVisible(false)
-
-    this.starsText = this.add.text(0, 0, 'STAGE CLEARED!', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#ffcc00',
-      stroke: '#0f380f',
-      strokeThickness: 2,
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    this.victoryContainer.add(this.starsText)
-
     // Build Pause Menu & How-To-Play Overlay
     this.createPauseMenu()
     this.createHelpModal()
-
   }
 
   private createPauseMenu() {
@@ -278,19 +259,5 @@ export class UIScene extends Phaser.Scene {
         this.pauseContainer.setVisible(true)
       }
     }
-  }
-
-  showStageCleared() {
-    this.victoryContainer.setScale(0).setVisible(true)
-    this.tweens.add({
-      targets: this.victoryContainer,
-      scale: 1,
-      duration: 250,
-      ease: 'Back.out',
-    })
-  }
-
-  hideVictoryBanner() {
-    this.victoryContainer.setVisible(false)
   }
 }

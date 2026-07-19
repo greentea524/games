@@ -41,6 +41,7 @@ export class BoardScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor('#0b0f0c')
     this.cameras.main.setBounds(0, 0, GBC_WIDTH, GBC_HEIGHT)
+    this.cameras.main.fadeIn(400, 0, 0, 0)
 
     this.setupLevelLayout()
     this.renderBoard()
@@ -542,12 +543,20 @@ export class BoardScene extends Phaser.Scene {
         localStorage.setItem('cart-crate-level', nextLevel.toString())
       }
 
-      const uiScene = this.scene.get('ui') as UIScene
-      if (uiScene) {
-        uiScene.showStageCleared()
-      }
+      // 3 bouncy jumps for joy
+      this.tweens.add({
+        targets: this.player,
+        y: this.player.y - 8,
+        yoyo: true,
+        repeat: 2,
+        duration: 150,
+        ease: 'Sine.easeInOut',
+        onComplete: () => {
+          this.cameras.main.fadeOut(400, 0, 0, 0)
+        }
+      })
 
-      this.time.delayedCall(2000, () => {
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
         GameState.currentLevelIndex++
         if (GameState.currentLevelIndex >= CAMPAIGN_LEVELS.length) {
           GameState.currentLevelIndex = 0
