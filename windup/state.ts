@@ -1,5 +1,5 @@
 export class GameState {
-  static paletteMode: 'dmg' | 'gbc' = 'dmg'
+  static paletteMode: 'dmg' | 'gbc' = 'gbc'
   static energy: number = 100
   static maxEnergy: number = 100
   static levelIndex: number = 1

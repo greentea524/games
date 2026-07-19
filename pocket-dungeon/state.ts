@@ -5,7 +5,7 @@ export enum TurnState {
 }
 
 export class GameState {
-  static paletteMode: 'dmg' | 'gbc' = 'dmg'
+  static paletteMode: 'dmg' | 'gbc' = 'gbc'
   static turnState: TurnState = TurnState.PLAYER_TURN
   static floorDepth: number = 1
   static playerHp: number = 20
