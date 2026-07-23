@@ -14,7 +14,28 @@ import { StaticWorldFX } from '../fx/StaticWorldFX'
 import { sfx } from '../audio'
 import { NPCS } from '../dialogue'
 import type { NpcDef } from '../dialogue'
-import { VALVE_DEF, BAKER_NORMAL_DEF, VANISH_DEF, CH3_HINT_DEF } from '../dialogue'
+import {
+  VALVE_DEF,
+  BAKER_NORMAL_DEF,
+  VANISH_DEF,
+  CH3_HINT_DEF,
+  GUS_STATIC_DEF,
+  GUS_VANISH_DEF,
+  PATTERN_DEF,
+} from '../dialogue'
+
+// Small code-placed structures (Chapter 3): 3-wide huts with a 2-row
+// roof and a door in the wall row. Cells listed for vanishing.
+interface Structure {
+  x0: number
+  y0: number
+  w: number
+  roofRows: number
+  wallRow: number
+  doorX: number
+}
+const GUS_HUT: Structure = { x0: 2, y0: 11, w: 3, roofRows: 2, wallRow: 13, doorX: 3 }
+const REN_HOUSE: Structure = { x0: 18, y0: 16, w: 3, roofRows: 2, wallRow: 18, doorX: 19 }
 import type { UIScene } from './UIScene'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
@@ -343,16 +364,47 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  // Chapter beats (#16): the world reflects story flags on every map load.
+  // Chapter beats (#16/#18): the world reflects story flags on every map load.
   private applyStoryState(ground: Phaser.Tilemaps.TilemapLayer, mode: 'dmg' | 'gbc') {
     // Chapter reconciliation from flags (covers loaded saves too).
-    if (GameState.getFlag('chapter2_done') && GameState.chapter < 3) {
+    if (GameState.getFlag('ch3_done') && GameState.chapter < 4) {
+      GameState.chapter = 4
+    } else if (GameState.getFlag('chapter2_done') && GameState.chapter < 3) {
       GameState.chapter = 3
     } else if (GameState.getFlag('heard_about_house') && GameState.chapter < 2) {
       GameState.chapter = 2
     }
 
-    if (this.mapKey !== 'town' || GameState.world !== 'normal') return
+    if (this.mapKey !== 'town') return
+
+    // ---- Static-side Chapter 3 content (#18) ----
+    if (GameState.world === 'static') {
+      if (GameState.getFlag('gus_hut_vanished')) {
+        // The lost hut stands here, worn, with a frozen copy of Gus.
+        this.placeStructure(ground, GUS_HUT, true)
+        ground.setCollision(SOLID_TILES)
+        const sprite = this.npcGroup.create(
+          4 * TILE + TILE / 2,
+          14 * TILE + TILE / 2,
+          `npc_${mode}_gus_down`,
+        ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+        sprite.body.setSize(12, 12).setOffset(2, 3)
+        this.npcs.push({ sprite, def: GUS_STATIC_DEF, facing: 'down' })
+
+        // The pattern clicks once both standing houses have been examined.
+        if (
+          GameState.getFlag('seen_baker_static') &&
+          GameState.getFlag('seen_gus_static') &&
+          !GameState.getFlag('ch3_done')
+        ) {
+          this.time.delayedCall(800, () => {
+            if (GameState.uiBlocking || this.transitioning) return
+            this.openNarration(PATTERN_DEF)
+          })
+        }
+      }
+      return
+    }
 
     // Chapter 1: the Baker house still stands until the vanishing.
     if (!GameState.getFlag('baker_vanished')) {
@@ -391,6 +443,75 @@ export class WorldScene extends Phaser.Scene {
         this.openNarration(CH3_HINT_DEF)
       })
     }
+
+    // ---- Chapter 3 (#18): more of the town, and the second vanishing ----
+    // Ren's house always stands (it's the *next* target, for #19).
+    this.placeStructure(ground, REN_HOUSE, false)
+    if (!GameState.getFlag('gus_hut_vanished')) {
+      this.placeStructure(ground, GUS_HUT, false)
+    }
+    ground.setCollision(SOLID_TILES)
+    if (
+      GameState.chapter >= 3 &&
+      GameState.getFlag('ch3_hint_shown') &&
+      !GameState.getFlag('gus_hut_vanished')
+    ) {
+      this.time.delayedCall(1500, () =>
+        this.vanishStructure(GUS_HUT, 'gus_hut_vanished', GUS_VANISH_DEF),
+      )
+    }
+  }
+
+  private placeStructure(
+    ground: Phaser.Tilemaps.TilemapLayer,
+    s: Structure,
+    worn: boolean,
+  ) {
+    const wallTile = worn ? TILES.CRACKED_WALL : TILES.WALL
+    for (let c = s.x0; c < s.x0 + s.w; c++) {
+      for (let r = s.y0; r < s.y0 + s.roofRows; r++) {
+        ground.putTileAt(TILES.ROOF, c, r)
+      }
+      ground.putTileAt(wallTile, c, s.wallRow)
+    }
+    ground.putTileAt(TILES.DOOR, s.doorX, s.wallRow)
+  }
+
+  private flashStatic() {
+    const noise = this.add
+      .image(0, 0, 'noise')
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(2000)
+      .setAlpha(0)
+      .setDisplaySize(GBC_WIDTH, GBC_HEIGHT)
+    this.tweens.add({
+      targets: noise,
+      alpha: 0.6,
+      duration: 110,
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => noise.destroy(),
+    })
+  }
+
+  private vanishStructure(s: Structure, flag: string, def: NpcDef) {
+    if (GameState.getFlag(flag) || this.transitioning) return
+    if (GameState.uiBlocking) {
+      this.time.delayedCall(600, () => this.vanishStructure(s, flag, def))
+      return
+    }
+    GameState.setFlag(flag)
+    sfx.switchWorld()
+    this.flashStatic()
+    this.time.delayedCall(380, () => {
+      for (let c = s.x0; c < s.x0 + s.w; c++) {
+        for (let r = s.y0; r <= s.wallRow; r++) {
+          this.groundLayer.putTileAt(TILES.GRASS, c, r)
+        }
+      }
+      this.openNarration(def)
+    })
   }
 
   private vanishBakerHouse() {
@@ -401,14 +522,7 @@ export class WorldScene extends Phaser.Scene {
     }
     GameState.setFlag('baker_vanished')
     sfx.switchWorld()
-    const noise = this.add
-      .image(0, 0, 'noise')
-      .setOrigin(0)
-      .setScrollFactor(0)
-      .setDepth(2000)
-      .setAlpha(0)
-      .setDisplaySize(GBC_WIDTH, GBC_HEIGHT)
-    this.tweens.add({ targets: noise, alpha: 0.6, duration: 110, yoyo: true, repeat: 2, onComplete: () => noise.destroy() })
+    this.flashStatic()
     this.time.delayedCall(380, () => {
       // The lot returns to plain grass; the Baker is gone.
       for (let c = 3; c <= 7; c++) {

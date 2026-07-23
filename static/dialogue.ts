@@ -130,6 +130,13 @@ export const NPCS: Record<string, NpcDef> = {
         ],
       },
       {
+        requires: 'gus_hut_vanished',
+        lines: [
+          { text: 'Hut? What hut? I’ve always slept under the stars, kid.' },
+          { text: '...Why does my back hurt like I owned a bed, though?' },
+        ],
+      },
+      {
         lines: [{ text: 'Some nights, I still see faces in the static.' }],
       },
     ],
@@ -147,7 +154,10 @@ export const NPCS: Record<string, NpcDef> = {
         requiresItem: 'flower_fresh',
         excludes: 'flower_delivered',
         lines: [
-          { text: 'A figure stands frozen mid-step, eyes fixed on nothing.' },
+          {
+            text: 'A figure stands frozen mid-step, eyes fixed on nothing.',
+            setFlag: 'seen_baker_static',
+          },
           {
             text: 'You tuck the fresh flower into their basket.',
             take: 'flower_fresh',
@@ -159,13 +169,19 @@ export const NPCS: Record<string, NpcDef> = {
       {
         excludes: 'flower_delivered',
         lines: [
-          { text: 'A figure stands frozen mid-step. They do not see you.' },
+          {
+            text: 'A figure stands frozen mid-step. They do not see you.',
+            setFlag: 'seen_baker_static',
+          },
           { text: 'Their empty basket sways, though there is no wind.' },
         ],
       },
       {
         lines: [
-          { text: 'The flower rests in their basket, impossibly bright.' },
+          {
+            text: 'The flower rests in their basket, impossibly bright.',
+            setFlag: 'seen_baker_static',
+          },
           { text: 'Something in town may have changed...' },
         ],
       },
@@ -220,6 +236,66 @@ export const CH3_HINT_DEF: NpcDef = {
         { text: 'The static side keeps what the town forgets.' },
         { text: 'And the houses over there... they stand in a line.' },
         { text: 'As if something is working down a list.' },
+      ],
+    },
+  ],
+}
+
+// The frozen copy of Gus outside his hut on the Static-side (Chapter 3).
+export const GUS_STATIC_DEF: NpcDef = {
+  id: 'gus_static',
+  name: 'GUS?',
+  shirt: 'dark',
+  hair: 'light',
+  frozen: true,
+  branches: [
+    {
+      lines: [
+        {
+          text: 'A grey figure sits outside the hut, mid-laugh, unmoving.',
+          setFlag: 'seen_gus_static',
+        },
+        { text: 'It looks exactly like Gus. But Gus is still in town...' },
+      ],
+    },
+  ],
+}
+
+// Narration: the second vanishing (Chapter 3 trigger).
+export const GUS_VANISH_DEF: NpcDef = {
+  id: 'gus_vanish',
+  name: '???',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      lines: [
+        { text: 'The channel changes again.' },
+        { text: 'Gus’s hut unravels into grass and static.' },
+        { text: 'You already know: nobody else will remember it.' },
+      ],
+    },
+  ],
+}
+
+// Narration: the pattern clicks (Chapter 3 gate).
+export const PATTERN_DEF: NpcDef = {
+  id: 'pattern',
+  name: 'A REALIZATION',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      lines: [
+        {
+          text: 'Two houses stand on the static side now.',
+          setFlag: 'ch3_done',
+        },
+        { text: 'The Baker’s. Then Gus’s hut. In the order they were lost.' },
+        { text: 'A list, worked top to bottom...' },
+        { text: 'Ren’s house is next.' },
       ],
     },
   ],
