@@ -413,6 +413,71 @@ export const ANCHOR_DEF: NpcDef = {
   ],
 }
 
+// Chapter 5 (#20): opening beat, pointing the player home to the TV.
+export const CH5_START_DEF: NpcDef = {
+  id: 'ch5_start',
+  name: 'THE CALLING',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      lines: [
+        { text: 'Ren’s house is safe. But it isn’t over.' },
+        { text: 'The static is calling — through the TV, back home.' },
+        { text: 'Whatever is behind it... it wants to be found.' },
+      ],
+    },
+  ],
+}
+
+// Chapter 5 (#20): the lonely entity at the heart of the static. Its
+// reveal is colored by which #15 thread the player pursued, but both
+// endings stay available (choice is explicit, not gated).
+const ENTITY_CHOICE = [
+  { label: 'Stay with it', setFlag: 'ending_empathy' },
+  { label: 'End the signal', setFlag: 'ending_severance' },
+]
+export const ENTITY_DEF: NpcDef = {
+  id: 'entity',
+  name: 'THE STATIC',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      requires: 'thread_flower_done',
+      excludes: 'game_ended',
+      lines: [
+        { text: 'The shape flickers — a thousand borrowed faces.' },
+        { text: 'I only wanted to KEEP them. So I would not be alone.' },
+        { text: 'You left a flower for the forgotten. You understand me.' },
+        { text: 'So choose. What becomes of me?', choice: ENTITY_CHOICE },
+      ],
+    },
+    {
+      requires: 'thread_fountain_done',
+      excludes: 'game_ended',
+      lines: [
+        { text: 'The shape flickers — a thousand borrowed faces.' },
+        { text: 'I take, and I keep. It is all I know how to do.' },
+        { text: 'You dug up what I buried. You see exactly what I am.' },
+        { text: 'So choose. What becomes of me?', choice: ENTITY_CHOICE },
+      ],
+    },
+    {
+      excludes: 'game_ended',
+      lines: [
+        { text: 'The shape flickers — a thousand borrowed faces.' },
+        { text: 'I am what remains when a place is forgotten.' },
+        { text: 'And I am so tired of being alone.' },
+        { text: 'So choose. What becomes of me?', choice: ENTITY_CHOICE },
+      ],
+    },
+    { lines: [{ text: 'Only static remains.' }] },
+  ],
+}
+
 // Not a real NPC: narration shown when the player turns the fountain
 // valve on the Static-side (Thread B of #15).
 export const VALVE_DEF: NpcDef = {

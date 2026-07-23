@@ -6,6 +6,7 @@ import houseUrl from '../assets/house.json?url'
 import house2Url from '../assets/house2.json?url'
 import townStaticUrl from '../assets/town_static.json?url'
 import cellarUrl from '../assets/cellar.json?url'
+import coreUrl from '../assets/core.json?url'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -20,6 +21,7 @@ export class BootScene extends Phaser.Scene {
     this.load.tilemapTiledJSON('house2', house2Url)
     this.load.tilemapTiledJSON('town_static', townStaticUrl)
     this.load.tilemapTiledJSON('cellar', cellarUrl)
+    this.load.tilemapTiledJSON('core', coreUrl)
   }
 
   create() {
@@ -86,6 +88,19 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(mode === 'dmg' ? PAL.light : 0xb0a890); g.fillRect(4, 5, 8, 7)
     g.fillStyle(p.stoneDark); g.fillRect(5, 7, 6, 1); g.fillRect(5, 9, 4, 1)
     tex(`item_${mode}_ledger`, 16, 16)
+
+    // the entity: a dark figure with a static-filled screen for a face
+    if (!this.textures.exists('entity')) {
+      g.fillStyle(0x141820); g.fillRect(3, 4, 10, 14)
+      g.fillStyle(0x0a0c10); g.fillRect(2, 2, 12, 4)
+      for (let y = 6; y < 12; y++)
+        for (let x = 5; x < 11; x++) {
+          g.fillStyle(Math.random() < 0.5 ? 0x1a2438 : 0xc0ccdc)
+          g.fillRect(x, y, 1, 1)
+        }
+      g.generateTexture('entity', 16, 18)
+    }
+    g.clear()
 
     // static beacon: a pale pulsing pillar (mode-agnostic, made once)
     if (!this.textures.exists('beacon')) {

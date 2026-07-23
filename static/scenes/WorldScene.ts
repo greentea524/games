@@ -25,6 +25,8 @@ import {
   RACE_START_DEF,
   BEACON_DEF,
   ANCHOR_DEF,
+  ENTITY_DEF,
+  CH5_START_DEF,
 } from '../dialogue'
 
 // Small code-placed structures (Chapter 3): 3-wide huts with a 2-row
@@ -220,7 +222,7 @@ export class WorldScene extends Phaser.Scene {
     // + CRT grain post-process (#47). Canvas renderer falls back to the
     // old flat tint. World is a global flag; no separate map files yet.
     this.ensureExtraTextures()
-    if (GameState.world === 'static') {
+    if (GameState.world === 'static' || this.mapKey === 'core') {
       if (this.renderer.type === Phaser.WEBGL) {
         const pipelines = (this.renderer as Phaser.Renderer.WebGL.WebGLRenderer)
           .pipelines
@@ -240,7 +242,20 @@ export class WorldScene extends Phaser.Scene {
     this.interactables = []
     if (this.mapKey === 'house') {
       const tv = this.add.image(7 * TILE + TILE / 2, 1 * TILE + TILE / 2, 'tv')
-      this.interactables.push({ x: tv.x, y: tv.y, action: () => this.switchWorld() })
+      this.interactables.push({ x: tv.x, y: tv.y, action: () => this.useTV() })
+    }
+    // Chapter 5 (#20): the entity at the heart of the static.
+    if (this.mapKey === 'core') {
+      const ex = 5 * TILE + TILE / 2
+      const ey = 2 * TILE + TILE / 2
+      const entity = this.physics.add.staticImage(ex, ey, 'entity')
+      entity.body.setSize(14, 12).setOffset(1, 4)
+      this.physics.add.collider(this.player, entity)
+      this.interactables.push({
+        x: ex,
+        y: ey,
+        action: () => this.openNarration(ENTITY_DEF),
+      })
     }
     this.spawnPhase3Props(mode)
     this.groundLayer = ground
@@ -497,6 +512,19 @@ export class WorldScene extends Phaser.Scene {
         action: () => this.openNarration(ANCHOR_DEF),
       })
     }
+
+    // ---- Chapter 5 (#20): the calling. Point the player home. ----
+    if (
+      GameState.getFlag('ch4_done') &&
+      !GameState.getFlag('game_ended') &&
+      !GameState.getFlag('ch5_started')
+    ) {
+      this.time.delayedCall(900, () => {
+        if (GameState.uiBlocking || this.transitioning) return
+        GameState.setFlag('ch5_started')
+        this.openNarration(CH5_START_DEF)
+      })
+    }
   }
 
   private placeStructure(
@@ -595,6 +623,81 @@ export class WorldScene extends Phaser.Scene {
       ;(this.scene.get('ui') as UIScene).showItemToast(itemId)
       img.destroy()
       zone.destroy()
+    })
+  }
+
+  // In Chapter 5 the TV pulls the player into the finale room; otherwise
+  // it flips worlds as before.
+  private useTV() {
+    if (
+      GameState.getFlag('ch4_done') &&
+      !GameState.getFlag('game_ended') &&
+      !this.transitioning
+    ) {
+      this.transitioning = true
+      sfx.switchWorld()
+      this.flashStatic()
+      GameState.world = 'static'
+      this.time.delayedCall(320, () =>
+        this.scene.restart({ mapKey: 'core', tx: 5, ty: 8, facing: 'up' }),
+      )
+      return
+    }
+    this.switchWorld()
+  }
+
+  private playEnding() {
+    if (GameState.getFlag('game_ended')) return
+    GameState.setFlag('game_ended')
+    this.transitioning = true
+    this.player.setVelocity(0, 0)
+    if (this.prompt) this.prompt.setVisible(false)
+    this.cameras.main.resetPostPipeline() // finale escapes the duotone
+    sfx.sting()
+
+    const empathy = GameState.getFlag('ending_empathy')
+    const bgColor = empathy ? 0xe0f0d0 : 0x08080e
+    const textColor = empathy ? '#0f380f' : '#9bbc0f'
+    const body = empathy
+      ? 'You step into the static\nand stay.\n\nThe lonely thing is\nlonely no more.\n\nThe town remembers\neverything it lost.'
+      : 'You tear the signal loose.\n\nThe static screams,\nthen falls silent.\n\nThe town is safe, sealed.\n\nBut the vanished stay gone —\nand something blinks out,\nalone.'
+
+    const bg = this.add
+      .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, bgColor)
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(3000)
+      .setAlpha(0)
+    const txt = this.add
+      .text(GBC_WIDTH / 2, GBC_HEIGHT / 2 - 6, body, {
+        fontFamily: '"Press Start 2P"',
+        fontSize: '7px',
+        color: textColor,
+        align: 'center',
+        lineSpacing: 3,
+        resolution: 1,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(3001)
+      .setAlpha(0)
+    this.tweens.add({ targets: [bg, txt], alpha: 1, duration: 1600 })
+
+    this.time.delayedCall(3200, () => {
+      const prompt = this.add
+        .text(GBC_WIDTH / 2, GBC_HEIGHT - 12, 'Z: title', {
+          fontFamily: '"Press Start 2P"',
+          fontSize: '7px',
+          color: textColor,
+          resolution: 1,
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(3001)
+      this.tweens.add({ targets: prompt, alpha: 0.3, duration: 500, yoyo: true, repeat: -1 })
+      this.input.keyboard!.once('keydown-Z', () => this.scene.start('title'))
+      this.input.keyboard!.once('keydown-ENTER', () => this.scene.start('title'))
+      this.input.once('pointerdown', () => this.scene.start('title'))
     })
   }
 
@@ -767,6 +870,17 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update() {
+    // Finale: once the entity choice is made, play the ending.
+    if (
+      this.mapKey === 'core' &&
+      !GameState.getFlag('game_ended') &&
+      !GameState.uiBlocking &&
+      (GameState.getFlag('ending_empathy') || GameState.getFlag('ending_severance'))
+    ) {
+      this.playEnding()
+      return
+    }
+
     if (this.transitioning) return
 
     this.updateMinimap()
