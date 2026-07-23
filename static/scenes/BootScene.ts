@@ -87,6 +87,22 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(p.stoneDark); g.fillRect(5, 7, 6, 1); g.fillRect(5, 9, 4, 1)
     tex(`item_${mode}_ledger`, 16, 16)
 
+    // static beacon: a pale pulsing pillar (mode-agnostic, made once)
+    if (!this.textures.exists('beacon')) {
+      g.fillStyle(0xaab4cc); g.fillRect(6, 2, 4, 14)
+      g.fillStyle(0xe0f0ff); g.fillRect(7, 3, 2, 12)
+      g.fillStyle(0x88a0c0); g.fillRect(5, 6, 1, 1); g.fillRect(10, 10, 1, 1)
+      g.generateTexture('beacon', 16, 18)
+    }
+    g.clear()
+
+    // item: Ren's key (old brass key)
+    g.fillStyle(p.accent); g.fillCircle(5, 6, 3)
+    g.fillStyle(p.stoneDark); g.fillCircle(5, 6, 1)
+    g.fillStyle(p.accent); g.fillRect(7, 5, 6, 2)
+    g.fillRect(11, 7, 1, 2); g.fillRect(9, 7, 1, 2)
+    tex(`item_${mode}_ren_key`, 16, 16)
+
     g.destroy()
   }
 

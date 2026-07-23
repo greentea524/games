@@ -22,6 +22,9 @@ import {
   GUS_STATIC_DEF,
   GUS_VANISH_DEF,
   PATTERN_DEF,
+  RACE_START_DEF,
+  BEACON_DEF,
+  ANCHOR_DEF,
 } from '../dialogue'
 
 // Small code-placed structures (Chapter 3): 3-wide huts with a 2-row
@@ -367,7 +370,9 @@ export class WorldScene extends Phaser.Scene {
   // Chapter beats (#16/#18): the world reflects story flags on every map load.
   private applyStoryState(ground: Phaser.Tilemaps.TilemapLayer, mode: 'dmg' | 'gbc') {
     // Chapter reconciliation from flags (covers loaded saves too).
-    if (GameState.getFlag('ch3_done') && GameState.chapter < 4) {
+    if (GameState.getFlag('ch4_done') && GameState.chapter < 5) {
+      GameState.chapter = 5
+    } else if (GameState.getFlag('ch3_done') && GameState.chapter < 4) {
       GameState.chapter = 4
     } else if (GameState.getFlag('chapter2_done') && GameState.chapter < 3) {
       GameState.chapter = 3
@@ -402,6 +407,20 @@ export class WorldScene extends Phaser.Scene {
             this.openNarration(PATTERN_DEF)
           })
         }
+      }
+      // Chapter 4 (#19): Ren's house half-written on the static side,
+      // with the beacon copying it at the door.
+      if (GameState.getFlag('ch3_done') && !GameState.getFlag('ch4_done')) {
+        this.placeStructure(ground, REN_HOUSE, true)
+        ground.setCollision(SOLID_TILES)
+        const bx = REN_HOUSE.doorX * TILE + TILE / 2
+        const by = REN_HOUSE.wallRow * TILE + TILE / 2
+        this.add.image(bx, by - 4, 'beacon')
+        this.interactables.push({
+          x: bx,
+          y: by,
+          action: () => this.openNarration(BEACON_DEF),
+        })
       }
       return
     }
@@ -459,6 +478,24 @@ export class WorldScene extends Phaser.Scene {
       this.time.delayedCall(1500, () =>
         this.vanishStructure(GUS_HUT, 'gus_hut_vanished', GUS_VANISH_DEF),
       )
+    }
+
+    // ---- Chapter 4 (#19): the race to anchor Ren's house ----
+    if (GameState.getFlag('ch3_done') && !GameState.getFlag('ch4_done')) {
+      // One-time urgency beat when the race begins.
+      if (!GameState.getFlag('race_started')) {
+        this.time.delayedCall(900, () => {
+          if (GameState.uiBlocking || this.transitioning) return
+          GameState.setFlag('race_started')
+          this.openNarration(RACE_START_DEF)
+        })
+      }
+      // The anchoring act at Ren's door (gated by key + beacon_found).
+      this.interactables.push({
+        x: REN_HOUSE.doorX * TILE + TILE / 2,
+        y: REN_HOUSE.wallRow * TILE + TILE / 2,
+        action: () => this.openNarration(ANCHOR_DEF),
+      })
     }
   }
 

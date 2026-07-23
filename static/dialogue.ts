@@ -41,6 +41,7 @@ export const ITEMS: Record<string, ItemDef> = {
   flower_fresh: { id: 'flower_fresh', name: 'Fresh Flower', icon: 'item_flower_fresh' },
   photo: { id: 'photo', name: 'Old Photo', icon: 'item_photo' },
   ledger: { id: 'ledger', name: 'Water Ledger', icon: 'item_ledger' },
+  ren_key: { id: 'ren_key', name: "Ren's Key", icon: 'item_ren_key' },
 }
 
 export const NPCS: Record<string, NpcDef> = {
@@ -99,6 +100,35 @@ export const NPCS: Record<string, NpcDef> = {
           { text: 'Hey! Did you see the Bakers’ place?!' },
           { text: 'It was RIGHT there. Now it’s just grass.' },
           { text: 'It completely disappeared!', setFlag: 'heard_about_house' },
+        ],
+      },
+      // Chapter 4 (#19): Ren realizes their house is next.
+      {
+        requires: 'ch3_done',
+        excludes: 'ren_warned',
+        lines: [
+          { text: 'You’re saying MY house is next? I— I believe you.' },
+          {
+            text: 'Here, take my key. If there’s anything you can do... do it.',
+            give: 'ren_key',
+            setFlag: 'ren_warned',
+          },
+          { text: 'I’ll wait right here. I’m not going anywhere.' },
+        ],
+      },
+      {
+        requires: 'ren_warned',
+        excludes: 'ch4_done',
+        lines: [
+          { text: 'Did it work? Please tell me you stopped it.' },
+          { text: 'The air keeps humming, like a TV left on...' },
+        ],
+      },
+      {
+        requires: 'ch4_done',
+        lines: [
+          { text: 'You saved it. You saved my HOUSE.' },
+          { text: 'I saw it flicker and... hold. I’ll never forget this.' },
         ],
       },
       {
@@ -298,6 +328,88 @@ export const PATTERN_DEF: NpcDef = {
         { text: 'Ren’s house is next.' },
       ],
     },
+  ],
+}
+
+// Chapter 4 (#19): urgency beat when the race begins.
+export const RACE_START_DEF: NpcDef = {
+  id: 'race_start',
+  name: 'THE RACE',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      lines: [
+        { text: 'Ren’s house is next on the list.' },
+        { text: 'You have to anchor it — before the channel turns.' },
+        { text: 'Warn Ren. Find how the static copies a house. Then break it.' },
+      ],
+    },
+  ],
+}
+
+// The Static-side beacon writing Ren's house into the recording.
+export const BEACON_DEF: NpcDef = {
+  id: 'beacon',
+  name: 'STATIC BEACON',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      excludes: 'beacon_found',
+      lines: [
+        { text: 'A pale beacon pulses against Ren’s house, copying it.' },
+        { text: 'Line by line, it writes the house into the static.' },
+        {
+          text: 'You can’t stop it here — only from the real side, at the door.',
+          setFlag: 'beacon_found',
+        },
+      ],
+    },
+    { lines: [{ text: 'The beacon pulses on, patient and cold.' }] },
+  ],
+}
+
+// The anchoring act at Ren's door in the normal world (gated).
+export const ANCHOR_DEF: NpcDef = {
+  id: 'anchor',
+  name: "REN'S DOOR",
+  shirt: 'light',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      requires: 'beacon_found',
+      requiresItem: 'ren_key',
+      excludes: 'ch4_done',
+      lines: [
+        {
+          text: 'You lock the door with Ren’s key and hold it fast.',
+          setFlag: 'prevented_vanishing',
+        },
+        {
+          text: 'Then you carve REN’S NAME deep into the frame. A record.',
+          setFlag: 'ch4_done',
+          take: 'ren_key',
+        },
+        { text: 'The channel tries to turn. The house flickers... and HOLDS.' },
+      ],
+    },
+    {
+      requires: 'ch4_done',
+      lines: [{ text: 'The name in the frame still holds. The house is safe.' }],
+    },
+    {
+      excludes: 'beacon_found',
+      lines: [
+        { text: 'You rattle the door, but nothing happens.' },
+        { text: 'The static keeps a copy somewhere. Find it first.' },
+      ],
+    },
+    // Reached only with the beacon found but no key in hand.
+    { lines: [{ text: 'The door is locked. You’d need Ren’s key.' }] },
   ],
 }
 
