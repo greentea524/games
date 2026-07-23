@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { BootScene } from './scenes/BootScene'
+import { TitleScene } from './scenes/TitleScene'
 import { WorldScene } from './scenes/WorldScene'
 import { UIScene } from './scenes/UIScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
@@ -42,7 +43,7 @@ function createGame() {
       default: 'arcade',
       arcade: { gravity: { x: 0, y: 0 } },
     },
-    scene: [BootScene, WorldScene, UIScene],
+    scene: [BootScene, TitleScene, WorldScene, UIScene],
   })
   window.addEventListener('resize', () => {
     const zoom = integerZoom()

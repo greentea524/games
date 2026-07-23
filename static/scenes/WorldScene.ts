@@ -14,7 +14,7 @@ import { StaticWorldFX } from '../fx/StaticWorldFX'
 import { sfx } from '../audio'
 import { NPCS } from '../dialogue'
 import type { NpcDef } from '../dialogue'
-import { VALVE_DEF } from '../dialogue'
+import { VALVE_DEF, BAKER_NORMAL_DEF, VANISH_DEF, CH3_HINT_DEF } from '../dialogue'
 import type { UIScene } from './UIScene'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
@@ -46,6 +46,8 @@ export class WorldScene extends Phaser.Scene {
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
   private doors: DoorData[] = []
   private interactables: Interactable[] = []
+  private npcGroup!: Phaser.Physics.Arcade.StaticGroup
+  private groundLayer!: Phaser.Tilemaps.TilemapLayer
   private lastStepAt = 0
   private facing: Facing = 'down'
   private transitioning = false
@@ -128,6 +130,14 @@ export class WorldScene extends Phaser.Scene {
     }
     this.facing = facing
 
+    // Autosave checkpoint (#16): every map entry / world switch is a safe
+    // point; Continue on the title screen restores here.
+    GameState.checkpoint(
+      this.mapKey,
+      Math.floor(sx / TILE),
+      Math.floor(sy / TILE),
+    )
+
     this.player = this.physics.add.sprite(sx, sy, `kid_${mode}_${facing}_0`)
     this.player.setCollideWorldBounds(true)
     // A slightly slimmer body than the sprite so movement feels roomy.
@@ -180,6 +190,7 @@ export class WorldScene extends Phaser.Scene {
       this.npcs.push({ sprite, def, facing: 'down' })
     }
     this.physics.add.collider(this.player, npcGroup)
+    this.npcGroup = npcGroup
 
     // Dual-world: the Static-side runs the whole camera through a duotone
     // + CRT grain post-process (#47). Canvas renderer falls back to the
@@ -208,6 +219,8 @@ export class WorldScene extends Phaser.Scene {
       this.interactables.push({ x: tv.x, y: tv.y, action: () => this.switchWorld() })
     }
     this.spawnPhase3Props(mode)
+    this.groundLayer = ground
+    this.applyStoryState(ground, mode)
 
     const promptLabel = window.matchMedia('(hover: hover) and (pointer: fine)')
       .matches
@@ -328,6 +341,86 @@ export class WorldScene extends Phaser.Scene {
     if (this.mapKey === 'cellar' && !GameState.getFlag('thread_fountain_done')) {
       this.spawnPickup(5, 3, 'ledger', 'thread_fountain_done', mode)
     }
+  }
+
+  // Chapter beats (#16): the world reflects story flags on every map load.
+  private applyStoryState(ground: Phaser.Tilemaps.TilemapLayer, mode: 'dmg' | 'gbc') {
+    // Chapter reconciliation from flags (covers loaded saves too).
+    if (GameState.getFlag('chapter2_done') && GameState.chapter < 3) {
+      GameState.chapter = 3
+    } else if (GameState.getFlag('heard_about_house') && GameState.chapter < 2) {
+      GameState.chapter = 2
+    }
+
+    if (this.mapKey !== 'town' || GameState.world !== 'normal') return
+
+    // Chapter 1: the Baker house still stands until the vanishing.
+    if (!GameState.getFlag('baker_vanished')) {
+      for (let c = 3; c <= 7; c++) {
+        ground.putTileAt(TILES.ROOF, c, 16)
+        ground.putTileAt(TILES.ROOF, c, 17)
+        ground.putTileAt(TILES.WALL, c, 18)
+        ground.putTileAt(TILES.WALL, c, 19)
+      }
+      ground.putTileAt(TILES.DOOR, 5, 19)
+      ground.setCollision(SOLID_TILES)
+
+      const sprite = this.npcGroup.create(
+        7 * TILE + TILE / 2,
+        20 * TILE + TILE / 2,
+        `npc_${mode}_baker_down`,
+      ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      sprite.body.setSize(12, 12).setOffset(2, 3)
+      this.npcs.push({ sprite, def: BAKER_NORMAL_DEF, facing: 'down' })
+
+      // The vanishing triggers shortly after the player has the
+      // flashlight (i.e. talked to Mom) and is out in town.
+      if (GameState.getFlag('got_flashlight')) {
+        this.time.delayedCall(1200, () => this.vanishBakerHouse())
+      }
+    }
+
+    // Chapter 3 hook after the first crossover puzzle is solved.
+    if (
+      GameState.getFlag('chapter2_done') &&
+      !GameState.getFlag('ch3_hint_shown')
+    ) {
+      this.time.delayedCall(800, () => {
+        if (GameState.uiBlocking) return
+        GameState.setFlag('ch3_hint_shown')
+        this.openNarration(CH3_HINT_DEF)
+      })
+    }
+  }
+
+  private vanishBakerHouse() {
+    if (GameState.getFlag('baker_vanished') || this.transitioning) return
+    if (GameState.uiBlocking) {
+      this.time.delayedCall(600, () => this.vanishBakerHouse())
+      return
+    }
+    GameState.setFlag('baker_vanished')
+    sfx.switchWorld()
+    const noise = this.add
+      .image(0, 0, 'noise')
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(2000)
+      .setAlpha(0)
+      .setDisplaySize(GBC_WIDTH, GBC_HEIGHT)
+    this.tweens.add({ targets: noise, alpha: 0.6, duration: 110, yoyo: true, repeat: 2, onComplete: () => noise.destroy() })
+    this.time.delayedCall(380, () => {
+      // The lot returns to plain grass; the Baker is gone.
+      for (let c = 3; c <= 7; c++) {
+        for (let r = 16; r <= 19; r++) this.groundLayer.putTileAt(TILES.GRASS, c, r)
+      }
+      const baker = this.npcs.find(n => n.def.id === 'baker')
+      if (baker) {
+        baker.sprite.destroy()
+        this.npcs = this.npcs.filter(n => n !== baker)
+      }
+      this.openNarration(VANISH_DEF)
+    })
   }
 
   private spawnPickup(

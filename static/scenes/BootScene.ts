@@ -30,7 +30,7 @@ export class BootScene extends Phaser.Scene {
       this.buildItems(mode)
       this.buildProps(mode)
     })
-    this.scene.start('world', { mapKey: 'town' })
+    this.scene.start('title')
   }
 
   // Phase 3 props: fountain (full/drained), cellar hatch, and the

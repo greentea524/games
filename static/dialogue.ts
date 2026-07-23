@@ -63,6 +63,15 @@ export const NPCS: Record<string, NpcDef> = {
         ],
       },
       {
+        requires: 'heard_about_house',
+        excludes: 'chapter2_done',
+        lines: [
+          { text: 'A vanished house? Honey, you read too many comics.' },
+          { text: 'Though... that old TV of ours has been hissing all morning.' },
+          { text: 'Like it wants to say something. Creepy old thing.' },
+        ],
+      },
+      {
         lines: [
           { text: 'Stay close to home, okay?' },
           { text: 'Something feels off today.' },
@@ -77,9 +86,17 @@ export const NPCS: Record<string, NpcDef> = {
     hair: 'darkest',
     branches: [
       {
+        excludes: 'baker_vanished',
+        lines: [
+          { text: 'Morning! Smell that? The Baker’s got rye today.' },
+          { text: 'Best street in town, I keep telling you.' },
+        ],
+      },
+      {
+        requires: 'baker_vanished',
         excludes: 'heard_about_house',
         lines: [
-          { text: 'Hey! Did you see the Bakers’ place?' },
+          { text: 'Hey! Did you see the Bakers’ place?!' },
           { text: 'It was RIGHT there. Now it’s just grass.' },
           { text: 'It completely disappeared!', setFlag: 'heard_about_house' },
         ],
@@ -154,6 +171,58 @@ export const NPCS: Record<string, NpcDef> = {
       },
     ],
   },
+}
+
+// The Baker before the vanishing (Chapter 1, normal town).
+export const BAKER_NORMAL_DEF: NpcDef = {
+  id: 'baker',
+  name: 'THE BAKER',
+  shirt: 'light',
+  hair: 'light',
+  branches: [
+    {
+      lines: [
+        { text: 'Fresh rye, straight from the oven!' },
+        { text: 'Funny weather today. The radio is all static.' },
+      ],
+    },
+  ],
+}
+
+// Narration: the vanishing itself (Chapter 1 trigger).
+export const VANISH_DEF: NpcDef = {
+  id: 'vanish',
+  name: '???',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      lines: [
+        { text: 'The air crackles, like a channel changing.' },
+        { text: 'Where the Bakers’ house stood... there is only grass.' },
+        { text: 'Somehow, you feel you are the only one who noticed.' },
+      ],
+    },
+  ],
+}
+
+// Narration: Chapter 3 hook, after the first crossover puzzle.
+export const CH3_HINT_DEF: NpcDef = {
+  id: 'ch3hint',
+  name: 'A THOUGHT',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      lines: [
+        { text: 'The static side keeps what the town forgets.' },
+        { text: 'And the houses over there... they stand in a line.' },
+        { text: 'As if something is working down a list.' },
+      ],
+    },
+  ],
 }
 
 // Not a real NPC: narration shown when the player turns the fountain
