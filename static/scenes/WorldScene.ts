@@ -11,7 +11,7 @@ import {
 } from '../constants'
 import { GameState } from '../state'
 import { StaticWorldFX } from '../fx/StaticWorldFX'
-import { sfx } from '../audio'
+import { sfx, music } from '../audio'
 import { NPCS } from '../dialogue'
 import type { NpcDef } from '../dialogue'
 import {
@@ -260,6 +260,12 @@ export class WorldScene extends Phaser.Scene {
     this.spawnPhase3Props(mode)
     this.groundLayer = ground
     this.applyStoryState(ground, mode)
+
+    // Background music (#21): town theme in the normal world, the same
+    // melody detuned/degraded on the Static-side + in the finale room.
+    if (!GameState.getFlag('game_ended')) {
+      music.play(GameState.world === 'static' || this.mapKey === 'core' ? 'static' : 'town')
+    }
 
     const promptLabel = window.matchMedia('(hover: hover) and (pointer: fine)')
       .matches
@@ -653,6 +659,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.setVelocity(0, 0)
     if (this.prompt) this.prompt.setVisible(false)
     this.cameras.main.resetPostPipeline() // finale escapes the duotone
+    music.stop() // silence for the ending card
     sfx.sting()
 
     const empathy = GameState.getFlag('ending_empathy')

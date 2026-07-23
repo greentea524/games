@@ -4,7 +4,7 @@ import { TitleScene } from './scenes/TitleScene'
 import { WorldScene } from './scenes/WorldScene'
 import { UIScene } from './scenes/UIScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
-import { sfx, isMuted, setMuted } from './audio'
+import { sfx, isMuted, setMuted, music } from './audio'
 import { GameState } from './state'
 
 function integerZoom(): number {
@@ -55,6 +55,7 @@ function createGame() {
   })
   window.__game = game
   ;(window as any).__state = GameState
+  ;(window as any).__music = music
 }
 
 document.fonts

@@ -102,3 +102,96 @@ export const sfx = {
     tone('square', 587, 784, 0.22, 0.06, 0.24)
   },
 }
+
+// ---- Background music (#21): a small looping chiptune sequencer ----
+// The town theme; the Static-side plays the same notes detuned + degraded.
+type MNote = { f: number; d: number }
+const A = 440, G = 392, E = 329.63, D = 293.66, C = 261.63
+const LEAD: MNote[] = [
+  { f: A, d: 0.3 }, { f: G, d: 0.3 }, { f: E, d: 0.3 }, { f: G, d: 0.3 },
+  { f: D, d: 0.3 }, { f: E, d: 0.3 }, { f: C, d: 0.6 },
+  { f: E, d: 0.3 }, { f: G, d: 0.3 }, { f: A, d: 0.3 }, { f: G, d: 0.3 },
+  { f: E, d: 0.6 }, { f: D, d: 0.6 },
+]
+const BASS: MNote[] = [
+  { f: 110, d: 0.6 }, { f: 130.81, d: 0.6 },
+  { f: 98, d: 0.6 }, { f: 110, d: 0.6 },
+]
+const TRACKS: Record<string, { detune: number; tempo: number; lead: OscillatorType; bass: OscillatorType }> = {
+  town: { detune: 1, tempo: 1, lead: 'triangle', bass: 'square' },
+  static: { detune: 0.965, tempo: 1.18, lead: 'sawtooth', bass: 'square' },
+}
+
+let musicBus: GainNode | null = null
+let musicTimer: number | null = null
+let currentTrack: string | null = null
+
+function bus(): GainNode | null {
+  const c = ensureCtx()
+  if (!c || !master) return null
+  if (!musicBus) {
+    musicBus = c.createGain()
+    musicBus.gain.value = 0.55
+    musicBus.connect(master)
+  }
+  return musicBus
+}
+
+function musicNote(f: number, dur: number, at: number, wave: OscillatorType, vol: number) {
+  const c = ensureCtx()
+  const b = bus()
+  if (!c || !b) return
+  const osc = c.createOscillator()
+  const g = c.createGain()
+  osc.type = wave
+  osc.frequency.value = f
+  osc.connect(g)
+  g.connect(b)
+  g.gain.setValueAtTime(0, at)
+  g.gain.linearRampToValueAtTime(vol, at + 0.02)
+  g.gain.exponentialRampToValueAtTime(0.001, at + dur * 0.9)
+  osc.start(at)
+  osc.stop(at + dur)
+}
+
+export const music = {
+  play(name: 'town' | 'static') {
+    if (currentTrack === name) return
+    this.stop()
+    const c = ensureCtx()
+    const cfg = TRACKS[name]
+    if (!c || !cfg) return
+    currentTrack = name
+    let leadStep = 0, bassStep = 0
+    let leadT = c.currentTime + 0.15
+    let bassT = c.currentTime + 0.15
+    const tick = () => {
+      if (currentTrack !== name) return
+      const horizon = c.currentTime + 0.25
+      while (leadT < horizon) {
+        const n = LEAD[leadStep % LEAD.length]
+        musicNote(n.f * cfg.detune, n.d * cfg.tempo, leadT, cfg.lead, 0.05)
+        leadT += n.d * cfg.tempo
+        leadStep++
+      }
+      while (bassT < horizon) {
+        const n = BASS[bassStep % BASS.length]
+        musicNote(n.f * cfg.detune, n.d * cfg.tempo, bassT, cfg.bass, 0.035)
+        bassT += n.d * cfg.tempo
+        bassStep++
+      }
+    }
+    tick()
+    musicTimer = window.setInterval(tick, 60)
+  },
+  stop() {
+    currentTrack = null
+    if (musicTimer !== null) {
+      clearInterval(musicTimer)
+      musicTimer = null
+    }
+  },
+  get current() {
+    return currentTrack
+  },
+}

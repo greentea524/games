@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH } from '../constants'
 import { GameState } from '../state'
-import { sfx } from '../audio'
+import { sfx, music } from '../audio'
 
 // Minimal title screen (#16): Continue restores the autosave; New Game
 // clears it. Keyboard (arrows + Z/Enter) and tap both work.
@@ -16,6 +16,7 @@ export class TitleScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor('#0f380f')
+    music.stop() // silence at the menu (resumes in-world after a keypress)
 
     const title = this.add
       .text(GBC_WIDTH / 2, 36, 'STATIC', {
