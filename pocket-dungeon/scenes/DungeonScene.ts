@@ -283,6 +283,12 @@ export class DungeonScene extends Phaser.Scene {
 
         if (this.grid[targetTY][targetTX] === 'S') {
           GameState.floorDepth++
+          if (GameState.floorDepth > 12) {
+            // Victory!
+            this.scene.stop('ui')
+            this.scene.start('gameover', { victory: true })
+            return
+          }
           this.scene.restart()
           return
         }
@@ -313,6 +319,11 @@ export class DungeonScene extends Phaser.Scene {
       yoyo: true,
       onComplete: () => {
         if (enemy.hp <= 0) {
+          // Gold drop
+          const goldDrop = enemy.ai === 'boss' ? 20 : (enemy.isSplit ? 1 : 3)
+          GameState.runGold += goldDrop
+          this.showDamageText(targetX, targetY + 4, `+${goldDrop}g`, '#ffd700')
+
           // Splitter: spawn 2 mini-slimes on death
           if (enemy.ai === 'splitter' && !enemy.isSplit) {
             this.spawnSplitChildren(enemy)
@@ -381,7 +392,14 @@ export class DungeonScene extends Phaser.Scene {
 
     const finishOne = () => {
       completed++
-      if (completed >= total) GameState.turnState = TurnState.PLAYER_TURN
+      if (completed >= total) {
+        if (GameState.playerHp <= 0) {
+          this.scene.stop('ui')
+          this.scene.start('gameover', { victory: false })
+          return
+        }
+        GameState.turnState = TurnState.PLAYER_TURN
+      }
     }
 
     activeEnemies.forEach((enemy) => {

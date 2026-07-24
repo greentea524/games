@@ -2,8 +2,11 @@ import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 import { GameState } from './state'
 import { BootScene } from './scenes/BootScene'
+import { TitleScene } from './scenes/TitleScene'
+import { ShopScene } from './scenes/ShopScene'
 import { DungeonScene } from './scenes/DungeonScene'
 import { UIScene } from './scenes/UIScene'
+import { GameOverScene } from './scenes/GameOverScene'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -15,7 +18,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, DungeonScene, UIScene],
+  scene: [BootScene, TitleScene, ShopScene, DungeonScene, UIScene, GameOverScene],
 }
 
 export const game = new Phaser.Game(config)

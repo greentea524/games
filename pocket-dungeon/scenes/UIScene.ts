@@ -8,6 +8,7 @@ export class UIScene extends Phaser.Scene {
   private turnText!: Phaser.GameObjects.Text
   private hungerText!: Phaser.GameObjects.Text
   private atkText!: Phaser.GameObjects.Text
+  private goldText!: Phaser.GameObjects.Text
 
   constructor() {
     super('ui')
@@ -49,6 +50,13 @@ export class UIScene extends Phaser.Scene {
       color: '#ff8888',
       resolution: 2,
     }).setOrigin(1, 0)
+
+    this.goldText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 10, '', {
+      fontFamily: FONT,
+      fontSize: '5px',
+      color: '#ffd700',
+      resolution: 2,
+    }).setOrigin(0.5, 0)
   }
 
   update() {
@@ -70,5 +78,6 @@ export class UIScene extends Phaser.Scene {
     }
 
     this.atkText.setText(`ATK:${GameState.playerAtk}`)
+    this.goldText.setText(`${GameState.runGold}g`)
   }
 }

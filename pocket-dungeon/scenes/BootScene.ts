@@ -20,7 +20,7 @@ export class BootScene extends Phaser.Scene {
       this.buildBoss(mode)
       this.buildItems(mode)
     })
-    this.scene.start('dungeon')
+    this.scene.start('title')
   }
 
   private buildTileset(mode: 'dmg' | 'gbc') {
