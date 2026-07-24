@@ -18,6 +18,7 @@ export class BootScene extends Phaser.Scene {
       this.buildSpider(mode)
       this.buildSlime(mode)
       this.buildBoss(mode)
+      this.buildItems(mode)
     })
     this.scene.start('dungeon')
   }
@@ -257,5 +258,31 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(dark); g.fillRect(3, 13, 3, 3); g.fillRect(10, 13, 3, 3)
     g.generateTexture(key, 16, 16)
     g.destroy()
+  }
+
+  private buildItems(mode: 'dmg' | 'gbc') {
+    const T = 16
+    // Generic item pickup sprite: a small glowing bag/chest
+    const buildItem = (key: string, color: number, accent: number) => {
+      if (this.textures.exists(key)) return
+      const g = this.make.graphics({}, false)
+      // Bag body
+      g.fillStyle(color); g.fillRect(4, 6, 8, 8)
+      g.fillStyle(accent); g.fillRect(5, 4, 6, 2)
+      // Tie
+      g.fillStyle(accent); g.fillRect(7, 3, 2, 2)
+      // Shine
+      g.fillStyle(0xffffff); g.fillRect(5, 7, 2, 2)
+      g.generateTexture(key, T, T)
+      g.destroy()
+    }
+
+    const isDmg = mode === 'dmg'
+    buildItem(`item_weapon_${mode}`, isDmg ? PAL.dark : 0xc0c0c0, isDmg ? PAL.darkest : 0x808080)
+    buildItem(`item_armor_${mode}`, isDmg ? PAL.dark : 0x6080a0, isDmg ? PAL.darkest : 0x304060)
+    buildItem(`item_food_${mode}`, isDmg ? PAL.light : 0xc09050, isDmg ? PAL.dark : 0x806030)
+    buildItem(`item_potion_${mode}`, isDmg ? PAL.light : 0xff4060, isDmg ? PAL.dark : 0xa02040)
+    buildItem(`item_scroll_${mode}`, isDmg ? PAL.lightest : 0xf0e8c0, isDmg ? PAL.light : 0xc0b080)
+    buildItem(`item_rewind_${mode}`, isDmg ? PAL.lightest : 0xffd700, isDmg ? PAL.light : 0xc0a000)
   }
 }

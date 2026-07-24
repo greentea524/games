@@ -9,6 +9,7 @@ import {
   ENEMY_DEFS,
 } from '../enemies'
 import { BossState, bossAI, getBossPhase } from '../boss'
+import { ItemDef, rollFloorItems, TurnSnapshot } from '../items'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -38,8 +39,11 @@ export class DungeonScene extends Phaser.Scene {
   private rng!: RNG
 
   private enemies: EnemyInstance[] = []
+  private floorItems: { def: ItemDef; tx: number; ty: number; sprite: Phaser.GameObjects.Sprite }[] = []
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
+  private useKey!: Phaser.Input.Keyboard.Key
+  private rewindKey!: Phaser.Input.Keyboard.Key
 
   constructor() {
     super('dungeon')
@@ -52,6 +56,10 @@ export class DungeonScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<string, Phaser.Input.Keyboard.Key>
+    this.useKey = this.input.keyboard!.addKey('E')
+    this.rewindKey = this.input.keyboard!.addKey('R')
+
+    GameState.actionHistory.resetForFloor()
 
     if (!this.scene.isActive('ui')) {
       this.scene.launch('ui')
@@ -155,6 +163,28 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // Spawn floor items
+    this.floorItems = []
+    const itemDefs = rollFloorItems(GameState.floorDepth, this.rng)
+    const floorTiles: { x: number; y: number }[] = []
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        if (this.grid[y][x] === '.' && !(x === startX && y === startY)) {
+          floorTiles.push({ x, y })
+        }
+      }
+    }
+    const itemPositions = this.rng.shuffle(floorTiles)
+    for (let i = 0; i < Math.min(itemDefs.length, itemPositions.length); i++) {
+      const pos = itemPositions[i]
+      const def = itemDefs[i]
+      const ipx = pos.x * TILE + TILE / 2
+      const ipy = pos.y * TILE + TILE / 2
+      const spriteKey = `item_${def.category}_${mode}`
+      const itemSprite = this.add.sprite(ipx, ipy, spriteKey).setDepth(3)
+      this.floorItems.push({ def, tx: pos.x, ty: pos.y, sprite: itemSprite })
+    }
+
     // Place player sprite
     const px = this.playerTX * TILE + TILE / 2
     const py = this.playerTY * TILE + TILE / 2
@@ -170,6 +200,18 @@ export class DungeonScene extends Phaser.Scene {
 
   update() {
     if (GameState.turnState !== TurnState.PLAYER_TURN || GameState.uiBlocking) return
+
+    // Rewind key (R)
+    if (Phaser.Input.Keyboard.JustDown(this.rewindKey)) {
+      if (GameState.inventory.has('hourglass') && GameState.actionHistory.canRewind()) {
+        const snap = GameState.actionHistory.rewind()
+        if (snap) {
+          GameState.inventory.remove('hourglass')
+          this.applyRewind(snap)
+          return
+        }
+      }
+    }
 
     let dx = 0
     let dy = 0
@@ -191,6 +233,7 @@ export class DungeonScene extends Phaser.Scene {
 
     if (dx !== 0 || dy !== 0) {
       this.facing = nextFacing
+      this.saveTurnSnapshot()
       this.handlePlayerAction(dx, dy)
     }
   }
@@ -235,12 +278,16 @@ export class DungeonScene extends Phaser.Scene {
       y: py,
       duration: 100,
       onComplete: () => {
+        // Pickup item at this position
+        this.tryPickupItem(targetTX, targetTY)
+
         if (this.grid[targetTY][targetTX] === 'S') {
           GameState.floorDepth++
           this.scene.restart()
           return
         }
         GameState.turnsCount++
+        GameState.drainHunger()
         this.processEnemyTurn()
       },
     })
@@ -522,5 +569,81 @@ export class DungeonScene extends Phaser.Scene {
       duration: 500,
       onComplete: () => txt.destroy(),
     })
+  }
+
+  private tryPickupItem(tx: number, ty: number) {
+    const idx = this.floorItems.findIndex(i => i.tx === tx && i.ty === ty)
+    if (idx === -1) return
+
+    const item = this.floorItems[idx]
+    const def = item.def
+
+    // Auto-use consumables, equip gear
+    if (def.category === 'weapon') {
+      GameState.equipWeapon(def)
+      this.showDamageText(this.player.x, this.player.y - 10, def.name, '#88ccff')
+    } else if (def.category === 'armor') {
+      GameState.equipArmor(def)
+      this.showDamageText(this.player.x, this.player.y - 10, def.name, '#88ccff')
+    } else if (def.category === 'food') {
+      GameState.hunger = Math.min(GameState.maxHunger, GameState.hunger + (def.hungerRestore ?? 0))
+      this.showDamageText(this.player.x, this.player.y - 10, `+${def.hungerRestore} FOOD`, '#88ff88')
+    } else if (def.category === 'potion') {
+      GameState.playerHp = Math.min(GameState.maxHp, GameState.playerHp + (def.healAmount ?? 0))
+      this.showDamageText(this.player.x, this.player.y - 10, `+${def.healAmount} HP`, '#ff88cc')
+    } else if (def.category === 'scroll') {
+      // Add to inventory for manual use later
+      GameState.inventory.add(def)
+      const displayName = GameState.scrollIdentifier.getDisplayName(def)
+      this.showDamageText(this.player.x, this.player.y - 10, displayName, '#ffff88')
+    } else if (def.category === 'rewind') {
+      GameState.inventory.add(def)
+      this.showDamageText(this.player.x, this.player.y - 10, 'HOURGLASS', '#ffd700')
+    }
+
+    item.sprite.destroy()
+    this.floorItems.splice(idx, 1)
+  }
+
+  private saveTurnSnapshot() {
+    const snapshot: TurnSnapshot = {
+      playerTX: this.playerTX,
+      playerTY: this.playerTY,
+      playerHp: GameState.playerHp,
+      hunger: GameState.hunger,
+      turnsCount: GameState.turnsCount,
+      enemyStates: this.enemies.filter(e => e.hp > 0).map(e => ({
+        id: e.id, tx: e.tx, ty: e.ty, hp: e.hp,
+      })),
+    }
+    GameState.actionHistory.save(snapshot)
+  }
+
+  private applyRewind(snap: TurnSnapshot) {
+    this.showDamageText(this.player.x, this.player.y - 10, 'REWIND!', '#ffd700')
+
+    this.playerTX = snap.playerTX
+    this.playerTY = snap.playerTY
+    GameState.playerHp = snap.playerHp
+    GameState.hunger = snap.hunger
+    GameState.turnsCount = snap.turnsCount
+
+    // Move player sprite
+    this.player.x = snap.playerTX * TILE + TILE / 2
+    this.player.y = snap.playerTY * TILE + TILE / 2
+
+    // Restore enemy positions and HP
+    for (const es of snap.enemyStates) {
+      const enemy = this.enemies.find(e => e.id === es.id)
+      if (enemy) {
+        enemy.tx = es.tx
+        enemy.ty = es.ty
+        enemy.hp = es.hp
+        enemy.sprite.x = es.tx * TILE + TILE / 2
+        enemy.sprite.y = es.ty * TILE + TILE / 2
+        enemy.sprite.setVisible(es.hp > 0)
+        enemy.sprite.setAlpha(es.hp > 0 ? 1 : 0)
+      }
+    }
   }
 }
