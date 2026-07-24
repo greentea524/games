@@ -13,6 +13,11 @@ export class BootScene extends Phaser.Scene {
       this.buildTileset(mode)
       this.buildHero(mode)
       this.buildRat(mode)
+      this.buildBat(mode)
+      this.buildArcher(mode)
+      this.buildSpider(mode)
+      this.buildSlime(mode)
+      this.buildBoss(mode)
     })
     this.scene.start('dungeon')
   }
@@ -146,6 +151,110 @@ export class BootScene extends Phaser.Scene {
     // Feet
     g.fillStyle(dark); g.fillRect(3, 13, 2, 2); g.fillRect(9, 13, 2, 2)
 
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildBat(mode: 'dmg' | 'gbc') {
+    const key = `bat_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+    const body = mode === 'dmg' ? PAL.dark : 0x6040a0
+    const wing = mode === 'dmg' ? PAL.darkest : 0x4020708
+    const eye = mode === 'dmg' ? PAL.lightest : 0xff6600
+    // Wings
+    g.fillStyle(wing); g.fillRect(0, 4, 5, 6); g.fillRect(11, 4, 5, 6)
+    // Body
+    g.fillStyle(body); g.fillRect(5, 5, 6, 7)
+    // Eyes
+    g.fillStyle(eye); g.fillRect(6, 6, 2, 2); g.fillRect(10, 6, 2, 2)
+    // Fangs
+    g.fillStyle(0xffffff); g.fillRect(7, 10, 1, 2); g.fillRect(10, 10, 1, 2)
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildArcher(mode: 'dmg' | 'gbc') {
+    const key = `archer_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+    const bone = mode === 'dmg' ? PAL.lightest : 0xe8e0d0
+    const dark = mode === 'dmg' ? PAL.darkest : 0x483828
+    const bow = mode === 'dmg' ? PAL.dark : 0x906840
+    // Skull
+    g.fillStyle(bone); g.fillRect(5, 1, 6, 6)
+    g.fillStyle(dark); g.fillRect(6, 3, 2, 2); g.fillRect(10, 3, 2, 2)
+    g.fillStyle(dark); g.fillRect(7, 5, 3, 1)
+    // Ribcage body
+    g.fillStyle(bone); g.fillRect(6, 7, 4, 5)
+    g.fillStyle(dark); g.fillRect(7, 8, 2, 1); g.fillRect(7, 10, 2, 1)
+    // Bow
+    g.fillStyle(bow); g.fillRect(11, 3, 1, 8)
+    g.fillStyle(bow); g.fillRect(12, 4, 1, 1); g.fillRect(12, 9, 1, 1)
+    // Legs
+    g.fillStyle(bone); g.fillRect(6, 12, 2, 3); g.fillRect(9, 12, 2, 3)
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildSpider(mode: 'dmg' | 'gbc') {
+    const key = `spider_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+    const body = mode === 'dmg' ? PAL.darkest : 0x282028
+    const legs = mode === 'dmg' ? PAL.dark : 0x504050
+    const eye = mode === 'dmg' ? PAL.lightest : 0xff2020
+    // Legs
+    g.fillStyle(legs)
+    g.fillRect(1, 5, 3, 1); g.fillRect(1, 7, 3, 1); g.fillRect(1, 9, 3, 1); g.fillRect(1, 11, 3, 1)
+    g.fillRect(12, 5, 3, 1); g.fillRect(12, 7, 3, 1); g.fillRect(12, 9, 3, 1); g.fillRect(12, 11, 3, 1)
+    // Body
+    g.fillStyle(body); g.fillRect(4, 4, 8, 9)
+    // Eyes (4 pairs)
+    g.fillStyle(eye)
+    g.fillRect(5, 5, 1, 1); g.fillRect(7, 5, 1, 1); g.fillRect(9, 5, 1, 1); g.fillRect(11, 5, 1, 1)
+    g.fillRect(5, 7, 1, 1); g.fillRect(7, 7, 1, 1); g.fillRect(9, 7, 1, 1); g.fillRect(11, 7, 1, 1)
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildSlime(mode: 'dmg' | 'gbc') {
+    const key = `slime_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+    const body = mode === 'dmg' ? PAL.light : 0x40c040
+    const dark = mode === 'dmg' ? PAL.dark : 0x208020
+    const eye = mode === 'dmg' ? PAL.darkest : 0x103010
+    // Body blob
+    g.fillStyle(body); g.fillRect(3, 6, 10, 8)
+    g.fillStyle(body); g.fillRect(5, 4, 6, 2)
+    // Darker base
+    g.fillStyle(dark); g.fillRect(3, 12, 10, 2)
+    // Eyes
+    g.fillStyle(eye); g.fillRect(5, 8, 2, 2); g.fillRect(9, 8, 2, 2)
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildBoss(mode: 'dmg' | 'gbc') {
+    const key = `boss_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+    const armor = mode === 'dmg' ? PAL.darkest : 0x4060a0
+    const dark = mode === 'dmg' ? PAL.dark : 0x203050
+    const eye = mode === 'dmg' ? PAL.lightest : 0xff3030
+    const crown = mode === 'dmg' ? PAL.light : 0xffd700
+    // Crown
+    g.fillStyle(crown); g.fillRect(4, 0, 2, 3); g.fillRect(7, 0, 2, 3); g.fillRect(10, 0, 2, 3)
+    g.fillStyle(crown); g.fillRect(3, 2, 10, 2)
+    // Head
+    g.fillStyle(armor); g.fillRect(3, 4, 10, 5)
+    g.fillStyle(eye); g.fillRect(5, 5, 2, 2); g.fillRect(9, 5, 2, 2)
+    // Body
+    g.fillStyle(armor); g.fillRect(2, 9, 12, 4)
+    g.fillStyle(dark); g.fillRect(5, 10, 6, 2)
+    // Legs
+    g.fillStyle(dark); g.fillRect(3, 13, 3, 3); g.fillRect(10, 13, 3, 3)
     g.generateTexture(key, 16, 16)
     g.destroy()
   }
