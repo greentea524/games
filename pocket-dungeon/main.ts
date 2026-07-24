@@ -31,6 +31,10 @@ const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
     ArrowRight: 'ArrowRight',
     KeyZ: 'z',
     KeyX: 'x',
+    KeyR: 'r',
+    KeyE: 'e',
+    Enter: 'Enter',
+    Escape: 'Escape',
   }
   const event = new KeyboardEvent(type, {
     key: keyMap[code] || code,

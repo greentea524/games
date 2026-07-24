@@ -61,6 +61,54 @@ export class DungeonScene extends Phaser.Scene {
 
     GameState.actionHistory.resetForFloor()
 
+    let touchStartX = 0
+    let touchStartY = 0
+    let touchStartTime = 0
+
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      touchStartX = pointer.x
+      touchStartY = pointer.y
+      touchStartTime = Date.now()
+    })
+
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      const dx = pointer.x - touchStartX
+      const dy = pointer.y - touchStartY
+      const dt = Date.now() - touchStartTime
+      const dist = Math.hypot(dx, dy)
+
+      if (dist > 25 && dt < 500) {
+        if (GameState.turnState !== TurnState.PLAYER_TURN || GameState.uiBlocking) return
+        let moveX = 0
+        let moveY = 0
+        if (Math.abs(dx) > Math.abs(dy)) {
+          moveX = dx > 0 ? 1 : -1
+          this.facing = dx > 0 ? 'right' : 'left'
+        } else {
+          moveY = dy > 0 ? 1 : -1
+          this.facing = dy > 0 ? 'down' : 'up'
+        }
+        this.saveTurnSnapshot()
+        this.handlePlayerAction(moveX, moveY)
+      } else if (dist <= 15 && dt < 400) {
+        const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+        const tapTX = Math.floor(worldPoint.x / TILE)
+        const tapTY = Math.floor(worldPoint.y / TILE)
+
+        if (tapTX >= 0 && tapTX < this.mapWidth && tapTY >= 0 && tapTY < this.mapHeight) {
+          const adx = tapTX - this.playerTX
+          const ady = tapTY - this.playerTY
+          if (Math.abs(adx) + Math.abs(ady) === 1 && GameState.turnState === TurnState.PLAYER_TURN && !GameState.uiBlocking) {
+            this.facing = adx === 1 ? 'right' : adx === -1 ? 'left' : ady === 1 ? 'down' : 'up'
+            this.saveTurnSnapshot()
+            this.handlePlayerAction(adx, ady)
+          } else {
+            this.inspectTile(tapTX, tapTY)
+          }
+        }
+      }
+    })
+
     if (!this.scene.isActive('ui')) {
       this.scene.launch('ui')
     }
@@ -662,6 +710,44 @@ export class DungeonScene extends Phaser.Scene {
         enemy.sprite.setVisible(es.hp > 0)
         enemy.sprite.setAlpha(es.hp > 0 ? 1 : 0)
       }
+    }
+  }
+
+  private inspectTile(tx: number, ty: number) {
+    const px = tx * TILE + TILE / 2
+    const py = ty * TILE + TILE / 2
+
+    // Check enemy
+    const enemy = this.enemies.find(e => e.tx === tx && e.ty === ty && e.hp > 0)
+    if (enemy) {
+      const aiName = typeof enemy.ai === 'string' ? enemy.ai.toUpperCase() : 'BOSS'
+      this.showDamageText(px, py - 8, `${enemy.name}\nHP:${enemy.hp}/${enemy.maxHp} ATK:${enemy.atk}\nAI:${aiName}`, '#a0e0ff')
+      return
+    }
+
+    // Check item
+    const item = this.floorItems.find(i => i.tx === tx && i.ty === ty)
+    if (item) {
+      const name = item.def.category === 'scroll'
+        ? GameState.scrollIdentifier.getDisplayName(item.def)
+        : item.def.name
+      this.showDamageText(px, py - 8, `${name}\n${item.def.description}`, '#ffffaa')
+      return
+    }
+
+    // Check stairs / player / tile
+    if (tx === this.playerTX && ty === this.playerTY) {
+      this.showDamageText(px, py - 8, `YOU (${GameState.selectedClass.toUpperCase()})\nHP:${GameState.playerHp}/${GameState.maxHp} ATK:${GameState.playerAtk}`, '#88ff88')
+      return
+    }
+
+    const char = this.grid[ty]?.[tx]
+    if (char === 'S') {
+      this.showDamageText(px, py - 8, `STAIRS DOWN\nTo Floor ${GameState.floorDepth + 1}`, '#ffd700')
+    } else if (char === '#') {
+      this.showDamageText(px, py - 8, 'DUNGEON WALL', '#aaaaaa')
+    } else if (char === '.') {
+      this.showDamageText(px, py - 8, 'DUNGEON FLOOR', '#668866')
     }
   }
 }
