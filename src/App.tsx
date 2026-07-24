@@ -21,7 +21,6 @@ const WEB_GAMES = [
     href: `${import.meta.env.BASE_URL}pocket-dungeon/`,
     description:
       "A GBC-style turn-based roguelite dungeon crawler. Explore floors, fight monsters, and survive the depth.",
-    isWip: true,
   },
   {
     title: "Windup",
