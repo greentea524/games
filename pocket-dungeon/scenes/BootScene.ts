@@ -18,49 +18,61 @@ export class BootScene extends Phaser.Scene {
   }
 
   private buildTileset(mode: 'dmg' | 'gbc') {
-    const key = `tiles_${mode}`
-    if (this.textures.exists(key)) return
-    const g = this.make.graphics({}, false)
     const T = TILE
     const at = (i: number) => i * T
 
-    if (mode === 'dmg') {
-      // 0: Dungeon Floor
-      g.fillStyle(PAL.lightest); g.fillRect(at(0), 0, T, T)
-      g.fillStyle(PAL.light); g.fillRect(at(0) + 3, 3, 1, 1); g.fillRect(at(0) + 11, 11, 1, 1)
+    const build = (key: string, colors: any, isDmg: boolean) => {
+      if (this.textures.exists(key)) return
+      const g = this.make.graphics({}, false)
 
-      // 1: Dungeon Wall
-      g.fillStyle(PAL.dark); g.fillRect(at(1), 0, T, T)
-      g.fillStyle(PAL.darkest)
-      for (let y = 0; y < T; y += 4) g.fillRect(at(1), y, T, 1)
-      for (let x = 0; x < T; x += 8) g.fillRect(at(1) + x, 0, 1, T)
-
-      // 2: Stairs Down
-      g.fillStyle(PAL.lightest); g.fillRect(at(2), 0, T, T)
-      g.fillStyle(PAL.dark)
-      for (let y = 2; y < T - 2; y += 3) g.fillRect(at(2) + 2, y, T - 4, 2)
-    } else {
-      // GBC Cellar
       // 0: Floor
-      g.fillStyle(GBC_PAL.floorBg); g.fillRect(at(0), 0, T, T)
-      g.fillStyle(GBC_PAL.floorDetail); g.fillRect(at(0) + 3, 3, 1, 1); g.fillRect(at(0) + 11, 11, 1, 1)
+      g.fillStyle(colors.floorBg); g.fillRect(at(0), 0, T, T)
+      g.fillStyle(colors.floorDetail); g.fillRect(at(0) + 3, 3, 1, 1); g.fillRect(at(0) + 11, 11, 1, 1)
 
       // 1: Wall
-      g.fillStyle(GBC_PAL.wallBg); g.fillRect(at(1), 0, T, T)
-      g.fillStyle(GBC_PAL.wallLine)
+      g.fillStyle(colors.wallBg); g.fillRect(at(1), 0, T, T)
+      g.fillStyle(colors.wallLine)
       for (let y = 0; y < T; y += 4) g.fillRect(at(1), y, T, 1)
       for (let x = 0; x < T; x += 8) g.fillRect(at(1) + x, 0, 1, T)
 
       // 2: Stairs Down
-      g.fillStyle(GBC_PAL.floorBg); g.fillRect(at(2), 0, T, T)
-      g.fillStyle(GBC_PAL.stairsBg)
+      g.fillStyle(colors.floorBg); g.fillRect(at(2), 0, T, T)
+      g.fillStyle(colors.stairsBg)
       for (let y = 2; y < T - 2; y += 3) g.fillRect(at(2) + 2, y, T - 4, 2)
-      g.fillStyle(GBC_PAL.stairsStep)
-      for (let y = 3; y < T - 2; y += 3) g.fillRect(at(2) + 2, y, T - 4, 1)
+      if (!isDmg && colors.stairsStep) {
+        g.fillStyle(colors.stairsStep)
+        for (let y = 3; y < T - 2; y += 3) g.fillRect(at(2) + 2, y, T - 4, 1)
+      }
+
+      g.generateTexture(key, T * 3, T)
+      g.destroy()
     }
 
-    g.generateTexture(key, T * 3, T)
-    g.destroy()
+    if (mode === 'dmg') {
+      build('tiles_dmg', {
+        floorBg: PAL.lightest, floorDetail: PAL.light,
+        wallBg: PAL.dark, wallLine: PAL.darkest,
+        stairsBg: PAL.dark
+      }, true)
+    } else {
+      build('tiles_gbc_cellar', {
+        floorBg: GBC_PAL.floorBg, floorDetail: GBC_PAL.floorDetail,
+        wallBg: GBC_PAL.wallBg, wallLine: GBC_PAL.wallLine,
+        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep
+      }, false)
+      
+      build('tiles_gbc_catacomb', {
+        floorBg: GBC_PAL.catacombFloorBg, floorDetail: GBC_PAL.catacombFloorDetail,
+        wallBg: GBC_PAL.catacombWallBg, wallLine: GBC_PAL.catacombWallLine,
+        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep
+      }, false)
+      
+      build('tiles_gbc_vault', {
+        floorBg: GBC_PAL.vaultFloorBg, floorDetail: GBC_PAL.vaultFloorDetail,
+        wallBg: GBC_PAL.vaultWallBg, wallLine: GBC_PAL.vaultWallLine,
+        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep
+      }, false)
+    }
   }
 
   private drawKnightHero(

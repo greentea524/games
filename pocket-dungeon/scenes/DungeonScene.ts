@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { TILE, GBC_WIDTH, GBC_HEIGHT } from '../constants'
 import { GameState, TurnState } from '../state'
+import { MapGenerator } from '../MapGenerator'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -20,19 +21,9 @@ export class DungeonScene extends Phaser.Scene {
   private playerTX = 2
   private playerTY = 2
   private facing: Facing = 'down'
-  private mapWidth = 10
-  private mapHeight = 9
-  private grid: string[] = [
-    '##########',
-    '#........#',
-    '#.P......#',
-    '#........#',
-    '#.......E#',
-    '#........#',
-    '#........#',
-    '#.......S#',
-    '##########',
-  ]
+  private mapWidth = 32
+  private mapHeight = 32
+  private grid: string[] = []
 
   private enemies: EnemyInstance[] = []
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
@@ -44,7 +35,6 @@ export class DungeonScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor('#0b0f0c')
-    this.cameras.main.setBounds(0, 0, GBC_WIDTH, GBC_HEIGHT)
 
     this.renderDungeon()
 
@@ -60,6 +50,20 @@ export class DungeonScene extends Phaser.Scene {
     const mode = GameState.paletteMode
     this.enemies = []
 
+    const generator = new MapGenerator(this.mapWidth, this.mapHeight, GameState.seed + GameState.floorDepth)
+    const { grid, startX, startY } = generator.generate(GameState.floorDepth)
+    this.grid = grid
+    this.playerTX = startX
+    this.playerTY = startY
+
+    this.cameras.main.setBounds(0, 0, this.mapWidth * TILE, this.mapHeight * TILE)
+
+    let biome = 'cellar'
+    if (GameState.floorDepth > 4) biome = 'catacomb'
+    if (GameState.floorDepth > 8) biome = 'vault'
+    
+    const tileKey = mode === 'dmg' ? 'tiles_dmg' : `tiles_gbc_${biome}`
+
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
         const char = this.grid[y][x]
@@ -67,20 +71,17 @@ export class DungeonScene extends Phaser.Scene {
         const py = y * TILE + TILE / 2
 
         if (char === '#') {
-          this.add.image(px, py, `tiles_${mode}`, 1)
+          this.add.image(px, py, tileKey, 1)
         } else if (char === 'S') {
-          this.add.image(px, py, `tiles_${mode}`, 2) // Stairs
+          this.add.image(px, py, tileKey, 2) // Stairs
         } else {
-          this.add.image(px, py, `tiles_${mode}`, 0) // Floor
+          this.add.image(px, py, tileKey, 0) // Floor
         }
 
-        if (char === 'P') {
-          this.playerTX = x
-          this.playerTY = y
-        } else if (char === 'E') {
+        if (char === 'E') {
           const ratSprite = this.add.sprite(px, py, `rat_${mode}`).setDepth(5)
           this.enemies.push({
-            id: 'rat_1',
+            id: `rat_${x}_${y}`,
             name: 'Cellar Rat',
             sprite: ratSprite,
             tx: x,
@@ -96,6 +97,8 @@ export class DungeonScene extends Phaser.Scene {
     const px = this.playerTX * TILE + TILE / 2
     const py = this.playerTY * TILE + TILE / 2
     this.player = this.add.sprite(px, py, `hero_${mode}_${this.facing}`).setDepth(10)
+    
+    this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
   }
 
   reloadPalette() {
@@ -170,6 +173,11 @@ export class DungeonScene extends Phaser.Scene {
       y: py,
       duration: 100,
       onComplete: () => {
+        if (this.grid[targetTY][targetTX] === 'S') {
+          GameState.floorDepth++
+          this.scene.restart()
+          return
+        }
         GameState.turnsCount++
         this.processEnemyTurn()
       },

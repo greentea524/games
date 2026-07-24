@@ -8,6 +8,7 @@ export class GameState {
   static paletteMode: 'dmg' | 'gbc' = 'gbc'
   static turnState: TurnState = TurnState.PLAYER_TURN
   static floorDepth: number = 1
+  static seed: number = Date.now()
   static playerHp: number = 20
   static maxHp: number = 20
   static playerAtk: number = 4

@@ -36,6 +36,7 @@ export class UIScene extends Phaser.Scene {
 
   update() {
     this.hpText.setText(`HP: ${GameState.playerHp}/${GameState.maxHp}`)
+    this.floorText.setText(`F${GameState.floorDepth}`)
     this.turnText.setText(`TURN: ${GameState.turnsCount}`)
   }
 }
