@@ -114,6 +114,9 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
+  private fogTiles: Phaser.GameObjects.Rectangle[][] = []
+  private explored: boolean[][] = []
+
   renderDungeon() {
     const mode = GameState.paletteMode
     this.enemies = []
@@ -130,20 +133,33 @@ export class DungeonScene extends Phaser.Scene {
     const biome = getBiome(GameState.floorDepth)
     const tileKey = mode === 'dmg' ? 'tiles_dmg' : `tiles_gbc_${biome}`
 
-    // Render tiles
+    // Initialize explored grid & fog layer
+    this.explored = Array.from({ length: this.mapHeight }, () => Array(this.mapWidth).fill(false))
+    this.fogTiles = Array.from({ length: this.mapHeight }, () => Array(this.mapWidth))
+
+    // Render rich tiles
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
         const char = this.grid[y][x]
         const px = x * TILE + TILE / 2
         const py = y * TILE + TILE / 2
 
-        if (char === '#') {
-          this.add.image(px, py, tileKey, 1)
-        } else if (char === 'S') {
-          this.add.image(px, py, tileKey, 2)
-        } else {
-          this.add.image(px, py, tileKey, 0)
-        }
+        let frameIndex = 0
+        if (char === '#') frameIndex = 1
+        else if (char === 'T') frameIndex = 5
+        else if (char === 'B') frameIndex = 6
+        else if (char === 'S') frameIndex = 2
+        else if (char === 'c') frameIndex = 3
+        else if (char === 'r') frameIndex = 7
+        else if (char === 'k') frameIndex = 4
+        else if (char === 'b') frameIndex = 8
+        else frameIndex = 0
+
+        this.add.image(px, py, tileKey, frameIndex)
+
+        // Fog layer overlay
+        const fog = this.add.rectangle(px, py, TILE, TILE, 0x050806).setDepth(15).setAlpha(0.95)
+        this.fogTiles[y][x] = fog
       }
     }
 
@@ -239,6 +255,9 @@ export class DungeonScene extends Phaser.Scene {
     this.player = this.add.sprite(px, py, `hero_${mode}_${this.facing}`).setDepth(10)
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
+
+    // Initial fog of war update
+    this.updateFogOfWar()
   }
 
   reloadPalette() {
@@ -316,6 +335,8 @@ export class DungeonScene extends Phaser.Scene {
     this.playerTX = targetTX
     this.playerTY = targetTY
     this.player.setTexture(`hero_${mode}_${this.facing}`)
+
+    this.updateFogOfWar()
 
     const px = targetTX * TILE + TILE / 2
     const py = targetTY * TILE + TILE / 2
@@ -711,6 +732,8 @@ export class DungeonScene extends Phaser.Scene {
         enemy.sprite.setAlpha(es.hp > 0 ? 1 : 0)
       }
     }
+
+    this.updateFogOfWar()
   }
 
   private inspectTile(tx: number, ty: number) {
@@ -744,10 +767,52 @@ export class DungeonScene extends Phaser.Scene {
     const char = this.grid[ty]?.[tx]
     if (char === 'S') {
       this.showDamageText(px, py - 8, `STAIRS DOWN\nTo Floor ${GameState.floorDepth + 1}`, '#ffd700')
+    } else if (char === 'c') {
+      this.showDamageText(px, py - 8, 'CORRIDOR PATH\nStone walkway', '#aa99bb')
+    } else if (char === 'T') {
+      this.showDamageText(px, py - 8, 'WALL TORCH\nLighting the way', '#ffa000')
+    } else if (char === 'r') {
+      this.showDamageText(px, py - 8, 'ROOM CARPET / RUG', '#ff88aa')
+    } else if (char === 'k') {
+      this.showDamageText(px, py - 8, 'CRACKED FLOOR', '#888888')
+    } else if (char === 'b') {
+      this.showDamageText(px, py - 8, 'SCATTERED BONES', '#e0d8c0')
     } else if (char === '#') {
       this.showDamageText(px, py - 8, 'DUNGEON WALL', '#aaaaaa')
-    } else if (char === '.') {
+    } else {
       this.showDamageText(px, py - 8, 'DUNGEON FLOOR', '#668866')
+    }
+  }
+
+  private updateFogOfWar() {
+    const sightRadius = 4
+    const px = this.playerTX
+    const py = this.playerTY
+
+    // Mark sight radius as explored
+    for (let y = Math.max(0, py - sightRadius); y <= Math.min(this.mapHeight - 1, py + sightRadius); y++) {
+      for (let x = Math.max(0, px - sightRadius); x <= Math.min(this.mapWidth - 1, px + sightRadius); x++) {
+        if (Math.hypot(x - px, y - py) <= sightRadius + 0.5) {
+          this.explored[y][x] = true
+        }
+      }
+    }
+
+    // Update fog tile alphas
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        const fog = this.fogTiles[y]?.[x]
+        if (!fog) continue
+
+        const inSight = Math.hypot(x - px, y - py) <= sightRadius + 0.5
+        if (inSight) {
+          fog.setAlpha(0)
+        } else if (this.explored[y][x]) {
+          fog.setAlpha(0.55)
+        } else {
+          fog.setAlpha(0.95)
+        }
+      }
     }
   }
 }

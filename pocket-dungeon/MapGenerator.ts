@@ -62,21 +62,66 @@ export class MapGenerator {
       }
     }
 
-    // 2. Connect Corridors
+    // 2. Connect Corridors with distinct 'c' path tiles
     for (let i = 1; i < rooms.length; i++) {
       const prev = rooms[i - 1]
       const curr = rooms[i]
       this.carveCorridor(prev.cx, prev.cy, curr.cx, curr.cy)
     }
 
-    // 3. Place Player and Stairs
+    // 3. Add Decorations to Rooms (rugs in center, cracked tiles, bones)
+    for (const r of rooms) {
+      // Rug at room center
+      if (r.w >= 5 && r.h >= 5) {
+        for (let ry = -1; ry <= 1; ry++) {
+          for (let rx = -1; rx <= 1; rx++) {
+            if (this.grid[r.cy + ry]?.[r.cx + rx] === '.') {
+              this.grid[r.cy + ry][r.cx + rx] = 'r'
+            }
+          }
+        }
+      }
+
+      // Random cracked tiles & bone debris in room
+      for (let y = r.y; y < r.y + r.h; y++) {
+        for (let x = r.x; x < r.x + r.w; x++) {
+          if (this.grid[y][x] === '.') {
+            const roll = this.rng.nextFloat(0, 1)
+            if (roll < 0.08) {
+              this.grid[y][x] = 'k' // cracked floor
+            } else if (roll < 0.12) {
+              this.grid[y][x] = 'b' // bones / debris
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Place Wall Torches along room top/side walls
+    let torchCounter = 0
+    for (let y = 1; y < this.height - 1; y++) {
+      for (let x = 1; x < this.width - 1; x++) {
+        if (this.grid[y][x] === '#') {
+          // Check if adjacent to floor below or beside
+          const hasFloorNeighbor = (this.grid[y + 1]?.[x] !== '#' && this.grid[y + 1]?.[x] !== undefined)
+          if (hasFloorNeighbor) {
+            torchCounter++
+            if (torchCounter % 5 === 0) {
+              this.grid[y][x] = 'T'
+            }
+          }
+        }
+      }
+    }
+
+    // 5. Place Player and Stairs
     const startRoom = rooms[0]
     const endRoom = rooms[rooms.length - 1]
 
     this.grid[startRoom.cy][startRoom.cx] = 'P'
     this.grid[endRoom.cy][endRoom.cx] = 'S'
 
-    // 4. Place Enemies (Depth + 2)
+    // 6. Place Enemies (Depth + 2)
     const enemyCount = depth + 2
     let enemiesPlaced = 0
     let attempts = 0
@@ -85,7 +130,7 @@ export class MapGenerator {
       const r = this.rng.pick(rooms)
       const ex = this.rng.nextInt(r.x, r.x + r.w - 1)
       const ey = this.rng.nextInt(r.y, r.y + r.h - 1)
-      if (this.grid[ey][ex] === '.') {
+      if (this.grid[ey][ex] === '.' || this.grid[ey][ex] === 'k' || this.grid[ey][ex] === 'b') {
         this.grid[ey][ex] = 'E'
         enemiesPlaced++
       }
@@ -105,27 +150,33 @@ export class MapGenerator {
     let x = x1
     let y = y1
 
+    const setCorridorTile = (cx: number, cy: number) => {
+      // Only set to corridor 'c' if it's currently a wall '#'
+      if (this.grid[cy][cx] === '#') {
+        this.grid[cy][cx] = 'c'
+      }
+    }
+
     // 50% chance to go horizontal first
     if (this.rng.nextFloat(0, 1) > 0.5) {
       while (x !== x2) {
-        this.grid[y][x] = '.'
+        setCorridorTile(x, y)
         x += x < x2 ? 1 : -1
       }
       while (y !== y2) {
-        this.grid[y][x] = '.'
+        setCorridorTile(x, y)
         y += y < y2 ? 1 : -1
       }
     } else {
       while (y !== y2) {
-        this.grid[y][x] = '.'
+        setCorridorTile(x, y)
         y += y < y2 ? 1 : -1
       }
       while (x !== x2) {
-        this.grid[y][x] = '.'
+        setCorridorTile(x, y)
         x += x < x2 ? 1 : -1
       }
     }
-    // Ensure final point is carved
-    this.grid[y2][x2] = '.'
+    setCorridorTile(x2, y2)
   }
 }

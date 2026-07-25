@@ -31,15 +31,16 @@ export class BootScene extends Phaser.Scene {
       if (this.textures.exists(key)) return
       const g = this.make.graphics({}, false)
 
-      // 0: Floor
+      // 0: Room Floor
       g.fillStyle(colors.floorBg); g.fillRect(at(0), 0, T, T)
       g.fillStyle(colors.floorDetail); g.fillRect(at(0) + 3, 3, 1, 1); g.fillRect(at(0) + 11, 11, 1, 1)
 
-      // 1: Wall
+      // 1: Wall (with top highlight & bottom shadow)
       g.fillStyle(colors.wallBg); g.fillRect(at(1), 0, T, T)
       g.fillStyle(colors.wallLine)
       for (let y = 0; y < T; y += 4) g.fillRect(at(1), y, T, 1)
       for (let x = 0; x < T; x += 8) g.fillRect(at(1) + x, 0, 1, T)
+      g.fillStyle(isDmg ? PAL.darkest : 0x15101a); g.fillRect(at(1), T - 2, T, 2) // bottom shadow
 
       // 2: Stairs Down
       g.fillStyle(colors.floorBg); g.fillRect(at(2), 0, T, T)
@@ -50,7 +51,49 @@ export class BootScene extends Phaser.Scene {
         for (let y = 3; y < T - 2; y += 3) g.fillRect(at(2) + 2, y, T - 4, 1)
       }
 
-      g.generateTexture(key, T * 3, T)
+      // 3: Corridor / Path Tile (distinct paved stone walkway)
+      const pathBg = isDmg ? PAL.light : colors.pathBg ?? 0x1e1828
+      const pathLine = isDmg ? PAL.dark : colors.pathLine ?? 0x3d304a
+      g.fillStyle(pathBg); g.fillRect(at(3), 0, T, T)
+      g.fillStyle(pathLine)
+      g.fillRect(at(3) + 1, 1, T - 2, 1); g.fillRect(at(3) + 1, T - 2, T - 2, 1) // top/bottom edge lines
+      g.fillRect(at(3) + 3, 4, 4, 4); g.fillRect(at(3) + 9, 8, 4, 4) // stone paving slabs
+
+      // 4: Cracked Floor Tile
+      g.fillStyle(colors.floorBg); g.fillRect(at(4), 0, T, T)
+      g.fillStyle(colors.floorDetail)
+      g.fillRect(at(4) + 4, 3, 1, 4); g.fillRect(at(4) + 5, 6, 4, 1); g.fillRect(at(4) + 8, 7, 1, 4)
+
+      // 5: Wall with Torch
+      g.fillStyle(colors.wallBg); g.fillRect(at(5), 0, T, T)
+      g.fillStyle(colors.wallLine)
+      for (let y = 0; y < T; y += 4) g.fillRect(at(5), y, T, 1)
+      // Torch bracket
+      g.fillStyle(isDmg ? PAL.darkest : 0x201510); g.fillRect(at(5) + 7, 7, 2, 5)
+      // Flame
+      g.fillStyle(isDmg ? PAL.lightest : 0xffa000); g.fillRect(at(5) + 6, 4, 4, 4)
+      g.fillStyle(isDmg ? PAL.light : 0xffff00); g.fillRect(at(5) + 7, 5, 2, 2)
+
+      // 6: Wall with Banner / Shield
+      g.fillStyle(colors.wallBg); g.fillRect(at(6), 0, T, T)
+      g.fillStyle(colors.wallLine)
+      for (let y = 0; y < T; y += 4) g.fillRect(at(6), y, T, 1)
+      // Banner
+      g.fillStyle(isDmg ? PAL.darkest : 0xaa2030); g.fillRect(at(6) + 5, 3, 6, 9)
+      g.fillStyle(isDmg ? PAL.lightest : 0xffd700); g.fillRect(at(6) + 7, 5, 2, 5)
+
+      // 7: Rug / Altar Floor (center room decoration)
+      g.fillStyle(colors.floorBg); g.fillRect(at(7), 0, T, T)
+      g.fillStyle(isDmg ? PAL.light : (colors.rugColor ?? 0x882035)); g.fillRect(at(7) + 2, 2, T - 4, T - 4)
+      g.fillStyle(isDmg ? PAL.lightest : 0xffd700); g.fillRect(at(7) + 3, 3, T - 6, 1); g.fillRect(at(7) + 3, T - 4, T - 6, 1)
+
+      // 8: Bones / Debris Floor
+      g.fillStyle(colors.floorBg); g.fillRect(at(8), 0, T, T)
+      g.fillStyle(isDmg ? PAL.lightest : 0xe0d8c0)
+      g.fillRect(at(8) + 4, 5, 3, 2); g.fillRect(at(8) + 9, 10, 3, 2) // skulls/bones
+      g.fillStyle(colors.floorDetail); g.fillRect(at(8) + 5, 6, 1, 1); g.fillRect(at(8) + 10, 11, 1, 1)
+
+      g.generateTexture(key, T * 9, T)
       g.destroy()
     }
 
@@ -64,19 +107,22 @@ export class BootScene extends Phaser.Scene {
       build('tiles_gbc_cellar', {
         floorBg: GBC_PAL.floorBg, floorDetail: GBC_PAL.floorDetail,
         wallBg: GBC_PAL.wallBg, wallLine: GBC_PAL.wallLine,
-        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep
+        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep,
+        pathBg: 0x1d1626, pathLine: 0x3d304a, rugColor: 0x882035,
       }, false)
       
       build('tiles_gbc_catacomb', {
         floorBg: GBC_PAL.catacombFloorBg, floorDetail: GBC_PAL.catacombFloorDetail,
         wallBg: GBC_PAL.catacombWallBg, wallLine: GBC_PAL.catacombWallLine,
-        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep
+        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep,
+        pathBg: 0x302418, pathLine: 0x584028, rugColor: 0x904020,
       }, false)
       
       build('tiles_gbc_vault', {
         floorBg: GBC_PAL.vaultFloorBg, floorDetail: GBC_PAL.vaultFloorDetail,
         wallBg: GBC_PAL.vaultWallBg, wallLine: GBC_PAL.vaultWallLine,
-        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep
+        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep,
+        pathBg: 0x122430, pathLine: 0x306080, rugColor: 0x207090,
       }, false)
     }
   }
