@@ -4,7 +4,7 @@ import { GameState } from '../state'
 
 export class MainMenuScene extends Phaser.Scene {
   private selectedIndex = 0
-  private menuItems = ['PLAY', 'HOW TO PLAY', 'ABOUT']
+  private menuItems: string[] = []
   private menuTexts: Phaser.GameObjects.Text[] = []
   
   private viewState: 'menu' | 'how-to' | 'about' = 'menu'
@@ -25,6 +25,12 @@ export class MainMenuScene extends Phaser.Scene {
       color: GameState.paletteMode === 'dmg' ? CSS_LIGHTEST : '#40d870',
       resolution: 2,
     }).setOrigin(0.5).setShadow(2, 2, GameState.paletteMode === 'dmg' ? CSS_DARKEST : '#184888', 0, false, true)
+
+    if (GameState.levelIndex > 1) {
+      this.menuItems = ['CONTINUE', 'NEW GAME', 'HOW TO PLAY', 'ABOUT']
+    } else {
+      this.menuItems = ['NEW GAME', 'HOW TO PLAY', 'ABOUT']
+    }
 
     // Menu Items
     const startY = 80
@@ -118,7 +124,10 @@ export class MainMenuScene extends Phaser.Scene {
   private selectOption() {
     const option = this.menuItems[this.selectedIndex]
     
-    if (option === 'PLAY') {
+    if (option === 'CONTINUE') {
+      this.scene.start('platformer')
+    } else if (option === 'NEW GAME') {
+      GameState.reset()
       this.scene.start('platformer')
     } else if (option === 'HOW TO PLAY') {
       this.viewState = 'how-to'

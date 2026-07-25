@@ -25,6 +25,16 @@ export class GameState {
     this.energy = Math.min(this.maxEnergy, this.energy + amount)
   }
 
+  static reset() {
+    this.levelIndex = 1
+    this.checkpointX = 32
+    this.checkpointY = 96
+    this.energy = this.maxEnergy
+    this.speedrunStartTime = null
+    this.speedrunTimeMillis = 0
+    this.saveGame()
+  }
+
   static saveGame() {
     localStorage.setItem('windup_save', JSON.stringify({
       levelIndex: this.levelIndex,
