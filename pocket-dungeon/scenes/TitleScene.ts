@@ -5,6 +5,7 @@ import { loadMeta, CLASSES, ClassName } from '../meta'
 
 export class TitleScene extends Phaser.Scene {
   private classIndex = 0
+  private menuIndex = 0
   private classKeys: ClassName[] = []
   private classLabel!: Phaser.GameObjects.Text
   private classDesc!: Phaser.GameObjects.Text
@@ -12,6 +13,7 @@ export class TitleScene extends Phaser.Scene {
   private goldText!: Phaser.GameObjects.Text
   private arrowLeft!: Phaser.GameObjects.Text
   private arrowRight!: Phaser.GameObjects.Text
+  private menuItems: Phaser.GameObjects.Text[] = []
 
   constructor() {
     super('title')
@@ -23,6 +25,7 @@ export class TitleScene extends Phaser.Scene {
     const meta = loadMeta()
     this.classKeys = meta.unlockedClasses as ClassName[]
     this.classIndex = 0
+    this.menuIndex = 0
 
     // ── Title Block ──
     this.add.text(GBC_WIDTH / 2, 6, 'POCKET', {
@@ -57,7 +60,7 @@ export class TitleScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '10px', color: '#e0f8cf', resolution: 2,
     }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
 
-    // ── Class Stats (bar style) ──
+    // ── Class Stats ──
     this.statsText = this.add.text(GBC_WIDTH / 2, 68, '', {
       fontFamily: FONT, fontSize: '7px', color: '#e0f8cf', resolution: 2,
     }).setOrigin(0.5, 0)
@@ -68,15 +71,19 @@ export class TitleScene extends Phaser.Scene {
       wordWrap: { width: 136 }, align: 'center',
     }).setOrigin(0.5, 0)
 
-    // ── Menu Buttons ──
+    // ── Menu Buttons (navigable with UP/DOWN + ENTER) ──
     const btnY = 104
-    const startBtn = this.add.text(GBC_WIDTH / 2, btnY, '\u25B6 START', {
+    this.menuItems = []
+
+    const startBtn = this.add.text(GBC_WIDTH / 2, btnY, 'START', {
       fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 2,
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
+    this.menuItems.push(startBtn)
 
     const shopBtn = this.add.text(GBC_WIDTH / 2, btnY + 14, 'SHOP', {
-      fontFamily: FONT, fontSize: '7px', color: '#86b06a', resolution: 2,
+      fontFamily: FONT, fontSize: '8px', color: '#86b06a', resolution: 2,
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
+    this.menuItems.push(shopBtn)
 
     // ── Run History ──
     const divider2 = this.add.graphics()
@@ -87,28 +94,29 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5, 0)
 
     this.updateClassDisplay()
+    this.updateMenuCursor()
 
     // ── Keyboard Input ──
     const cursors = this.input.keyboard!.createCursorKeys()
     const enterKey = this.input.keyboard!.addKey('ENTER')
-    const shopKey = this.input.keyboard!.addKey('S')
 
     cursors.left.on('down', () => this.cycleClass(-1))
     cursors.right.on('down', () => this.cycleClass(1))
-    enterKey.on('down', () => this.startRun())
-    shopKey.on('down', () => this.scene.start('shop'))
+    cursors.up.on('down', () => {
+      this.menuIndex = (this.menuIndex - 1 + this.menuItems.length) % this.menuItems.length
+      this.updateMenuCursor()
+    })
+    cursors.down.on('down', () => {
+      this.menuIndex = (this.menuIndex + 1) % this.menuItems.length
+      this.updateMenuCursor()
+    })
+    enterKey.on('down', () => this.confirmMenu())
 
     // ── Touch / Click Input ──
     this.arrowLeft.on('pointerdown', () => this.cycleClass(-1))
     this.arrowRight.on('pointerdown', () => this.cycleClass(1))
     startBtn.on('pointerdown', () => this.startRun())
     shopBtn.on('pointerdown', () => this.scene.start('shop'))
-
-    // Hover highlights
-    ;[startBtn, shopBtn].forEach(btn => {
-      btn.on('pointerover', () => btn.setColor('#ffffff'))
-      btn.on('pointerout', () => btn.setColor(btn === startBtn ? '#e0f8cf' : '#86b06a'))
-    })
   }
 
   private cycleClass(dir: number) {
@@ -116,10 +124,28 @@ export class TitleScene extends Phaser.Scene {
     this.updateClassDisplay()
   }
 
+  private confirmMenu() {
+    if (this.menuIndex === 0) this.startRun()
+    else if (this.menuIndex === 1) this.scene.start('shop')
+  }
+
   private startRun() {
     GameState.selectedClass = this.classKeys[this.classIndex]
     GameState.resetRun()
     this.scene.start('dungeon')
+  }
+
+  private updateMenuCursor() {
+    const labels = ['START', 'SHOP']
+    for (let i = 0; i < this.menuItems.length; i++) {
+      if (i === this.menuIndex) {
+        this.menuItems[i].setText(`\u25B6 ${labels[i]}`)
+        this.menuItems[i].setColor('#ffffff')
+      } else {
+        this.menuItems[i].setText(`  ${labels[i]}`)
+        this.menuItems[i].setColor('#86b06a')
+      }
+    }
   }
 
   private updateClassDisplay() {
