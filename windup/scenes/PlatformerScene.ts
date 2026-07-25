@@ -57,13 +57,12 @@ export class PlatformerScene extends Phaser.Scene {
     if (GameState.energy === GameState.maxEnergy && GameState.checkpointX === 32) {
       GameState.checkpointX = level.spawn.x
       GameState.checkpointY = level.spawn.y
-      
-      // Reset speedrun timer when starting level 1
-      if (GameState.levelIndex === 1) {
-        GameState.speedrunStartTime = Date.now()
-        GameState.speedrunTimeMillis = 0
-        GameState.saveGame()
-      }
+    }
+    
+    // Start speedrun timer if it's not running
+    if (!GameState.speedrunStartTime) {
+      GameState.speedrunStartTime = Date.now()
+      GameState.saveGame()
     }
 
     level.platforms.forEach(p => this.platforms.create(p.x, p.y, `tiles_${mode}`, 1))

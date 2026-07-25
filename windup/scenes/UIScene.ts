@@ -6,6 +6,7 @@ export class UIScene extends Phaser.Scene {
   private energyText!: Phaser.GameObjects.Text
   private energyBarGfx!: Phaser.GameObjects.Graphics
   private speedrunText!: Phaser.GameObjects.Text
+  private levelText!: Phaser.GameObjects.Text
 
   constructor() {
     super('ui')
@@ -28,10 +29,18 @@ export class UIScene extends Phaser.Scene {
       color: CSS_LIGHTEST,
       resolution: 2,
     }).setOrigin(1, 0)
+    
+    this.levelText = this.add.text(100, 4, 'LVL 1', {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: CSS_LIGHTEST,
+      resolution: 2,
+    }).setOrigin(0, 0)
   }
 
   update() {
     this.updateEnergyBar()
+    this.levelText.setText(`LVL ${GameState.levelIndex}`)
     
     let currentMillis = 0
     if (GameState.speedrunStartTime && GameState.speedrunStartTime > 0) {
