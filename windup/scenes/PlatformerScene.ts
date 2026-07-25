@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { TILE, GBC_WIDTH, GBC_HEIGHT } from '../constants'
 import { GameState } from '../state'
+import { LEVELS } from '../levels'
 
 type Facing = 'left' | 'right'
 
@@ -11,9 +12,11 @@ export class PlatformerScene extends Phaser.Scene {
   private movingPlatforms!: Phaser.Physics.Arcade.Group
   private pickups!: Phaser.Physics.Arcade.StaticGroup
   private stations!: Phaser.Physics.Arcade.StaticGroup
+  private goals!: Phaser.Physics.Arcade.StaticGroup
   private facing: Facing = 'right'
   private coyoteTimer = 0
   private wallJumpTimer = 0
+  private isTransitioning = false
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
@@ -27,6 +30,7 @@ export class PlatformerScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0b0f0c')
     this.cameras.main.setBounds(0, 0, GBC_WIDTH, GBC_HEIGHT)
     this.physics.world.setBounds(0, 0, GBC_WIDTH, GBC_HEIGHT)
+    this.isTransitioning = false
 
     this.renderLevel()
 
@@ -45,43 +49,39 @@ export class PlatformerScene extends Phaser.Scene {
     this.springs = this.physics.add.staticGroup()
     this.movingPlatforms = this.physics.add.group({ allowGravity: false, immovable: true })
     this.pickups = this.physics.add.staticGroup()
+    this.stations = this.physics.add.staticGroup()
+    this.goals = this.physics.add.staticGroup()
 
-    // Ground floor (y = 128)
-    for (let x = 0; x < 10; x++) {
-      this.platforms.create(x * TILE + TILE / 2, 136, `tiles_${mode}`, 0)
+    const level = LEVELS[GameState.levelIndex] || LEVELS[1]
+
+    if (GameState.energy === GameState.maxEnergy && GameState.checkpointX === 32) {
+      GameState.checkpointX = level.spawn.x
+      GameState.checkpointY = level.spawn.y
     }
 
-    // Elevated platforms
-    this.platforms.create(4 * TILE + TILE / 2, 96, `tiles_${mode}`, 1)
-    this.platforms.create(5 * TILE + TILE / 2, 96, `tiles_${mode}`, 1)
-    this.platforms.create(8 * TILE + TILE / 2, 72, `tiles_${mode}`, 1)
-
-    // Springs
-    this.springs.create(3 * TILE + TILE / 2, 128, `tiles_${mode}`, 2)
-
-    // Moving Platform
-    const mp = this.movingPlatforms.create(6 * TILE + TILE / 2, 112, `tiles_${mode}`, 3) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-    this.tweens.add({
-      targets: mp,
-      x: mp.x + 3 * TILE,
-      duration: 2000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
+    level.platforms.forEach(p => this.platforms.create(p.x, p.y, `tiles_${mode}`, 1))
+    level.springs.forEach(p => this.springs.create(p.x, p.y, `tiles_${mode}`, 2))
+    level.pickups.forEach(p => this.pickups.create(p.x, p.y, `energy_${mode}`))
+    
+    level.stations.forEach(p => {
+      const s = this.stations.create(p.x, p.y, `station_${mode}`) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      s.setData('used', false)
     })
 
-    // Pickups
-    this.pickups.create(5 * TILE + TILE / 2, 64, `energy_${mode}`)
+    level.movingPlatforms.forEach(p => {
+      const mp = this.movingPlatforms.create(p.x, p.y, `tiles_${mode}`, 3) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+      this.tweens.add({
+        targets: mp,
+        x: p.x + p.dx,
+        y: p.y + p.dy,
+        duration: p.duration,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      })
+    })
 
-    // Winding Station Checkpoint
-    this.stations = this.physics.add.staticGroup()
-    const s1 = this.stations.create(8 * TILE + TILE / 2, 56, `station_${mode}`) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
-    s1.setData('used', false)
-
-    // Example vertical wall for wall jumping test
-    for (let y = 0; y < 6; y++) {
-      this.platforms.create(9 * TILE + TILE / 2, y * TILE + TILE / 2, `tiles_${mode}`, 1)
-    }
+    this.goals.create(level.goal.x, level.goal.y, `goal_${mode}`)
 
     // Player
     this.player = this.physics.add.sprite(
@@ -106,6 +106,27 @@ export class PlatformerScene extends Phaser.Scene {
       pickup.destroy()
       GameState.addEnergy(20)
     })
+
+    this.physics.add.overlap(this.player, this.goals, () => this.reachGoal())
+  }
+
+  private reachGoal() {
+    if (this.isTransitioning) return
+    this.isTransitioning = true
+
+    GameState.levelIndex++
+    if (!LEVELS[GameState.levelIndex]) GameState.levelIndex = 1
+
+    const nextLevel = LEVELS[GameState.levelIndex]
+    GameState.checkpointX = nextLevel.spawn.x
+    GameState.checkpointY = nextLevel.spawn.y
+    GameState.refillEnergy()
+    GameState.saveGame()
+
+    this.cameras.main.fadeOut(800)
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.restart()
+    })
   }
 
   reloadPalette() {
@@ -128,10 +149,14 @@ export class PlatformerScene extends Phaser.Scene {
     swapGroup(this.movingPlatforms, `tiles_${mode}`)
     
     this.pickups.getChildren().forEach((p: any) => p.setTexture(`energy_${mode}`))
+    this.goals.getChildren().forEach((g: any) => g.setTexture(`goal_${mode}`))
   }
 
   update(time: number, delta: number) {
-    if (GameState.uiBlocking) return
+    if (GameState.uiBlocking || this.isTransitioning) {
+      this.player.setVelocityX(0)
+      return
+    }
 
     const mode = GameState.paletteMode
     const isGrounded = this.player.body.blocked.down

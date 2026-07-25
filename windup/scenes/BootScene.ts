@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { TILE, PAL, GBC_PAL } from '../constants'
 
+import { GameState } from '../state'
+
 type Facing = 'left' | 'right'
 
 export class BootScene extends Phaser.Scene {
@@ -9,11 +11,14 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    GameState.loadSave()
+
     ;(['dmg', 'gbc'] as const).forEach((mode) => {
       this.buildTileset(mode)
       this.buildPlayer(mode)
       this.buildStation(mode)
       this.buildEnergy(mode)
+      this.buildGoal(mode)
     })
     this.scene.start('platformer')
   }
@@ -172,6 +177,26 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(glow); g.fillCircle(8, 8, 6)
     g.fillStyle(base); g.fillRect(6, 4, 4, 8)
     g.fillStyle(base); g.fillRect(4, 6, 8, 4)
+
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildGoal(mode: 'dmg' | 'gbc') {
+    const key = `goal_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+
+    const dark = mode === 'dmg' ? PAL.darkest : 0x000000
+    const light = mode === 'dmg' ? PAL.lightest : 0xffffff
+    const pole = mode === 'dmg' ? PAL.dark : 0x888888
+
+    // Pole
+    g.fillStyle(pole); g.fillRect(2, 0, 2, 16)
+    // Checkered Flag
+    g.fillStyle(light); g.fillRect(4, 0, 10, 8)
+    g.fillStyle(dark)
+    g.fillRect(4, 0, 5, 4); g.fillRect(9, 4, 5, 4)
 
     g.generateTexture(key, 16, 16)
     g.destroy()

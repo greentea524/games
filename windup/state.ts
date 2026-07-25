@@ -22,4 +22,22 @@ export class GameState {
   static addEnergy(amount: number) {
     this.energy = Math.min(this.maxEnergy, this.energy + amount)
   }
+
+  static saveGame() {
+    localStorage.setItem('windup_save', JSON.stringify({
+      levelIndex: this.levelIndex,
+      paletteMode: this.paletteMode
+    }))
+  }
+
+  static loadSave() {
+    const data = localStorage.getItem('windup_save')
+    if (data) {
+      try {
+        const parsed = JSON.parse(data)
+        if (parsed.levelIndex) this.levelIndex = parsed.levelIndex
+        if (parsed.paletteMode) this.paletteMode = parsed.paletteMode
+      } catch (e) {}
+    }
+  }
 }
