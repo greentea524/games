@@ -20,7 +20,7 @@ export class BootScene extends Phaser.Scene {
       this.buildEnergy(mode)
       this.buildGoal(mode)
     })
-    this.scene.start('platformer')
+    this.scene.start('mainmenu')
   }
 
   private buildTileset(mode: 'dmg' | 'gbc') {
