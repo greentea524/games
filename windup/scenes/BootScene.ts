@@ -74,6 +74,11 @@ export class BootScene extends Phaser.Scene {
 
     g.generateTexture(key, T * 4, T)
     g.destroy()
+    
+    const tex = this.textures.get(key)
+    for (let i = 0; i < 4; i++) {
+      tex.add(i, 0, i * T, 0, T, T)
+    }
   }
 
   private drawWindupToy(

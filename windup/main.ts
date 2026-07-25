@@ -67,3 +67,17 @@ document.querySelectorAll('[data-key]').forEach((btn) => {
   btn.addEventListener('mouseup', handleRelease)
   btn.addEventListener('mouseleave', handleRelease)
 })
+
+const togglePalette = (e?: Event) => {
+  if (e) e.preventDefault()
+  GameState.setPaletteMode(GameState.paletteMode === 'gbc' ? 'dmg' : 'gbc')
+  const scene = game.scene.getScene('platformer') as PlatformerScene
+  if (scene && scene.sys.isActive()) {
+    scene.reloadPalette()
+  }
+}
+
+document.getElementById('btn-palette')?.addEventListener('click', togglePalette)
+document.getElementById('btn-palette')?.addEventListener('touchstart', togglePalette, { passive: false })
+document.getElementById('btn-select')?.addEventListener('click', togglePalette)
+document.getElementById('btn-select')?.addEventListener('touchstart', togglePalette, { passive: false })

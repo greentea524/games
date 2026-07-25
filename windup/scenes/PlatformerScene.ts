@@ -110,8 +110,24 @@ export class PlatformerScene extends Phaser.Scene {
 
   reloadPalette() {
     const mode = GameState.paletteMode
-    this.children.removeAll()
-    this.renderLevel()
+    this.player.setTexture(`windup_${mode}_${this.facing}`)
+
+    this.stations.getChildren().forEach((s: any) => {
+      s.setTexture(s.getData('used') ? `station_empty_${mode}` : `station_${mode}`)
+    })
+
+    const swapGroup = (group: Phaser.Physics.Arcade.Group | Phaser.Physics.Arcade.StaticGroup, key: string) => {
+      group.getChildren().forEach((c: any) => {
+        const frameName = c.frame.name === '__BASE' ? 0 : c.frame.name
+        c.setTexture(key, frameName)
+      })
+    }
+
+    swapGroup(this.platforms, `tiles_${mode}`)
+    swapGroup(this.springs, `tiles_${mode}`)
+    swapGroup(this.movingPlatforms, `tiles_${mode}`)
+    
+    this.pickups.getChildren().forEach((p: any) => p.setTexture(`energy_${mode}`))
   }
 
   update(time: number, delta: number) {
