@@ -122,6 +122,11 @@ export class ShopScene extends Phaser.Scene {
     })
     enterKey.on('down', () => this.tryPurchase())
     escKey.on('down', () => this.scene.start('title'))
+
+    const zKey = this.input.keyboard!.addKey('Z')
+    const xKey = this.input.keyboard!.addKey('X')
+    zKey.on('down', () => this.tryPurchase())
+    xKey.on('down', () => this.scene.start('title'))
   }
 
   private updateCursor() {

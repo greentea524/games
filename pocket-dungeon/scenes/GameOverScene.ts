@@ -79,9 +79,12 @@ export class GameOverScene extends Phaser.Scene {
     })
 
     const enterKey = this.input.keyboard!.addKey('ENTER')
-    enterKey.on('down', () => {
+    const zKey = this.input.keyboard!.addKey('Z')
+    const goBack = () => {
       this.scene.stop('ui')
       this.scene.start('title')
-    })
+    }
+    enterKey.on('down', goBack)
+    zKey.on('down', goBack)
   }
 }

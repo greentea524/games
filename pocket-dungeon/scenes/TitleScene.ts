@@ -99,6 +99,7 @@ export class TitleScene extends Phaser.Scene {
     // ── Keyboard Input ──
     const cursors = this.input.keyboard!.createCursorKeys()
     const enterKey = this.input.keyboard!.addKey('ENTER')
+    const zKey = this.input.keyboard!.addKey('Z')
 
     cursors.left.on('down', () => this.cycleClass(-1))
     cursors.right.on('down', () => this.cycleClass(1))
@@ -111,6 +112,7 @@ export class TitleScene extends Phaser.Scene {
       this.updateMenuCursor()
     })
     enterKey.on('down', () => this.confirmMenu())
+    zKey.on('down', () => this.confirmMenu())
 
     // ── Touch / Click Input ──
     this.arrowLeft.on('pointerdown', () => this.cycleClass(-1))
