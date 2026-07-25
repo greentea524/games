@@ -30,7 +30,7 @@ export class UIScene extends Phaser.Scene {
       resolution: 2,
     }).setOrigin(1, 0)
     
-    this.levelText = this.add.text(100, 4, 'LVL 1', {
+    this.levelText = this.add.text(6, GBC_HEIGHT - 12, 'LVL 1', {
       fontFamily: FONT,
       fontSize: '6px',
       color: CSS_LIGHTEST,
