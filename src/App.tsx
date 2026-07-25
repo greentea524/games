@@ -8,7 +8,6 @@ const WEB_GAMES = [
     title: "Static",
     href: `${import.meta.env.BASE_URL}static/`,
     description: "A GBC-style top-down mystery/adventure game. Explore a small town where an old TV works like a portal.",
-    isWip: true,
   },
   {
     title: "Cart & Crate",
@@ -27,7 +26,6 @@ const WEB_GAMES = [
     href: `${import.meta.env.BASE_URL}windup/`,
     description:
       "A GBC-style energy platformer. Guide the windup toy across platforms before its key runs out of power.",
-    isWip: true,
   },
   {
     title: "Lantern Keeper",
@@ -83,7 +81,6 @@ function App() {
               >
                 <span className="game-link-title-row">
                   🎮 {game.title}
-                  {game.isWip && <span className="wip-badge">WIP</span>}
                 </span>
                 <span>↗</span>
               </a>
