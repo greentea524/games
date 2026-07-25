@@ -10,9 +10,10 @@ export class PlatformerScene extends Phaser.Scene {
   private springs!: Phaser.Physics.Arcade.StaticGroup
   private movingPlatforms!: Phaser.Physics.Arcade.Group
   private pickups!: Phaser.Physics.Arcade.StaticGroup
-  private station!: Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+  private stations!: Phaser.Physics.Arcade.StaticGroup
   private facing: Facing = 'right'
   private coyoteTimer = 0
+  private wallJumpTimer = 0
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
@@ -73,11 +74,14 @@ export class PlatformerScene extends Phaser.Scene {
     this.pickups.create(5 * TILE + TILE / 2, 64, `energy_${mode}`)
 
     // Winding Station Checkpoint
-    this.station = this.physics.add.staticSprite(
-      8 * TILE + TILE / 2,
-      56,
-      `station_${mode}`,
-    ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+    this.stations = this.physics.add.staticGroup()
+    const s1 = this.stations.create(8 * TILE + TILE / 2, 56, `station_${mode}`) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+    s1.setData('used', false)
+
+    // Example vertical wall for wall jumping test
+    for (let y = 0; y < 6; y++) {
+      this.platforms.create(9 * TILE + TILE / 2, y * TILE + TILE / 2, `tiles_${mode}`, 1)
+    }
 
     // Player
     this.player = this.physics.add.sprite(
@@ -91,7 +95,7 @@ export class PlatformerScene extends Phaser.Scene {
 
     this.physics.add.collider(this.player, this.platforms)
     this.physics.add.collider(this.player, this.movingPlatforms)
-    this.physics.add.overlap(this.player, this.station, () => this.reachStation())
+    this.physics.add.overlap(this.player, this.stations, (p, s) => this.reachStation(s as Phaser.Types.Physics.Arcade.SpriteWithStaticBody))
 
     this.physics.add.overlap(this.player, this.springs, () => {
       this.player.setVelocityY(-350)
@@ -115,9 +119,19 @@ export class PlatformerScene extends Phaser.Scene {
 
     const mode = GameState.paletteMode
     const isGrounded = this.player.body.blocked.down
+    const isWalledLeft = this.player.body.blocked.left
+    const isWalledRight = this.player.body.blocked.right
+    const isWalled = !isGrounded && (isWalledLeft || isWalledRight)
 
     if (isGrounded) {
       this.coyoteTimer = time + 120
+    }
+
+    const isMovingTowardsWall = (isWalledLeft && (this.cursors.left.isDown || this.wasd.A.isDown)) || 
+                                (isWalledRight && (this.cursors.right.isDown || this.wasd.D.isDown))
+
+    if (isWalled && isMovingTowardsWall && this.player.body.velocity.y > 0) {
+      this.player.setVelocityY(40) // Wall slide friction
     }
 
     // Moving Platform Sticky Friction
@@ -146,7 +160,9 @@ export class PlatformerScene extends Phaser.Scene {
       this.facing = 'right'
     }
 
-    this.player.setVelocityX(moveX)
+    if (time > this.wallJumpTimer) {
+      this.player.setVelocityX(moveX)
+    }
     this.player.setTexture(`windup_${mode}_${this.facing}`)
 
     // Energy drain on movement
@@ -154,12 +170,21 @@ export class PlatformerScene extends Phaser.Scene {
       GameState.drainEnergy((delta / 1000) * 8)
     }
 
-    // Jump with Coyote Time
+    // Jump with Coyote Time & Wall Jump
     const canJump = isGrounded || time < this.coyoteTimer
-    if (Phaser.Input.Keyboard.JustDown(this.jumpKey) && canJump && GameState.energy > 0) {
-      this.player.setVelocityY(-170)
-      this.coyoteTimer = 0
-      GameState.drainEnergy(5) // Extra jump cost
+    if (Phaser.Input.Keyboard.JustDown(this.jumpKey) && GameState.energy > 0) {
+      if (canJump) {
+        this.player.setVelocityY(-170)
+        this.coyoteTimer = 0
+        GameState.drainEnergy(5) // Extra jump cost
+      } else if (isWalled) {
+        // Wall Jump
+        this.player.setVelocityY(-170)
+        this.player.setVelocityX(isWalledLeft ? 150 : -150)
+        this.facing = isWalledLeft ? 'right' : 'left'
+        this.wallJumpTimer = time + 250 // Lock out D-pad for 250ms
+        GameState.drainEnergy(5)
+      }
     }
 
     // Respawn if energy empty and player stops
@@ -168,11 +193,17 @@ export class PlatformerScene extends Phaser.Scene {
     }
   }
 
-  private reachStation() {
+  private reachStation(station: Phaser.Types.Physics.Arcade.SpriteWithStaticBody) {
+    if (station.getData('used')) return
+
+    const mode = GameState.paletteMode
+    station.setData('used', true)
+    station.setTexture(`station_empty_${mode}`)
+
     if (GameState.energy < GameState.maxEnergy) {
       GameState.refillEnergy()
-      GameState.checkpointX = this.station.x
-      GameState.checkpointY = this.station.y - 12
+      GameState.checkpointX = station.x
+      GameState.checkpointY = station.y - 12
     }
   }
 

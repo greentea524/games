@@ -143,6 +143,16 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(glow); g.fillCircle(8, 9, 3)
 
     g.generateTexture(key, 16, 16)
+    g.clear()
+
+    // Empty (Used) Station
+    const emptyKey = `station_empty_${mode}`
+    g.fillStyle(dark); g.fillRect(2, 4, 12, 12)
+    g.fillStyle(body); g.fillRect(3, 5, 10, 10)
+    // No glow in center, just a dark hole or dim color
+    g.fillStyle(dark); g.fillCircle(8, 9, 3)
+
+    g.generateTexture(emptyKey, 16, 16)
     g.destroy()
   }
 
