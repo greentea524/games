@@ -5,6 +5,7 @@ import { GameState } from '../state'
 export class UIScene extends Phaser.Scene {
   private energyText!: Phaser.GameObjects.Text
   private energyBarGfx!: Phaser.GameObjects.Graphics
+  private speedrunText!: Phaser.GameObjects.Text
 
   constructor() {
     super('ui')
@@ -20,10 +21,31 @@ export class UIScene extends Phaser.Scene {
 
     this.energyBarGfx = this.add.graphics()
     this.updateEnergyBar()
+
+    this.speedrunText = this.add.text(GBC_WIDTH - 6, 4, '00:00:000', {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: CSS_LIGHTEST,
+      resolution: 2,
+    }).setOrigin(1, 0)
   }
 
   update() {
     this.updateEnergyBar()
+    
+    let currentMillis = 0
+    if (GameState.speedrunStartTime && GameState.speedrunStartTime > 0) {
+      currentMillis = Date.now() - GameState.speedrunStartTime
+    } else if (GameState.speedrunTimeMillis > 0) {
+      currentMillis = GameState.speedrunTimeMillis
+    }
+
+    const mins = Math.floor(currentMillis / 60000)
+    const secs = Math.floor((currentMillis % 60000) / 1000)
+    const ms = currentMillis % 1000
+    this.speedrunText.setText(
+      `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}:${ms.toString().padStart(3, '0')}`
+    )
   }
 
   private updateEnergyBar() {

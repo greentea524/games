@@ -6,6 +6,8 @@ export class GameState {
   static checkpointX: number = 32
   static checkpointY: number = 96
   static uiBlocking: boolean = false
+  static speedrunStartTime: number | null = null
+  static speedrunTimeMillis: number = 0
 
   static setPaletteMode(mode: 'dmg' | 'gbc') {
     this.paletteMode = mode
@@ -26,7 +28,9 @@ export class GameState {
   static saveGame() {
     localStorage.setItem('windup_save', JSON.stringify({
       levelIndex: this.levelIndex,
-      paletteMode: this.paletteMode
+      paletteMode: this.paletteMode,
+      speedrunStartTime: this.speedrunStartTime,
+      speedrunTimeMillis: this.speedrunTimeMillis
     }))
   }
 
@@ -37,6 +41,8 @@ export class GameState {
         const parsed = JSON.parse(data)
         if (parsed.levelIndex) this.levelIndex = parsed.levelIndex
         if (parsed.paletteMode) this.paletteMode = parsed.paletteMode
+        if (parsed.speedrunStartTime) this.speedrunStartTime = parsed.speedrunStartTime
+        if (parsed.speedrunTimeMillis) this.speedrunTimeMillis = parsed.speedrunTimeMillis
       } catch (e) {}
     }
   }

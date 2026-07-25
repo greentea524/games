@@ -57,6 +57,13 @@ export class PlatformerScene extends Phaser.Scene {
     if (GameState.energy === GameState.maxEnergy && GameState.checkpointX === 32) {
       GameState.checkpointX = level.spawn.x
       GameState.checkpointY = level.spawn.y
+      
+      // Reset speedrun timer when starting level 1
+      if (GameState.levelIndex === 1) {
+        GameState.speedrunStartTime = Date.now()
+        GameState.speedrunTimeMillis = 0
+        GameState.saveGame()
+      }
     }
 
     level.platforms.forEach(p => this.platforms.create(p.x, p.y, `tiles_${mode}`, 1))
@@ -113,6 +120,29 @@ export class PlatformerScene extends Phaser.Scene {
   private reachGoal() {
     if (this.isTransitioning) return
     this.isTransitioning = true
+
+    if (GameState.levelIndex === 32) {
+      if (GameState.speedrunStartTime) {
+        GameState.speedrunTimeMillis = Date.now() - GameState.speedrunStartTime
+        GameState.speedrunStartTime = null
+      }
+      GameState.saveGame()
+
+      this.cameras.main.fadeOut(2000)
+      this.add.text(GBC_WIDTH / 2, GBC_HEIGHT / 2 - 10, 'VICTORY!', {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '12px',
+        color: mode === 'dmg' ? '#0f380f' : '#ffffff'
+      }).setOrigin(0.5).setDepth(100)
+
+      this.time.delayedCall(3000, () => {
+        GameState.levelIndex = 1
+        GameState.speedrunTimeMillis = 0
+        GameState.saveGame()
+        this.scene.restart()
+      })
+      return
+    }
 
     GameState.levelIndex++
     if (!LEVELS[GameState.levelIndex]) GameState.levelIndex = 1
