@@ -7,6 +7,9 @@ type Facing = 'left' | 'right'
 export class PlatformerScene extends Phaser.Scene {
   private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
   private platforms!: Phaser.Physics.Arcade.StaticGroup
+  private springs!: Phaser.Physics.Arcade.StaticGroup
+  private movingPlatforms!: Phaser.Physics.Arcade.Group
+  private pickups!: Phaser.Physics.Arcade.StaticGroup
   private station!: Phaser.Types.Physics.Arcade.SpriteWithStaticBody
   private facing: Facing = 'right'
   private coyoteTimer = 0
@@ -38,6 +41,9 @@ export class PlatformerScene extends Phaser.Scene {
   renderLevel() {
     const mode = GameState.paletteMode
     this.platforms = this.physics.add.staticGroup()
+    this.springs = this.physics.add.staticGroup()
+    this.movingPlatforms = this.physics.add.group({ allowGravity: false, immovable: true })
+    this.pickups = this.physics.add.staticGroup()
 
     // Ground floor (y = 128)
     for (let x = 0; x < 10; x++) {
@@ -48,6 +54,23 @@ export class PlatformerScene extends Phaser.Scene {
     this.platforms.create(4 * TILE + TILE / 2, 96, `tiles_${mode}`, 1)
     this.platforms.create(5 * TILE + TILE / 2, 96, `tiles_${mode}`, 1)
     this.platforms.create(8 * TILE + TILE / 2, 72, `tiles_${mode}`, 1)
+
+    // Springs
+    this.springs.create(3 * TILE + TILE / 2, 128, `tiles_${mode}`, 2)
+
+    // Moving Platform
+    const mp = this.movingPlatforms.create(6 * TILE + TILE / 2, 112, `tiles_${mode}`, 3) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+    this.tweens.add({
+      targets: mp,
+      x: mp.x + 3 * TILE,
+      duration: 2000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    })
+
+    // Pickups
+    this.pickups.create(5 * TILE + TILE / 2, 64, `energy_${mode}`)
 
     // Winding Station Checkpoint
     this.station = this.physics.add.staticSprite(
@@ -67,7 +90,18 @@ export class PlatformerScene extends Phaser.Scene {
     this.player.body.setSize(10, 12).setOffset(3, 4)
 
     this.physics.add.collider(this.player, this.platforms)
+    this.physics.add.collider(this.player, this.movingPlatforms)
     this.physics.add.overlap(this.player, this.station, () => this.reachStation())
+
+    this.physics.add.overlap(this.player, this.springs, () => {
+      this.player.setVelocityY(-350)
+      this.coyoteTimer = 0
+    })
+
+    this.physics.add.overlap(this.player, this.pickups, (p, pickup) => {
+      pickup.destroy()
+      GameState.addEnergy(20)
+    })
   }
 
   reloadPalette() {
@@ -85,6 +119,19 @@ export class PlatformerScene extends Phaser.Scene {
     if (isGrounded) {
       this.coyoteTimer = time + 120
     }
+
+    // Moving Platform Sticky Friction
+    this.movingPlatforms.getChildren().forEach((plat: any) => {
+      if (plat.prevX !== undefined) {
+        const dx = plat.x - plat.prevX
+        const isAbove = this.player.body.bottom <= plat.body.top + 2 && this.player.body.bottom >= plat.body.top - 2
+        const isWithin = this.player.body.right > plat.body.left && this.player.body.left < plat.body.right
+        if (isAbove && isWithin && this.player.body.velocity.y >= 0) {
+          this.player.x += dx
+        }
+      }
+      plat.prevX = plat.x
+    })
 
     // Zero-Energy Speed Drain Penalty
     const speedMultiplier = GameState.energy > 0 ? 1 : 0.2

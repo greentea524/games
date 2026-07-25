@@ -26,6 +26,13 @@ export const GBC_PAL = {
   robotDark: 0x184888,
   windupKey: 0xf8b020,
   eyeGlow: 0xf8f840,
+  // Interactive Mechanics
+  springBase: 0x888888,
+  springCoil: 0xd8d8d8,
+  platformBody: 0x505050,
+  platformEdge: 0xa0a0a0,
+  energyBase: 0x2038e0,
+  energyGlow: 0x4888f8,
 }
 
 export const CSS_LIGHTEST = '#9bbc0f'

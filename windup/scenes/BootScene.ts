@@ -13,6 +13,7 @@ export class BootScene extends Phaser.Scene {
       this.buildTileset(mode)
       this.buildPlayer(mode)
       this.buildStation(mode)
+      this.buildEnergy(mode)
     })
     this.scene.start('platformer')
   }
@@ -35,6 +36,17 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(PAL.darkest)
       for (let y = 0; y < T; y += 4) g.fillRect(at(1), y, T, 1)
       for (let x = 0; x < T; x += 8) g.fillRect(at(1) + x, 0, 1, T)
+      
+      // 2: Spring Pad
+      g.fillStyle(PAL.dark); g.fillRect(at(2), 12, T, 4)
+      g.fillStyle(PAL.light)
+      g.fillRect(at(2) + 2, 8, T - 4, 4)
+      g.fillRect(at(2) + 4, 6, T - 8, 2)
+      
+      // 3: Moving Platform
+      g.fillStyle(PAL.dark); g.fillRect(at(3), 0, T, 8)
+      g.fillStyle(PAL.light); g.fillRect(at(3), 0, T, 2)
+      g.fillStyle(PAL.light); g.fillRect(at(3), 6, T, 2)
     } else {
       // GBC Color
       // 0: Grass Ground
@@ -47,9 +59,20 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(GBC_PAL.brickLine)
       for (let y = 0; y < T; y += 4) g.fillRect(at(1), y, T, 1)
       for (let x = 0; x < T; x += 8) g.fillRect(at(1) + x, 0, 1, T)
+
+      // 2: Spring Pad
+      g.fillStyle(GBC_PAL.springBase); g.fillRect(at(2), 12, T, 4)
+      g.fillStyle(GBC_PAL.springCoil)
+      g.fillRect(at(2) + 2, 8, T - 4, 4)
+      g.fillRect(at(2) + 4, 6, T - 8, 2)
+      
+      // 3: Moving Platform
+      g.fillStyle(GBC_PAL.platformBody); g.fillRect(at(3), 0, T, 8)
+      g.fillStyle(GBC_PAL.platformEdge); g.fillRect(at(3), 0, T, 2)
+      g.fillStyle(GBC_PAL.platformEdge); g.fillRect(at(3), 6, T, 2)
     }
 
-    g.generateTexture(key, T * 2, T)
+    g.generateTexture(key, T * 4, T)
     g.destroy()
   }
 
@@ -118,6 +141,22 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(dark); g.fillRect(2, 4, 12, 12)
     g.fillStyle(body); g.fillRect(3, 5, 10, 10)
     g.fillStyle(glow); g.fillCircle(8, 9, 3)
+
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildEnergy(mode: 'dmg' | 'gbc') {
+    const key = `energy_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+
+    const base = mode === 'dmg' ? PAL.dark : GBC_PAL.energyBase
+    const glow = mode === 'dmg' ? PAL.light : GBC_PAL.energyGlow
+
+    g.fillStyle(glow); g.fillCircle(8, 8, 6)
+    g.fillStyle(base); g.fillRect(6, 4, 4, 8)
+    g.fillStyle(base); g.fillRect(4, 6, 8, 4)
 
     g.generateTexture(key, 16, 16)
     g.destroy()

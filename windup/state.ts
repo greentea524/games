@@ -18,4 +18,8 @@ export class GameState {
   static refillEnergy() {
     this.energy = this.maxEnergy
   }
+
+  static addEnergy(amount: number) {
+    this.energy = Math.min(this.maxEnergy, this.energy + amount)
+  }
 }
