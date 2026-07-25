@@ -32,7 +32,6 @@ export class ShopScene extends Phaser.Scene {
     // Build menu items
     this.items = []
 
-    // Classes
     for (const [key, cls] of Object.entries(CLASSES)) {
       if (cls.unlockCost > 0) {
         this.items.push({
@@ -43,7 +42,6 @@ export class ShopScene extends Phaser.Scene {
       }
     }
 
-    // Shop items
     for (const item of SHOP_ITEMS) {
       this.items.push({
         type: 'item', id: item.id, name: item.name,
@@ -52,48 +50,64 @@ export class ShopScene extends Phaser.Scene {
       })
     }
 
-    // Title
-    this.add.text(GBC_WIDTH / 2, 8, 'META SHOP', {
-      fontFamily: FONT, fontSize: '8px', color: '#ffd700', resolution: 2,
-    }).setOrigin(0.5)
+    // ── Title ──
+    this.add.text(GBC_WIDTH / 2, 6, 'SHOP', {
+      fontFamily: FONT, fontSize: '10px', color: '#ffd700', resolution: 2,
+    }).setOrigin(0.5, 0)
 
-    this.goldText = this.add.text(GBC_WIDTH / 2, 20, `GOLD: ${meta.gold}`, {
-      fontFamily: FONT, fontSize: '6px', color: '#ffd700', resolution: 2,
-    }).setOrigin(0.5)
+    this.goldText = this.add.text(GBC_WIDTH / 2, 20, `${meta.gold} GOLD`, {
+      fontFamily: FONT, fontSize: '7px', color: '#ffd700', resolution: 2,
+    }).setOrigin(0.5, 0)
 
-    // Render item list
+    // ── Divider ──
+    const div = this.add.graphics()
+    div.fillStyle(0x506850); div.fillRect(20, 31, GBC_WIDTH - 40, 1)
+
+    // ── Item List ──
     this.itemTexts = []
-    const startY = 34
+    const startY = 36
+    const rowH = 14
     for (let i = 0; i < this.items.length; i++) {
-      const item = this.items[i]
-      const label = item.owned ? `${item.name} [OWNED]` : `${item.name} (${item.cost}g)`
-      const txt = this.add.text(12, startY + i * 12, label, {
-        fontFamily: FONT, fontSize: '5px',
-        color: item.owned ? '#506850' : '#e0f8cf',
-        resolution: 2,
+      const txt = this.add.text(16, startY + i * rowH, '', {
+        fontFamily: FONT, fontSize: '6px',
+        color: '#e0f8cf', resolution: 2,
+      }).setInteractive({ useHandCursor: true })
+
+      txt.on('pointerdown', () => {
+        this.cursor = i
+        this.updateCursor()
+        this.tryPurchase()
       })
+
       this.itemTexts.push(txt)
     }
 
-    // Description area
-    this.descText = this.add.text(GBC_WIDTH / 2, 106, '', {
-      fontFamily: FONT, fontSize: '4px', color: '#86b06a', resolution: 2,
-      wordWrap: { width: 140 }, align: 'center',
+    // ── Description Area ──
+    const descDiv = this.add.graphics()
+    descDiv.fillStyle(0x506850); descDiv.fillRect(20, 105, GBC_WIDTH - 40, 1)
+
+    this.descText = this.add.text(GBC_WIDTH / 2, 109, '', {
+      fontFamily: FONT, fontSize: '5px', color: '#7a9a62', resolution: 2,
+      wordWrap: { width: 136 }, align: 'center',
     }).setOrigin(0.5, 0)
 
-    // Info
+    // ── Feedback Text ──
     this.infoText = this.add.text(GBC_WIDTH / 2, 126, '', {
-      fontFamily: FONT, fontSize: '5px', color: '#ff8888', resolution: 2,
-    }).setOrigin(0.5)
+      fontFamily: FONT, fontSize: '6px', color: '#ff8888', resolution: 2,
+    }).setOrigin(0.5, 0)
 
-    // Controls
-    this.add.text(GBC_WIDTH / 2, 138, 'UP/DOWN:NAV  ENTER:BUY  ESC:BACK', {
-      fontFamily: FONT, fontSize: '3px', color: '#506850', resolution: 2,
-    }).setOrigin(0.5)
+    // ── Back Button ──
+    const backBtn = this.add.text(GBC_WIDTH / 2, 138, '\u25C0 BACK', {
+      fontFamily: FONT, fontSize: '6px', color: '#86b06a', resolution: 2,
+    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
+
+    backBtn.on('pointerdown', () => this.scene.start('title'))
+    backBtn.on('pointerover', () => backBtn.setColor('#e0f8cf'))
+    backBtn.on('pointerout', () => backBtn.setColor('#86b06a'))
 
     this.updateCursor()
 
-    // Input
+    // ── Keyboard Input ──
     const cursors = this.input.keyboard!.createCursorKeys()
     const enterKey = this.input.keyboard!.addKey('ENTER')
     const escKey = this.input.keyboard!.addKey('ESC')
@@ -113,12 +127,16 @@ export class ShopScene extends Phaser.Scene {
   private updateCursor() {
     for (let i = 0; i < this.itemTexts.length; i++) {
       const item = this.items[i]
-      if (i === this.cursor) {
-        this.itemTexts[i].setText(`> ${item.owned ? `${item.name} [OWNED]` : `${item.name} (${item.cost}g)`}`)
-        this.itemTexts[i].setColor(item.owned ? '#506850' : '#ffffff')
+      const costStr = item.owned ? 'OWNED' : `${item.cost}g`
+      const prefix = i === this.cursor ? '\u25B6 ' : '  '
+      this.itemTexts[i].setText(`${prefix}${item.name}  ${costStr}`)
+
+      if (item.owned) {
+        this.itemTexts[i].setColor('#506850')
+      } else if (i === this.cursor) {
+        this.itemTexts[i].setColor('#ffffff')
       } else {
-        this.itemTexts[i].setText(`  ${item.owned ? `${item.name} [OWNED]` : `${item.name} (${item.cost}g)`}`)
-        this.itemTexts[i].setColor(item.owned ? '#506850' : '#e0f8cf')
+        this.itemTexts[i].setColor('#e0f8cf')
       }
     }
     this.descText.setText(this.items[this.cursor]?.description ?? '')
@@ -129,6 +147,7 @@ export class ShopScene extends Phaser.Scene {
     const item = this.items[this.cursor]
     if (!item || item.owned) {
       this.infoText.setText('ALREADY OWNED')
+      this.infoText.setColor('#888888')
       return
     }
 
@@ -142,7 +161,7 @@ export class ShopScene extends Phaser.Scene {
     if (success) {
       item.owned = true
       const meta = loadMeta()
-      this.goldText.setText(`GOLD: ${meta.gold}`)
+      this.goldText.setText(`${meta.gold} GOLD`)
       this.infoText.setText('PURCHASED!')
       this.infoText.setColor('#88ff88')
       this.updateCursor()
