@@ -161,7 +161,7 @@ export class DungeonScene extends Phaser.Scene {
         }
 
         // Fog layer overlay
-        const fog = this.add.rectangle(px, py, TILE, TILE, 0x050806).setDepth(15).setAlpha(0.95)
+        const fog = this.add.rectangle(px, py, TILE, TILE, 0x050806).setDepth(15).setAlpha(0.85)
         this.fogTiles[y][x] = fog
       }
     }
@@ -815,7 +815,7 @@ export class DungeonScene extends Phaser.Scene {
         } else if (this.explored[y][x]) {
           fog.setAlpha(0.55)
         } else {
-          fog.setAlpha(0.95)
+          fog.setAlpha(0.85)
         }
       }
     }

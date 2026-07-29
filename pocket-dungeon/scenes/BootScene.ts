@@ -35,12 +35,20 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(colors.floorBg); g.fillRect(at(0), 0, T, T)
       g.fillStyle(colors.floorDetail); g.fillRect(at(0) + 3, 3, 1, 1); g.fillRect(at(0) + 11, 11, 1, 1)
 
-      // 1: Wall (with top highlight & bottom shadow)
-      g.fillStyle(colors.wallBg); g.fillRect(at(1), 0, T, T)
-      g.fillStyle(colors.wallLine)
-      for (let y = 0; y < T; y += 4) g.fillRect(at(1), y, T, 1)
-      for (let x = 0; x < T; x += 8) g.fillRect(at(1) + x, 0, 1, T)
-      g.fillStyle(isDmg ? PAL.darkest : 0x15101a); g.fillRect(at(1), T - 2, T, 2) // bottom shadow
+      const drawRaisedWall = (offsetX: number) => {
+        g.fillStyle(colors.wallLine); g.fillRect(offsetX, 0, T, T)
+        g.fillStyle(colors.wallBg); g.fillRect(offsetX + 1, 1, T - 2, T - 2)
+        // Highlight
+        g.fillStyle(isDmg ? PAL.lightest : 0xffffff); g.globalAlpha = 0.25
+        g.fillRect(offsetX + 1, 1, T - 2, 1); g.fillRect(offsetX + 1, 1, 1, T - 2)
+        // Shadow
+        g.fillStyle(isDmg ? PAL.darkest : 0x000000); g.globalAlpha = 0.4
+        g.fillRect(offsetX + 1, T - 2, T - 2, 1); g.fillRect(offsetX + T - 2, 1, 1, T - 2)
+        g.globalAlpha = 1.0
+      }
+
+      // 1: Wall (raised block)
+      drawRaisedWall(at(1))
 
       // 2: Stairs Down
       g.fillStyle(colors.floorBg); g.fillRect(at(2), 0, T, T)
@@ -65,9 +73,7 @@ export class BootScene extends Phaser.Scene {
       g.fillRect(at(4) + 4, 3, 1, 4); g.fillRect(at(4) + 5, 6, 4, 1); g.fillRect(at(4) + 8, 7, 1, 4)
 
       // 5: Wall with Torch
-      g.fillStyle(colors.wallBg); g.fillRect(at(5), 0, T, T)
-      g.fillStyle(colors.wallLine)
-      for (let y = 0; y < T; y += 4) g.fillRect(at(5), y, T, 1)
+      drawRaisedWall(at(5))
       // Torch bracket
       g.fillStyle(isDmg ? PAL.darkest : 0x201510); g.fillRect(at(5) + 7, 7, 2, 5)
       // Flame
@@ -75,9 +81,7 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(isDmg ? PAL.light : 0xffff00); g.fillRect(at(5) + 7, 5, 2, 2)
 
       // 6: Wall with Banner / Shield
-      g.fillStyle(colors.wallBg); g.fillRect(at(6), 0, T, T)
-      g.fillStyle(colors.wallLine)
-      for (let y = 0; y < T; y += 4) g.fillRect(at(6), y, T, 1)
+      drawRaisedWall(at(6))
       // Banner
       g.fillStyle(isDmg ? PAL.darkest : 0xaa2030); g.fillRect(at(6) + 5, 3, 6, 9)
       g.fillStyle(isDmg ? PAL.lightest : 0xffd700); g.fillRect(at(6) + 7, 5, 2, 5)

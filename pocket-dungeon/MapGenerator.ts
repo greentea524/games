@@ -136,33 +136,6 @@ export class MapGenerator {
       }
     }
 
-    // 7. Cull unnecessary walls into void (' ')
-    // A wall is unnecessary if it has NO adjacent floor/path/room tiles in its 8-neighborhood.
-    const newGrid = this.grid.map(row => [...row])
-    for (let y = 0; y < this.height; y++) {
-      for (let x = 0; x < this.width; x++) {
-        if (this.grid[y][x] === '#') {
-          let hasFloorNeighbor = false
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              const ny = y + dy
-              const nx = x + dx
-              if (ny >= 0 && ny < this.height && nx >= 0 && nx < this.width) {
-                const neighbor = this.grid[ny][nx]
-                if (neighbor !== '#' && neighbor !== ' ' && neighbor !== 'T' && neighbor !== 'B') {
-                  hasFloorNeighbor = true
-                }
-              }
-            }
-          }
-          if (!hasFloorNeighbor) {
-            newGrid[y][x] = ' '
-          }
-        }
-      }
-    }
-    this.grid = newGrid
-
     // Convert back to string array
     const resultGrid = this.grid.map(row => row.join(''))
 
