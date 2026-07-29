@@ -7,6 +7,7 @@ import { ShopScene } from './scenes/ShopScene'
 import { DungeonScene } from './scenes/DungeonScene'
 import { UIScene } from './scenes/UIScene'
 import { GameOverScene } from './scenes/GameOverScene'
+import { ensureCtx } from './audio'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -68,6 +69,7 @@ document.querySelectorAll('[data-key]').forEach((btn) => {
   const handlePress = (e: Event) => {
     e.preventDefault()
     btn.classList.add('active-kb')
+    ensureCtx()
     dispatchKey(code, 'keydown')
   }
 

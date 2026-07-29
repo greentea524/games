@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
 import { loadMeta, CLASSES, SHOP_ITEMS, unlockClass, purchaseShopItem, ClassName } from '../meta'
+import { sfx } from '../audio'
 
 interface MenuItem {
   type: 'class' | 'item'
@@ -101,7 +102,7 @@ export class ShopScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '6px', color: '#86b06a', resolution: 2,
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
 
-    backBtn.on('pointerdown', () => this.scene.start('title'))
+    backBtn.on('pointerdown', () => { sfx.menuCancel(); this.scene.start('title') })
     backBtn.on('pointerover', () => backBtn.setColor('#e0f8cf'))
     backBtn.on('pointerout', () => backBtn.setColor('#86b06a'))
 
@@ -113,20 +114,22 @@ export class ShopScene extends Phaser.Scene {
     const escKey = this.input.keyboard!.addKey('ESC')
 
     cursors.up.on('down', () => {
+      sfx.menuMove()
       this.cursor = (this.cursor - 1 + this.items.length) % this.items.length
       this.updateCursor()
     })
     cursors.down.on('down', () => {
+      sfx.menuMove()
       this.cursor = (this.cursor + 1) % this.items.length
       this.updateCursor()
     })
     enterKey.on('down', () => this.tryPurchase())
-    escKey.on('down', () => this.scene.start('title'))
+    escKey.on('down', () => { sfx.menuCancel(); this.scene.start('title') })
 
     const zKey = this.input.keyboard!.addKey('Z')
     const xKey = this.input.keyboard!.addKey('X')
     zKey.on('down', () => this.tryPurchase())
-    xKey.on('down', () => this.scene.start('title'))
+    xKey.on('down', () => { sfx.menuCancel(); this.scene.start('title') })
   }
 
   private updateCursor() {
@@ -151,6 +154,7 @@ export class ShopScene extends Phaser.Scene {
   private tryPurchase() {
     const item = this.items[this.cursor]
     if (!item || item.owned) {
+      sfx.menuCancel()
       this.infoText.setText('ALREADY OWNED')
       this.infoText.setColor('#888888')
       return
@@ -164,6 +168,7 @@ export class ShopScene extends Phaser.Scene {
     }
 
     if (success) {
+      sfx.pickup()
       item.owned = true
       const meta = loadMeta()
       this.goldText.setText(`${meta.gold} GOLD`)
@@ -171,6 +176,7 @@ export class ShopScene extends Phaser.Scene {
       this.infoText.setColor('#88ff88')
       this.updateCursor()
     } else {
+      sfx.menuCancel()
       this.infoText.setText('NOT ENOUGH GOLD')
       this.infoText.setColor('#ff8888')
     }

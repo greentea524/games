@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
 import { GameState } from '../state'
 import { loadMeta, CLASSES, ClassName } from '../meta'
+import { music, sfx, isMuted, setMuted } from '../audio'
 
 export class TitleScene extends Phaser.Scene {
   private classIndex = 0
@@ -96,6 +97,8 @@ export class TitleScene extends Phaser.Scene {
     this.updateClassDisplay()
     this.updateMenuCursor()
 
+    music.play('title')
+
     // ── Keyboard Input ──
     const cursors = this.input.keyboard!.createCursorKeys()
     const enterKey = this.input.keyboard!.addKey('ENTER')
@@ -104,24 +107,39 @@ export class TitleScene extends Phaser.Scene {
     cursors.left.on('down', () => this.cycleClass(-1))
     cursors.right.on('down', () => this.cycleClass(1))
     cursors.up.on('down', () => {
+      sfx.menuMove()
       this.menuIndex = (this.menuIndex - 1 + this.menuItems.length) % this.menuItems.length
       this.updateMenuCursor()
     })
     cursors.down.on('down', () => {
+      sfx.menuMove()
       this.menuIndex = (this.menuIndex + 1) % this.menuItems.length
       this.updateMenuCursor()
     })
-    enterKey.on('down', () => this.confirmMenu())
-    zKey.on('down', () => this.confirmMenu())
+    enterKey.on('down', () => {
+      sfx.menuSelect()
+      this.confirmMenu()
+    })
+    zKey.on('down', () => {
+      sfx.menuSelect()
+      this.confirmMenu()
+    })
+
+    const mKey = this.input.keyboard!.addKey('M')
+    mKey.on('down', () => {
+      setMuted(!isMuted())
+      if (!isMuted()) sfx.menuSelect()
+    })
 
     // ── Touch / Click Input ──
     this.arrowLeft.on('pointerdown', () => this.cycleClass(-1))
     this.arrowRight.on('pointerdown', () => this.cycleClass(1))
-    startBtn.on('pointerdown', () => this.startRun())
-    shopBtn.on('pointerdown', () => this.scene.start('shop'))
+    startBtn.on('pointerdown', () => { sfx.menuSelect(); this.startRun() })
+    shopBtn.on('pointerdown', () => { sfx.menuSelect(); this.scene.start('shop') })
   }
 
   private cycleClass(dir: number) {
+    sfx.menuMove()
     this.classIndex = (this.classIndex + dir + this.classKeys.length) % this.classKeys.length
     this.updateClassDisplay()
   }

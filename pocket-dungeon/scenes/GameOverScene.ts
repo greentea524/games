@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
 import { GameState } from '../state'
 import { recordRun, RunStats } from '../meta'
+import { music, sfx } from '../audio'
 
 export class GameOverScene extends Phaser.Scene {
   constructor() {
@@ -11,6 +12,7 @@ export class GameOverScene extends Phaser.Scene {
   create(data: { victory: boolean }) {
     this.cameras.main.setBackgroundColor('#0b0f0c')
 
+    music.stop()
     const victory = data?.victory ?? false
 
     // Record run stats
@@ -74,6 +76,7 @@ export class GameOverScene extends Phaser.Scene {
     continueBtn.on('pointerover', () => continueBtn.setColor('#ffffff'))
     continueBtn.on('pointerout', () => continueBtn.setColor('#e0f8cf'))
     continueBtn.on('pointerdown', () => {
+      sfx.menuSelect()
       this.scene.stop('ui')
       this.scene.start('title')
     })
@@ -81,6 +84,7 @@ export class GameOverScene extends Phaser.Scene {
     const enterKey = this.input.keyboard!.addKey('ENTER')
     const zKey = this.input.keyboard!.addKey('Z')
     const goBack = () => {
+      sfx.menuSelect()
       this.scene.stop('ui')
       this.scene.start('title')
     }

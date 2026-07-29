@@ -8,6 +8,7 @@ import {
   chaserAI, cowardAI, rangerAI, sleeperAI, splitterAI,
   ENEMY_DEFS,
 } from '../enemies'
+import { music, sfx, setMuted, isMuted } from '../audio'
 import { BossState, bossAI, getBossPhase } from '../boss'
 import { ItemDef, rollFloorItems, TurnSnapshot } from '../items'
 
@@ -65,6 +66,9 @@ export class DungeonScene extends Phaser.Scene {
     let touchStartY = 0
     let touchStartTime = 0
 
+    const mKey = this.input.keyboard!.addKey('M')
+    mKey.on('down', () => setMuted(!isMuted()))
+
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       touchStartX = pointer.x
       touchStartY = pointer.y
@@ -121,6 +125,12 @@ export class DungeonScene extends Phaser.Scene {
     const mode = GameState.paletteMode
     this.enemies = []
     this.rng = new RNG(GameState.seed + GameState.floorDepth)
+
+    if (GameState.floorDepth === 12) {
+      music.play('boss')
+    } else {
+      music.play('dungeon')
+    }
 
     const generator = new MapGenerator(this.mapWidth, this.mapHeight, GameState.seed + GameState.floorDepth)
     const { grid, startX, startY } = generator.generate(GameState.floorDepth)
@@ -354,6 +364,7 @@ export class DungeonScene extends Phaser.Scene {
         this.tryPickupItem(targetTX, targetTY)
 
         if (this.grid[targetTY][targetTX] === 'S') {
+          sfx.stairs()
           GameState.floorDepth++
           if (GameState.floorDepth > 12) {
             // Victory!
@@ -372,6 +383,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private executeMeleeAttack(enemy: EnemyInstance) {
+    sfx.attack()
     GameState.turnState = TurnState.ANIMATING
     const damage = GameState.playerAtk
     enemy.hp -= damage
@@ -502,6 +514,7 @@ export class DungeonScene extends Phaser.Scene {
         }
 
         if (action.type === 'attack') {
+          sfx.hit()
           const dmg = enemy.bossState.phase === 'desperate' ? enemy.atk * 2 : enemy.atk
           GameState.playerHp = Math.max(0, GameState.playerHp - dmg)
           this.showDamageText(this.player.x, this.player.y - 6, `-${dmg}`, '#ffcc00')
@@ -561,6 +574,7 @@ export class DungeonScene extends Phaser.Scene {
       }
 
       if (result.action === 'attack') {
+        sfx.hit()
         GameState.playerHp = Math.max(0, GameState.playerHp - enemy.atk)
         this.showDamageText(this.player.x, this.player.y - 6, `-${enemy.atk}`, '#ffcc00')
         this.tweens.add({
@@ -572,6 +586,7 @@ export class DungeonScene extends Phaser.Scene {
         })
       } else if (result.action === 'shoot') {
         // Ranged attack: deal damage from distance
+        sfx.hit()
         GameState.playerHp = Math.max(0, GameState.playerHp - enemy.atk)
         this.showDamageText(this.player.x, this.player.y - 6, `-${enemy.atk}`, '#ff8800')
         // Flash enemy to indicate shot
@@ -690,7 +705,8 @@ export class DungeonScene extends Phaser.Scene {
       GameState.inventory.add(def)
       this.showDamageText(this.player.x, this.player.y - 10, 'HOURGLASS', '#ffd700')
     }
-
+    
+    sfx.pickup()
     item.sprite.destroy()
     this.floorItems.splice(idx, 1)
   }
