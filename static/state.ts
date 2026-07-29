@@ -31,7 +31,7 @@ class GameStateClass {
   }
 
   paletteMode: 'dmg' | 'gbc' =
-    (localStorage.getItem('static_palette') as 'dmg' | 'gbc') || 'dmg'
+    (localStorage.getItem('static_palette') as 'dmg' | 'gbc') || 'gbc'
 
   setPaletteMode(mode: 'dmg' | 'gbc') {
     this.paletteMode = mode
