@@ -1,5 +1,5 @@
 let zzfxV = 0.3
-let zzfxX: AudioContext
+export let zzfxX: AudioContext
 
 export const zzfxInit = () => {
   if (!zzfxX) {
@@ -109,3 +109,111 @@ export const playWin = () => {
 }
 export const playMenuSelect = () => zzfx(0.5,0.05,600,0,0,0.02,0,1,0,0,0,0,0,0,0,0,0,1,0,0)
 export const playMenuConfirm = () => zzfx(1,0.05,900,0,0.05,0.05,0,1,0,0,0,0,0,0,0,0,0,1,0,0)
+
+let master: GainNode | null = null
+let muted = localStorage.getItem('cartcrate_muted') === '1'
+
+export function ensureCtx(): AudioContext | null {
+  zzfxInit()
+  if (!zzfxX) return null
+  if (!master) {
+    master = zzfxX.createGain()
+    master.gain.value = muted ? 0 : 1
+    master.connect(zzfxX.destination)
+  }
+  return zzfxX
+}
+
+export function isMuted(): boolean { return muted }
+export function setMuted(m: boolean) {
+  muted = m
+  localStorage.setItem('cartcrate_muted', m ? '1' : '0')
+  if (master) master.gain.value = m ? 0 : 1
+}
+
+let musicBus: GainNode | null = null
+let musicTimer: number | null = null
+let currentTrack: string | null = null
+
+function bus(): GainNode | null {
+  const c = ensureCtx()
+  if (!c || !master) return null
+  if (!musicBus) {
+    musicBus = c.createGain()
+    musicBus.gain.value = 0.3
+    musicBus.connect(master)
+  }
+  return musicBus
+}
+
+function musicNote(f: number, dur: number, at: number, wave: OscillatorType, vol: number) {
+  if (f === 0) return
+  const c = ensureCtx()
+  const b = bus()
+  if (!c || !b) return
+  const osc = c.createOscillator()
+  const g = c.createGain()
+  osc.type = wave
+  osc.frequency.value = f
+  osc.connect(g)
+  g.connect(b)
+  g.gain.setValueAtTime(0, at)
+  g.gain.linearRampToValueAtTime(vol, at + 0.05)
+  g.gain.exponentialRampToValueAtTime(0.001, at + dur * 0.95)
+  osc.start(at)
+  osc.stop(at + dur)
+}
+
+type MNote = { f: number; d: number }
+const LEAD: MNote[] = [
+  { f: 392, d: 0.5 }, { f: 440, d: 0.25 }, { f: 493.88, d: 0.75 }, { f: 0, d: 0.5 },
+  { f: 329.63, d: 0.5 }, { f: 392, d: 0.25 }, { f: 440, d: 0.75 }, { f: 0, d: 0.5 }
+]
+const BASS: MNote[] = [
+  { f: 196, d: 0.5 }, { f: 0, d: 0.5 }, { f: 164.81, d: 0.5 }, { f: 0, d: 0.5 },
+  { f: 146.83, d: 0.5 }, { f: 0, d: 0.5 }, { f: 130.81, d: 0.5 }, { f: 0, d: 0.5 }
+]
+
+const TRACKS: Record<string, { lead: OscillatorType; bass: OscillatorType; tempo: number; l: MNote[]; b: MNote[] }> = {
+  puzzle: { lead: 'sine', bass: 'triangle', tempo: 0.8, l: LEAD, b: BASS }
+}
+
+export const music = {
+  play(name: 'puzzle') {
+    if (currentTrack === name) return
+    this.stop()
+    const c = ensureCtx()
+    const cfg = TRACKS[name]
+    if (!c || !cfg) return
+    currentTrack = name
+    let leadStep = 0, bassStep = 0
+    let leadT = c.currentTime + 0.1
+    let bassT = c.currentTime + 0.1
+    const tick = () => {
+      if (currentTrack !== name) return
+      const horizon = c.currentTime + 0.25
+      while (leadT < horizon) {
+        const n = cfg.l[leadStep % cfg.l.length]
+        musicNote(n.f, n.d * cfg.tempo, leadT, cfg.lead, 0.08)
+        leadT += n.d * cfg.tempo
+        leadStep++
+      }
+      while (bassT < horizon) {
+        const n = cfg.b[bassStep % cfg.b.length]
+        musicNote(n.f, n.d * cfg.tempo, bassT, cfg.bass, 0.08)
+        bassT += n.d * cfg.tempo
+        bassStep++
+      }
+    }
+    tick()
+    musicTimer = window.setInterval(tick, 60)
+  },
+  stop() {
+    currentTrack = null
+    if (musicTimer !== null) {
+      clearInterval(musicTimer)
+      musicTimer = null
+    }
+  },
+  get current() { return currentTrack }
+}

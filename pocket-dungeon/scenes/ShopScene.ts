@@ -53,11 +53,11 @@ export class ShopScene extends Phaser.Scene {
 
     // ── Title ──
     this.add.text(GBC_WIDTH / 2, 6, 'SHOP', {
-      fontFamily: FONT, fontSize: '10px', color: '#ffd700', resolution: 2,
+      fontFamily: FONT, fontSize: '10px', color: '#ffd700', resolution: 4,
     }).setOrigin(0.5, 0)
 
     this.goldText = this.add.text(GBC_WIDTH / 2, 20, `${meta.gold} GOLD`, {
-      fontFamily: FONT, fontSize: '7px', color: '#ffd700', resolution: 2,
+      fontFamily: FONT, fontSize: '7px', color: '#ffd700', resolution: 4,
     }).setOrigin(0.5, 0)
 
     // ── Divider ──
@@ -71,7 +71,7 @@ export class ShopScene extends Phaser.Scene {
     for (let i = 0; i < this.items.length; i++) {
       const txt = this.add.text(16, startY + i * rowH, '', {
         fontFamily: FONT, fontSize: '6px',
-        color: '#e0f8cf', resolution: 2,
+        color: '#e0f8cf', resolution: 4,
       }).setInteractive({ useHandCursor: true })
 
       txt.on('pointerdown', () => {
@@ -88,18 +88,18 @@ export class ShopScene extends Phaser.Scene {
     descDiv.fillStyle(0x506850); descDiv.fillRect(20, 105, GBC_WIDTH - 40, 1)
 
     this.descText = this.add.text(GBC_WIDTH / 2, 109, '', {
-      fontFamily: FONT, fontSize: '5px', color: '#7a9a62', resolution: 2,
+      fontFamily: FONT, fontSize: '5px', color: '#7a9a62', resolution: 4,
       wordWrap: { width: 136 }, align: 'center',
     }).setOrigin(0.5, 0)
 
     // ── Feedback Text ──
     this.infoText = this.add.text(GBC_WIDTH / 2, 126, '', {
-      fontFamily: FONT, fontSize: '6px', color: '#ff8888', resolution: 2,
+      fontFamily: FONT, fontSize: '6px', color: '#ff8888', resolution: 4,
     }).setOrigin(0.5, 0)
 
     // ── Back Button ──
     const backBtn = this.add.text(GBC_WIDTH / 2, 138, '\u25C0 BACK', {
-      fontFamily: FONT, fontSize: '6px', color: '#86b06a', resolution: 2,
+      fontFamily: FONT, fontSize: '6px', color: '#86b06a', resolution: 4,
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
 
     backBtn.on('pointerdown', () => { sfx.menuCancel(); this.scene.start('title') })

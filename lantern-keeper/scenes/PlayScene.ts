@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { sfx } from '../audio'
+import { sfx, music, isMuted, setMuted } from '../audio'
 import {
   GBC_WIDTH,
   GBC_HEIGHT,
@@ -81,6 +81,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   create() {
+    music.play('adventure')
     this.cameras.main.fadeIn(500, 0, 0, 0)
     
     this.won = false
@@ -198,6 +199,9 @@ export class PlayScene extends Phaser.Scene {
     this.dashKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X)
     this.jumpKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z)
     this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER)
+
+    const mKey = this.input.keyboard!.addKey('M')
+    mKey.on('down', () => setMuted(!isMuted()))
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
 

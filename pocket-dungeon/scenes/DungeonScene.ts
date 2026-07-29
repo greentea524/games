@@ -141,7 +141,7 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, this.mapWidth * TILE, this.mapHeight * TILE)
 
     const biome = getBiome(GameState.floorDepth)
-    const tileKey = mode === 'dmg' ? 'tiles_dmg' : `tiles_gbc_${biome}`
+    const tileKey = mode === 'dmg' ? 'tiles_dmg_v2' : `tiles_gbc_${biome}_v2`
 
     // Initialize explored grid & fog layer
     this.explored = Array.from({ length: this.mapHeight }, () => Array(this.mapWidth).fill(false))

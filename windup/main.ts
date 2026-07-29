@@ -5,6 +5,7 @@ import { BootScene } from './scenes/BootScene'
 import { MainMenuScene } from './scenes/MainMenuScene'
 import { PlatformerScene } from './scenes/PlatformerScene'
 import { UIScene } from './scenes/UIScene'
+import { PauseScene } from './scenes/PauseScene'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, MainMenuScene, PlatformerScene, UIScene],
+  scene: [BootScene, MainMenuScene, PlatformerScene, UIScene, PauseScene],
 }
 
 export const game = new Phaser.Game(config)

@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { TILE, GBC_WIDTH, GBC_HEIGHT } from '../constants'
 import { GameState } from '../state'
 import { LEVELS } from '../levels'
+import { sfx, music } from '../audio'
 
 type Facing = 'left' | 'right'
 
@@ -41,10 +42,21 @@ export class PlatformerScene extends Phaser.Scene {
     if (!this.scene.isActive('ui')) {
       this.scene.launch('ui')
     }
+
+    const pauseHandler = () => {
+      sfx.play('jump')
+      this.scene.pause('platformer')
+      this.scene.launch('pause')
+    }
+    
+    this.input.keyboard!.on('keydown-ENTER', pauseHandler)
+    this.input.keyboard!.on('keydown-ESC', pauseHandler)
   }
 
   renderLevel() {
     const mode = GameState.paletteMode
+
+    music.play('game')
     this.platforms = this.physics.add.staticGroup()
     this.springs = this.physics.add.staticGroup()
     this.movingPlatforms = this.physics.add.group({ allowGravity: false, immovable: true })
@@ -138,6 +150,7 @@ export class PlatformerScene extends Phaser.Scene {
         GameState.levelIndex = 1
         GameState.speedrunTimeMillis = 0
         GameState.saveGame()
+        sfx.win()
         this.scene.restart()
       })
       return
@@ -154,6 +167,7 @@ export class PlatformerScene extends Phaser.Scene {
 
     this.cameras.main.fadeOut(800)
     this.cameras.main.once('camerafadeoutcomplete', () => {
+      sfx.win()
       this.scene.restart()
     })
   }
@@ -247,6 +261,7 @@ export class PlatformerScene extends Phaser.Scene {
         this.player.setVelocityY(-170)
         this.coyoteTimer = 0
         GameState.drainEnergy(5) // Extra jump cost
+        sfx.jump()
       } else if (isWalled) {
         // Wall Jump
         this.player.setVelocityY(-170)
@@ -254,6 +269,7 @@ export class PlatformerScene extends Phaser.Scene {
         this.facing = isWalledLeft ? 'right' : 'left'
         this.wallJumpTimer = time + 250 // Lock out D-pad for 250ms
         GameState.drainEnergy(5)
+        sfx.jump()
       }
     }
 
@@ -271,6 +287,7 @@ export class PlatformerScene extends Phaser.Scene {
     station.setTexture(`station_empty_${mode}`)
 
     if (GameState.energy < GameState.maxEnergy) {
+      sfx.wind()
       GameState.refillEnergy()
       GameState.checkpointX = station.x
       GameState.checkpointY = station.y - 12
@@ -278,6 +295,7 @@ export class PlatformerScene extends Phaser.Scene {
   }
 
   private respawnAtCheckpoint() {
+    sfx.hit()
     GameState.refillEnergy()
     this.player.setPosition(GameState.checkpointX, GameState.checkpointY)
     this.player.setVelocity(0, 0)

@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH } from '../constants'
+import { music, isMuted, setMuted } from '../audio'
 
 export class MenuScene extends Phaser.Scene {
   private selectedIndex = 0;
@@ -18,6 +19,7 @@ export class MenuScene extends Phaser.Scene {
   create() {
     this.inputCooldownUntil = this.time.now + 200
     this.cameras.main.setBackgroundColor('#0f1a12')
+    music.play('adventure')
 
     // Title
     const titleText = this.add.text(GBC_WIDTH / 2, 18, 'LANTERN KEEPER', {
@@ -109,6 +111,9 @@ export class MenuScene extends Phaser.Scene {
     aboutOptionText.setInteractive().on('pointerdown', () => {
       if (this.viewMode === 'menu') this.showAbout();
     });
+
+    const mKey = this.input.keyboard!.addKey('M')
+    mKey.on('down', () => setMuted(!isMuted()))
   }
   
   updateSelection() {
@@ -156,6 +161,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   handleKey(event: KeyboardEvent) {
+    if (event.code === 'KeyM') return;
     if (this.time.now < this.inputCooldownUntil) return;
 
     if (this.viewMode === 'controls') {

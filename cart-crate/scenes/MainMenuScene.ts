@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, FONT, PAL } from '../constants'
 import { GameState } from '../state'
+import { music, isMuted, setMuted } from '../audio'
 
 export class MainMenuScene extends Phaser.Scene {
   private blinkText!: Phaser.GameObjects.Text
@@ -48,7 +49,12 @@ export class MainMenuScene extends Phaser.Scene {
       this.canStart = true
     })
 
+    music.play('puzzle')
+
     this.input.on('pointerdown', () => this.startGame())
+    
+    const mKey = this.input.keyboard!.addKey('M')
+    mKey.on('down', () => setMuted(!isMuted()))
   }
 
   update() {

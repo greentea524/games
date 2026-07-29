@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHT, CSS_LIGHTEST, CSS_DARKEST, CSS_MID, PAL, GBC_PAL } from '../constants'
 import { GameState } from '../state'
+import { music, sfx, isMuted, setMuted } from '../audio'
 
 export class MainMenuScene extends Phaser.Scene {
   private selectedIndex = 0
@@ -77,9 +78,13 @@ export class MainMenuScene extends Phaser.Scene {
         this.selectOption()
       }
     })
+
+    const mKey = this.input.keyboard!.addKey('M')
+    mKey.on('down', () => setMuted(!isMuted()))
   }
 
   private backToMenu() {
+    sfx.menuSelect()
     this.viewState = 'menu'
     this.infoText.setVisible(false)
     this.menuTexts.forEach(t => t.setVisible(true))
@@ -95,13 +100,17 @@ export class MainMenuScene extends Phaser.Scene {
     }
 
     if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+      sfx.menuSelect()
       this.selectedIndex = (this.selectedIndex - 1 + this.menuItems.length) % this.menuItems.length
       this.updateCursor()
     } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+      sfx.menuSelect()
       this.selectedIndex = (this.selectedIndex + 1) % this.menuItems.length
       this.updateCursor()
     } else if (e.code === 'KeyZ' || e.code === 'Enter' || e.code === 'Space') {
       this.selectOption()
+    } else if (e.code === 'KeyM') {
+      setMuted(!isMuted())
     }
   }
 
@@ -123,6 +132,7 @@ export class MainMenuScene extends Phaser.Scene {
 
   private selectOption() {
     const option = this.menuItems[this.selectedIndex]
+    sfx.menuSelect()
     
     if (option === 'CONTINUE') {
       this.scene.start('platformer')

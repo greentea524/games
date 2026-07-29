@@ -99,30 +99,35 @@ export class BootScene extends Phaser.Scene {
 
       g.generateTexture(key, T * 9, T)
       g.destroy()
+
+      const tex = this.textures.get(key)
+      for (let i = 0; i < 9; i++) {
+        tex.add(i, 0, i * T, 0, T, T)
+      }
     }
 
     if (mode === 'dmg') {
-      build('tiles_dmg', {
+      build('tiles_dmg_v2', {
         floorBg: PAL.lightest, floorDetail: PAL.light,
         wallBg: PAL.dark, wallLine: PAL.darkest,
         stairsBg: PAL.dark
       }, true)
     } else {
-      build('tiles_gbc_cellar', {
+      build('tiles_gbc_cellar_v2', {
         floorBg: GBC_PAL.floorBg, floorDetail: GBC_PAL.floorDetail,
         wallBg: GBC_PAL.wallBg, wallLine: GBC_PAL.wallLine,
         stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep,
         pathBg: 0x1d1626, pathLine: 0x3d304a, rugColor: 0x882035,
       }, false)
       
-      build('tiles_gbc_catacomb', {
+      build('tiles_gbc_catacomb_v2', {
         floorBg: GBC_PAL.catacombFloorBg, floorDetail: GBC_PAL.catacombFloorDetail,
         wallBg: GBC_PAL.catacombWallBg, wallLine: GBC_PAL.catacombWallLine,
         stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep,
         pathBg: 0x302418, pathLine: 0x584028, rugColor: 0x904020,
       }, false)
       
-      build('tiles_gbc_vault', {
+      build('tiles_gbc_vault_v2', {
         floorBg: GBC_PAL.vaultFloorBg, floorDetail: GBC_PAL.vaultFloorDetail,
         wallBg: GBC_PAL.vaultWallBg, wallLine: GBC_PAL.vaultWallLine,
         stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep,

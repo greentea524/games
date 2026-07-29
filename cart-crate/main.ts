@@ -155,9 +155,9 @@ if (paletteBtn) {
   updatePaletteBtn()
 }
 
-import { zzfxInit } from './audio'
+import { ensureCtx } from './audio'
 const initAudio = () => {
-  zzfxInit()
+  ensureCtx()
   document.removeEventListener('click', initAudio)
   document.removeEventListener('keydown', initAudio)
   document.removeEventListener('touchstart', initAudio)

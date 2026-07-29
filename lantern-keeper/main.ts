@@ -3,6 +3,7 @@ import { BootScene } from './scenes/BootScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PlayScene } from './scenes/PlayScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
+import { ensureCtx } from './audio'
 
 function integerZoom(): number {
   const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -271,3 +272,13 @@ document.addEventListener('touchstart', (event) => {
     event.preventDefault()
   }
 }, { passive: false })
+
+const initAudio = () => {
+  ensureCtx()
+  document.removeEventListener('click', initAudio)
+  document.removeEventListener('keydown', initAudio)
+  document.removeEventListener('touchstart', initAudio)
+}
+document.addEventListener('click', initAudio, { once: true })
+document.addEventListener('keydown', initAudio, { once: true })
+document.addEventListener('touchstart', initAudio, { once: true, passive: true })
