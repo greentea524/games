@@ -165,6 +165,7 @@ export class WorldScene extends Phaser.Scene {
     )
 
     this.player = this.physics.add.sprite(sx, sy, `kid_${mode}_${facing}_0`)
+    this.player.setDepth(10)
     this.player.setCollideWorldBounds(true)
     // A slightly slimmer body than the sprite so movement feels roomy.
     this.player.body.setSize(10, 10).setOffset(3, 5)
@@ -212,6 +213,7 @@ export class WorldScene extends Phaser.Scene {
         o.y! + TILE / 2,
         `npc_${mode}_${def.id}_down`,
       ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      sprite.setDepth(10)
       sprite.body.setSize(12, 12).setOffset(2, 3)
       this.npcs.push({ sprite, def, facing: 'down' })
     }
@@ -345,7 +347,9 @@ export class WorldScene extends Phaser.Scene {
   private placeDecorations(mode: string) {
     if (this.mapKey === 'house' || this.mapKey === 'house2') {
       // Bed top left corner
-      this.add.image(2 * TILE, 2 * TILE, `prop_bed_${mode}`).setOrigin(0, 0)
+      const bed = this.physics.add.staticImage(2 * TILE, 2 * TILE, `prop_bed_${mode}`).setOrigin(0, 0)
+      bed.body.setSize(32, 32)
+      this.physics.add.collider(this.player, bed)
       
       // Rug in middle
       this.add.image(4 * TILE, 4 * TILE, `prop_rug_${mode}`).setOrigin(0, 0)
