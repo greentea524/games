@@ -42,6 +42,22 @@ const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
     bubbles: true,
     cancelable: true,
   })
+
+  const keyCodeMap: Record<string, number> = {
+    ArrowUp: 38,
+    ArrowDown: 40,
+    ArrowLeft: 37,
+    ArrowRight: 39,
+    KeyZ: 90,
+    KeyX: 88,
+    KeyR: 82,
+    KeyE: 69,
+    Enter: 13,
+    Escape: 27,
+  }
+  Object.defineProperty(event, 'keyCode', { get: () => keyCodeMap[code] || 0 })
+  Object.defineProperty(event, 'which', { get: () => keyCodeMap[code] || 0 })
+
   window.dispatchEvent(event)
 }
 
