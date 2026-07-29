@@ -118,6 +118,50 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(11, 7, 1, 2); g.fillRect(9, 7, 1, 2)
     tex(`item_${mode}_ren_key`, 16, 16)
 
+    // DECORATIONS
+    // prop_bed 32x32
+    g.fillStyle(p.wood); g.fillRect(2, 2, 28, 28) // bed frame
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : 0xf0f0f0); g.fillRect(4, 10, 24, 18) // mattress/sheets
+    g.fillStyle(mode === 'dmg' ? PAL.light : 0xd0d0d0); g.fillRect(4, 4, 24, 6) // pillow
+    tex(`prop_bed_${mode}`, 32, 32)
+
+    // prop_rug 32x32
+    g.fillStyle(mode === 'dmg' ? PAL.dark : 0x904040); g.fillRect(0, 0, 32, 32)
+    g.fillStyle(mode === 'dmg' ? PAL.light : 0xc06060)
+    for (let i = 2; i < 30; i += 4) { g.fillRect(i, 2, 2, 28); g.fillRect(2, i, 28, 2) }
+    tex(`prop_rug_${mode}`, 32, 32)
+
+    // prop_bookshelf 16x32
+    g.fillStyle(p.wood); g.fillRect(0, 0, 16, 32)
+    g.fillStyle(p.stoneDark); g.fillRect(2, 2, 12, 28)
+    g.fillStyle(p.wood); g.fillRect(2, 10, 12, 2); g.fillRect(2, 20, 12, 2)
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : 0x404090); g.fillRect(3, 4, 2, 6); g.fillRect(10, 13, 3, 7) // books
+    g.fillStyle(mode === 'dmg' ? PAL.light : 0x904040); g.fillRect(6, 5, 2, 5); g.fillRect(4, 15, 2, 5)
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : 0x409040); g.fillRect(7, 23, 2, 7)
+    tex(`prop_bookshelf_${mode}`, 16, 32)
+
+    // prop_plant 16x16
+    g.fillStyle(p.wood); g.fillRect(4, 10, 8, 6)
+    g.fillStyle(mode === 'dmg' ? PAL.darkest : GBC_PAL.treeDark); g.fillCircle(8, 6, 5)
+    g.fillStyle(mode === 'dmg' ? PAL.dark : GBC_PAL.treeOutline); g.fillCircle(7, 5, 3)
+    tex(`prop_plant_${mode}`, 16, 16)
+
+    // prop_bush 16x16
+    g.fillStyle(mode === 'dmg' ? PAL.darkest : GBC_PAL.treeDark); g.fillCircle(8, 8, 7)
+    g.fillStyle(mode === 'dmg' ? PAL.dark : GBC_PAL.treeOutline); g.fillCircle(6, 6, 4); g.fillCircle(10, 10, 3)
+    tex(`prop_bush_${mode}`, 16, 16)
+
+    // prop_fence 16x16
+    g.fillStyle(p.wood)
+    g.fillRect(2, 4, 2, 12); g.fillRect(12, 4, 2, 12)
+    g.fillRect(0, 8, 16, 2)
+    tex(`prop_fence_${mode}`, 16, 16)
+
+    // prop_flower 16x16
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : GBC_PAL.flowerBloom)
+    g.fillCircle(4, 4, 2); g.fillCircle(12, 8, 2); g.fillCircle(6, 12, 2)
+    tex(`prop_flower_${mode}`, 16, 16)
+
     g.destroy()
   }
 

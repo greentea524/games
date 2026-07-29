@@ -258,6 +258,7 @@ export class WorldScene extends Phaser.Scene {
       })
     }
     this.spawnPhase3Props(mode)
+    this.placeDecorations(mode)
     this.groundLayer = ground
     this.applyStoryState(ground, mode)
 
@@ -339,6 +340,48 @@ export class WorldScene extends Phaser.Scene {
     GameState.dialogueActive = true
     ;(this.scene.get('ui') as UIScene).startDialogue(def)
     this.player.setVelocity(0, 0)
+  }
+  // Add decorative props to the map based on the mapKey
+  private placeDecorations(mode: string) {
+    if (this.mapKey === 'house' || this.mapKey === 'house2') {
+      // Bed top left corner
+      this.add.image(2 * TILE, 2 * TILE, `prop_bed_${mode}`).setOrigin(0, 0)
+      
+      // Rug in middle
+      this.add.image(4 * TILE, 4 * TILE, `prop_rug_${mode}`).setOrigin(0, 0)
+      
+      // Bookshelf top right
+      const shelf = this.physics.add.staticImage(8 * TILE, 2 * TILE, `prop_bookshelf_${mode}`).setOrigin(0, 0)
+      shelf.body.setSize(16, 32)
+      this.physics.add.collider(this.player, shelf)
+      
+      // Plant bottom left
+      const plant = this.physics.add.staticImage(2 * TILE, 7 * TILE, `prop_plant_${mode}`).setOrigin(0, 0)
+      plant.body.setSize(16, 16)
+      this.physics.add.collider(this.player, plant)
+    } else if (this.mapKey === 'town' || this.mapKey === 'town_static') {
+      // Add bushes
+      const bushCoords = [[5, 5], [6, 15], [25, 4], [28, 20], [15, 25]]
+      for (const [bx, by] of bushCoords) {
+        const bush = this.physics.add.staticImage(bx * TILE, by * TILE, `prop_bush_${mode}`).setOrigin(0, 0)
+        bush.body.setSize(16, 16)
+        this.physics.add.collider(this.player, bush)
+      }
+      
+      // Add flowers
+      const flwCoords = [[8, 6], [9, 6], [7, 7], [22, 10], [23, 11], [14, 28], [15, 29]]
+      for (const [fx, fy] of flwCoords) {
+        this.add.image(fx * TILE, fy * TILE, `prop_flower_${mode}`).setOrigin(0, 0)
+      }
+      
+      // Add a small fence near Gus's hut (x0: 2, y0: 11)
+      const fenceCoords = [[1, 14], [2, 14], [4, 14], [5, 14], [1, 15], [5, 15]]
+      for (const [fx, fy] of fenceCoords) {
+        const f = this.physics.add.staticImage(fx * TILE, fy * TILE, `prop_fence_${mode}`).setOrigin(0, 0)
+        f.body.setSize(16, 16)
+        this.physics.add.collider(this.player, f)
+      }
+    }
   }
 
   // Phase 3 (#15) conditional props: fountain (both worlds), the valve

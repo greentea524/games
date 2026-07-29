@@ -145,7 +145,8 @@ export class DungeonScene extends Phaser.Scene {
         const py = y * TILE + TILE / 2
 
         let frameIndex = 0
-        if (char === '#') frameIndex = 1
+        if (char === ' ') frameIndex = -1
+        else if (char === '#') frameIndex = 1
         else if (char === 'T') frameIndex = 5
         else if (char === 'B') frameIndex = 6
         else if (char === 'S') frameIndex = 2
@@ -155,7 +156,9 @@ export class DungeonScene extends Phaser.Scene {
         else if (char === 'b') frameIndex = 8
         else frameIndex = 0
 
-        this.add.image(px, py, tileKey, frameIndex)
+        if (frameIndex !== -1) {
+          this.add.image(px, py, tileKey, frameIndex)
+        }
 
         // Fog layer overlay
         const fog = this.add.rectangle(px, py, TILE, TILE, 0x050806).setDepth(15).setAlpha(0.95)
@@ -316,8 +319,8 @@ export class DungeonScene extends Phaser.Scene {
       return
     }
 
-    // Check wall collision
-    if (this.grid[targetTY][targetTX] === '#') {
+    // Check wall/void collision
+    if (this.grid[targetTY][targetTX] === '#' || this.grid[targetTY][targetTX] === ' ') {
       this.player.setTexture(`hero_${mode}_${this.facing}`)
       return
     }
@@ -424,7 +427,7 @@ export class DungeonScene extends Phaser.Scene {
       const nx = parent.tx + off.dx
       const ny = parent.ty + off.dy
       if (nx >= 0 && nx < this.mapWidth && ny >= 0 && ny < this.mapHeight &&
-          this.grid[ny][nx] !== '#' &&
+          this.grid[ny][nx] !== '#' && this.grid[ny][nx] !== ' ' &&
           !this.enemies.some(e => e.tx === nx && e.ty === ny && e.hp > 0) &&
           !(nx === this.playerTX && ny === this.playerTY)) {
         const px = nx * TILE + TILE / 2
@@ -619,7 +622,7 @@ export class DungeonScene extends Phaser.Scene {
       const nx = boss.tx + off.dx
       const ny = boss.ty + off.dy
       if (nx >= 0 && nx < this.mapWidth && ny >= 0 && ny < this.mapHeight &&
-          this.grid[ny][nx] !== '#' &&
+          this.grid[ny][nx] !== '#' && this.grid[ny][nx] !== ' ' &&
           !this.enemies.some(e => e.tx === nx && e.ty === ny && e.hp > 0) &&
           !(nx === this.playerTX && ny === this.playerTY)) {
         const px = nx * TILE + TILE / 2
@@ -779,6 +782,8 @@ export class DungeonScene extends Phaser.Scene {
       this.showDamageText(px, py - 8, 'SCATTERED BONES', '#e0d8c0')
     } else if (char === '#') {
       this.showDamageText(px, py - 8, 'DUNGEON WALL', '#aaaaaa')
+    } else if (char === ' ') {
+      this.showDamageText(px, py - 8, 'THE VOID\nImpassable darkness', '#555555')
     } else {
       this.showDamageText(px, py - 8, 'DUNGEON FLOOR', '#668866')
     }
