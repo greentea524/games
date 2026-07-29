@@ -157,9 +157,9 @@ const isDesktop = () =>
   window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
 let paused = false
-let view: 'pause' | 'controls' | 'about' = 'pause'
+let view: 'pause' | 'controls' | 'about' | 'walkthrough' = 'pause'
 let controlsMode: 'keyboard' | 'touch' = 'keyboard'
-const pauseItems = ['Resume', 'About', 'Inventory', 'Sound', 'Controls']
+const pauseItems = ['Resume', 'Walkthrough', 'About', 'Inventory', 'Sound', 'Controls']
 let selected = 0
 
 // 'Sound' shows its live state in the label.
@@ -254,6 +254,31 @@ function renderControls() {
     renderPause()
   })
 }
+function renderWalkthrough() {
+  if (!overlayText) return
+  view = 'walkthrough'
+  overlayText.innerHTML = `
+    <h2 style="font-size:10px;">WALKTHROUGH</h2>
+    <div style="font-size:6px; color:#8bac0f; text-align:left; line-height:1.6; margin-top:4px; max-height:80px; overflow-y:auto; padding-right:4px; margin-bottom:8px;">
+      1. Talk to Mom to get the Flashlight.<br/>
+      2. See the Baker's vanished house (bottom-left).<br/>
+      3. Talk to Ren about the vanished house.<br/>
+      4. Go through a TV to the Static Side.<br/>
+      5. Give the frozen Baker a Fresh Flower (found by Gus's hut).<br/>
+      6. Gus's hut vanishes. Talk to Gus.<br/>
+      7. Notice the vanishing pattern; Ren is next.<br/>
+      8. Warn Ren, get their Key.<br/>
+      9. Find the beacon at Ren's house on the Static Side.<br/>
+      10. Lock Ren's door in the real world to anchor it.<br/>
+      11. Go home and enter the TV for the final choice.
+    </div>
+    <div>
+      <button id="wt-back" class="overlay-btn">Back</button>
+    </div>`
+  document.getElementById('wt-back')?.addEventListener('click', () => {
+    renderPause()
+  })
+}
 
 function activateSelected() {
   sfx.menuSelect()
@@ -263,6 +288,8 @@ function activateSelected() {
     setMuted(!isMuted())
     if (!isMuted()) sfx.menuSelect() // audible confirmation when unmuting
     updateSelection()
+  } else if (pauseItems[selected] === 'Walkthrough') {
+    renderWalkthrough()
   } else if (pauseItems[selected] === 'About') {
     renderAbout()
   } else if (pauseItems[selected] === 'Inventory') {
@@ -323,7 +350,7 @@ window.addEventListener('keydown', (e) => {
     return
   }
   e.preventDefault()
-  if (view === 'controls' || view === 'about') {
+  if (view === 'controls' || view === 'about' || view === 'walkthrough') {
     if (
       ['Escape', 'Enter', 'z', 'Z', 'x', 'X', 'KeyZ', 'KeyX'].includes(e.key) ||
       ['Escape', 'Enter', 'KeyZ', 'KeyX'].includes(e.code)
