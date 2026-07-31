@@ -39,6 +39,26 @@ export class TitleScene extends Phaser.Scene {
       resolution: 4, align: 'center',
     }).setOrigin(0.5, 0)
 
+    // Sprite preview: hero flanked by a dungeon threat, in the title's side margins
+    const heroPreview = this.add.sprite(20, 16, `hero_${GameState.paletteMode}_down`).setScale(1.4)
+    const ratPreview = this.add.sprite(140, 16, `rat_${GameState.paletteMode}`).setScale(1.2)
+    this.tweens.add({
+      targets: heroPreview,
+      y: '+=2',
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+    this.tweens.add({
+      targets: ratPreview,
+      x: '+=2',
+      duration: 350,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+
     // ── Divider Line ──
     const divider = this.add.graphics()
     divider.fillStyle(0x506850); divider.fillRect(20, 33, GBC_WIDTH - 40, 1)

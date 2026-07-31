@@ -45,6 +45,16 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
+    // Sprite preview: the kid, with the static-side entity flickering nearby
+    const mode = GameState.paletteMode
+    this.add.sprite(GBC_WIDTH / 2 - 18, 76, `kid_${mode}_down_0`).setScale(2).play(`walk_${mode}_down`)
+    const entityPreview = this.add.sprite(GBC_WIDTH / 2 + 18, 75, 'entity').setScale(1.6)
+    this.time.addEvent({
+      delay: 180,
+      loop: true,
+      callback: () => entityPreview.setAlpha(Phaser.Math.FloatBetween(0.4, 1)),
+    })
+
     this.labels = GameState.hasSave() ? ['Continue', 'New Game'] : ['New Game']
     this.selected = 0
     this.options = this.labels.map((label, i) =>

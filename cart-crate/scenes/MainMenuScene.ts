@@ -30,6 +30,28 @@ export class MainMenuScene extends Phaser.Scene {
       resolution: 2,
     }).setOrigin(0.5)
 
+    // Sprite preview: the courier fox pushing a crate onto its target
+    const mode = GameState.paletteMode
+    const keyPrefix = mode === 'gbc' ? '_w1' : ''
+    const targetPreview = this.add.sprite(GBC_WIDTH / 2 + 20, 80, `target_${mode}${keyPrefix}`).setScale(1.8)
+    const cratePreview = this.add.sprite(GBC_WIDTH / 2, 80, `crate_${mode}${keyPrefix}`).setScale(1.8)
+    this.add.sprite(GBC_WIDTH / 2 - 22, 80, `player_${mode}_right`).setScale(1.8)
+    this.tweens.add({
+      targets: cratePreview,
+      x: '+=4',
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+    this.tweens.add({
+      targets: targetPreview,
+      alpha: { from: 0.5, to: 1 },
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+    })
+
     this.blinkText = this.add.text(GBC_WIDTH / 2, 100, 'PRESS START', {
       fontFamily: FONT,
       fontSize: '8px',

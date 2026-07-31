@@ -27,6 +27,26 @@ export class MainMenuScene extends Phaser.Scene {
       resolution: 2,
     }).setOrigin(0.5).setShadow(2, 2, GameState.paletteMode === 'dmg' ? CSS_DARKEST : '#184888', 0, false, true)
 
+    // Sprite preview: the windup toy beside the energy station it recharges at
+    const mode = GameState.paletteMode
+    const robotPreview = this.add.sprite(GBC_WIDTH / 2 - 14, 58, `windup_${mode}_right`).setScale(2)
+    const stationPreview = this.add.sprite(GBC_WIDTH / 2 + 14, 58, `station_${mode}`).setScale(2)
+    this.tweens.add({
+      targets: robotPreview,
+      y: '+=3',
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+    this.tweens.add({
+      targets: stationPreview,
+      alpha: { from: 0.7, to: 1 },
+      duration: 450,
+      yoyo: true,
+      repeat: -1,
+    })
+
     if (GameState.levelIndex > 1) {
       this.menuItems = ['CONTINUE', 'NEW GAME', 'HOW TO PLAY', 'ABOUT']
     } else {
