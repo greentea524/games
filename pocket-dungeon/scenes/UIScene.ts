@@ -16,16 +16,18 @@ export class UIScene extends Phaser.Scene {
 
   create() {
     // Top HUD background
-    this.add.rectangle(0, 0, GBC_WIDTH, 14, 0x000000, 0.65).setOrigin(0, 0)
-    
-    // Bottom HUD background
-    this.add.rectangle(0, GBC_HEIGHT - 14, GBC_WIDTH, 14, 0x000000, 0.65).setOrigin(0, 0)
+    this.add.rectangle(0, 0, GBC_WIDTH, 15, 0x000000, 0.8).setOrigin(0, 0)
 
-    const textStyle = (color: string, size: string = '6px') => ({
+    // Bottom HUD background
+    this.add.rectangle(0, GBC_HEIGHT - 15, GBC_WIDTH, 15, 0x000000, 0.8).setOrigin(0, 0)
+
+    const textStyle = (color: string, size: string = '7px') => ({
       fontFamily: FONT,
       fontSize: size,
       color: color,
       resolution: 4,
+      stroke: '#000000',
+      strokeThickness: 2,
     })
 
     this.hpText = this.add.text(6, 4, '', textStyle(CSS_LIGHTEST))
@@ -33,9 +35,9 @@ export class UIScene extends Phaser.Scene {
     this.turnText = this.add.text(GBC_WIDTH - 6, 4, '', textStyle(CSS_LIGHTEST)).setOrigin(1, 0)
 
     // Bottom bar
-    this.hungerText = this.add.text(6, GBC_HEIGHT - 10, '', textStyle('#88ff88', '5px'))
-    this.atkText = this.add.text(GBC_WIDTH - 6, GBC_HEIGHT - 10, '', textStyle('#ff8888', '5px')).setOrigin(1, 0)
-    this.goldText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 10, '', textStyle('#ffd700', '5px')).setOrigin(0.5, 0)
+    this.hungerText = this.add.text(6, GBC_HEIGHT - 11, '', textStyle('#88ff88', '6px'))
+    this.atkText = this.add.text(GBC_WIDTH - 6, GBC_HEIGHT - 11, '', textStyle('#ff8888', '6px')).setOrigin(1, 0)
+    this.goldText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 11, '', textStyle('#ffd700', '6px')).setOrigin(0.5, 0)
   }
 
   update() {
