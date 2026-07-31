@@ -52,26 +52,29 @@ export class ShopScene extends Phaser.Scene {
     }
 
     // ── Title ──
-    this.add.text(GBC_WIDTH / 2, 6, 'SHOP', {
+    this.add.text(GBC_WIDTH / 2, 3, 'SHOP', {
       fontFamily: FONT, fontSize: '10px', color: '#ffd700', resolution: 4,
+      stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0)
 
-    this.goldText = this.add.text(GBC_WIDTH / 2, 20, `${meta.gold} GOLD`, {
+    this.goldText = this.add.text(GBC_WIDTH / 2, 17, `${meta.gold} GOLD`, {
       fontFamily: FONT, fontSize: '7px', color: '#ffd700', resolution: 4,
+      stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0)
 
     // ── Divider ──
     const div = this.add.graphics()
-    div.fillStyle(0x506850); div.fillRect(20, 31, GBC_WIDTH - 40, 1)
+    div.fillStyle(0x506850); div.fillRect(20, 29, GBC_WIDTH - 40, 1)
 
     // ── Item List ──
     this.itemTexts = []
-    const startY = 36
-    const rowH = 14
+    const startY = 33
+    const rowH = 12
     for (let i = 0; i < this.items.length; i++) {
-      const txt = this.add.text(16, startY + i * rowH, '', {
-        fontFamily: FONT, fontSize: '6px',
+      const txt = this.add.text(14, startY + i * rowH, '', {
+        fontFamily: FONT, fontSize: '7px',
         color: '#e0f8cf', resolution: 4,
+        stroke: '#000000', strokeThickness: 2,
       }).setInteractive({ useHandCursor: true })
 
       txt.on('pointerdown', () => {
@@ -85,21 +88,24 @@ export class ShopScene extends Phaser.Scene {
 
     // ── Description Area ──
     const descDiv = this.add.graphics()
-    descDiv.fillStyle(0x506850); descDiv.fillRect(20, 105, GBC_WIDTH - 40, 1)
+    descDiv.fillStyle(0x506850); descDiv.fillRect(20, 92, GBC_WIDTH - 40, 1)
 
-    this.descText = this.add.text(GBC_WIDTH / 2, 109, '', {
-      fontFamily: FONT, fontSize: '5px', color: '#7a9a62', resolution: 4,
-      wordWrap: { width: 136 }, align: 'center',
+    this.descText = this.add.text(GBC_WIDTH / 2, 96, '', {
+      fontFamily: FONT, fontSize: '6px', color: '#b8d8a0', resolution: 4,
+      stroke: '#000000', strokeThickness: 2,
+      wordWrap: { width: 150 }, align: 'center',
     }).setOrigin(0.5, 0)
 
     // ── Feedback Text ──
-    this.infoText = this.add.text(GBC_WIDTH / 2, 126, '', {
+    this.infoText = this.add.text(GBC_WIDTH / 2, 125, '', {
       fontFamily: FONT, fontSize: '6px', color: '#ff8888', resolution: 4,
+      stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0)
 
     // ── Back Button ──
-    const backBtn = this.add.text(GBC_WIDTH / 2, 138, '\u25C0 BACK', {
-      fontFamily: FONT, fontSize: '6px', color: '#86b06a', resolution: 4,
+    const backBtn = this.add.text(GBC_WIDTH / 2, 134, '\u25C0 BACK', {
+      fontFamily: FONT, fontSize: '7px', color: '#86b06a', resolution: 4,
+      stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
 
     backBtn.on('pointerdown', () => { sfx.menuCancel(); this.scene.start('title') })
@@ -140,7 +146,7 @@ export class ShopScene extends Phaser.Scene {
       this.itemTexts[i].setText(`${prefix}${item.name}  ${costStr}`)
 
       if (item.owned) {
-        this.itemTexts[i].setColor('#506850')
+        this.itemTexts[i].setColor('#7e9a7c')
       } else if (i === this.cursor) {
         this.itemTexts[i].setColor('#ffffff')
       } else {
