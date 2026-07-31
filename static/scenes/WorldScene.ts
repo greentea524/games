@@ -27,6 +27,17 @@ import {
   ANCHOR_DEF,
   ENTITY_DEF,
   CH5_START_DEF,
+  STATIC_DOOR_DEF,
+  BOOKSHELF_DEF,
+  JOURNAL_DEF,
+  BED_DEF,
+  RUG_DEF,
+  PLANT_DEF,
+  BUSH_DEF,
+  FOUNTAIN_DEF,
+  BAKERY_PHOTO_DEF,
+  GUS_STOVE_DEF,
+  REN_DESK_DEF,
 } from '../dialogue'
 
 // Small code-placed structures (Chapter 3): 3-wide huts with a 2-row
@@ -41,6 +52,9 @@ interface Structure {
 }
 const GUS_HUT: Structure = { x0: 2, y0: 11, w: 3, roofRows: 2, wallRow: 13, doorX: 3 }
 const REN_HOUSE: Structure = { x0: 18, y0: 16, w: 3, roofRows: 2, wallRow: 18, doorX: 19 }
+// Chapter 1's bakery is stamped in inline rather than via placeStructure
+// (it has two wall rows), but still needs a door zone.
+const BAKER_HOUSE: Structure = { x0: 3, y0: 16, w: 5, roofRows: 2, wallRow: 19, doorX: 5 }
 import type { UIScene } from './UIScene'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
@@ -345,24 +359,51 @@ export class WorldScene extends Phaser.Scene {
   }
   // Add decorative props to the map based on the mapKey
   private placeDecorations(mode: string) {
-    if (this.mapKey === 'house' || this.mapKey === 'house2') {
+    const interiors = ['house', 'house2', 'bakery', 'gus_hut', 'ren_house']
+    if (interiors.includes(this.mapKey)) {
       // Bed top left corner
       const bed = this.physics.add.staticImage(2 * TILE, 2 * TILE, `prop_bed_${mode}`).setOrigin(0, 0)
       bed.body.setSize(32, 32)
       this.physics.add.collider(this.player, bed)
-      
+
       // Rug in middle
       this.add.image(4 * TILE, 4 * TILE, `prop_rug_${mode}`).setOrigin(0, 0)
-      
+
       // Bookshelf top right
       const shelf = this.physics.add.staticImage(8 * TILE, 2 * TILE, `prop_bookshelf_${mode}`).setOrigin(0, 0)
       shelf.body.setSize(16, 32)
       this.physics.add.collider(this.player, shelf)
-      
+
       // Plant bottom left
       const plant = this.physics.add.staticImage(2 * TILE, 7 * TILE, `prop_plant_${mode}`).setOrigin(0, 0)
       plant.body.setSize(16, 16)
       this.physics.add.collider(this.player, plant)
+
+      // Examine points sit ON the prop, so the player triggers them by
+      // standing on the adjacent floor tile and facing it. These tiles are
+      // floor in every interior layout.
+      this.examine(2, 3, BED_DEF)
+      this.examine(5, 5, RUG_DEF)
+      this.examine(2, 7, PLANT_DEF)
+
+      // The shelf carries the house-specific beat.
+      const shelfDef =
+        this.mapKey === 'ren_house'
+          ? REN_DESK_DEF
+          : this.mapKey === 'gus_hut'
+            ? GUS_STOVE_DEF
+            : BOOKSHELF_DEF
+      this.examine(8, 3, shelfDef)
+
+      // One extra prop per story house, drawn so it can actually be seen.
+      if (this.mapKey === 'house') {
+        // The notebook is the always-available objective reminder.
+        this.add.image(6 * TILE + TILE / 2, 2 * TILE + TILE / 2, `item_${mode}_ledger`)
+        this.examine(6, 2, JOURNAL_DEF)
+      } else if (this.mapKey === 'bakery') {
+        this.add.image(6 * TILE + TILE / 2, 2 * TILE + TILE / 2, `item_${mode}_photo`)
+        this.examine(6, 2, BAKERY_PHOTO_DEF)
+      }
     } else if (this.mapKey === 'town' || this.mapKey === 'town_static') {
       // Add bushes
       const bushCoords = [[5, 5], [6, 15], [25, 4], [28, 20], [15, 25]]
@@ -370,6 +411,7 @@ export class WorldScene extends Phaser.Scene {
         const bush = this.physics.add.staticImage(bx * TILE, by * TILE, `prop_bush_${mode}`).setOrigin(0, 0)
         bush.body.setSize(16, 16)
         this.physics.add.collider(this.player, bush)
+        this.examine(bx, by, BUSH_DEF)
       }
       
       // Add flowers
@@ -410,6 +452,12 @@ export class WorldScene extends Phaser.Scene {
           x: fx + 8,
           y: fy + 8,
           action: () => this.openNarration(VALVE_DEF),
+        })
+      } else {
+        this.interactables.push({
+          x: fx + 8,
+          y: fy + 8,
+          action: () => this.openNarration(FOUNTAIN_DEF),
         })
       }
       if (world === 'normal' && GameState.getFlag('fountain_drained')) {
@@ -456,6 +504,7 @@ export class WorldScene extends Phaser.Scene {
         // The lost hut stands here, worn, with a frozen copy of Gus.
         this.placeStructure(ground, GUS_HUT, true)
         ground.setCollision(SOLID_TILES)
+        this.addStructureDoor(GUS_HUT, 'gus_hut')
         const sprite = this.npcGroup.create(
           4 * TILE + TILE / 2,
           14 * TILE + TILE / 2,
@@ -503,6 +552,8 @@ export class WorldScene extends Phaser.Scene {
       }
       ground.putTileAt(TILES.DOOR, 5, 19)
       ground.setCollision(SOLID_TILES)
+      // Visiting the bakery before it goes makes the loss concrete.
+      this.addStructureDoor(BAKER_HOUSE, 'bakery')
 
       const sprite = this.npcGroup.create(
         7 * TILE + TILE / 2,
@@ -536,8 +587,16 @@ export class WorldScene extends Phaser.Scene {
     this.placeStructure(ground, REN_HOUSE, false)
     if (!GameState.getFlag('gus_hut_vanished')) {
       this.placeStructure(ground, GUS_HUT, false)
+      this.addStructureDoor(GUS_HUT, 'gus_hut')
     }
     ground.setCollision(SOLID_TILES)
+    // During the Chapter 4 race the same tile is the anchoring act, so the
+    // entry zone is registered everywhere except that window.
+    const renAnchorActive =
+      GameState.getFlag('ch3_done') && !GameState.getFlag('ch4_done')
+    if (!renAnchorActive) {
+      this.addStructureDoor(REN_HOUSE, 'ren_house')
+    }
     if (
       GameState.chapter >= 3 &&
       GameState.getFlag('ch3_hint_shown') &&
@@ -578,6 +637,57 @@ export class WorldScene extends Phaser.Scene {
         this.openNarration(CH5_START_DEF)
       })
     }
+  }
+
+  // Structures stamped in by code (Baker/Gus/Ren) paint a DOOR tile but
+  // have no object-layer door, so they need their trigger zone registered
+  // here or they read as broken scenery.
+  private addStructureDoor(s: Structure, target: string) {
+    const dx = s.doorX * TILE + TILE / 2
+    const dy = s.wallRow * TILE + TILE / 2
+    // Static-side copies are a recording: the door never opens.
+    if (GameState.world === 'static') {
+      this.interactables.push({
+        x: dx,
+        y: dy,
+        action: () => this.openNarration(STATIC_DOOR_DEF),
+      })
+      return
+    }
+    const zone = this.add.zone(dx, dy, TILE, TILE)
+    this.physics.add.existing(zone, true)
+    // Step back out onto the tile below the door.
+    const backTX = s.doorX
+    const backTY = s.wallRow + 1
+    this.doors.push({ zone, target, tx: 5, ty: 7, returnTX: backTX, returnTY: backTY })
+    this.physics.add.overlap(this.player, zone, () =>
+      this.enterDoor(target, 5, 7, backTX, backTY),
+    )
+  }
+
+  // A vanished house must take its door with it, or the player walks onto
+  // bare grass and gets teleported into an interior that no longer exists.
+  private removeDoorAt(tileX: number, tileY: number) {
+    const cx = tileX * TILE + TILE / 2
+    const cy = tileY * TILE + TILE / 2
+    this.doors = this.doors.filter((d) => {
+      if (Math.abs(d.zone.x - cx) < 1 && Math.abs(d.zone.y - cy) < 1) {
+        d.zone.destroy()
+        return false
+      }
+      return true
+    })
+    this.interactables = this.interactables.filter(
+      (it) => Math.abs(it.x - cx) >= 1 || Math.abs(it.y - cy) >= 1,
+    )
+  }
+
+  private examine(tx: number, ty: number, def: NpcDef) {
+    this.interactables.push({
+      x: tx * TILE + TILE / 2,
+      y: ty * TILE + TILE / 2,
+      action: () => this.openNarration(def),
+    })
   }
 
   private placeStructure(
@@ -628,6 +738,7 @@ export class WorldScene extends Phaser.Scene {
           this.groundLayer.putTileAt(TILES.GRASS, c, r)
         }
       }
+      this.removeDoorAt(s.doorX, s.wallRow)
       this.openNarration(def)
     })
   }
@@ -646,6 +757,7 @@ export class WorldScene extends Phaser.Scene {
       for (let c = 3; c <= 7; c++) {
         for (let r = 16; r <= 19; r++) this.groundLayer.putTileAt(TILES.GRASS, c, r)
       }
+      this.removeDoorAt(BAKER_HOUSE.doorX, BAKER_HOUSE.wallRow)
       const baker = this.npcs.find(n => n.def.id === 'baker')
       if (baker) {
         baker.sprite.destroy()

@@ -7,6 +7,7 @@ import house2Url from '../assets/house2.json?url'
 import townStaticUrl from '../assets/town_static.json?url'
 import cellarUrl from '../assets/cellar.json?url'
 import coreUrl from '../assets/core.json?url'
+import renHouseUrl from '../assets/ren_house.json?url'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -22,6 +23,11 @@ export class BootScene extends Phaser.Scene {
     this.load.tilemapTiledJSON('town_static', townStaticUrl)
     this.load.tilemapTiledJSON('cellar', cellarUrl)
     this.load.tilemapTiledJSON('core', coreUrl)
+    this.load.tilemapTiledJSON('ren_house', renHouseUrl)
+    // The bakery and Gus's hut reuse house2's layout under their own map
+    // keys, so each can carry its own decorations and examine text.
+    this.load.tilemapTiledJSON('bakery', house2Url)
+    this.load.tilemapTiledJSON('gus_hut', house2Url)
   }
 
   create() {

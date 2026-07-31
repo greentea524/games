@@ -504,6 +504,229 @@ export const VALVE_DEF: NpcDef = {
   ],
 }
 
+// ---- Examinable scenery ----
+// Small helper: most props are a fixed observation with no state.
+const examine = (id: string, name: string, ...text: string[]): NpcDef => ({
+  id,
+  name,
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [{ lines: text.map((t) => ({ text: t })) }],
+})
+
+// The bookshelf carries the slow reveal: the same shelf reads differently
+// as the player learns what is happening to the town.
+export const BOOKSHELF_DEF: NpcDef = {
+  id: 'bookshelf',
+  name: 'BOOKSHELF',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      requires: 'ch3_done',
+      lines: [
+        { text: 'The town history, third edition.' },
+        { text: 'You check the index of families again.' },
+        { text: 'Two names you remember are no longer printed there.' },
+        { text: 'The paper is not damaged. They were simply never set.' },
+      ],
+    },
+    {
+      requires: 'chapter2_done',
+      lines: [
+        { text: 'A local history, a seed catalogue, some paperbacks.' },
+        { text: 'The history has a fold-out map of the town.' },
+        { text: 'You count the houses on it. You count them again.' },
+        { text: 'The map has one more house than the street does.' },
+      ],
+    },
+    {
+      lines: [
+        { text: 'A local history, a seed catalogue, some paperbacks.' },
+        { text: 'Dust on the top shelf, none on the second.' },
+        { text: 'Someone still reads these.' },
+      ],
+    },
+  ],
+}
+
+// The journal is the always-available objective hint (Part C).
+// Branches run newest-chapter-first; the first match wins.
+export const JOURNAL_DEF: NpcDef = {
+  id: 'journal',
+  name: 'YOUR NOTEBOOK',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      requires: 'ch4_done',
+      lines: [
+        { text: 'Last entry:' },
+        { text: 'Ren is safe. The static took something else instead.' },
+        { text: 'The TV is louder now. It is asking for me by name.' },
+        { text: '> Go home. Use the TV.' },
+      ],
+    },
+    {
+      requires: 'ch3_done',
+      lines: [
+        { text: 'Last entry:' },
+        { text: "Ren's house is next. I am sure of it." },
+        { text: 'On the static side it is half-drawn already.' },
+        { text: '> Find the beacon, get the key, anchor the door.' },
+      ],
+    },
+    {
+      requires: 'gus_hut_vanished',
+      lines: [
+        { text: 'Last entry:' },
+        { text: 'Gus is gone. Nobody remembers the hut was there.' },
+        { text: 'On the static side both lost houses still stand.' },
+        { text: '> Cross over. Look at the houses that vanished.' },
+      ],
+    },
+    {
+      requires: 'chapter2_done',
+      lines: [
+        { text: 'Last entry:' },
+        { text: 'Things carried through the TV come back changed.' },
+        { text: 'The town is losing houses in some kind of order.' },
+        { text: '> Keep crossing over. Work out the pattern.' },
+      ],
+    },
+    {
+      requires: 'heard_about_house',
+      lines: [
+        { text: 'Last entry:' },
+        { text: "The baker's house is gone and I am the only one who saw it." },
+        { text: 'Mom says the TV has been hissing all morning.' },
+        { text: '> Go home. Try the TV.' },
+      ],
+    },
+    {
+      requires: 'got_flashlight',
+      lines: [
+        { text: 'Last entry:' },
+        { text: 'Power keeps flickering. Mom gave me the flashlight.' },
+        { text: '> Go out into town. See what is wrong.' },
+      ],
+    },
+    {
+      lines: [
+        { text: 'Your notebook. Mostly drawings.' },
+        { text: 'The last page is blank, waiting.' },
+        { text: '> Talk to Mom before heading out.' },
+      ],
+    },
+  ],
+}
+
+// Static-side doors: the buildings are a recording, not a place.
+export const STATIC_DOOR_DEF = examine(
+  'static_door',
+  'DOOR',
+  'You reach for the handle.',
+  'There is no handle. It is painted on,',
+  'right down to the shine on the brass.',
+  'Whoever copied this house never opened it.',
+)
+
+export const BED_DEF = examine(
+  'bed',
+  'BED',
+  'Your bed, still unmade.',
+  'You could sleep. You know you will not.',
+)
+
+export const RUG_DEF = examine(
+  'rug',
+  'RUG',
+  'A worn rug, colours gone soft with age.',
+  'The fringe is combed the wrong way near the TV.',
+  'Something has been dragged across it.',
+)
+
+export const PLANT_DEF = examine(
+  'plant',
+  'POTTED PLANT',
+  "Mom's fern. Watered too often, as usual.",
+)
+
+export const BUSH_DEF = examine(
+  'bush',
+  'HEDGE',
+  'A thick hedge. Something small darts away under it.',
+)
+
+export const FOUNTAIN_DEF: NpcDef = {
+  id: 'fountain',
+  name: 'FOUNTAIN',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      requires: 'fountain_drained',
+      lines: [
+        { text: 'The basin is empty now.' },
+        { text: 'Set into the dry floor is a hatch you have never seen.' },
+      ],
+    },
+    {
+      lines: [
+        { text: 'The town fountain, still running.' },
+        { text: 'Coins on the bottom. Some of them are old.' },
+        { text: 'One is stamped with a building you cannot place.' },
+      ],
+    },
+  ],
+}
+
+export const BAKERY_PHOTO_DEF = examine(
+  'photo_wall',
+  'FAMILY PHOTO',
+  'The baker, younger, outside this same door.',
+  'Two children squint into the sun beside him.',
+  'You do not know their names.',
+  'You have the sudden urge to learn them.',
+)
+
+export const GUS_STOVE_DEF = examine(
+  'gus_shelf',
+  'SHELF',
+  'Seed packets, twine, a tin of screws sorted by size.',
+  'A photograph lies face down on the top shelf.',
+  'You leave it that way. It felt like the polite thing.',
+)
+
+export const REN_DESK_DEF: NpcDef = {
+  id: 'ren_desk',
+  name: 'DESK',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      requires: 'ch3_done',
+      excludes: 'ren_warned',
+      lines: [
+        { text: "Ren's desk. Homework, half finished." },
+        { text: 'An empty nail above it, key-shaped and clean.' },
+        { text: 'Ren keeps it on them. You would have to ask.' },
+      ],
+    },
+    {
+      lines: [
+        { text: "Ren's desk, buried in comics and homework." },
+        { text: 'A drawing of the two of you is pinned above it.' },
+      ],
+    },
+  ],
+}
+
 // First branch whose flag conditions match the current state.
 export function resolveDialogue(npc: NpcDef): DialogueLine[] {
   for (const b of npc.branches) {
