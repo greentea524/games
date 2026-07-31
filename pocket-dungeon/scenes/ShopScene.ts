@@ -16,6 +16,7 @@ export class ShopScene extends Phaser.Scene {
   private items: MenuItem[] = []
   private cursor = 0
   private itemTexts: Phaser.GameObjects.Text[] = []
+  private costTexts: Phaser.GameObjects.Text[] = []
   private descText!: Phaser.GameObjects.Text
   private goldText!: Phaser.GameObjects.Text
   private infoText!: Phaser.GameObjects.Text
@@ -52,30 +53,37 @@ export class ShopScene extends Phaser.Scene {
     }
 
     // ── Title ──
-    this.add.text(GBC_WIDTH / 2, 3, 'SHOP', {
-      fontFamily: FONT, fontSize: '10px', color: '#ffd700', resolution: 4,
+    this.add.text(GBC_WIDTH / 2, 1, 'SHOP', {
+      fontFamily: FONT, fontSize: '16px', color: '#ffd700', resolution: 4,
       stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0)
 
-    this.goldText = this.add.text(GBC_WIDTH / 2, 17, `${meta.gold} GOLD`, {
-      fontFamily: FONT, fontSize: '7px', color: '#ffd700', resolution: 4,
+    this.goldText = this.add.text(GBC_WIDTH / 2, 21, `${meta.gold} GOLD`, {
+      fontFamily: FONT, fontSize: '8px', color: '#ffd700', resolution: 4,
       stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0)
 
     // ── Divider ──
     const div = this.add.graphics()
-    div.fillStyle(0x506850); div.fillRect(20, 29, GBC_WIDTH - 40, 1)
+    div.fillStyle(0x506850); div.fillRect(20, 33, GBC_WIDTH - 40, 1)
 
     // ── Item List ──
+    // Name and cost are separate columns: at 8px (monospaced, 8px/char) a
+    // single combined string would run past the 160px screen edge.
     this.itemTexts = []
-    const startY = 33
+    this.costTexts = []
+    const startY = 37
     const rowH = 12
     for (let i = 0; i < this.items.length; i++) {
-      const txt = this.add.text(14, startY + i * rowH, '', {
-        fontFamily: FONT, fontSize: '7px',
+      const rowStyle = {
+        fontFamily: FONT, fontSize: '8px',
         color: '#e0f8cf', resolution: 4,
         stroke: '#000000', strokeThickness: 2,
-      }).setInteractive({ useHandCursor: true })
+      }
+      const txt = this.add.text(4, startY + i * rowH, '', rowStyle)
+        .setInteractive({ useHandCursor: true })
+      const cost = this.add.text(GBC_WIDTH - 4, startY + i * rowH, '', rowStyle)
+        .setOrigin(1, 0)
 
       txt.on('pointerdown', () => {
         this.cursor = i
@@ -84,27 +92,28 @@ export class ShopScene extends Phaser.Scene {
       })
 
       this.itemTexts.push(txt)
+      this.costTexts.push(cost)
     }
 
     // ── Description Area ──
     const descDiv = this.add.graphics()
-    descDiv.fillStyle(0x506850); descDiv.fillRect(20, 92, GBC_WIDTH - 40, 1)
+    descDiv.fillStyle(0x506850); descDiv.fillRect(20, 97, GBC_WIDTH - 40, 1)
 
-    this.descText = this.add.text(GBC_WIDTH / 2, 96, '', {
-      fontFamily: FONT, fontSize: '6px', color: '#b8d8a0', resolution: 4,
+    this.descText = this.add.text(GBC_WIDTH / 2, 101, '', {
+      fontFamily: FONT, fontSize: '7px', color: '#b8d8a0', resolution: 4,
       stroke: '#000000', strokeThickness: 2,
       wordWrap: { width: 150 }, align: 'center',
     }).setOrigin(0.5, 0)
 
     // ── Feedback Text ──
-    this.infoText = this.add.text(GBC_WIDTH / 2, 125, '', {
-      fontFamily: FONT, fontSize: '6px', color: '#ff8888', resolution: 4,
+    this.infoText = this.add.text(GBC_WIDTH / 2, 121, '', {
+      fontFamily: FONT, fontSize: '7px', color: '#ff8888', resolution: 4,
       stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0)
 
     // ── Back Button ──
-    const backBtn = this.add.text(GBC_WIDTH / 2, 134, '\u25C0 BACK', {
-      fontFamily: FONT, fontSize: '7px', color: '#86b06a', resolution: 4,
+    const backBtn = this.add.text(GBC_WIDTH / 2, 132, '\u25C0 BACK', {
+      fontFamily: FONT, fontSize: '8px', color: '#86b06a', resolution: 4,
       stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
 
@@ -143,15 +152,12 @@ export class ShopScene extends Phaser.Scene {
       const item = this.items[i]
       const costStr = item.owned ? 'OWNED' : `${item.cost}g`
       const prefix = i === this.cursor ? '\u25B6 ' : '  '
-      this.itemTexts[i].setText(`${prefix}${item.name}  ${costStr}`)
+      this.itemTexts[i].setText(`${prefix}${item.name}`)
+      this.costTexts[i].setText(costStr)
 
-      if (item.owned) {
-        this.itemTexts[i].setColor('#7e9a7c')
-      } else if (i === this.cursor) {
-        this.itemTexts[i].setColor('#ffffff')
-      } else {
-        this.itemTexts[i].setColor('#e0f8cf')
-      }
+      const color = item.owned ? '#7e9a7c' : i === this.cursor ? '#ffffff' : '#e0f8cf'
+      this.itemTexts[i].setColor(color)
+      this.costTexts[i].setColor(item.owned ? '#7e9a7c' : '#ffd700')
     }
     this.descText.setText(this.items[this.cursor]?.description ?? '')
     this.infoText.setText('')

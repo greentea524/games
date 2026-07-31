@@ -27,7 +27,7 @@ export const CLASSES: Record<ClassName, ClassDef> = {
   },
   alchemist: {
     id: 'alchemist', name: 'Alchemist',
-    description: 'Scholarly. Extra hunger but identifies 1 scroll free.',
+    description: 'Scholarly. More hunger, IDs 1 scroll.',
     hp: 16, atk: 3, hunger: 120, unlockCost: 80,
   },
 }
@@ -40,9 +40,9 @@ export interface ShopItem {
 }
 
 export const SHOP_ITEMS: ShopItem[] = [
-  { id: 'start_sword', name: 'Starter Sword', description: 'Begin runs with a Rusty Sword (+2 ATK).', cost: 30 },
-  { id: 'start_food', name: 'Packed Lunch', description: 'Begin runs with +30 bonus hunger.', cost: 40 },
-  { id: 'start_potion', name: 'Emergency Potion', description: 'Begin runs with 1 Health Potion.', cost: 25 },
+  { id: 'start_sword', name: 'Rusty Sword', description: 'Begin runs with a Rusty Sword (+2 ATK).', cost: 30 },
+  { id: 'start_food', name: 'Lunch Box', description: 'Begin runs with +30 bonus hunger.', cost: 40 },
+  { id: 'start_potion', name: 'Potion', description: 'Begin runs with 1 Health Potion.', cost: 25 },
 ]
 
 export interface RunStats {
