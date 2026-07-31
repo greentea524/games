@@ -372,6 +372,7 @@ export class DungeonScene extends Phaser.Scene {
             this.scene.start('gameover', { victory: true })
             return
           }
+          GameState.turnState = TurnState.PLAYER_TURN
           this.scene.restart()
           return
         }
