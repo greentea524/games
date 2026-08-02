@@ -196,6 +196,48 @@ export class UIScene extends Phaser.Scene {
     })
   }
 
+  // Transient location card on entering a new area. Sits top-left and is
+  // sized to its text so it clears the town minimap in the top-right.
+  private locationBanner?: Phaser.GameObjects.Container
+
+  public showLocationBanner(label: string) {
+    if (this.locationBanner) this.locationBanner.destroy()
+
+    const text = this.add.text(5, 3, label, {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: '#e0f8cf',
+      resolution: 2,
+    })
+    const w = Math.ceil(text.width) + 10
+    const h = 13
+
+    const bg = this.add.graphics()
+    bg.fillStyle(PAL.darkest, 0.9)
+    bg.fillRoundedRect(0, 0, w, h, 3)
+    bg.lineStyle(1, PAL.light, 1)
+    bg.strokeRoundedRect(0, 0, w, h, 3)
+
+    this.locationBanner = this.add
+      .container(4, -h, [bg, text])
+      .setDepth(1500)
+      .setAlpha(0)
+
+    this.tweens.add({
+      targets: this.locationBanner,
+      y: 4,
+      alpha: 1,
+      duration: 260,
+      ease: 'Back.easeOut',
+      hold: 1500,
+      yoyo: true,
+      onComplete: () => {
+        this.locationBanner?.destroy()
+        this.locationBanner = undefined
+      },
+    })
+  }
+
   private advance() {
     if (this.time.now < this.inputLockUntil) return
     if (this.choiceMode) return

@@ -316,6 +316,38 @@ export class WorldScene extends Phaser.Scene {
     this.buildMinimap(map, ground)
 
     if (!this.scene.isActive('ui')) this.scene.launch('ui')
+    this.announceLocation()
+  }
+
+  // Human-readable name per map. The Static-side suffix is only used where
+  // the copy is reachable, keeping the card short enough to clear the
+  // minimap.
+  private static readonly LOCATIONS: Record<string, string> = {
+    town: 'TOWN',
+    town_static: 'TOWN',
+    house: 'HOME',
+    house2: 'NEIGHBOUR HOUSE',
+    bakery: 'BAKERY',
+    gus_hut: "GUS'S HUT",
+    ren_house: "REN'S HOUSE",
+    cellar: 'CELLAR',
+  }
+
+  // Remembered across scene.restart() so re-entering the same map (world
+  // toggle aside) or a palette reload doesn't re-announce it.
+  private static lastLocation = ''
+
+  private announceLocation() {
+    const base = WorldScene.LOCATIONS[this.mapKey]
+    if (!base) return // the finale room announces itself
+    const label =
+      GameState.world === 'static' ? `${base} / STATIC` : base
+    if (label === WorldScene.lastLocation) return
+    WorldScene.lastLocation = label
+    this.time.delayedCall(140, () => {
+      const ui = this.scene.get('ui') as UIScene | undefined
+      if (ui && ui.scene.isActive()) ui.showLocationBanner(label)
+    })
   }
 
   private ensureExtraTextures() {
