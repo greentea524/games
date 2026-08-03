@@ -3,49 +3,66 @@ import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 
+import thumbStatic from './assets/images/static.jpg'
+import thumbCartCrate from './assets/images/cart-crate.jpg'
+import thumbPocketDungeon from './assets/images/pocket-dungeon.jpg'
+import thumbWindup from './assets/images/windup.jpg'
+import thumbLanternKeeper from './assets/images/lantern-keeper.jpg'
+import thumbInvasion from './assets/images/invasion.webp'
+import thumbPlatformer from './assets/images/platformer.webp'
+import thumbBig2 from './assets/images/big2.jpg'
+
 const WEB_GAMES = [
   {
     title: "Static",
+    image: thumbStatic,
     href: `${import.meta.env.BASE_URL}static/`,
     description: "A GBC-style top-down mystery/adventure game. Explore a small town where an old TV works like a portal.",
   },
   {
     title: "Cart & Crate",
+    image: thumbCartCrate,
     href: `${import.meta.env.BASE_URL}cart-crate/`,
     description:
       "A GBC-style Sokoban puzzle game. Help the courier animal push delivery carts and crates onto target tiles.",
   },
   {
     title: "Pocket Dungeon",
+    image: thumbPocketDungeon,
     href: `${import.meta.env.BASE_URL}pocket-dungeon/`,
     description:
       "A GBC-style turn-based roguelite dungeon crawler. Explore floors, fight monsters, and survive the depth.",
   },
   {
     title: "Windup",
+    image: thumbWindup,
     href: `${import.meta.env.BASE_URL}windup/`,
     description:
       "A GBC-style energy platformer. Guide the windup toy across platforms before its key runs out of power.",
   },
   {
     title: "Lantern Keeper",
+    image: thumbLanternKeeper,
     href: `${import.meta.env.BASE_URL}lantern-keeper/`,
     description:
       "Light lanterns in a dark forest in this GBC-style puzzle-platformer. Double jump, dash, and wall-cling your way to the Crown.",
   },
   {
     title: "Invasion",
+    image: thumbInvasion,
     href: "https://greentea524.github.io/vite-project/space/",
     description: "Defend against waves of alien invaders. Features a multiplayer mode!",
   },
   {
     title: "Platformer",
+    image: thumbPlatformer,
     href: "https://greentea524.github.io/vite-project/platformer/",
     description:
       "A 2D side-scrolling adventure featuring a multiplayer 'Race a friend' mode.",
   },
   {
     title: "Big 2",
+    image: thumbBig2,
     href: "https://greentea524.github.io/vite-project/big2/",
     description: "Shed all 13 cards first in this classic climbing card game.",
   },
@@ -72,6 +89,20 @@ function App() {
         <div className="games-grid">
           {WEB_GAMES.map((game) => (
             <div className="game-card" key={game.title}>
+              {game.image && (
+                <a
+                  href={game.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="game-thumb-link"
+                >
+                  <img
+                    src={game.image}
+                    alt={game.title}
+                    className="game-card-thumb"
+                  />
+                </a>
+              )}
               <a
                 className="game-link"
                 href={game.href}

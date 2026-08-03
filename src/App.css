@@ -212,6 +212,28 @@
   transform: translateY(-2px);
 }
 
+.game-thumb-link {
+  display: block;
+  overflow: hidden;
+  border-radius: 12px;
+  aspect-ratio: 4 / 3;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.game-card-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 12px;
+  transition: transform 0.3s ease;
+}
+
+.game-card:hover .game-card-thumb {
+  transform: scale(1.05);
+}
+
 .game-link {
   display: flex;
   align-items: center;
