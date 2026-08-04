@@ -3,14 +3,14 @@ import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 
-import thumbStatic from './assets/images/static.jpg'
-import thumbCartCrate from './assets/images/cart-crate.jpg'
-import thumbPocketDungeon from './assets/images/pocket-dungeon.jpg'
-import thumbWindup from './assets/images/windup.jpg'
-import thumbLanternKeeper from './assets/images/lantern-keeper.jpg'
+import thumbStatic from './assets/images/static.webp'
+import thumbCartCrate from './assets/images/cart-crate.webp'
+import thumbPocketDungeon from './assets/images/pocket-dungeon.webp'
+import thumbWindup from './assets/images/windup.webp'
+import thumbLanternKeeper from './assets/images/lantern-keeper.webp'
 import thumbInvasion from './assets/images/invasion.webp'
 import thumbPlatformer from './assets/images/platformer.webp'
-import thumbBig2 from './assets/images/big2.jpg'
+import thumbBig2 from './assets/images/big2.webp'
 
 const WEB_GAMES = [
   {
@@ -100,6 +100,10 @@ function App() {
                     src={game.image}
                     alt={game.title}
                     className="game-card-thumb"
+                    loading="lazy"
+                    decoding="async"
+                    width="640"
+                    height="478"
                   />
                 </a>
               )}
