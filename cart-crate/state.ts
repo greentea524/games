@@ -1,5 +1,5 @@
 export class GameState {
-  static paletteMode: 'dmg' | 'gbc' = 'dmg'
+  static paletteMode: 'dmg' | 'gbc' = 'gbc'
   static currentLevelIndex: number = 0
   static movesCount: number = 0
   static pushesCount: number = 0
