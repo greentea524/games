@@ -410,6 +410,18 @@ export class BootScene extends Phaser.Scene {
         g1.destroy()
       }
 
+      // Same silhouette as the flashlight with the lens unlit — the shape has
+      // to read as the same object or the swap is illegible at 16x16.
+      const keyFlashDead = 'item_dmg_flashlight_dead'
+      if (!this.textures.exists(keyFlashDead)) {
+        const g3 = this.make.graphics({}, false)
+        g3.fillStyle(PAL.darkest); g3.fillRect(2, 5, 8, 4)
+        g3.fillStyle(PAL.dark); g3.fillRect(9, 4, 4, 6)
+        g3.fillStyle(PAL.darkest); g3.fillRect(12, 5, 2, 4)
+        g3.generateTexture(keyFlashDead, 16, 16)
+        g3.destroy()
+      }
+
       const keyFlower = 'item_dmg_flower'
       if (!this.textures.exists(keyFlower)) {
         const g2 = this.make.graphics({}, false)
@@ -428,6 +440,16 @@ export class BootScene extends Phaser.Scene {
         g1.fillStyle(0xffffff); g1.fillRect(12, 5, 2, 4)
         g1.generateTexture(keyFlash, 16, 16)
         g1.destroy()
+      }
+
+      const keyFlashDead = 'item_gbc_flashlight_dead'
+      if (!this.textures.exists(keyFlashDead)) {
+        const g3 = this.make.graphics({}, false)
+        g3.fillStyle(GBC_PAL.flashlightBody); g3.fillRect(2, 5, 8, 4)
+        g3.fillStyle(0x2c3038); g3.fillRect(9, 4, 4, 6)
+        g3.fillStyle(0x1a1d22); g3.fillRect(12, 5, 2, 4)
+        g3.generateTexture(keyFlashDead, 16, 16)
+        g3.destroy()
       }
 
       const keyFlower = 'item_gbc_flower'

@@ -29,20 +29,11 @@ export interface NpcDef {
   branches: DialogueBranch[]
 }
 
-export interface ItemDef {
-  id: string
-  name: string
-  icon: string // BootScene texture key
-}
-
-export const ITEMS: Record<string, ItemDef> = {
-  flashlight: { id: 'flashlight', name: 'Flashlight', icon: 'item_flashlight' },
-  flower: { id: 'flower', name: 'Wilted Flower', icon: 'item_flower' },
-  flower_fresh: { id: 'flower_fresh', name: 'Fresh Flower', icon: 'item_flower_fresh' },
-  photo: { id: 'photo', name: 'Old Photo', icon: 'item_photo' },
-  ledger: { id: 'ledger', name: 'Water Ledger', icon: 'item_ledger' },
-  ren_key: { id: 'ren_key', name: "Ren's Key", icon: 'item_ren_key' },
-}
+// Items moved to `items.ts` so `state.ts` can read the transform table without
+// importing this module, which imports GameState. Re-exported here because
+// callers have always reached for them through dialogue.
+export { ITEMS } from './items'
+export type { ItemDef } from './items'
 
 export const NPCS: Record<string, NpcDef> = {
   mom: {
