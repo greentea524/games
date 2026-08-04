@@ -1,12 +1,14 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, PAL } from '../constants'
 import { GameState } from '../state'
-import { ITEMS, resolveDialogue } from '../dialogue'
+import { ITEMS, resolveDialogue, currentObjective } from '../dialogue'
 import { sfx } from '../audio'
 import type { NpcDef, DialogueLine, ChoiceOption } from '../dialogue'
 import type { TransformEvent } from '../items'
 
 const FONT = '"Press Start 2P"'
+// Top of the 'A / SELECT: close' hint; item rows must stay above it.
+const HINT_TOP = GBC_HEIGHT - 18
 const CSS_LIGHT = '#9bbc0f'
 const CSS_MID = '#8bac0f'
 
@@ -29,6 +31,7 @@ export class UIScene extends Phaser.Scene {
 
   // inventory
   private inv!: Phaser.GameObjects.Container
+  private invObjective!: Phaser.GameObjects.Text
 
   // keys
   private advanceKey!: Phaser.Input.Keyboard.Key
@@ -350,18 +353,30 @@ export class UIScene extends Phaser.Scene {
     bg.fillRect(0, 0, GBC_WIDTH, GBC_HEIGHT)
     bg.lineStyle(1, PAL.light, 1)
     bg.strokeRect(4, 4, GBC_WIDTH - 8, GBC_HEIGHT - 8)
-    const title = this.add.text(10, 10, 'INVENTORY', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    })
     const hint = this.add.text(10, GBC_HEIGHT - 16, 'A / SELECT: close', {
       fontFamily: FONT,
       fontSize: '7px',
       color: CSS_MID,
       resolution: 2,
     })
+    // The objective heads the panel, in place of an 'INVENTORY' title.
+    //
+    // The title cost a row this screen cannot spare: with a full bag the item
+    // list already reached y=124 against a close hint at y=128, so anything
+    // added above it has to be paid for. A row of icons does not need to be
+    // labelled as an inventory; the objective is the part worth the space.
+    //
+    // The same directive is in the notebook prop back at the player's house,
+    // which is the one place you are not standing when you get lost.
+    this.invObjective = this.add.text(10, 10, '', {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: CSS_LIGHT,
+      resolution: 2,
+      lineSpacing: 3,
+      wordWrap: { width: GBC_WIDTH - 20 },
+    })
+
     const tapZone = this.add
       .zone(GBC_WIDTH / 2, GBC_HEIGHT / 2, GBC_WIDTH, GBC_HEIGHT)
       .setInteractive({ useHandCursor: true })
@@ -370,18 +385,29 @@ export class UIScene extends Phaser.Scene {
           this.toggleInventory()
         }
       })
-    this.inv.add([bg, title, hint, tapZone])
+    this.inv.add([bg, this.invObjective, hint, tapZone])
   }
 
   private refreshInventory() {
-    // clear previous item rows (keep first 4 children: bg, title, hint, tapZone)
+    // clear previous item rows (keep the 4 persistent children:
+    // bg, objective, hint, tapZone)
     while (this.inv.length > 4) {
       const c = this.inv.getAt(this.inv.length - 1) as Phaser.GameObjects.GameObject
       this.inv.remove(c, true)
     }
+
+    const objective = currentObjective()
+    this.invObjective.setText(objective ? `> ${objective}` : '')
+
+    // Measured, not assumed: the objective wraps to a variable number of
+    // lines, and how many depends on font metrics at runtime.
+    const itemsTop = objective
+      ? this.invObjective.y + this.invObjective.height + 8
+      : 28
+
     if (GameState.inventory.length === 0) {
       this.inv.add(
-        this.add.text(16, 30, '(empty)', {
+        this.add.text(16, itemsTop + 2, '(empty)', {
           fontFamily: FONT,
           fontSize: '8px',
           color: CSS_MID,
@@ -390,9 +416,16 @@ export class UIScene extends Phaser.Scene {
       )
       return
     }
+
+    // Row spacing tightens to fit rather than running under the close hint.
+    // The floor is the 16px icon height — below that, rows would overlap, and
+    // an unreadable list is worse than a cramped one.
+    const rows = GameState.inventory.length
+    const spacing = Math.max(16, Math.min(20, Math.floor((HINT_TOP - itemsTop) / rows)))
+
     GameState.inventory.forEach((id, i) => {
       const def = ITEMS[id]
-      const y = 28 + i * 20
+      const y = itemsTop + i * spacing
       const mode = GameState.paletteMode
       const iconKey = def ? `item_${mode}_${def.id}` : ''
       const icon = this.add.image(20, y + 4, iconKey).setOrigin(0.5)
@@ -410,6 +443,11 @@ export class UIScene extends Phaser.Scene {
     if (GameState.dialogueActive) return
     GameState.inventoryOpen = true
     this.inputLockUntil = this.time.now + 300
+    // The location banner sits at depth 1500, above this panel, and would
+    // float over the objective on the top line. It is transient anyway, so
+    // opening the panel dismisses it rather than reshuffling depths.
+    this.locationBanner?.destroy()
+    this.locationBanner = undefined
     this.refreshInventory()
     this.inv.setVisible(true)
   }
