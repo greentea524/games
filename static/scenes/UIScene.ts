@@ -4,6 +4,7 @@ import { GameState } from '../state'
 import { ITEMS, resolveDialogue } from '../dialogue'
 import { sfx } from '../audio'
 import type { NpcDef, DialogueLine, ChoiceOption } from '../dialogue'
+import type { TransformEvent } from '../items'
 
 const FONT = '"Press Start 2P"'
 const CSS_LIGHT = '#9bbc0f'
@@ -152,6 +153,21 @@ export class UIScene extends Phaser.Scene {
   public showItemToast(itemId: string) {
     const def = ITEMS[itemId]
     const itemName = def ? def.name : itemId
+    this.showToast(itemId, `Obtained ${itemName}!\nStored into inventory.`)
+  }
+
+  /**
+   * Crossing worlds swapped a carried item. Only the first swap of a crossing
+   * is shown: the toast is a single fixed-size card and the screen is 160x144,
+   * so a second one would either overwrite the first before it could be read
+   * or need a queue longer than the transition itself.
+   */
+  public showTransformToast(event: TransformEvent) {
+    this.showToast(event.itemId, event.message)
+  }
+
+  private showToast(itemId: string, message: string) {
+    const def = ITEMS[itemId]
     const mode = GameState.paletteMode
     const iconKey = def ? `item_${mode}_${def.id}` : ''
 
@@ -170,7 +186,7 @@ export class UIScene extends Phaser.Scene {
     bg.strokeRoundedRect(-w / 2, 0, w, h, 3)
 
     const icon = this.add.image(-w / 2 + 12, h / 2, iconKey).setOrigin(0.5)
-    const text = this.add.text(-w / 2 + 24, 3, `Obtained ${itemName}!\nStored into inventory.`, {
+    const text = this.add.text(-w / 2 + 24, 3, message, {
       fontFamily: FONT,
       fontSize: '6px',
       color: '#e0f8cf',

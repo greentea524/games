@@ -913,7 +913,12 @@ export class WorldScene extends Phaser.Scene {
       .setDisplaySize(GBC_WIDTH, GBC_HEIGHT)
     this.tweens.add({ targets: noise, alpha: 0.5, duration: 120, yoyo: true, repeat: 1 })
     this.time.delayedCall(260, () => {
-      GameState.toggleWorld()
+      const changed = GameState.toggleWorld()
+      // UIScene is a separate scene and survives this one's restart, so the
+      // toast outlives the transition and is still up as the new world fades in.
+      if (changed.length > 0) {
+        ;(this.scene.get('ui') as UIScene).showTransformToast(changed[0])
+      }
       this.scene.restart({
         mapKey: this.mapKey,
         tx: Math.floor(this.player.x / TILE),

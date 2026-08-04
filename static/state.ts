@@ -1,5 +1,7 @@
 // Global game state: story flags + inventory + UI-blocking status,
 // serialized to localStorage (#16).
+import { TRANSFORMS, type TransformEvent } from './items'
+
 const SAVE_KEY = 'static_save'
 const SAVE_VERSION = 1
 
@@ -15,19 +17,30 @@ class GameStateClass {
 
   // Dual-world (Phase 3). In-memory for now; #16 persists it.
   world: 'normal' | 'static' = 'normal'
-  toggleWorld() {
+
+  /**
+   * Flips the world and swaps every carried item for its counterpart.
+   * Returns what changed so the caller can surface it — the swap used to
+   * happen silently inside a closed menu, which made the mechanic invisible
+   * to anyone who wasn't already looking for it (#72).
+   */
+  toggleWorld(): TransformEvent[] {
     this.world = this.world === 'normal' ? 'static' : 'normal'
-    // Item crossover (#15): carried items transform between worlds.
-    // Pairs are [normal-form, static-form]; kept here (not dialogue.ts)
-    // to avoid an import cycle.
-    const transforms: [string, string][] = [['flower', 'flower_fresh']]
+    const changed: TransformEvent[] = []
     this.inventory = this.inventory.map(id => {
-      for (const [normal, statik] of transforms) {
-        if (this.world === 'static' && id === normal) return statik
-        if (this.world === 'normal' && id === statik) return normal
+      for (const t of TRANSFORMS) {
+        if (this.world === 'static' && id === t.normal) {
+          changed.push({ itemId: t.statik, message: t.intoStatic })
+          return t.statik
+        }
+        if (this.world === 'normal' && id === t.statik) {
+          changed.push({ itemId: t.normal, message: t.intoNormal })
+          return t.normal
+        }
       }
       return id
     })
+    return changed
   }
 
   paletteMode: 'dmg' | 'gbc' =
