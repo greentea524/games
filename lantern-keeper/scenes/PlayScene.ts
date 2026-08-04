@@ -10,6 +10,7 @@ import {
   DARKNESS_ALPHA,
   DECO,
 } from '../constants'
+import { Darkness, type Light } from '../../shared/lighting'
 
 // Tuned to the KAN-110 movement budget: single jump ~2.8 tiles,
 // double jump ~5.6 tiles, so the 5-tile cliff gate needs the Ember lantern.
@@ -17,6 +18,8 @@ const RUN_SPEED = 60
 const JUMP_VELOCITY = -150
 const LIGHT_TOUCH_DISTANCE = 10
 const SPAWN_POINT = { x: 16, y: 120 }
+// Was the size of the 'brushBig' texture, which lanterns stamped unscaled.
+const LANTERN_GLOW_RADIUS = 28
 
 interface Lantern {
   name: string
@@ -27,9 +30,7 @@ interface Lantern {
 export class PlayScene extends Phaser.Scene {
   private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
-  private darkness!: Phaser.GameObjects.RenderTexture
-  private brush!: Phaser.GameObjects.Image
-  private brushBig!: Phaser.GameObjects.Image
+  private darkness!: Darkness
   private lanterns: Lantern[] = []
   private dashKey!: Phaser.Input.Keyboard.Key
   private jumpKey!: Phaser.Input.Keyboard.Key
@@ -232,14 +233,12 @@ export class PlayScene extends Phaser.Scene {
 
     this.updateHud()
 
-    this.darkness = this.add
-      .renderTexture(0, 0, GBC_WIDTH, GBC_HEIGHT)
-      .setOrigin(0)
-      .setScrollFactor(0)
-      .setDepth(10)
-    this.darkness.alpha = initialDarkness
-    this.brush = new Phaser.GameObjects.Image(this, 0, 0, 'brush')
-    this.brushBig = new Phaser.GameObjects.Image(this, 0, 0, 'brushBig')
+    this.darkness = new Darkness(this, {
+      width: GBC_WIDTH,
+      height: GBC_HEIGHT,
+      depth: 10,
+      alpha: initialDarkness,
+    })
 
     this.respawnPoint = { x: spawnX, y: spawnY }
     this.lastGroundedAt = 0
@@ -812,25 +811,18 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private redrawDarkness() {
-    const cam = this.cameras.main
-    const radius = this.playerLightRadius()
-    this.darkness.clear()
-    this.darkness.fill(0x000000, 1)
-    // erase() honors the brush's center origin: pass the light's center
-    this.brush.setDisplaySize(radius * 2, radius * 2)
-    this.darkness.erase(
-      this.brush,
-      this.player.x - cam.scrollX,
-      this.player.y - cam.scrollY,
-    )
+    const lights: Light[] = [
+      { x: this.player.x, y: this.player.y, radius: this.playerLightRadius() },
+    ]
     for (const lantern of this.lanterns) {
       if (lantern.lit) {
-        this.darkness.erase(
-          this.brushBig,
-          lantern.sprite.x - cam.scrollX,
-          lantern.sprite.y - cam.scrollY,
-        )
+        lights.push({
+          x: lantern.sprite.x,
+          y: lantern.sprite.y,
+          radius: LANTERN_GLOW_RADIUS,
+        })
       }
     }
+    this.darkness.redraw(lights)
   }
 }
