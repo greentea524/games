@@ -366,14 +366,10 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('lanternLit', 6, 6)
     g.clear()
 
-    // Light brushes for the darkness-overlay reveal (KAN-109 decision)
-    g.fillStyle(0xffffff)
-    g.fillCircle(24, 24, 24)
-    g.generateTexture('brush', 48, 48)
-    g.clear()
-    g.fillStyle(0xffffff)
-    g.fillCircle(28, 28, 28)
-    g.generateTexture('brushBig', 56, 56)
+    // The light brushes for the darkness overlay (KAN-109) used to be built
+    // here. shared/lighting.ts now generates one per radius on demand, so a
+    // shrinking or growing light gets a native-size circle instead of a
+    // scaled one.
     g.destroy()
   }
 }
