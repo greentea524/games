@@ -719,6 +719,24 @@ export const REN_DESK_DEF: NpcDef = {
 }
 
 // First branch whose flag conditions match the current state.
+/**
+ * The current objective, read off whichever journal entry applies right now.
+ *
+ * JOURNAL_DEF marks its directive line with a leading '>', and its last
+ * branch has no `requires`, so there is always an entry and always a
+ * directive — but the fallback is kept anyway rather than asserting.
+ *
+ * This exists so the objective can be shown where the player is. The notebook
+ * prop itself only exists in one room, which is the one place you are not
+ * standing when you get lost.
+ */
+export function currentObjective(): string | null {
+  for (const line of resolveDialogue(JOURNAL_DEF)) {
+    if (line.text.startsWith('>')) return line.text.slice(1).trim()
+  }
+  return null
+}
+
 export function resolveDialogue(npc: NpcDef): DialogueLine[] {
   for (const b of npc.branches) {
     if (b.requires && !GameState.getFlag(b.requires)) continue
