@@ -54,14 +54,25 @@
         
         .gb-controls { display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 400px; padding: 10px; margin-bottom: 15px; }
         
-        .d-pad { position: relative; width: 120px; height: 120px; }
+        /* 40px arms were under both the 44pt (iOS) and 48dp (Android) minimum
+           touch target. Arms are percentages of the pad so the whole control
+           scales from this one width. */
+        .d-pad { position: relative; width: 150px; height: 150px; }
         .d-btn { position: absolute; background: #333; border-radius: 4px; touch-action: none; transition: background 0.1s; display: flex; align-items: center; justify-content: center; color: #1c1c1c; font-size: 12px; user-select: none; -webkit-user-select: none; -moz-user-select: none; -webkit-touch-callout: none; }
         .d-btn:active, .d-btn.active-kb { background: #111; color: #000; }
-        .d-up { top: 0; left: 40px; width: 40px; height: 40px; border-radius: 4px 4px 0 0; }
-        .d-down { bottom: 0; left: 40px; width: 40px; height: 40px; border-radius: 0 0 4px 4px; }
-        .d-left { top: 40px; left: 0; width: 40px; height: 40px; border-radius: 4px 0 0 4px; }
-        .d-right { top: 40px; right: 0; width: 40px; height: 40px; border-radius: 0 4px 4px 0; }
-        .d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; position: absolute; }
+        .d-btn, .d-center { width: 33.3333%; height: 33.3333%; }
+        .d-up { top: 0; left: 33.3333%; border-radius: 4px 4px 0 0; }
+        .d-down { bottom: 0; left: 33.3333%; border-radius: 0 0 4px 4px; }
+        .d-left { top: 33.3333%; left: 0; border-radius: 4px 0 0 4px; }
+        .d-right { top: 33.3333%; right: 0; border-radius: 0 4px 4px 0; }
+        .d-center { top: 33.3333%; left: 33.3333%; background: #333; position: absolute; }
+
+        /* At 320px there is only ~29px of horizontal slack between the pad and
+           the action buttons, so the full size would collide. 132px still gives
+           44px arms, which clears the iOS minimum. */
+        @media (max-width: 340px) {
+          .d-pad { width: 132px; height: 132px; }
+        }
 
         .action-btns { display: flex; gap: 15px; transform: rotate(-20deg); align-items: flex-end; }
         .a-btn { width: 50px; height: 50px; background: #b00; border-radius: 50%; box-shadow: 0 4px 0 #500; touch-action: none; display: flex; align-items: center; justify-content: center; color: #500; font-family: sans-serif; font-weight: bold; transition: transform 0.1s, box-shadow 0.1s, background 0.1s; user-select: none; -webkit-user-select: none; -moz-user-select: none; -webkit-touch-callout: none; }
