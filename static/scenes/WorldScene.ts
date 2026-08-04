@@ -507,11 +507,11 @@ export class WorldScene extends Phaser.Scene {
         GameState.getFlag('flower_delivered') &&
         !GameState.getFlag('thread_flower_done')
       ) {
-        this.spawnPickup(5, 19, 'photo', 'thread_flower_done', mode)
+        this.spawnPickup(5, 19, 'photo', 'thread_flower_done', mode, 'chapter2_done')
       }
     }
     if (this.mapKey === 'cellar' && !GameState.getFlag('thread_fountain_done')) {
-      this.spawnPickup(5, 3, 'ledger', 'thread_fountain_done', mode)
+      this.spawnPickup(5, 3, 'ledger', 'thread_fountain_done', mode, 'chapter2_done')
     }
   }
 
@@ -799,12 +799,22 @@ export class WorldScene extends Phaser.Scene {
     })
   }
 
+  /**
+   * Places a one-time item pickup on the map.
+   *
+   * `chapterFlag` is the story beat this pickup completes, and it is explicit
+   * because it used to be hardcoded to 'chapter2_done' here — correct for the
+   * two Chapter 2 payoffs below, but it meant any pickup added later would
+   * silently advance the chapter. This is the only writer of that flag;
+   * `applyStoryState` reads it to move GameState.chapter to 3.
+   */
   private spawnPickup(
     tx: number,
     ty: number,
     itemId: string,
     doneFlag: string,
     mode: 'dmg' | 'gbc',
+    chapterFlag?: string,
   ) {
     const px = tx * TILE + TILE / 2
     const py = ty * TILE + TILE / 2
@@ -814,7 +824,7 @@ export class WorldScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, zone, () => {
       if (GameState.getFlag(doneFlag)) return
       GameState.setFlag(doneFlag)
-      GameState.setFlag('chapter2_done')
+      if (chapterFlag) GameState.setFlag(chapterFlag)
       GameState.addItem(itemId)
       sfx.pickup()
       ;(this.scene.get('ui') as UIScene).showItemToast(itemId)
