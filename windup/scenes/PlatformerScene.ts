@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { TILE, GBC_WIDTH, GBC_HEIGHT } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT } from '../constants'
 import { GameState } from '../state'
 import { LEVELS } from '../levels'
 import { sfx, music } from '../audio'
@@ -120,14 +120,14 @@ export class PlatformerScene extends Phaser.Scene {
 
     this.physics.add.collider(this.player, this.platforms)
     this.physics.add.collider(this.player, this.movingPlatforms)
-    this.physics.add.overlap(this.player, this.stations, (p, s) => this.reachStation(s as Phaser.Types.Physics.Arcade.SpriteWithStaticBody))
+    this.physics.add.overlap(this.player, this.stations, (_p, s) => this.reachStation(s as Phaser.Types.Physics.Arcade.SpriteWithStaticBody))
 
     this.physics.add.overlap(this.player, this.springs, () => {
       this.player.setVelocityY(-350)
       this.coyoteTimer = 0
     })
 
-    this.physics.add.overlap(this.player, this.pickups, (p, pickup) => {
+    this.physics.add.overlap(this.player, this.pickups, (_p, pickup) => {
       pickup.destroy()
       GameState.addEnergy(20)
     })

@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHT, CSS_LIGHTEST, CSS_DARKEST, CSS_MID, PAL, GBC_PAL } from '../constants'
+import { GBC_WIDTH, FONT, CSS_LIGHTEST, CSS_DARKEST, CSS_MID, PAL } from '../constants'
 import { GameState } from '../state'
-import { music, sfx, isMuted, setMuted } from '../audio'
+import { sfx, isMuted, setMuted } from '../audio'
 
 export class MainMenuScene extends Phaser.Scene {
   private selectedIndex = 0
