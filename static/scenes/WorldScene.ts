@@ -13,6 +13,7 @@ import { GameState } from '../state'
 import { StaticWorldFX } from '../fx/StaticWorldFX'
 import { sfx, music } from '../audio'
 import { NPCS, currentTarget } from '../dialogue'
+import { Darkness } from '../../shared/lighting'
 import type { NpcDef } from '../dialogue'
 import {
   VALVE_DEF,
@@ -53,6 +54,15 @@ interface Structure {
 // Within this many tiles of the objective, the marker stops drawing — you can
 // see the place by then, and a marker on top of you is noise.
 const DESTINATION_NEAR_TILES = 4
+
+/**
+ * How far the player can see in a dark room (#73).
+ *
+ * A working flashlight lights the room; a dead one, or none at all, leaves
+ * barely more than arm's reach. Deliberately the same for 'dead' and 'absent':
+ * a broken light and no light should look identical, which is the joke.
+ */
+const LIGHT_RADIUS = { lit: 44, dim: 18 } as const
 
 const GUS_HUT: Structure = { x0: 2, y0: 11, w: 3, roofRows: 2, wallRow: 13, doorX: 3 }
 const REN_HOUSE: Structure = { x0: 18, y0: 16, w: 3, roofRows: 2, wallRow: 18, doorX: 19 }
@@ -99,6 +109,9 @@ export class WorldScene extends Phaser.Scene {
   private npcs: NpcInstance[] = []
   private interactKey!: Phaser.Input.Keyboard.Key
   private prompt?: Phaser.GameObjects.Container
+
+  // Darkness overlay, only on maps flagged `dark` in Tiled (#73)
+  private darkness?: Darkness
 
   // Minimap (only on maps larger than one screen)
   private blip?: Phaser.GameObjects.Graphics
@@ -317,6 +330,7 @@ export class WorldScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.Z,
     )
 
+    this.buildDarkness(map)
     this.buildMinimap(map, ground)
 
     if (!this.scene.isActive('ui')) this.scene.launch('ui')
@@ -1000,6 +1014,64 @@ export class WorldScene extends Phaser.Scene {
     })
   }
 
+  /**
+   * Darkness overlay for maps flagged `dark` in Tiled (#73).
+   *
+   * Depth 20 puts it over the world and the player but under the minimap
+   * (1000), the interact prompt (2000) and the dialogue box, so the UI stays
+   * readable in the dark.
+   */
+  private buildDarkness(map: Phaser.Tilemaps.Tilemap) {
+    this.darkness = undefined
+    // Phaser hands back an array of {name, value} for a map that has Tiled
+    // properties, but a plain object for one that has none — so this must
+    // check the shape, not just for absence. Assuming the array crashed every
+    // unmarked map, which is most of them.
+    const raw = map.properties as unknown
+    const props = Array.isArray(raw) ? (raw as { name: string; value: unknown }[]) : []
+    const prop = (n: string) => props.find((x) => x.name === n)?.value
+    if (prop('dark') !== true) return
+
+    const alpha = typeof prop('darkAlpha') === 'number' ? (prop('darkAlpha') as number) : 0.9
+    this.darkness = new Darkness(this, {
+      width: GBC_WIDTH,
+      height: GBC_HEIGHT,
+      depth: 20,
+      alpha,
+    })
+  }
+
+  /**
+   * How far the player can see. A working flashlight lights the room; a dead
+   * one is worth no more than none at all.
+   *
+   * Note this reads the item, not the `got_flashlight` flag — the flag records
+   * that Mom handed it over and stays set forever, including on the static
+   * side where the thing in your hands does not work.
+   */
+  private playerLightRadius(): number {
+    return GameState.hasItem('flashlight') ? LIGHT_RADIUS.lit : LIGHT_RADIUS.dim
+  }
+
+  private redrawDarkness() {
+    if (!this.darkness) return
+    this.darkness.redraw([
+      { x: this.player.x, y: this.player.y, radius: this.playerLightRadius() },
+    ])
+  }
+
+  // Deliberately no interaction gating here.
+  //
+  // #73 proposed hiding the interact prompt for targets outside the lit
+  // radius, so light would be a key rather than a filter. That is unsafe on
+  // town_static: reaching Chapter 3 requires examining the Baker's house and
+  // Gus's hut on that side, and the flashlight is dead there — gating would
+  // make the game unfinishable. Darkness affects what you can see, not what
+  // you can touch.
+  //
+  // A future dark room that is genuinely optional could gate its own props
+  // via a per-interactable flag. Nothing today needs it.
+
   // A corner minimap showing buildings/water/trees + a blinking player
   // blip. Skipped on maps that already fit one screen (e.g. interiors).
   private buildMinimap(
@@ -1142,6 +1214,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.transitioning) return
 
     this.updateMinimap()
+    this.redrawDarkness()
 
     // Consume the interact key every frame so a held key can't double-fire
     // across the dialogue open/close boundary.
