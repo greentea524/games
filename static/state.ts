@@ -1,6 +1,17 @@
 // Global game state: story flags + inventory + UI-blocking status,
 // serialized to localStorage (#16).
 import { TRANSFORMS, type TransformEvent } from './items'
+import { loadSave, saveSave, clearSave } from '../shared/storage'
+
+interface Saved {
+  chapter: number
+  flags: Record<string, boolean>
+  inventory: string[]
+  world: 'normal' | 'static'
+  mapKey: string
+  tx: number
+  ty: number
+}
 
 const SAVE_KEY = 'static_save'
 const SAVE_VERSION = 1
@@ -85,38 +96,54 @@ class GameStateClass {
 
   save() {
     if (!this.lastMap) return // nothing meaningful to restore yet
-    localStorage.setItem(
-      SAVE_KEY,
-      JSON.stringify({
-        version: SAVE_VERSION,
-        chapter: this.chapter,
-        flags: this.flags,
-        inventory: this.inventory,
-        world: this.world,
-        ...this.lastMap,
-      }),
-    )
+    saveSave(SAVE_KEY, SAVE_VERSION, {
+      chapter: this.chapter,
+      flags: this.flags,
+      inventory: this.inventory,
+      world: this.world,
+      ...this.lastMap,
+    })
   }
 
   hasSave(): boolean {
-    return !!localStorage.getItem(SAVE_KEY)
+    return this.readSave() !== null
+  }
+
+  /**
+   * Both shapes are accepted: the envelope written now, and the pre-#67 value
+   * that carried `version: 1` inline. Both are version 1 payloads with the
+   * same fields, so `storedVersion` tells them apart without either branch
+   * needing different handling.
+   */
+  private readSave(): Saved | null {
+    return loadSave<Saved | null>(SAVE_KEY, SAVE_VERSION, null, (payload, storedVersion) => {
+      if (storedVersion !== SAVE_VERSION) return null // unknown schema: fresh start
+      if (typeof payload !== 'object' || payload === null) return null
+      const d = payload as Record<string, unknown>
+      return {
+        chapter: typeof d.chapter === 'number' ? d.chapter : 1,
+        flags:
+          typeof d.flags === 'object' && d.flags !== null
+            ? (d.flags as Record<string, boolean>)
+            : {},
+        inventory: Array.isArray(d.inventory) ? (d.inventory as string[]) : [],
+        world: d.world === 'static' ? 'static' : 'normal',
+        mapKey: typeof d.mapKey === 'string' ? d.mapKey : 'town',
+        tx: typeof d.tx === 'number' ? d.tx : 11,
+        ty: typeof d.ty === 'number' ? d.ty : 18,
+      }
+    })
   }
 
   load(): boolean {
-    try {
-      const raw = localStorage.getItem(SAVE_KEY)
-      if (!raw) return false
-      const d = JSON.parse(raw)
-      if (d.version !== SAVE_VERSION) return false // schema mismatch: fresh start
-      this.chapter = d.chapter ?? 1
-      this.flags = d.flags ?? {}
-      this.inventory = Array.isArray(d.inventory) ? d.inventory : []
-      this.world = d.world === 'static' ? 'static' : 'normal'
-      this.lastMap = { mapKey: d.mapKey ?? 'town', tx: d.tx ?? 11, ty: d.ty ?? 18 }
-      return true
-    } catch {
-      return false
-    }
+    const d = this.readSave()
+    if (!d) return false
+    this.chapter = d.chapter
+    this.flags = d.flags
+    this.inventory = d.inventory
+    this.world = d.world
+    this.lastMap = { mapKey: d.mapKey, tx: d.tx, ty: d.ty }
+    return true
   }
 
   reset() {
@@ -125,7 +152,7 @@ class GameStateClass {
     this.world = 'normal'
     this.chapter = 1
     this.lastMap = null
-    localStorage.removeItem(SAVE_KEY)
+    clearSave(SAVE_KEY)
   }
 }
 

@@ -1,6 +1,9 @@
 // --- Meta-Progression: Persistent data saved to LocalStorage ---
 
+import { loadSave, saveSave } from '../shared/storage'
+
 const SAVE_KEY = 'pocket_dungeon_meta'
+const SAVE_VERSION = 1
 
 export type ClassName = 'knight' | 'scout' | 'alchemist'
 
@@ -77,20 +80,19 @@ function defaultSave(): MetaSave {
 }
 
 export function loadMeta(): MetaSave {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<MetaSave>
-      return { ...defaultSave(), ...parsed }
-    }
-  } catch { /* ignore */ }
-  return defaultSave()
+  // No try/catch: loadSave does not throw, which is the reason it exists.
+  //
+  // Spreading over the defaults means a field missing from an older save gets
+  // its default rather than becoming undefined, so no version gate is applied
+  // here — every field is optional by construction.
+  return loadSave(SAVE_KEY, SAVE_VERSION, defaultSave(), (payload) => {
+    if (typeof payload !== 'object' || payload === null) return null
+    return { ...defaultSave(), ...(payload as Partial<MetaSave>) }
+  })
 }
 
 export function saveMeta(meta: MetaSave) {
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(meta))
-  } catch { /* ignore */ }
+  saveSave(SAVE_KEY, SAVE_VERSION, meta)
 }
 
 export function addGold(amount: number) {

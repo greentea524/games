@@ -142,6 +142,7 @@ export class PlatformerScene extends Phaser.Scene {
     if (GameState.levelIndex === 32) {
       // Run over: bank the last segment so the HUD freezes on the final time.
       GameState.speedrunBank()
+      GameState.completed = true
       GameState.saveGame()
 
       this.cameras.main.fadeOut(2000)
