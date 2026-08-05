@@ -20,7 +20,7 @@ export class TitleScene extends Phaser.Scene {
 
     const title = this.add
       .text(GBC_WIDTH / 2, 36, 'STATIC', {
-        fontFamily: '"Press Start 2P"',
+        fontFamily: '"Press Start 2P", monospace',
         fontSize: '16px',
         color: '#9bbc0f',
         resolution: 1,
@@ -37,9 +37,12 @@ export class TitleScene extends Phaser.Scene {
       },
     })
     this.add
-      .text(GBC_WIDTH / 2, 58, 'a small town is fading', {
-        fontFamily: '"Press Start 2P"',
-        fontSize: '7px',
+      // 'a small town is fading' is 22 characters — 176px at the font's
+      // native 8px, wider than the screen. Wrapping it to two lines ran the
+      // second line into the sprites below, so the line is shortened instead.
+      .text(GBC_WIDTH / 2, 58, 'a small town fades', {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '8px',
         color: '#306230',
         resolution: 1,
       })
@@ -60,7 +63,7 @@ export class TitleScene extends Phaser.Scene {
     this.options = this.labels.map((label, i) =>
       this.add
         .text(GBC_WIDTH / 2, 94 + i * 16, label, {
-          fontFamily: '"Press Start 2P"',
+          fontFamily: '"Press Start 2P", monospace',
           fontSize: '8px',
           color: '#8bac0f',
           resolution: 1,

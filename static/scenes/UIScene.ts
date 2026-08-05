@@ -6,12 +6,17 @@ import { sfx } from '../audio'
 import type { NpcDef, DialogueLine, ChoiceOption } from '../dialogue'
 import type { TransformEvent } from '../items'
 
-const FONT = '"Press Start 2P"'
+const FONT = '"Press Start 2P", monospace'
 // Top of the 'A / SELECT: close' hint; item rows must stay above it.
 const HINT_TOP = GBC_HEIGHT - 18
 // Floor for item row spacing: the icons are 16px, so anything tighter
 // overlaps them. An unreadable list is worse than a cramped one.
 const MIN_ROW = 16
+// How far the last item row reaches below its baseline: the icon is centred
+// at y + 4 and is 16px tall, so it bottoms out at y + 12.
+const ROW_OVERHANG = 12
+// Space between the objective/notes block and the first item row.
+const ITEMS_GAP = 8
 const CSS_LIGHT = '#9bbc0f'
 const CSS_MID = '#8bac0f'
 
@@ -50,7 +55,13 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
-    const boxH = 50
+    // 58, not 50. Press Start 2P is a bitmap face on an 8px grid: at 7px it
+    // renders at 0.875x and the glyph strokes land between pixels, which is
+    // what made this text mushy. At its native 8px it is crisp, but wraps
+    // wider — and the old box was already too short, overflowing on 10 of the
+    // game's 137 lines at 7px. Measured against all 137, the tallest needs
+    // 38px of body, so the box is sized to that rather than to the average.
+    const boxH = 58
     const boxY = GBC_HEIGHT - boxH - 2
 
     this.box = this.add.graphics().setDepth(1000)
@@ -60,12 +71,12 @@ export class UIScene extends Phaser.Scene {
     this.box.strokeRoundedRect(3, boxY, GBC_WIDTH - 6, boxH, 3)
 
     this.nameText = this.add
-      .text(8, boxY + 4, '', { fontFamily: FONT, fontSize: '7px', color: CSS_MID, resolution: 2 })
+      .text(8, boxY + 4, '', { fontFamily: FONT, fontSize: '8px', color: CSS_MID, resolution: 2 })
       .setDepth(1001)
     this.bodyText = this.add
-      .text(8, boxY + 15, '', {
+      .text(8, boxY + 16, '', {
         fontFamily: FONT,
-        fontSize: '7px',
+        fontSize: '8px',
         color: CSS_LIGHT,
         resolution: 2,
         lineSpacing: 2,
@@ -75,7 +86,7 @@ export class UIScene extends Phaser.Scene {
     this.arrow = this.add
       .text(GBC_WIDTH - 12, GBC_HEIGHT - 10, '▼', {
         fontFamily: FONT,
-        fontSize: '7px',
+        fontSize: '8px',
         color: CSS_LIGHT,
         resolution: 2,
       })
@@ -160,7 +171,7 @@ export class UIScene extends Phaser.Scene {
   public showItemToast(itemId: string) {
     const def = ITEMS[itemId]
     const itemName = def ? def.name : itemId
-    this.showToast(itemId, `Obtained ${itemName}!\nStored into inventory.`)
+    this.showToast(itemId, `${itemName}\nadded to bag`)
   }
 
   /**
@@ -181,7 +192,9 @@ export class UIScene extends Phaser.Scene {
     if (this.toastContainer) this.toastContainer.destroy()
 
     const w = GBC_WIDTH - 16
-    const h = 22
+    // 30, not 22: at the font's native 8px two lines need 20px plus padding,
+    // and a wrapped message can take two.
+    const h = 30
     const cx = GBC_WIDTH / 2
     const startY = -h - 2
     const endY = 4
@@ -193,12 +206,15 @@ export class UIScene extends Phaser.Scene {
     bg.strokeRoundedRect(-w / 2, 0, w, h, 3)
 
     const icon = this.add.image(-w / 2 + 12, h / 2, iconKey).setOrigin(0.5)
-    const text = this.add.text(-w / 2 + 24, 3, message, {
+    const text = this.add.text(-w / 2 + 24, 5, message, {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
       lineSpacing: 2,
+      // The icon eats the left 24px; without a wrap the message ran clean off
+      // the screen — 'The flashlight flickers back on.' measured 210px wide.
+      wordWrap: { width: w - 28 },
     })
 
     this.toastContainer = this.add.container(cx, startY, [bg, icon, text]).setDepth(2000)
@@ -228,12 +244,12 @@ export class UIScene extends Phaser.Scene {
 
     const text = this.add.text(5, 3, label, {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     })
     const w = Math.ceil(text.width) + 10
-    const h = 13
+    const h = 15
 
     const bg = this.add.graphics()
     bg.fillStyle(PAL.darkest, 0.9)
@@ -359,7 +375,7 @@ export class UIScene extends Phaser.Scene {
     bg.strokeRect(4, 4, GBC_WIDTH - 8, GBC_HEIGHT - 8)
     const hint = this.add.text(10, GBC_HEIGHT - 16, 'A / SELECT: close', {
       fontFamily: FONT,
-      fontSize: '7px',
+      fontSize: '8px',
       color: CSS_MID,
       resolution: 2,
     })
@@ -374,23 +390,30 @@ export class UIScene extends Phaser.Scene {
     // which is the one place you are not standing when you get lost.
     this.invObjective = this.add.text(10, 10, '', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       // The brightest value in the palette, not CSS_LIGHT: with thread notes
       // beneath it, light-vs-mid is too close to establish which line leads.
       color: '#e0f8cf',
       resolution: 2,
-      lineSpacing: 3,
+      // 1, not 3. Three lines of 8px text with generous leading did not leave
+      // room for five item rows; tightening the leading buys those lines back
+      // without shortening the directives into telegram English.
+      lineSpacing: 1,
       wordWrap: { width: GBC_WIDTH - 20 },
+      // Hard cap, so a longer directive added later cannot silently push item
+      // rows off the panel. Every directive today fits inside it — see the
+      // wrap check — so this is a backstop, not something players will see.
+      maxLines: 3,
     })
 
     // Open side threads, under the objective and dimmer than it. These are
     // reminders, not instructions — the directive above stays the loud line.
     this.invNotes = this.add.text(10, 0, '', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: CSS_MID,
       resolution: 2,
-      lineSpacing: 3,
+      lineSpacing: 1,
       wordWrap: { width: GBC_WIDTH - 20 },
     })
 
@@ -427,7 +450,14 @@ export class UIScene extends Phaser.Scene {
     // nicety — the objective above it already says what to do next.
     const notes = openThreads()
     const notesTop = objBottom + 6
-    const budget = HINT_TOP - notesTop - GameState.inventory.length * MIN_ROW
+    // What the item list needs below the notes. Rows are spaced MIN_ROW apart,
+    // but the last one reaches ROW_OVERHANG past its baseline because the icon
+    // is drawn centred at y+4 with a 16px height — reserving only
+    // rows * MIN_ROW undercounts by half an icon and overflows by a hair.
+    const rowCount = GameState.inventory.length
+    const itemsNeed =
+      rowCount > 0 ? ITEMS_GAP + (rowCount - 1) * MIN_ROW + ROW_OVERHANG : 0
+    const budget = HINT_TOP - notesTop - itemsNeed
 
     this.invNotes.setPosition(10, notesTop)
     if (notes.length === 0) {
@@ -445,7 +475,8 @@ export class UIScene extends Phaser.Scene {
     const notesBottom = this.invNotes.text
       ? this.invNotes.y + this.invNotes.height
       : objBottom
-    const itemsTop = objective || this.invNotes.text ? notesBottom + 8 : 28
+    const itemsTop =
+      objective || this.invNotes.text ? notesBottom + ITEMS_GAP : 28
 
     if (GameState.inventory.length === 0) {
       this.inv.add(

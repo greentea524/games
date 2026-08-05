@@ -42,8 +42,8 @@ export const TRANSFORMS: Transform[] = [
   {
     normal: 'flower',
     statik: 'flower_fresh',
-    intoStatic: 'The flower blooms.',
-    intoNormal: 'The flower wilts again.',
+    intoStatic: 'Flower blooms.',
+    intoNormal: 'Flower wilts.',
   },
   // Deliberately an inversion of the flower: crossing over makes this one
   // worse. If every transform were an upgrade, carrying the whole inventory
@@ -52,8 +52,8 @@ export const TRANSFORMS: Transform[] = [
   {
     normal: 'flashlight',
     statik: 'flashlight_dead',
-    intoStatic: 'The flashlight dies.',
-    intoNormal: 'The flashlight flickers back on.',
+    intoStatic: 'Flashlight dies.',
+    intoNormal: 'Flashlight works.',
   },
 ]
 
