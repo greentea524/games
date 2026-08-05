@@ -48,6 +48,11 @@ export class PlatformerScene extends Phaser.Scene {
       // first line of the handler, so scene.pause() below never ran and pause
       // did not work at all.
       sfx.menuSelect()
+      // Stop the run clock while the menu is up. Pausing the 'ui' scene would
+      // only freeze the display: the elapsed value is recomputed from the
+      // wall clock, so it would jump forward the moment play resumed.
+      GameState.speedrunBank()
+      GameState.saveGame()
       this.scene.pause('platformer')
       this.scene.launch('pause')
     }
@@ -74,11 +79,10 @@ export class PlatformerScene extends Phaser.Scene {
       GameState.checkpointY = level.spawn.y
     }
     
-    // Start speedrun timer if it's not running
-    if (!GameState.speedrunStartTime) {
-      GameState.speedrunStartTime = Date.now()
-      GameState.saveGame()
-    }
+    // create() runs on every level restart; speedrunResume() is idempotent,
+    // so this starts the clock on the first level and is a no-op after.
+    GameState.speedrunResume()
+    GameState.saveGame()
 
     level.platforms.forEach(p => this.platforms.create(p.x, p.y, `tiles_${mode}`, 1))
     level.springs.forEach(p => this.springs.create(p.x, p.y, `tiles_${mode}`, 2))
@@ -136,10 +140,8 @@ export class PlatformerScene extends Phaser.Scene {
     this.isTransitioning = true
 
     if (GameState.levelIndex === 32) {
-      if (GameState.speedrunStartTime) {
-        GameState.speedrunTimeMillis = Date.now() - GameState.speedrunStartTime
-        GameState.speedrunStartTime = null
-      }
+      // Run over: bank the last segment so the HUD freezes on the final time.
+      GameState.speedrunBank()
       GameState.saveGame()
 
       this.cameras.main.fadeOut(2000)
@@ -151,7 +153,8 @@ export class PlatformerScene extends Phaser.Scene {
 
       this.time.delayedCall(3000, () => {
         GameState.levelIndex = 1
-        GameState.speedrunTimeMillis = 0
+        GameState.speedrunElapsedMs = 0
+        GameState.speedrunResumedAt = null
         GameState.saveGame()
         sfx.win()
         this.scene.restart()

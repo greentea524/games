@@ -45,12 +45,7 @@ export class UIScene extends Phaser.Scene {
     this.updateEnergyBar()
     this.levelText.setText(`LVL ${GameState.levelIndex}/32`)
     
-    let currentMillis = 0
-    if (GameState.speedrunStartTime && GameState.speedrunStartTime > 0) {
-      currentMillis = Date.now() - GameState.speedrunStartTime
-    } else if (GameState.speedrunTimeMillis > 0) {
-      currentMillis = GameState.speedrunTimeMillis
-    }
+    const currentMillis = GameState.speedrunDisplayMs
 
     const mins = Math.floor(currentMillis / 60000)
     const secs = Math.floor((currentMillis % 60000) / 1000)

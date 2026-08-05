@@ -92,11 +92,16 @@ export class PauseScene extends Phaser.Scene {
   }
 
   private resumeGame() {
+    // Restart the run clock; it was banked when the menu opened.
+    GameState.speedrunResume()
     this.scene.resume('platformer')
     this.scene.stop()
   }
 
   private quitToMenu() {
+    // Abandoning to the menu leaves the clock stopped, not running in the
+    // background — it was already banked on pause, so just persist it.
+    GameState.saveGame()
     this.scene.stop('platformer')
     this.scene.stop('ui')
     this.scene.start('mainmenu')
