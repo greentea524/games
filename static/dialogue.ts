@@ -18,6 +18,15 @@ interface DialogueBranch {
   excludes?: string // flag that must NOT be set
   requiresItem?: string // item the player must carry for this branch
   lines: DialogueLine[]
+  /**
+   * Town tile the minimap marker points at while this branch is current (#78).
+   * Only JOURNAL_DEF sets it — the target lives next to the directive it
+   * belongs to, so the two are resolved by one pass and cannot drift apart.
+   *
+   * Coordinates are always on the town map, because that is the only map with
+   * a minimap. Somewhere indoors is represented by the door that leads there.
+   */
+  target?: { tx: number; ty: number }
 }
 
 export interface NpcDef {
@@ -554,6 +563,7 @@ export const JOURNAL_DEF: NpcDef = {
   branches: [
     {
       requires: 'ch4_done',
+      target: { tx: 6, ty: 8 }, // the TV, back home
       lines: [
         { text: 'Last entry:' },
         { text: 'Ren is safe. The static took something else instead.' },
@@ -563,6 +573,7 @@ export const JOURNAL_DEF: NpcDef = {
     },
     {
       requires: 'ch3_done',
+      target: { tx: 19, ty: 18 }, // Ren's house and the beacon
       lines: [
         { text: 'Last entry:' },
         { text: "Ren's house is next. I am sure of it." },
@@ -572,6 +583,7 @@ export const JOURNAL_DEF: NpcDef = {
     },
     {
       requires: 'gus_hut_vanished',
+      target: { tx: 6, ty: 8 }, // the TV — crossing over starts at home
       lines: [
         { text: 'Last entry:' },
         { text: 'Gus is gone. Nobody remembers the hut was there.' },
@@ -581,6 +593,7 @@ export const JOURNAL_DEF: NpcDef = {
     },
     {
       requires: 'chapter2_done',
+      target: { tx: 6, ty: 8 }, // the TV again
       lines: [
         { text: 'Last entry:' },
         { text: 'Things carried through the TV come back changed.' },
@@ -590,6 +603,7 @@ export const JOURNAL_DEF: NpcDef = {
     },
     {
       requires: 'heard_about_house',
+      target: { tx: 6, ty: 8 }, // home, to try the TV
       lines: [
         { text: 'Last entry:' },
         { text: "The baker's house is gone and I am the only one who saw it." },
@@ -599,6 +613,7 @@ export const JOURNAL_DEF: NpcDef = {
     },
     {
       requires: 'got_flashlight',
+      target: { tx: 5, ty: 19 }, // where the Baker's house stood
       lines: [
         { text: 'Last entry:' },
         { text: 'Power keeps flickering. Mom gave me the flashlight.' },
@@ -606,6 +621,7 @@ export const JOURNAL_DEF: NpcDef = {
       ],
     },
     {
+      target: { tx: 9, ty: 8 }, // Mom, standing in town
       lines: [
         { text: 'Your notebook. Mostly drawings.' },
         { text: 'The last page is blank, waiting.' },
@@ -794,12 +810,26 @@ export function currentObjective(): string | null {
   return null
 }
 
-export function resolveDialogue(npc: NpcDef): DialogueLine[] {
+/** The branch that applies right now, or null when none does. */
+function resolveBranch(npc: NpcDef): DialogueBranch | null {
   for (const b of npc.branches) {
     if (b.requires && !GameState.getFlag(b.requires)) continue
     if (b.excludes && GameState.getFlag(b.excludes)) continue
     if (b.requiresItem && !GameState.hasItem(b.requiresItem)) continue
-    return b.lines
+    return b
   }
-  return [{ text: '...' }]
+  return null
+}
+
+export function resolveDialogue(npc: NpcDef): DialogueLine[] {
+  return resolveBranch(npc)?.lines ?? [{ text: '...' }]
+}
+
+/**
+ * Where the current objective is, as a town tile — read off the same journal
+ * branch the directive comes from, so the marker and the text can never
+ * disagree. Null when the current entry has no target.
+ */
+export function currentTarget(): { tx: number; ty: number } | null {
+  return resolveBranch(JOURNAL_DEF)?.target ?? null
 }
