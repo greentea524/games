@@ -12,7 +12,7 @@ import {
 import { GameState } from '../state'
 import { StaticWorldFX } from '../fx/StaticWorldFX'
 import { sfx, music } from '../audio'
-import { NPCS } from '../dialogue'
+import { NPCS, currentTarget } from '../dialogue'
 import type { NpcDef } from '../dialogue'
 import {
   VALVE_DEF,
@@ -50,6 +50,10 @@ interface Structure {
   wallRow: number
   doorX: number
 }
+// Within this many tiles of the objective, the marker stops drawing — you can
+// see the place by then, and a marker on top of you is noise.
+const DESTINATION_NEAR_TILES = 4
+
 const GUS_HUT: Structure = { x0: 2, y0: 11, w: 3, roofRows: 2, wallRow: 13, doorX: 3 }
 const REN_HOUSE: Structure = { x0: 18, y0: 16, w: 3, roofRows: 2, wallRow: 18, doorX: 19 }
 // Chapter 1's bakery is stamped in inline rather than via placeStructure
@@ -1053,6 +1057,11 @@ export class WorldScene extends Phaser.Scene {
   private updateMinimap() {
     if (!this.blip) return
     this.blip.clear()
+
+    // The destination first, so the player's own blip draws over it if they
+    // happen to overlap.
+    this.drawDestinationBlip()
+
     // Blink so the player reads clearly against static building pixels.
     if (Math.floor(this.time.now / 280) % 2 === 0) {
       const bx = this.miniOX + (this.player.x / TILE) * this.miniScale
@@ -1060,6 +1069,38 @@ export class WorldScene extends Phaser.Scene {
       this.blip.fillStyle(PAL.lightest, 1)
       this.blip.fillRect(Math.round(bx) - 1, Math.round(by) - 1, 3, 3)
     }
+  }
+
+  /**
+   * Marks where the current objective is (#78).
+   *
+   * Targets are town tiles, so this only draws on the town maps — the other
+   * maps are a single screen and get no minimap at all. It stops drawing once
+   * the player is near, borrowing the rule from Lantern Keeper's guidance
+   * arrow: direction is only useful until you have arrived.
+   */
+  private drawDestinationBlip() {
+    if (this.mapKey !== 'town' && this.mapKey !== 'town_static') return
+    const target = currentTarget()
+    if (!target || !this.blip) return
+
+    const ptx = this.player.x / TILE
+    const pty = this.player.y / TILE
+    const dx = target.tx - ptx
+    const dy = target.ty - pty
+    if (Math.hypot(dx, dy) <= DESTINATION_NEAR_TILES) return
+
+    // A slower blink than the player's 280ms, and off-phase from it, so the
+    // two markers never pulse together and cannot be read as one thing.
+    if (Math.floor(this.time.now / 460) % 2 !== 0) return
+
+    const bx = this.miniOX + (target.tx + 0.5) * this.miniScale
+    const by = this.miniOY + (target.ty + 0.5) * this.miniScale
+    // Brass yellow: distinct from the player's pale green and from the
+    // terracotta the buildings are drawn in.
+    this.blip.fillStyle(GBC_PAL.knobGlow, 1)
+    this.blip.fillRect(Math.round(bx) - 2, Math.round(by), 5, 1)
+    this.blip.fillRect(Math.round(bx), Math.round(by) - 2, 1, 5)
   }
 
   private enterDoor(
