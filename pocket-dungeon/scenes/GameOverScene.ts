@@ -30,12 +30,12 @@ export class GameOverScene extends Phaser.Scene {
     const titleColor = victory ? '#ffd700' : '#ff4444'
     const titleText = victory ? 'VICTORY!' : 'YOU DIED'
     this.add.text(GBC_WIDTH / 2, 8, titleText, {
-      fontFamily: FONT, fontSize: '12px', color: titleColor, resolution: 2,
+      fontFamily: FONT, fontSize: '16px', color: titleColor, resolution: 2,
     }).setOrigin(0.5, 0)
 
     if (victory) {
-      this.add.text(GBC_WIDTH / 2, 24, 'The Vault is cleared!', {
-        fontFamily: FONT, fontSize: '6px', color: '#86b06a', resolution: 2,
+      this.add.text(GBC_WIDTH / 2, 24, 'Vault cleared!', {
+        fontFamily: FONT, fontSize: '8px', color: '#86b06a', resolution: 2,
       }).setOrigin(0.5, 0)
     }
 
@@ -53,10 +53,10 @@ export class GameOverScene extends Phaser.Scene {
     ]
     lines.forEach(([label, value], i) => {
       this.add.text(30, statsY + i * 12, label, {
-        fontFamily: FONT, fontSize: '6px', color: '#7a9a62', resolution: 2,
+        fontFamily: FONT, fontSize: '8px', color: '#7a9a62', resolution: 2,
       })
       this.add.text(GBC_WIDTH - 30, statsY + i * 12, value, {
-        fontFamily: FONT, fontSize: '6px', color: '#e0f8cf', resolution: 2,
+        fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 2,
       }).setOrigin(1, 0)
     })
 

@@ -38,21 +38,21 @@ export class MenuScene extends Phaser.Scene {
     // Menu Options
     const startText = this.add.text(GBC_WIDTH / 2, 74, 'Start Game', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '7px',
+      fontSize: '8px',
       color: '#86b06a',
       resolution: 1,
     }).setOrigin(0.5);
 
     const controlsText = this.add.text(GBC_WIDTH / 2, 92, 'Controls', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '7px',
+      fontSize: '8px',
       color: '#86b06a',
       resolution: 1,
     }).setOrigin(0.5);
 
     const aboutOptionText = this.add.text(GBC_WIDTH / 2, 110, 'About', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '7px',
+      fontSize: '8px',
       color: '#86b06a',
       resolution: 1,
     }).setOrigin(0.5);
@@ -64,7 +64,7 @@ export class MenuScene extends Phaser.Scene {
     this.controlsText = this.add.text(GBC_WIDTH / 2, 85,
       'Arrows: Move & Jump\nX/B: Dash\n\nPress X to return', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '7px',
+      fontSize: '8px',
       color: '#86b06a',
       align: 'center',
       resolution: 1,
@@ -81,7 +81,7 @@ export class MenuScene extends Phaser.Scene {
     const storyText = this.add.text(GBC_WIDTH / 2, 68,
       'An ancient darkness\nhas fallen upon\nthe realm.\n\nLight the ancient\nlanterns to restore\nyour powers & reach\nthe Heart Tree.', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#86b06a',
       align: 'center',
       lineSpacing: 3,
@@ -90,7 +90,7 @@ export class MenuScene extends Phaser.Scene {
 
     const returnText = this.add.text(GBC_WIDTH / 2, 126, 'Press X to return', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 1,
     }).setOrigin(0.5);

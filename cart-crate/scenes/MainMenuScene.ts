@@ -14,18 +14,23 @@ export class MainMenuScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor('#081820')
 
-    this.add.text(GBC_WIDTH / 2, 40, 'CART CRATE', {
+    // Two lines: 'CART CRATE' on one is 163px at 16px, wider than the screen.
+    // Dropping to 8px would keep it on one line but no longer read as a title.
+    this.add.text(GBC_WIDTH / 2, 34, 'CART\nCRATE', {
       fontFamily: FONT,
-      fontSize: '12px',
+      fontSize: '16px',
       color: '#e0f8cf',
       stroke: '#0f380f',
       strokeThickness: 2,
+      align: 'center',
+      lineSpacing: 2,
       resolution: 2,
     }).setOrigin(0.5)
 
-    this.add.text(GBC_WIDTH / 2, 60, 'Sokoban Puzzle', {
+    // Between the two-line title (ends y=51) and the sprite row (starts y=65).
+    this.add.text(GBC_WIDTH / 2, 58, 'Sokoban Puzzle', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#8bac0f',
       resolution: 2,
     }).setOrigin(0.5)

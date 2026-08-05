@@ -663,7 +663,7 @@ export class DungeonScene extends Phaser.Scene {
   private showDamageText(x: number, y: number, text: string, color: string) {
     const txt = this.add.text(x, y, text, {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '7px',
+      fontSize: '8px',
       color: color,
       resolution: 2,
     }).setOrigin(0.5).setDepth(20)

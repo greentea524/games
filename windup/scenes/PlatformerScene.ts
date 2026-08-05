@@ -142,7 +142,7 @@ export class PlatformerScene extends Phaser.Scene {
       this.cameras.main.fadeOut(2000)
       this.add.text(GBC_WIDTH / 2, GBC_HEIGHT / 2 - 10, 'VICTORY!', {
         fontFamily: '"Press Start 2P", monospace',
-        fontSize: '12px',
+        fontSize: '16px',
         color: mode === 'dmg' ? '#0f380f' : '#ffffff'
       }).setOrigin(0.5).setDepth(100)
 

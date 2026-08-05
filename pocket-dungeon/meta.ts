@@ -17,17 +17,17 @@ export interface ClassDef {
 export const CLASSES: Record<ClassName, ClassDef> = {
   knight: {
     id: 'knight', name: 'Knight',
-    description: 'Balanced fighter. Sturdy armor and reliable sword.',
+    description: 'Balanced. Sturdy armor.',
     hp: 20, atk: 4, hunger: 100, unlockCost: 0,
   },
   scout: {
     id: 'scout', name: 'Scout',
-    description: 'Fast and hungry. Lower HP but higher ATK.',
+    description: 'Fast. Low HP, high ATK.',
     hp: 14, atk: 6, hunger: 80, unlockCost: 50,
   },
   alchemist: {
     id: 'alchemist', name: 'Alchemist',
-    description: 'Scholarly. More hunger, IDs 1 scroll.',
+    description: 'Scholarly. IDs 1 scroll.',
     hp: 16, atk: 3, hunger: 120, unlockCost: 80,
   },
 }

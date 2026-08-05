@@ -100,14 +100,14 @@ export class ShopScene extends Phaser.Scene {
     descDiv.fillStyle(0x506850); descDiv.fillRect(20, 97, GBC_WIDTH - 40, 1)
 
     this.descText = this.add.text(GBC_WIDTH / 2, 101, '', {
-      fontFamily: FONT, fontSize: '7px', color: '#b8d8a0', resolution: 4,
+      fontFamily: FONT, fontSize: '8px', color: '#b8d8a0', resolution: 4,
       stroke: '#000000', strokeThickness: 2,
       wordWrap: { width: 150 }, align: 'center',
     }).setOrigin(0.5, 0)
 
     // ── Feedback Text ──
     this.infoText = this.add.text(GBC_WIDTH / 2, 121, '', {
-      fontFamily: FONT, fontSize: '7px', color: '#ff8888', resolution: 4,
+      fontFamily: FONT, fontSize: '8px', color: '#ff8888', resolution: 4,
       stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5, 0)
 
