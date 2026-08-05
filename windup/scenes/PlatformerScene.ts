@@ -138,6 +138,9 @@ export class PlatformerScene extends Phaser.Scene {
   private reachGoal() {
     if (this.isTransitioning) return
     this.isTransitioning = true
+    // The victory text below reads this. It was never declared in this scope,
+    // so clearing level 32 threw a ReferenceError instead of showing VICTORY!.
+    const mode = GameState.paletteMode
 
     if (GameState.levelIndex === 32) {
       // Run over: bank the last segment so the HUD freezes on the final time.

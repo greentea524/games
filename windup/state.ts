@@ -93,7 +93,10 @@ export class GameState {
   }
 
   static loadSave() {
-    const s = loadSave(SAVE_KEY, SAVE_VERSION, null as Saved | null, (payload) => {
+    // Annotated, not inferred: without it the ternaries below widen to string
+    // and paletteMode stops being 'dmg' | 'gbc'. windup is not in the
+    // type-check include, so this went unnoticed — see the cleanup issue.
+    const s = loadSave<Saved | null>(SAVE_KEY, SAVE_VERSION, null, (payload): Saved | null => {
       if (typeof payload !== 'object' || payload === null) return null
       const p = payload as Record<string, unknown>
       return {
