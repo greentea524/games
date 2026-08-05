@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, PAL } from '../constants'
 import { GameState } from '../state'
-import { ITEMS, resolveDialogue, currentObjective } from '../dialogue'
+import { ITEMS, resolveDialogue, currentObjective, openThreads } from '../dialogue'
 import { sfx } from '../audio'
 import type { NpcDef, DialogueLine, ChoiceOption } from '../dialogue'
 import type { TransformEvent } from '../items'
@@ -9,6 +9,9 @@ import type { TransformEvent } from '../items'
 const FONT = '"Press Start 2P"'
 // Top of the 'A / SELECT: close' hint; item rows must stay above it.
 const HINT_TOP = GBC_HEIGHT - 18
+// Floor for item row spacing: the icons are 16px, so anything tighter
+// overlaps them. An unreadable list is worse than a cramped one.
+const MIN_ROW = 16
 const CSS_LIGHT = '#9bbc0f'
 const CSS_MID = '#8bac0f'
 
@@ -32,6 +35,7 @@ export class UIScene extends Phaser.Scene {
   // inventory
   private inv!: Phaser.GameObjects.Container
   private invObjective!: Phaser.GameObjects.Text
+  private invNotes!: Phaser.GameObjects.Text
 
   // keys
   private advanceKey!: Phaser.Input.Keyboard.Key
@@ -371,7 +375,20 @@ export class UIScene extends Phaser.Scene {
     this.invObjective = this.add.text(10, 10, '', {
       fontFamily: FONT,
       fontSize: '6px',
-      color: CSS_LIGHT,
+      // The brightest value in the palette, not CSS_LIGHT: with thread notes
+      // beneath it, light-vs-mid is too close to establish which line leads.
+      color: '#e0f8cf',
+      resolution: 2,
+      lineSpacing: 3,
+      wordWrap: { width: GBC_WIDTH - 20 },
+    })
+
+    // Open side threads, under the objective and dimmer than it. These are
+    // reminders, not instructions — the directive above stays the loud line.
+    this.invNotes = this.add.text(10, 0, '', {
+      fontFamily: FONT,
+      fontSize: '6px',
+      color: CSS_MID,
       resolution: 2,
       lineSpacing: 3,
       wordWrap: { width: GBC_WIDTH - 20 },
@@ -385,13 +402,13 @@ export class UIScene extends Phaser.Scene {
           this.toggleInventory()
         }
       })
-    this.inv.add([bg, this.invObjective, hint, tapZone])
+    this.inv.add([bg, this.invObjective, this.invNotes, hint, tapZone])
   }
 
   private refreshInventory() {
-    // clear previous item rows (keep the 4 persistent children:
-    // bg, objective, hint, tapZone)
-    while (this.inv.length > 4) {
+    // clear previous item rows (keep the 5 persistent children:
+    // bg, objective, notes, hint, tapZone)
+    while (this.inv.length > 5) {
       const c = this.inv.getAt(this.inv.length - 1) as Phaser.GameObjects.GameObject
       this.inv.remove(c, true)
     }
@@ -399,11 +416,36 @@ export class UIScene extends Phaser.Scene {
     const objective = currentObjective()
     this.invObjective.setText(objective ? `> ${objective}` : '')
 
-    // Measured, not assumed: the objective wraps to a variable number of
-    // lines, and how many depends on font metrics at runtime.
-    const itemsTop = objective
-      ? this.invObjective.y + this.invObjective.height + 8
-      : 28
+    // Measured, not assumed: text wraps to a variable number of lines, and
+    // how many depends on font metrics at runtime.
+    const objBottom = objective
+      ? this.invObjective.y + this.invObjective.height
+      : this.invObjective.y
+
+    // The items have first claim on the space. Notes take what is left over,
+    // because a cramped item list is unusable while a note is only ever a
+    // nicety — the objective above it already says what to do next.
+    const notes = openThreads()
+    const notesTop = objBottom + 6
+    const budget = HINT_TOP - notesTop - GameState.inventory.length * MIN_ROW
+
+    this.invNotes.setPosition(10, notesTop)
+    if (notes.length === 0) {
+      this.invNotes.setText('')
+    } else {
+      this.invNotes.setText(notes.join('\n'))
+      if (this.invNotes.height > budget) {
+        // Too tall to spell out: say how many are open and leave it there.
+        const plural = notes.length === 1 ? '' : 's'
+        this.invNotes.setText(`(${notes.length} thread${plural} open)`)
+        if (this.invNotes.height > budget) this.invNotes.setText('')
+      }
+    }
+
+    const notesBottom = this.invNotes.text
+      ? this.invNotes.y + this.invNotes.height
+      : objBottom
+    const itemsTop = objective || this.invNotes.text ? notesBottom + 8 : 28
 
     if (GameState.inventory.length === 0) {
       this.inv.add(
@@ -421,7 +463,7 @@ export class UIScene extends Phaser.Scene {
     // The floor is the 16px icon height — below that, rows would overlap, and
     // an unreadable list is worse than a cramped one.
     const rows = GameState.inventory.length
-    const spacing = Math.max(16, Math.min(20, Math.floor((HINT_TOP - itemsTop) / rows)))
+    const spacing = Math.max(MIN_ROW, Math.min(20, Math.floor((HINT_TOP - itemsTop) / rows)))
 
     GameState.inventory.forEach((id, i) => {
       const def = ITEMS[id]
