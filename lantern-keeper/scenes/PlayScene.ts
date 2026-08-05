@@ -11,6 +11,7 @@ import {
   DECO,
 } from '../constants'
 import { Darkness, type Light } from '../../shared/lighting'
+import { loadProgress, saveProgress } from '../progress'
 
 // Tuned to the KAN-110 movement budget: single jump ~2.8 tiles,
 // double jump ~5.6 tiles, so the 5-tile cliff gate needs the Ember lantern.
@@ -82,6 +83,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   create() {
+    this.persist()
     music.play('adventure')
     this.cameras.main.fadeIn(500, 0, 0, 0)
     
@@ -402,13 +404,7 @@ export class PlayScene extends Phaser.Scene {
         this.time.delayedCall(4000, () => {
           this.cameras.main.fadeOut(1000, 0, 0, 0)
           this.cameras.main.once('camerafadeoutcomplete', () => {
-            this.scene.start('play', { 
-              levelKey: 'level3',
-              hasDoubleJump: this.hasDoubleJump,
-              hasDash: this.hasDash,
-              hasWallCling: this.hasWallCling,
-              totalLanternsLit: this.totalLanternsLit
-            })
+            this.advanceTo('level3')
           })
         })
       }
@@ -430,13 +426,7 @@ export class PlayScene extends Phaser.Scene {
       this.time.delayedCall(4000, () => {
         this.cameras.main.fadeOut(1000, 0, 0, 0)
         this.cameras.main.once('camerafadeoutcomplete', () => {
-          this.scene.start('play', { 
-            levelKey: 'level2',
-            hasDoubleJump: this.hasDoubleJump,
-            hasDash: this.hasDash,
-            hasWallCling: this.hasWallCling,
-            totalLanternsLit: this.totalLanternsLit
-          })
+          this.advanceTo('level2')
         })
       })
     } else if (lantern.name === 'canopy_grand') {
@@ -465,17 +455,12 @@ export class PlayScene extends Phaser.Scene {
       this.time.delayedCall(5000, () => {
         this.cameras.main.fadeOut(1000, 0, 0, 0)
         this.cameras.main.once('camerafadeoutcomplete', () => {
-          this.scene.start('play', { 
-            levelKey: 'level4',
-            hasDoubleJump: this.hasDoubleJump,
-            hasDash: this.hasDash,
-            hasWallCling: this.hasWallCling,
-            totalLanternsLit: this.totalLanternsLit
-          })
+          this.advanceTo('level4')
         })
       })
     } else if (lantern.name === 'heart_tree') {
       this.won = true
+      this.persist(true)
       sfx.win()
       this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 500)
       const treeToast = this.toast('THE HEART TREE IS RESTORED', 0)
@@ -514,6 +499,35 @@ export class PlayScene extends Phaser.Scene {
     }
     
     this.updateHud()
+  }
+
+  /**
+   * Writes the run's progress. `completed` is sticky: once the Heart Tree has
+   * been reached it stays set, because it records that this player finished
+   * the game rather than the state of the current run.
+   */
+  private persist(completed = false) {
+    saveProgress({
+      levelKey: this.levelKey,
+      hasDoubleJump: this.hasDoubleJump,
+      hasDash: this.hasDash,
+      hasWallCling: this.hasWallCling,
+      totalLanternsLit: this.totalLanternsLit,
+      completed: completed || loadProgress().completed,
+    })
+  }
+
+  /** Saves, then moves to the next level. */
+  private advanceTo(levelKey: string) {
+    this.levelKey = levelKey
+    this.persist()
+    this.scene.start('play', {
+      levelKey,
+      hasDoubleJump: this.hasDoubleJump,
+      hasDash: this.hasDash,
+      hasWallCling: this.hasWallCling,
+      totalLanternsLit: this.totalLanternsLit,
+    })
   }
 
   private updateHud() {
