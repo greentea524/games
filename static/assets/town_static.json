@@ -689,5 +689,17 @@
    "tileheight": 16,
    "tilewidth": 16
   }
+ ],
+ "properties": [
+  {
+   "name": "dark",
+   "type": "bool",
+   "value": true
+  },
+  {
+   "name": "darkAlpha",
+   "type": "float",
+   "value": 0.66
+  }
  ]
 }
