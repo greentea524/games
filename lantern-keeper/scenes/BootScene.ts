@@ -26,14 +26,14 @@ export class BootScene extends Phaser.Scene {
     // Title / Header
     this.add.text(GBC_WIDTH / 2, 24, 'RETRO PAD', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '9px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 1,
     }).setOrigin(0.5)
 
     this.add.text(GBC_WIDTH / 2, 38, 'LANTERN KEEPER', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#86b06a',
       resolution: 1,
     }).setOrigin(0.5)
@@ -62,7 +62,7 @@ export class BootScene extends Phaser.Scene {
     // Progress Text
     const progressText = this.add.text(GBC_WIDTH / 2, 112, 'SYSTEM INIT... 0%', {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#86b06a',
       resolution: 1,
     }).setOrigin(0.5)

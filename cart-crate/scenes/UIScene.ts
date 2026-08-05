@@ -33,7 +33,7 @@ export class UIScene extends Phaser.Scene {
     // Top Bar Level Title Text with stroke contour
     this.levelTitleText = this.add.text(4, 3, `STG ${levelConfig.id}`, {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       stroke: '#0f380f',
       strokeThickness: 1,
@@ -42,7 +42,7 @@ export class UIScene extends Phaser.Scene {
 
     this.movesText = this.add.text(GBC_WIDTH - 4, 3, `0 / ${levelConfig.parMoves}`, {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       stroke: '#0f380f',
       strokeThickness: 1,
@@ -54,9 +54,11 @@ export class UIScene extends Phaser.Scene {
     bottomBarGfx.fillStyle(0x0f380f, 0.85)
     bottomBarGfx.fillRect(0, GBC_HEIGHT - 12, GBC_WIDTH, 12)
 
-    this.objectiveTickerText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'Z:UNDO H:HINT R:RESTART', {
+    this.objectiveTickerText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'Z:UNDO H:HINT R:RST', {
       fontFamily: FONT,
-      fontSize: '5px',
+      // 8px is the font's native grid; anything else renders between pixels.
+      // The old label was 23 chars, which is 184px at 8px, so it is abbreviated.
+      fontSize: '8px',
       color: '#9bbc0f',
       stroke: '#0f380f',
       strokeThickness: 1,
@@ -86,7 +88,7 @@ export class UIScene extends Phaser.Scene {
 
     const stageBest = this.add.text(0, 7, bestText, {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0.5)
@@ -113,42 +115,42 @@ export class UIScene extends Phaser.Scene {
 
     const titleText = this.add.text(0, -32, 'PAUSED', {
       fontFamily: FONT,
-      fontSize: '9px',
+      fontSize: '16px',
       color: '#9bbc0f',
       resolution: 2,
     }).setOrigin(0.5)
 
-    const btnResume = this.add.text(-50, -12, '1. RESUME GAME', {
+    const btnResume = this.add.text(-50, -14, '1. RESUME GAME', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '1. RESUME GAME')
 
-    const btnHelp = this.add.text(-50, 4, '2. HOW TO PLAY', {
+    const btnHelp = this.add.text(-50, -2, '2. HOW TO PLAY', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '2. HOW TO PLAY')
 
-    const btnSkip = this.add.text(-50, 14, '3. SKIP STAGE', {
+    const btnSkip = this.add.text(-50, 10, '3. SKIP STAGE', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '3. SKIP STAGE')
 
-    const btnRestart = this.add.text(-50, 26, '4. RESTART STAGE', {
+    const btnRestart = this.add.text(-50, 22, '4. RESTART LVL', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '4. RESTART STAGE')
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '4. RESTART LVL')
 
-    const btnQuit = this.add.text(-50, 38, '5. QUIT TO MAP', {
+    const btnQuit = this.add.text(-50, 34, '5. QUIT TO MAP', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '5. QUIT TO MAP')
@@ -188,21 +190,24 @@ export class UIScene extends Phaser.Scene {
       resolution: 2,
     }).setOrigin(0.5)
 
+    // Rewritten to 16 characters. At 8px the text column inside this panel
+    // is 134px, and every one of the old lines ran past it.
     const rulesLines = [
-      'MOVE: D-Pad / WASD / Swipe',
-      'GOAL: Push crates [C]',
-      '      onto target X marks',
-      'ICE : Crates slide to wall',
-      'UNDO: B Button / Z key',
-      'RSET: SELECT / R key',
+      'MOVE: D-Pad/WASD',
+      'GOAL: Push all',
+      '  crates onto X',
+      'ICE: Crates fly',
+      'UNDO: B or Z',
+      'RESET: SELECT/R',
       '',
-      'Lvls 11-50 by D.W. Skinner'
+      'Lvls 11-50 by',
+      'D.W. Skinner',
     ]
 
     const textObjs = rulesLines.map((line, idx) => {
-      return this.add.text(-62, -32 + idx * 12, line, {
+      return this.add.text(-62, -38 + idx * 10, line, {
         fontFamily: FONT,
-        fontSize: '5px',
+        fontSize: '8px',
         color: '#e0f8cf',
         stroke: '#0f380f',
         strokeThickness: 1,
@@ -210,9 +215,9 @@ export class UIScene extends Phaser.Scene {
       }).setOrigin(0, 0.5)
     })
 
-    const closeBtn = this.add.text(0, 46, '[ BACK TO PAUSE ]', {
+    const closeBtn = this.add.text(0, 54, '[ BACK TO PAUSE ]', {
       fontFamily: FONT,
-      fontSize: '5px',
+      fontSize: '8px',
       color: '#9bbc0f',
       resolution: 2,
     }).setOrigin(0.5).setInteractive({ useHandCursor: true })

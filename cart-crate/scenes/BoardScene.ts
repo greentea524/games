@@ -726,7 +726,7 @@ export class BoardScene extends Phaser.Scene {
   showToast(msg: string) {
     const toast = this.add.text(this.cameras.main.worldView.centerX, this.cameras.main.worldView.centerY - 20, msg, {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: '#ffcc00',
       backgroundColor: '#0f380f',
       padding: { x: 4, y: 2 },

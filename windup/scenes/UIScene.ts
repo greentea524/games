@@ -15,7 +15,7 @@ export class UIScene extends Phaser.Scene {
   create() {
     this.energyText = this.add.text(6, 4, 'PWR', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: CSS_LIGHTEST,
       resolution: 2,
     })
@@ -23,16 +23,19 @@ export class UIScene extends Phaser.Scene {
     this.energyBarGfx = this.add.graphics()
     this.updateEnergyBar()
 
-    this.speedrunText = this.add.text(GBC_WIDTH - 6, 4, '00:00:000', {
+    // Second row, not beside the bar. At the font's native 8px the timer is
+    // 72px wide and 'PWR' plus the 60px bar already reach x=92, so a single
+    // row would need 164px on a 160px screen and the two would overlap.
+    this.speedrunText = this.add.text(GBC_WIDTH - 6, 14, '00:00:000', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: CSS_LIGHTEST,
       resolution: 2,
     }).setOrigin(1, 0)
     
     this.levelText = this.add.text(6, GBC_HEIGHT - 12, 'LVL 1', {
       fontFamily: FONT,
-      fontSize: '6px',
+      fontSize: '8px',
       color: CSS_LIGHTEST,
       resolution: 2,
     }).setOrigin(0, 0)

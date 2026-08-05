@@ -30,7 +30,7 @@ export class TitleScene extends Phaser.Scene {
 
     // ── Title Block ──
     this.add.text(GBC_WIDTH / 2, 6, 'POCKET', {
-      fontFamily: FONT, fontSize: '12px', color: '#e0f8cf',
+      fontFamily: FONT, fontSize: '16px', color: '#e0f8cf',
       resolution: 4, align: 'center',
     }).setOrigin(0.5, 0)
 
@@ -65,35 +65,35 @@ export class TitleScene extends Phaser.Scene {
 
     // ── Gold ──
     this.goldText = this.add.text(GBC_WIDTH / 2, 38, `${meta.gold} GOLD`, {
-      fontFamily: FONT, fontSize: '7px', color: '#ffd700', resolution: 4,
+      fontFamily: FONT, fontSize: '8px', color: '#ffd700', resolution: 4,
     }).setOrigin(0.5, 0)
 
     // ── Class Selector ──
     this.arrowLeft = this.add.text(14, 56, '\u25C0', {
-      fontFamily: FONT, fontSize: '10px', color: '#e0f8cf', resolution: 4,
+      fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 4,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true })
 
     this.classLabel = this.add.text(GBC_WIDTH / 2, 56, '', {
-      fontFamily: FONT, fontSize: '10px', color: '#e0f8cf', resolution: 4,
+      fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 4,
     }).setOrigin(0.5, 0.5)
 
     this.arrowRight = this.add.text(GBC_WIDTH - 14, 56, '\u25B6', {
-      fontFamily: FONT, fontSize: '10px', color: '#e0f8cf', resolution: 4,
+      fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 4,
     }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
 
     // ── Class Stats ──
     this.statsText = this.add.text(GBC_WIDTH / 2, 68, '', {
-      fontFamily: FONT, fontSize: '7px', color: '#e0f8cf', resolution: 4,
+      fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 4,
     }).setOrigin(0.5, 0)
 
     // ── Class Description ──
     this.classDesc = this.add.text(GBC_WIDTH / 2, 80, '', {
-      fontFamily: FONT, fontSize: '5px', color: '#7a9a62', resolution: 4,
+      fontFamily: FONT, fontSize: '8px', color: '#7a9a62', resolution: 4,
       wordWrap: { width: 136 }, align: 'center',
     }).setOrigin(0.5, 0)
 
     // ── Menu Buttons (navigable with UP/DOWN + ENTER) ──
-    const btnY = 104
+    const btnY = 100
     this.menuItems = []
 
     const startBtn = this.add.text(GBC_WIDTH / 2, btnY, 'START', {
@@ -108,10 +108,11 @@ export class TitleScene extends Phaser.Scene {
 
     // ── Run History ──
     const divider2 = this.add.graphics()
-    divider2.fillStyle(0x506850); divider2.fillRect(20, 133, GBC_WIDTH - 40, 1)
+    divider2.fillStyle(0x506850); divider2.fillRect(20, 128, GBC_WIDTH - 40, 1)
 
-    this.add.text(GBC_WIDTH / 2, 136, `RUNS ${meta.totalRuns}  BEST F${meta.bestFloor}  WINS ${meta.totalVictories}`, {
-      fontFamily: FONT, fontSize: '4px', color: '#506850', resolution: 4,
+    // One line, abbreviated: two lines of 8px text ran off the bottom edge.
+    this.add.text(GBC_WIDTH / 2, 132, `RUNS ${meta.totalRuns} WIN ${meta.totalVictories} BEST ${meta.bestFloor}`, {
+      fontFamily: FONT, fontSize: '8px', color: '#506850', resolution: 4,
     }).setOrigin(0.5, 0)
 
     this.updateClassDisplay()
@@ -193,6 +194,6 @@ export class TitleScene extends Phaser.Scene {
     const cls = CLASSES[key]
     this.classLabel.setText(cls.name.toUpperCase())
     this.classDesc.setText(cls.description)
-    this.statsText.setText(`HP ${cls.hp}  ATK ${cls.atk}  FD ${cls.hunger}`)
+    this.statsText.setText(`HP ${cls.hp} ATK ${cls.atk} FD ${cls.hunger}`)
   }
 }
