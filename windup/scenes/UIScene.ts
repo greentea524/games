@@ -1,9 +1,8 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST, CSS_MID } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST } from '../constants'
 import { GameState } from '../state'
 
 export class UIScene extends Phaser.Scene {
-  private energyText!: Phaser.GameObjects.Text
   private energyBarGfx!: Phaser.GameObjects.Graphics
   private speedrunText!: Phaser.GameObjects.Text
   private levelText!: Phaser.GameObjects.Text
@@ -13,7 +12,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
-    this.energyText = this.add.text(6, 4, 'PWR', {
+    // Static label; nothing updates it, so it needs no field.
+    this.add.text(6, 4, 'PWR', {
       fontFamily: FONT,
       fontSize: '8px',
       color: CSS_LIGHTEST,
