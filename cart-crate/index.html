@@ -14,9 +14,19 @@
 
       gtag('config', 'G-YL2TN1H62K');
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <!-- Self-hosted: the Google Fonts copy is a third-party request that
+         fails closed. When it does not arrive the browser falls back to its
+         default serif, which is unreadable at these sizes in a pixel game.
+         font-display: block waits for it rather than flashing serif first. -->
+    <style>
+      @font-face {
+        font-family: 'Press Start 2P';
+        font-style: normal;
+        font-weight: 400;
+        font-display: block;
+        src: url('/games/fonts/press-start-2p-latin.woff2') format('woff2');
+      }
+    </style>
     <script>
       (function() {
         var gbcW = 160, gbcH = 144;

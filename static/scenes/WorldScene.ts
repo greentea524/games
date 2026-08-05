@@ -866,9 +866,12 @@ export class WorldScene extends Phaser.Scene {
     const empathy = GameState.getFlag('ending_empathy')
     const bgColor = empathy ? 0xe0f0d0 : 0x08080e
     const textColor = empathy ? '#0f380f' : '#9bbc0f'
+    // Hard-wrapped to 18 characters. At the font's native 8px that is 144px
+    // on a 160px screen; the old wrapping ran to 196px and was being clipped
+    // off both edges even at 7px.
     const body = empathy
-      ? 'You step into the static\nand stay.\n\nThe lonely thing is\nlonely no more.\n\nThe town remembers\neverything it lost.'
-      : 'You tear the signal loose.\n\nThe static screams,\nthen falls silent.\n\nThe town is safe, sealed.\n\nBut the vanished stay gone —\nand something blinks out,\nalone.'
+      ? 'You step into the\nstatic and stay.\n\nThe lonely thing\nis lonely no more.\n\nThe town remembers\nall it lost.'
+      : 'You tear the\nsignal loose.\n\nThe static\nscreams, then\nfalls silent.\n\nThe town is safe.\n\nBut the vanished\nstay gone.'
 
     const bg = this.add
       .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, bgColor)
@@ -878,11 +881,12 @@ export class WorldScene extends Phaser.Scene {
       .setAlpha(0)
     const txt = this.add
       .text(GBC_WIDTH / 2, GBC_HEIGHT / 2 - 6, body, {
-        fontFamily: '"Press Start 2P"',
-        fontSize: '7px',
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '8px',
         color: textColor,
         align: 'center',
-        lineSpacing: 3,
+        // 1, not 3: at 8px the extra leading pushed the card past 144px tall.
+        lineSpacing: 1,
         resolution: 1,
       })
       .setOrigin(0.5)
@@ -894,8 +898,8 @@ export class WorldScene extends Phaser.Scene {
     this.time.delayedCall(3200, () => {
       const prompt = this.add
         .text(GBC_WIDTH / 2, GBC_HEIGHT - 12, 'Z: title', {
-          fontFamily: '"Press Start 2P"',
-          fontSize: '7px',
+          fontFamily: '"Press Start 2P", monospace',
+          fontSize: '8px',
           color: textColor,
           resolution: 1,
         })

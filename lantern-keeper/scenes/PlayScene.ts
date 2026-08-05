@@ -215,7 +215,7 @@ export class PlayScene extends Phaser.Scene {
     })
 
     this.hudText = this.add.text(4, 8, '', {
-      fontFamily: '"Press Start 2P"',
+      fontFamily: '"Press Start 2P", monospace',
       fontSize: '8px',
       color: '#e0f8cf',
       resolution: 1,
@@ -506,7 +506,7 @@ export class PlayScene extends Phaser.Scene {
         if (treeToast) treeToast.destroy()
         
         this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 32, 'GAME CLEARED\nTHANKS FOR PLAYING', {
-          fontFamily: '"Press Start 2P"', fontSize: '8px', color: '#e0f8cf',
+          fontFamily: '"Press Start 2P", monospace', fontSize: '8px', color: '#e0f8cf',
           backgroundColor: '#0f1a12', padding: { x: 4, y: 4 },
           align: 'center', resolution: 1, lineSpacing: 4,
         }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
@@ -557,7 +557,7 @@ export class PlayScene extends Phaser.Scene {
   private toast(message: string, duration = 2000): Phaser.GameObjects.Text {
     const text = this.add
       .text(GBC_WIDTH / 2, GBC_HEIGHT - 32, message, {
-        fontFamily: '"Press Start 2P"',
+        fontFamily: '"Press Start 2P", monospace',
         fontSize: '8px',
         color: '#e0f8cf',
         backgroundColor: '#0f1a12',

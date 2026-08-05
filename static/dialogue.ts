@@ -567,7 +567,7 @@ export const JOURNAL_DEF: NpcDef = {
         { text: 'Last entry:' },
         { text: "Ren's house is next. I am sure of it." },
         { text: 'On the static side it is half-drawn already.' },
-        { text: '> Find the beacon, get the key, anchor the door.' },
+        { text: '> Find the beacon. Anchor the door.' },
       ],
     },
     {
@@ -576,7 +576,7 @@ export const JOURNAL_DEF: NpcDef = {
         { text: 'Last entry:' },
         { text: 'Gus is gone. Nobody remembers the hut was there.' },
         { text: 'On the static side both lost houses still stand.' },
-        { text: '> Cross over. Look at the houses that vanished.' },
+        { text: '> Cross over. See the lost houses.' },
       ],
     },
     {
@@ -585,7 +585,7 @@ export const JOURNAL_DEF: NpcDef = {
         { text: 'Last entry:' },
         { text: 'Things carried through the TV come back changed.' },
         { text: 'The town is losing houses in some kind of order.' },
-        { text: '> Keep crossing over. Work out the pattern.' },
+        { text: '> Cross over. Find the pattern.' },
       ],
     },
     {
@@ -602,7 +602,7 @@ export const JOURNAL_DEF: NpcDef = {
       lines: [
         { text: 'Last entry:' },
         { text: 'Power keeps flickering. Mom gave me the flashlight.' },
-        { text: '> Go out into town. See what is wrong.' },
+        { text: '> Go into town. See what is wrong.' },
       ],
     },
     {
@@ -742,22 +742,27 @@ export interface JournalNote {
  * not found — the second would be a hint system and would spoil the finding.
  */
 export const JOURNAL_NOTES: JournalNote[] = [
+  // Kept terse on purpose. Press Start 2P is only legible at its native 8px,
+  // and 8px on a 160px screen is about 17 characters a line — so a sentence
+  // of prose costs four lines and crowds out the item list. These are nudges;
+  // the notebook at home still carries the full entry.
+  //
   // Thread A: Gus's flower.
   {
     requires: 'gus_flower',
     excludes: 'flower_delivered',
-    text: "Gus's flower is wilted. It might not be, on the other side.",
+    text: 'Flower still wilts.',
   },
   {
     requires: 'flower_delivered',
     excludes: 'thread_flower_done',
-    text: 'You left the flower in the basket. Something in town may have changed.',
+    text: 'Flower left in basket.',
   },
   // Thread B: the fountain valve.
   {
     requires: 'fountain_drained',
     excludes: 'thread_fountain_done',
-    text: 'You drained the fountain. Somewhere, something shifted.',
+    text: 'Fountain is drained.',
   },
 ]
 
