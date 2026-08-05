@@ -312,3 +312,25 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   border-color: rgba(255, 255, 255, 0.3);
 }
+
+/* Completion badge on a hub card. Sits between the title link and the blurb,
+   inline-block so it hugs its text rather than spanning the card. */
+.game-badge {
+  align-self: flex-start;
+  margin: 2px 0 0;
+  padding: 2px 7px;
+  border: 1px solid #3a4a3a;
+  border-radius: 999px;
+  background: #1c2a1c;
+  color: #9bbc0f;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.game-badge.is-complete {
+  border-color: #9bbc0f;
+  background: #24401c;
+  color: #e0f8cf;
+}

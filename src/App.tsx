@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+import { readStatuses } from '../shared/completion'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
@@ -15,12 +17,14 @@ import thumbBig2 from './assets/images/big2.webp'
 const WEB_GAMES = [
   {
     title: "Static",
+    id: 'static',
     image: thumbStatic,
     href: `${import.meta.env.BASE_URL}static/`,
     description: "A GBC-style top-down mystery/adventure game. Explore a small town where an old TV works like a portal.",
   },
   {
     title: "Cart & Crate",
+    id: 'cart-crate',
     image: thumbCartCrate,
     href: `${import.meta.env.BASE_URL}cart-crate/`,
     description:
@@ -28,6 +32,7 @@ const WEB_GAMES = [
   },
   {
     title: "Pocket Dungeon",
+    id: 'pocket-dungeon',
     image: thumbPocketDungeon,
     href: `${import.meta.env.BASE_URL}pocket-dungeon/`,
     description:
@@ -35,6 +40,7 @@ const WEB_GAMES = [
   },
   {
     title: "Windup",
+    id: 'windup',
     image: thumbWindup,
     href: `${import.meta.env.BASE_URL}windup/`,
     description:
@@ -42,6 +48,7 @@ const WEB_GAMES = [
   },
   {
     title: "Lantern Keeper",
+    id: 'lantern-keeper',
     image: thumbLanternKeeper,
     href: `${import.meta.env.BASE_URL}lantern-keeper/`,
     description:
@@ -69,6 +76,10 @@ const WEB_GAMES = [
 ];
 
 function App() {
+  // Read once per mount. Saves only change while a game is open, and the games
+  // open in their own tab, so there is nothing to subscribe to here.
+  const statuses = useMemo(() => readStatuses(), [])
+
   return (
     <>
       <section id="center">
@@ -119,6 +130,19 @@ function App() {
                 </span>
                 <span>↗</span>
               </a>
+              {(() => {
+                const status = game.id ? statuses[game.id] : undefined
+                if (!status?.progress) return null
+                return (
+                  <span
+                    className={
+                      status.completed ? 'game-badge is-complete' : 'game-badge'
+                    }
+                  >
+                    {status.completed ? `\u2714 ${status.progress}` : status.progress}
+                  </span>
+                )
+              })()}
               <p className="game-link-description">
                 {game.description}
               </p>
