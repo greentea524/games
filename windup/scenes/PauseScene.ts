@@ -43,21 +43,25 @@ export class PauseScene extends Phaser.Scene {
     this.updateSelection()
 
     // Input handling
-    this.input.keyboard!.on('keydown-ArrowUp', () => this.moveSelection(-1))
-    this.input.keyboard!.on('keydown-ArrowDown', () => this.moveSelection(1))
+    // Phaser names these events after Phaser.Input.Keyboard.KeyCodes, not the
+    // DOM key: 'UP'/'DOWN', not 'ArrowUp'/'ArrowDown'. The DOM spelling never
+    // fired, so the cursor could not be moved off RESUME. The ENTER/ESC/Z
+    // bindings around it were already using the right names.
+    this.input.keyboard!.on('keydown-UP', () => this.moveSelection(-1))
+    this.input.keyboard!.on('keydown-DOWN', () => this.moveSelection(1))
     
     const confirm = () => this.handleSelection()
     this.input.keyboard!.on('keydown-ENTER', confirm)
     this.input.keyboard!.on('keydown-Z', confirm)
 
     this.input.keyboard!.on('keydown-ESC', () => {
-      sfx.play('jump') // Generic UI sound for cancel
+      sfx.menuSelect()
       this.resumeGame()
     })
   }
 
   private moveSelection(dir: number) {
-    sfx.play('hit')
+    sfx.hit()
     this.selectedIndex += dir
     if (this.selectedIndex < 0) this.selectedIndex = this.menuItems.length - 1
     if (this.selectedIndex >= this.menuItems.length) this.selectedIndex = 0
@@ -79,7 +83,7 @@ export class PauseScene extends Phaser.Scene {
   }
 
   private handleSelection() {
-    sfx.play('jump')
+    sfx.menuSelect()
     if (this.selectedIndex === 0) {
       this.resumeGame()
     } else if (this.selectedIndex === 1) {

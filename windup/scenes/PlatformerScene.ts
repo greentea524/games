@@ -44,7 +44,10 @@ export class PlatformerScene extends Phaser.Scene {
     }
 
     const pauseHandler = () => {
-      sfx.play('jump')
+      // sfx has named methods, not a play(name) dispatcher. This threw on the
+      // first line of the handler, so scene.pause() below never ran and pause
+      // did not work at all.
+      sfx.menuSelect()
       this.scene.pause('platformer')
       this.scene.launch('pause')
     }

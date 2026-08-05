@@ -24,15 +24,6 @@ const config: Phaser.Types.Core.GameConfig = {
 
 export const game = new Phaser.Game(config)
 
-// Same handle static/ and lantern-keeper/ already expose: a read-only way to
-// reach the running game from the console or a driven browser.
-declare global {
-  interface Window {
-    __game?: Phaser.Game
-  }
-}
-window.__game = game
-
 const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
   const keyMap: Record<string, string> = {
     ArrowUp: 'ArrowUp',
