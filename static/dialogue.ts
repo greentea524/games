@@ -720,6 +720,58 @@ export const REN_DESK_DEF: NpcDef = {
 
 // First branch whose flag conditions match the current state.
 /**
+ * A side thread that is open right now — started, not yet finished.
+ *
+ * Notes are *collected*, not resolved first-match. The journal is a status
+ * report rather than a conversation, and Chapter 2 runs two independent
+ * threads at once, so "the first branch that applies" cannot describe it.
+ */
+export interface JournalNote {
+  requires?: string
+  excludes?: string
+  requiresItem?: string
+  text: string
+}
+
+/**
+ * Each note names a thread between the beat that opens it and the beat that
+ * closes it, so a thread stops being mentioned the moment it is finished.
+ *
+ * Nothing here hints at a thread the player has not started. A note is a
+ * reminder of something you already saw, not a pointer at something you have
+ * not found — the second would be a hint system and would spoil the finding.
+ */
+export const JOURNAL_NOTES: JournalNote[] = [
+  // Thread A: Gus's flower.
+  {
+    requires: 'gus_flower',
+    excludes: 'flower_delivered',
+    text: "Gus's flower is wilted. It might not be, on the other side.",
+  },
+  {
+    requires: 'flower_delivered',
+    excludes: 'thread_flower_done',
+    text: 'You left the flower in the basket. Something in town may have changed.',
+  },
+  // Thread B: the fountain valve.
+  {
+    requires: 'fountain_drained',
+    excludes: 'thread_fountain_done',
+    text: 'You drained the fountain. Somewhere, something shifted.',
+  },
+]
+
+/** Every note whose conditions hold — all of them, not the first. */
+export function openThreads(): string[] {
+  return JOURNAL_NOTES.filter((n) => {
+    if (n.requires && !GameState.getFlag(n.requires)) return false
+    if (n.excludes && GameState.getFlag(n.excludes)) return false
+    if (n.requiresItem && !GameState.hasItem(n.requiresItem)) return false
+    return true
+  }).map((n) => n.text)
+}
+
+/**
  * The current objective, read off whichever journal entry applies right now.
  *
  * JOURNAL_DEF marks its directive line with a leading '>', and its last
