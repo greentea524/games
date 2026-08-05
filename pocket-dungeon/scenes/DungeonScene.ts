@@ -1,5 +1,19 @@
 import Phaser from 'phaser'
 import { TILE, GBC_WIDTH, GBC_HEIGHT } from '../constants'
+
+// Fog alphas, and how far a wall torch pushes a tile back toward lit.
+//
+// FOG_SIGHTED is the point of #57. It used to be 0: everything within the
+// player's four tiles was fully lit, so a torch had no headroom to matter and
+// the 'WALL TORCH / Lighting the way' text described something that was not
+// happening. Giving the player's own light a floor above zero is what lets
+// torchlight read as light.
+const FOG_UNSEEN = 0.85
+const FOG_EXPLORED = 0.55
+const FOG_SIGHTED = 0.3
+const TORCH_RADIUS = 3.5
+const TORCH_LIFT = 0.42
+const TORCH_FLICKER = 0.05
 import { GameState, TurnState } from '../state'
 import { MapGenerator } from '../MapGenerator'
 import { RNG } from '../rng'
@@ -119,6 +133,16 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private fogTiles: Phaser.GameObjects.Rectangle[][] = []
+  /**
+   * Light each tile receives from wall torches, 0..1, computed once per floor
+   * (#57). Torches never move, so this is baked at generation rather than
+   * recomputed per move — the per-move pass just reads it.
+   */
+  private torchLight: number[][] = []
+  /** Only the tiles a torch actually reaches, so flicker does not walk 1024. */
+  private litTiles: { x: number; y: number }[] = []
+  /** Base fog alpha before flicker, so flicker is applied, not accumulated. */
+  private fogBase: number[][] = []
   private explored: boolean[][] = []
 
   renderDungeon() {
@@ -269,8 +293,18 @@ export class DungeonScene extends Phaser.Scene {
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
 
+    this.computeTorchLight()
+
     // Initial fog of war update
     this.updateFogOfWar()
+
+    // Flicker on a timer rather than per frame: the eye reads ~8Hz as a live
+    // flame, and the issue asks for subtle, not strobing.
+    this.time.addEvent({
+      delay: 120,
+      loop: true,
+      callback: () => this.applyTorchFlicker(),
+    })
   }
 
   reloadPalette() {
@@ -827,14 +861,79 @@ export class DungeonScene extends Phaser.Scene {
         if (!fog) continue
 
         const inSight = Math.hypot(x - px, y - py) <= sightRadius + 0.5
+        const torch = this.torchLight[y]?.[x] ?? 0
+        let alpha: number
         if (inSight) {
-          fog.setAlpha(0)
+          // Lit enough to play by, brighter still under a torch.
+          alpha = Math.max(0, FOG_SIGHTED - torch * TORCH_LIFT)
         } else if (this.explored[y][x]) {
-          fog.setAlpha(0.55)
+          // Somewhere already seen. A torch nearby keeps it bright; a corridor
+          // between torches falls back toward dark, which is the whole point.
+          alpha = Math.max(0, FOG_EXPLORED - torch * TORCH_LIFT)
         } else {
-          fog.setAlpha(0.85)
+          // Torchlight deliberately does not reach here. Brightening unseen
+          // tiles would light up the floor plan and undo fog of war.
+          alpha = FOG_UNSEEN
         }
+        this.fogBase[y][x] = alpha
+        fog.setAlpha(alpha)
       }
+    }
+  }
+
+  /**
+   * Bakes per-tile torch light for this floor.
+   *
+   * Levels are quantised to quarters rather than left as a smooth ramp: DMG
+   * has four shades, so a continuous falloff bands badly there, and stepping
+   * it deliberately reads as intentional rather than broken.
+   */
+  private computeTorchLight() {
+    const torches: { x: number; y: number }[] = []
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        if (this.grid[y]?.[x] === 'T') torches.push({ x, y })
+      }
+    }
+
+    this.torchLight = Array.from({ length: this.mapHeight }, () =>
+      Array(this.mapWidth).fill(0),
+    )
+    this.fogBase = Array.from({ length: this.mapHeight }, () =>
+      Array(this.mapWidth).fill(FOG_UNSEEN),
+    )
+    this.litTiles = []
+
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        let best = 0
+        for (const t of torches) {
+          const d = Math.hypot(x - t.x, y - t.y)
+          if (d > TORCH_RADIUS) continue
+          best = Math.max(best, 1 - d / TORCH_RADIUS)
+        }
+        const level = Math.round(best * 4) / 4
+        this.torchLight[y][x] = level
+        if (level > 0) this.litTiles.push({ x, y })
+      }
+    }
+  }
+
+  /** A shared, slow pulse over torch-lit tiles. Small on purpose. */
+  private applyTorchFlicker() {
+    const wobble = Math.sin(this.time.now / 380) * TORCH_FLICKER
+    for (const { x, y } of this.litTiles) {
+      const fog = this.fogTiles[y]?.[x]
+      if (!fog) continue
+      // Undiscovered tiles must not flicker. Torchlight is excluded from them
+      // above precisely so it cannot hint at the floor plan, and a shimmer
+      // there would give the same thing away through the fog.
+      if (!this.explored[y]?.[x]) continue
+      const base = this.fogBase[y]?.[x] ?? FOG_UNSEEN
+      // Fully lit tiles have no fog to modulate; pulsing them would draw the
+      // eye to wherever the player is standing.
+      if (base <= 0) continue
+      fog.setAlpha(Math.max(0, Math.min(1, base + wobble * this.torchLight[y][x])))
     }
   }
 }
