@@ -1,10 +1,12 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH } from '../constants'
 import { music, isMuted, setMuted } from '../audio'
+import { clearProgress, hasProgress, loadProgress } from '../progress'
 
 export class MenuScene extends Phaser.Scene {
   private selectedIndex = 0;
   private options: Phaser.GameObjects.Text[] = [];
+  private optionActions: (() => void)[] = [];
   
   private viewMode: 'menu' | 'controls' | 'about' = 'menu';
   private controlsText!: Phaser.GameObjects.Text;
@@ -35,29 +37,30 @@ export class MenuScene extends Phaser.Scene {
 
     this.headerContainer = this.add.container(0, 0, [titleText, playerPreview, lanternPreview]);
 
-    // Menu Options
-    const startText = this.add.text(GBC_WIDTH / 2, 74, 'Start Game', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '8px',
-      color: '#86b06a',
-      resolution: 1,
-    }).setOrigin(0.5);
+    // Menu Options. Built from a list so 'New Game' can appear only when
+    // there is progress to keep, without hard-coding two sets of positions.
+    const resuming = hasProgress()
+    const specs: { label: string; action: () => void }[] = resuming
+      ? [
+          { label: 'Continue', action: () => this.continueGame() },
+          { label: 'New Game', action: () => this.newGame() },
+        ]
+      : [{ label: 'Start Game', action: () => this.newGame() }]
+    specs.push({ label: 'Controls', action: () => this.showControls() })
+    specs.push({ label: 'About', action: () => this.showAbout() })
 
-    const controlsText = this.add.text(GBC_WIDTH / 2, 92, 'Controls', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '8px',
-      color: '#86b06a',
-      resolution: 1,
-    }).setOrigin(0.5);
-
-    const aboutOptionText = this.add.text(GBC_WIDTH / 2, 110, 'About', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '8px',
-      color: '#86b06a',
-      resolution: 1,
-    }).setOrigin(0.5);
-
-    this.options = [startText, controlsText, aboutOptionText];
+    // 74 + 18 * 3 = 128, and an 8px line ends at 136 on a 144px screen.
+    this.options = specs.map((spec, i) =>
+      this.add
+        .text(GBC_WIDTH / 2, 74 + i * 18, spec.label, {
+          fontFamily: '"Press Start 2P", monospace',
+          fontSize: '8px',
+          color: '#86b06a',
+          resolution: 1,
+        })
+        .setOrigin(0.5),
+    )
+    this.optionActions = specs.map((spec) => spec.action)
     this.selectedIndex = 0;
     
     // Controls View
@@ -102,15 +105,11 @@ export class MenuScene extends Phaser.Scene {
     this.updateSelection();
     
     // Allow touch/click on options
-    startText.setInteractive().on('pointerdown', () => {
-      if (this.viewMode === 'menu') this.startGame();
-    });
-    controlsText.setInteractive().on('pointerdown', () => {
-      if (this.viewMode === 'menu') this.showControls();
-    });
-    aboutOptionText.setInteractive().on('pointerdown', () => {
-      if (this.viewMode === 'menu') this.showAbout();
-    });
+    this.options.forEach((opt, i) => {
+      opt.setInteractive().on('pointerdown', () => {
+        if (this.viewMode === 'menu') this.optionActions[i]()
+      })
+    })
 
     const mKey = this.input.keyboard!.addKey('M')
     mKey.on('down', () => setMuted(!isMuted()))
@@ -128,7 +127,21 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  startGame() {
+  /** Resumes the saved run — level reached, abilities earned, lanterns lit. */
+  continueGame() {
+    const p = loadProgress()
+    this.scene.start('play', {
+      levelKey: p.levelKey,
+      hasDoubleJump: p.hasDoubleJump,
+      hasDash: p.hasDash,
+      hasWallCling: p.hasWallCling,
+      totalLanternsLit: p.totalLanternsLit,
+    });
+  }
+
+  /** Starts over. Clears the save so 'Continue' cannot resurrect the old run. */
+  newGame() {
+    clearProgress()
     this.scene.start('play', { levelKey: 'level1', hasDoubleJump: false, hasDash: false, hasWallCling: false });
   }
   
@@ -187,13 +200,10 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (event.code === 'Enter' || event.code === 'KeyX' || event.code === 'KeyZ') {
-      if (this.selectedIndex === 0) {
-        this.startGame();
-      } else if (this.selectedIndex === 1) {
-        this.showControls();
-      } else if (this.selectedIndex === 2) {
-        this.showAbout();
-      }
+      // Dispatch by index into the same list the labels came from. This used
+      // to be a hard-coded 0/1/2 chain, which silently mismapped the moment
+      // 'New Game' was inserted.
+      this.optionActions[this.selectedIndex]?.()
     }
   }
 }
