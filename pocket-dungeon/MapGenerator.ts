@@ -1,5 +1,5 @@
 import { RNG } from './rng'
-import { ROOM_TEMPLATES, RoomTemplate } from './templates'
+import { ROOM_TEMPLATES } from './templates'
 
 interface Room {
   x: number

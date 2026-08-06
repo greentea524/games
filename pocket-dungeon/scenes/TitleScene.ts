@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
+import { GBC_WIDTH, FONT } from '../constants'
 import { GameState } from '../state'
-import { loadMeta, CLASSES, ClassName } from '../meta'
+import { loadMeta, CLASSES } from '../meta'
+import type { ClassName } from '../meta'
 import { music, sfx, isMuted, setMuted } from '../audio'
 
 export class TitleScene extends Phaser.Scene {
@@ -11,7 +12,6 @@ export class TitleScene extends Phaser.Scene {
   private classLabel!: Phaser.GameObjects.Text
   private classDesc!: Phaser.GameObjects.Text
   private statsText!: Phaser.GameObjects.Text
-  private goldText!: Phaser.GameObjects.Text
   private arrowLeft!: Phaser.GameObjects.Text
   private arrowRight!: Phaser.GameObjects.Text
   private menuItems: Phaser.GameObjects.Text[] = []
@@ -64,7 +64,8 @@ export class TitleScene extends Phaser.Scene {
     divider.fillStyle(0x506850); divider.fillRect(20, 33, GBC_WIDTH - 40, 1)
 
     // ── Gold ──
-    this.goldText = this.add.text(GBC_WIDTH / 2, 38, `${meta.gold} GOLD`, {
+    // Drawn once per visit to this scene, never updated in place.
+    this.add.text(GBC_WIDTH / 2, 38, `${meta.gold} GOLD`, {
       fontFamily: FONT, fontSize: '8px', color: '#ffd700', resolution: 4,
     }).setOrigin(0.5, 0)
 

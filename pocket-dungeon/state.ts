@@ -1,12 +1,18 @@
 import { Inventory, ScrollIdentifier, ActionHistory, ITEMS } from './items'
 import { RNG } from './rng'
-import { ClassName, CLASSES, loadMeta } from './meta'
+import { CLASSES, loadMeta } from './meta'
+import type { ClassName } from './meta'
 
-export enum TurnState {
-  PLAYER_TURN,
-  ENEMY_TURN,
-  ANIMATING,
-}
+// A const object rather than an enum: `erasableSyntaxOnly` rejects enum
+// because it emits runtime code. Values are compared by identity everywhere
+// and never persisted, so naming them is safe and reads better in a debugger
+// than 0/1/2 did.
+export const TurnState = {
+  PLAYER_TURN: 'PLAYER_TURN',
+  ENEMY_TURN: 'ENEMY_TURN',
+  ANIMATING: 'ANIMATING',
+} as const
+export type TurnState = (typeof TurnState)[keyof typeof TurnState]
 
 export class GameState {
   static paletteMode: 'dmg' | 'gbc' = 'gbc'
