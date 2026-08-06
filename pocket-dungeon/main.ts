@@ -7,6 +7,7 @@ import { DungeonScene } from './scenes/DungeonScene'
 import { UIScene } from './scenes/UIScene'
 import { GameOverScene } from './scenes/GameOverScene'
 import { ensureCtx } from './audio'
+import { setupDpad } from '../shared/dpad'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -61,7 +62,8 @@ const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
   window.dispatchEvent(event)
 }
 
-document.querySelectorAll('[data-key]').forEach((btn) => {
+// The d-pad arms are excluded: setupDpad below drives them as one control.
+document.querySelectorAll('[data-key]:not(.d-btn)').forEach((btn) => {
   const code = btn.getAttribute('data-key')
   if (!code) return
 
@@ -83,4 +85,9 @@ document.querySelectorAll('[data-key]').forEach((btn) => {
   btn.addEventListener('mousedown', handlePress)
   btn.addEventListener('mouseup', handleRelease)
   btn.addEventListener('mouseleave', handleRelease)
+})
+
+setupDpad({
+  dispatch: (type, code) => dispatchKey(code, type),
+  onPress: ensureCtx,
 })

@@ -4,6 +4,7 @@ import { MenuScene } from './scenes/MenuScene'
 import { PlayScene } from './scenes/PlayScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 import { ensureCtx } from './audio'
+import { setupDpad } from '../shared/dpad'
 
 function integerZoom(): number {
   const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -76,8 +77,9 @@ const dispatchSimulatedKey = (type: 'keydown' | 'keyup', keyName: string) => {
   window.dispatchEvent(event)
 }
 
-// Set up mobile on-screen controls
-document.querySelectorAll('.d-btn, .a-btn').forEach((btn) => {
+// Set up mobile on-screen controls. The d-pad is driven as one control by
+// setupDpad below, not as four buttons.
+document.querySelectorAll('.a-btn').forEach((btn) => {
   const key = btn.getAttribute('data-key')
   if (!key) return
 
@@ -106,6 +108,9 @@ document.querySelectorAll('.d-btn, .a-btn').forEach((btn) => {
   btn.addEventListener('touchend', release)
   btn.addEventListener('touchcancel', release)
 })
+
+setupDpad({ dispatch: dispatchSimulatedKey })
+
 // Overlay logic for Pause and Info
 const overlay = document.getElementById('overlay')
 const overlayText = document.getElementById('overlay-text')

@@ -6,6 +6,7 @@ import { UIScene } from './scenes/UIScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 import { sfx, isMuted, setMuted, music } from './audio'
 import { GameState } from './state'
+import { setupDpad } from '../shared/dpad'
 
 function integerZoom(): number {
   // Must match the #game box sizing in index.html's pre-init script, or
@@ -82,7 +83,8 @@ const dispatchSimulatedKey = (type: 'keydown' | 'keyup', keyName: string) => {
   window.dispatchEvent(event)
 }
 
-document.querySelectorAll('.d-btn, .a-btn').forEach((btn) => {
+// The d-pad is driven as one control by setupDpad below, not as four buttons.
+document.querySelectorAll('.a-btn').forEach((btn) => {
   const key = btn.getAttribute('data-key')
   if (!key) return
   let isDown = false
@@ -108,6 +110,8 @@ document.querySelectorAll('.d-btn, .a-btn').forEach((btn) => {
   btn.addEventListener('touchend', release)
   btn.addEventListener('touchcancel', release)
 })
+
+setupDpad({ dispatch: dispatchSimulatedKey })
 
 // Keyboard press feedback on the on-screen buttons.
 window.addEventListener('keydown', (e) => {
