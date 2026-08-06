@@ -25,10 +25,15 @@ export interface StepRecord {
 }
 
 export class MoveCommand implements ICommand {
-  constructor(
-    private scene: BoardScene,
-    public record: StepRecord,
-  ) {}
+  // Written out rather than declared as constructor parameter properties:
+  // those emit runtime assignments, which erasableSyntaxOnly rejects.
+  private scene: BoardScene
+  public record: StepRecord
+
+  constructor(scene: BoardScene, record: StepRecord) {
+    this.scene = scene
+    this.record = record
+  }
 
   execute() {
     // Executed during board step
