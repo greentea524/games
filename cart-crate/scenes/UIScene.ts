@@ -8,7 +8,6 @@ import type { BoardScene } from './BoardScene'
 export class UIScene extends Phaser.Scene {
   private levelTitleText!: Phaser.GameObjects.Text
   private movesText!: Phaser.GameObjects.Text
-  private objectiveTickerText!: Phaser.GameObjects.Text
 
   private pauseContainer!: Phaser.GameObjects.Container
   private helpContainer!: Phaser.GameObjects.Container
@@ -54,7 +53,8 @@ export class UIScene extends Phaser.Scene {
     bottomBarGfx.fillStyle(0x0f380f, 0.85)
     bottomBarGfx.fillRect(0, GBC_HEIGHT - 12, GBC_WIDTH, 12)
 
-    this.objectiveTickerText = this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'Z:UNDO H:HINT R:RST', {
+    // Fixed hint line; never updated after creation.
+    this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'Z:UNDO H:HINT R:RST', {
       fontFamily: FONT,
       // 8px is the font's native grid; anything else renders between pixels.
       // The old label was 23 chars, which is 184px at 8px, so it is abbreviated.

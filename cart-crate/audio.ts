@@ -38,7 +38,9 @@ const zzfxG = (
   z = 0,
   w = 0,
   A = 0,
-  l = 0,
+  // Positional slot in zzfx's signature. Unused, but it cannot be removed
+  // without shifting every argument after it.
+  _l = 0,
   B = 0,
   x = 0,
   A2 = 0,

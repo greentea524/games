@@ -1,9 +1,10 @@
 import Phaser from 'phaser'
-import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
+import { TILE, FONT, GBC_PAL, WORLD_PALS } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem } from '../save'
-import { MoveCommand, StepRecord } from '../commands'
+import { MoveCommand } from '../commands'
+import type { StepRecord } from '../commands'
 import type { UIScene } from './UIScene'
 
 type Facing = 'down' | 'up' | 'left' | 'right'

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT, PAL } from '../constants'
+import { GBC_WIDTH, FONT } from '../constants'
 import { GameState } from '../state'
 import { music, isMuted, setMuted } from '../audio'
 
