@@ -153,7 +153,13 @@ export class BoardScene extends Phaser.Scene {
         const py = y * TILE + TILE / 2
 
         if (char === '#') {
-          this.floorSprites[y][x] = this.add.image(px, py, tKey('wall'))
+          let texKey = 'wall'
+          if (y === 0) {
+            texKey = (x % 2 === 0) ? 'shelf' : 'pegboard'
+          } else if (y === this.mapHeight - 1 || x === 0 || x === this.mapWidth - 1) {
+            texKey = 'barrel'
+          }
+          this.floorSprites[y][x] = this.add.image(px, py, tKey(texKey))
         } else if (char === 'T') {
           this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'))
           const targetSprite = this.add.image(px, py, tKey('target'))
