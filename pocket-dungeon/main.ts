@@ -1,6 +1,5 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
-import { GameState } from './state'
 import { BootScene } from './scenes/BootScene'
 import { TitleScene } from './scenes/TitleScene'
 import { ShopScene } from './scenes/ShopScene'

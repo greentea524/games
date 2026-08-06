@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
+import { GBC_WIDTH, FONT } from '../constants'
 import { GameState } from '../state'
-import { recordRun, RunStats } from '../meta'
+import { recordRun } from '../meta'
+import type { RunStats } from '../meta'
 import { music, sfx } from '../audio'
 
 export class GameOverScene extends Phaser.Scene {

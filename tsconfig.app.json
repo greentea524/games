@@ -22,5 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "shared", "lantern-keeper", "static", "windup"]
+  "include": ["src", "shared", "lantern-keeper", "static", "windup", "pocket-dungeon"]
 }

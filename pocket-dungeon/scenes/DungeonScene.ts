@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { TILE, GBC_WIDTH, GBC_HEIGHT } from '../constants'
+import { TILE } from '../constants'
 
 // Fog alphas, and how far a wall torch pushes a tile back toward lit.
 //
@@ -17,14 +17,16 @@ const TORCH_FLICKER = 0.05
 import { GameState, TurnState } from '../state'
 import { MapGenerator } from '../MapGenerator'
 import { RNG } from '../rng'
+import type { AIType, AIContext } from '../enemies'
 import {
-  AIType, AIContext, rollEnemies, getBiome,
+  rollEnemies, getBiome,
   chaserAI, cowardAI, rangerAI, sleeperAI, splitterAI,
-  ENEMY_DEFS,
 } from '../enemies'
 import { music, sfx, setMuted, isMuted } from '../audio'
-import { BossState, bossAI, getBossPhase } from '../boss'
-import { ItemDef, rollFloorItems, TurnSnapshot } from '../items'
+import { bossAI } from '../boss'
+import type { BossState } from '../boss'
+import { rollFloorItems } from '../items'
+import type { ItemDef, TurnSnapshot } from '../items'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -57,7 +59,6 @@ export class DungeonScene extends Phaser.Scene {
   private floorItems: { def: ItemDef; tx: number; ty: number; sprite: Phaser.GameObjects.Sprite }[] = []
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
-  private useKey!: Phaser.Input.Keyboard.Key
   private rewindKey!: Phaser.Input.Keyboard.Key
 
   constructor() {
@@ -71,7 +72,8 @@ export class DungeonScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<string, Phaser.Input.Keyboard.Key>
-    this.useKey = this.input.keyboard!.addKey('E')
+    // 'E' used to be registered here and never read — nothing responded to
+    // it. Removed rather than left looking wired.
     this.rewindKey = this.input.keyboard!.addKey('R')
 
     GameState.actionHistory.resetForFloor()

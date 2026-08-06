@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
-import { loadMeta, CLASSES, SHOP_ITEMS, unlockClass, purchaseShopItem, ClassName } from '../meta'
+import { GBC_WIDTH, FONT } from '../constants'
+import { loadMeta, CLASSES, SHOP_ITEMS, unlockClass, purchaseShopItem } from '../meta'
+import type { ClassName } from '../meta'
 import { sfx } from '../audio'
 
 interface MenuItem {

@@ -190,7 +190,15 @@ export class Inventory {
 
 // --- Floor Item Drops ---
 
-export function rollFloorItems(depth: number, rng: RNG): ItemDef[] {
+/**
+ * Rolls this floor's item drops.
+ *
+ * `_depth` is accepted and ignored: loot is currently identical on floor 1 and
+ * floor 12. The caller already passes the depth, so scaling it is a data
+ * change rather than a signature change — but choosing that curve is design
+ * work, not a cleanup, so it is left as-is and named to say so.
+ */
+export function rollFloorItems(_depth: number, rng: RNG): ItemDef[] {
   const pool = Object.values(ITEMS).filter(i => i.weight > 0)
   const count = rng.nextInt(2, 4) // 2-4 items per floor
   const result: ItemDef[] = []

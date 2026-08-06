@@ -38,13 +38,15 @@ export class BootScene extends Phaser.Scene {
       const drawRaisedWall = (offsetX: number) => {
         g.fillStyle(colors.wallLine); g.fillRect(offsetX, 0, T, T)
         g.fillStyle(colors.wallBg); g.fillRect(offsetX + 1, 1, T - 2, T - 2)
+        // Alpha belongs in fillStyle. Graphics has no globalAlpha, so these
+        // three assignments did nothing and the highlight and shadow were
+        // painted at full strength.
         // Highlight
-        g.fillStyle(isDmg ? PAL.lightest : 0xffffff); g.globalAlpha = 0.25
+        g.fillStyle(isDmg ? PAL.lightest : 0xffffff, 0.25)
         g.fillRect(offsetX + 1, 1, T - 2, 1); g.fillRect(offsetX + 1, 1, 1, T - 2)
         // Shadow
-        g.fillStyle(isDmg ? PAL.darkest : 0x000000); g.globalAlpha = 0.4
+        g.fillStyle(isDmg ? PAL.darkest : 0x000000, 0.4)
         g.fillRect(offsetX + 1, T - 2, T - 2, 1); g.fillRect(offsetX + T - 2, 1, 1, T - 2)
-        g.globalAlpha = 1.0
       }
 
       // 1: Wall (raised block)
