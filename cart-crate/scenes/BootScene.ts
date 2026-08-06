@@ -16,6 +16,7 @@ export class BootScene extends Phaser.Scene {
         this.buildCrate(mode, w)
         this.buildTarget(mode, w)
         this.buildSpecialTerrain(mode, w)
+        this.buildBorderDressing(mode, w)
       }
     })
     this.scene.start('mainmenu')
@@ -89,6 +90,52 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(pitColor); g.fillRect(0, 0, 16, 16)
       g.fillStyle(0x000000); g.fillRect(2, 2, 12, 12)
       g.generateTexture(`hole_${mode}${keyPrefix}`, 16, 16)
+    }
+
+    g.destroy()
+  }
+
+  private buildBorderDressing(mode: 'dmg' | 'gbc', world: number) {
+    const keyPrefix = mode === 'gbc' ? `_w${world}` : ''
+    const pal = mode === 'gbc' ? (WORLD_PALS[world - 1] || GBC_PAL) : GBC_PAL
+    const g = this.make.graphics({}, false)
+    const wallBg = mode === 'dmg' ? PAL.dark : pal.wallBg
+    const lineCol = mode === 'dmg' ? PAL.darkest : pal.wallLine
+
+    // Shelf
+    if (!this.textures.exists(`shelf_${mode}${keyPrefix}`)) {
+      g.clear()
+      g.fillStyle(wallBg); g.fillRect(0, 0, 16, 16)
+      g.fillStyle(lineCol); g.fillRect(0, 12, 16, 2)
+      g.fillStyle(mode === 'dmg' ? PAL.light : pal.bgPath)
+      g.fillRect(2, 6, 6, 6); g.fillRect(9, 8, 5, 4)
+      g.fillStyle(lineCol)
+      g.fillRect(4, 8, 2, 2)
+      g.generateTexture(`shelf_${mode}${keyPrefix}`, 16, 16)
+    }
+
+    // Pegboard
+    if (!this.textures.exists(`pegboard_${mode}${keyPrefix}`)) {
+      g.clear()
+      g.fillStyle(wallBg); g.fillRect(0, 0, 16, 16)
+      g.fillStyle(lineCol)
+      for (let y = 2; y < 16; y += 4) {
+        for (let x = 2; x < 16; x += 4) g.fillRect(x, y, 1, 1)
+      }
+      g.fillStyle(mode === 'dmg' ? PAL.lightest : 0xd0d0d0)
+      g.fillRect(10, 4, 2, 8); g.fillRect(9, 3, 4, 2); g.fillRect(11, 2, 2, 1)
+      g.generateTexture(`pegboard_${mode}${keyPrefix}`, 16, 16)
+    }
+
+    // Barrel / Canister
+    if (!this.textures.exists(`barrel_${mode}${keyPrefix}`)) {
+      g.clear()
+      g.fillStyle(wallBg); g.fillRect(0, 0, 16, 16)
+      g.fillStyle(mode === 'dmg' ? PAL.light : pal.bgPath)
+      g.fillRect(4, 4, 8, 12)
+      g.fillStyle(lineCol)
+      g.fillRect(4, 6, 8, 2); g.fillRect(4, 12, 8, 2)
+      g.generateTexture(`barrel_${mode}${keyPrefix}`, 16, 16)
     }
 
     g.destroy()
