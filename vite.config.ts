@@ -27,6 +27,15 @@ export default defineConfig({
           new URL('./windup/index.html', import.meta.url),
         ),
       },
+      output: {
+        // Rollup names a shared chunk after one of the modules inside it. The
+        // 1.2 MB vendor chunk was called "phaser" only by luck; adding another
+        // module shared by all five games renamed it to that module, which
+        // makes a network waterfall very hard to read. Pin the name.
+        manualChunks(id: string) {
+          if (id.includes('node_modules/phaser')) return 'phaser'
+        },
+      },
     },
   },
 })
