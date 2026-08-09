@@ -1,11 +1,12 @@
 import Phaser from 'phaser'
-import { TILE, FONT, GBC_PAL, WORLD_PALS } from '../constants'
+import { TILE, FONT, PAL, GBC_PAL, WORLD_PALS } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem } from '../save'
 import { MoveCommand } from '../commands'
 import type { StepRecord } from '../commands'
 import type { UIScene } from './UIScene'
+import { showRunSummary } from '../../shared/runSummary'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -25,6 +26,15 @@ export class BoardScene extends Phaser.Scene {
   private facing: Facing = 'down'
   private isMoving = false
   private isHintMode = false
+  /**
+   * True while the end-of-level summary is up (#66).
+   *
+   * The board has two long-standing "advance on any input" paths that trigger
+   * on `uiBlocking` — a pointerup handler and an update() branch. Both would
+   * fire on the same press that dismisses the panel, advancing two levels at
+   * once, so while the panel is up it owns the input and they stand down.
+   */
+  private summaryOpen = false
   private mapWidth = 10
   private mapHeight = 9
 
@@ -67,6 +77,7 @@ export class BoardScene extends Phaser.Scene {
       touchStartY = pointer.y
     })
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (this.summaryOpen) return
       if (GameState.uiBlocking) {
         const uiScene = this.scene.get('ui') as UIScene
         if (uiScene && uiScene.isPauseOpen()) return
@@ -111,6 +122,7 @@ export class BoardScene extends Phaser.Scene {
     this.facing = 'down'
     this.isMoving = false
     this.isHintMode = false
+    this.summaryOpen = false
     this.undoStack = []
     GameState.resetStats()
 
@@ -339,6 +351,7 @@ export class BoardScene extends Phaser.Scene {
     }
 
     if (GameState.uiBlocking) {
+      if (this.summaryOpen) return
       const uiScene = this.scene.get('ui') as UIScene
       if (uiScene && uiScene.isPauseOpen()) return
 
@@ -607,7 +620,12 @@ export class BoardScene extends Phaser.Scene {
     if (totalTargets > 0 && dockedCrates === totalTargets) {
       GameState.uiBlocking = true
       const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
-      SaveSystem.saveLevelCompletion(levelConfig.id, GameState.movesCount, levelConfig.parMoves)
+      // Read before saving: afterwards `bestMoves` includes this attempt, and
+      // every clear would look like a personal best.
+      const previous = SaveSystem.getLevelData(levelConfig.id)
+      const moves = GameState.movesCount
+      const stars = SaveSystem.saveLevelCompletion(levelConfig.id, moves, levelConfig.parMoves)
+      const isBest = !previous.completed || moves < previous.bestMoves
 
       const nextLevel = GameState.currentLevelIndex + 1
       const savedStr = localStorage.getItem('cart-crate-level')
@@ -627,7 +645,32 @@ export class BoardScene extends Phaser.Scene {
         duration: 150,
         ease: 'Sine.easeInOut',
         onComplete: () => {
-          this.cameras.main.fadeOut(400, 0, 0, 0)
+          // The level used to fade straight into the next one, so the numbers
+          // it already tracked — moves against par, stars, your best — were
+          // never shown (#66).
+          this.summaryOpen = true
+          // The HUD is its own scene and renders above anything added here.
+          this.scene.setVisible(false, 'ui')
+          // Stars as a plain count, not glyphs: Press Start 2P has no U+2605,
+          // so a row of them falls back to another face mid-panel.
+          showRunSummary(this, {
+            title: `LEVEL ${levelConfig.id} CLEAR`,
+            palette: PAL,
+            stats: [
+              { label: 'MOVES', value: `${moves}`, highlight: isBest },
+              { label: 'PAR', value: `${levelConfig.parMoves}` },
+              { label: 'STARS', value: `${stars}/3` },
+              {
+                label: 'BEST',
+                value: `${isBest ? moves : previous.bestMoves}`,
+              },
+            ],
+            onDismiss: () => {
+              this.summaryOpen = false
+              this.scene.setVisible(true, 'ui')
+              this.cameras.main.fadeOut(400, 0, 0, 0)
+            },
+          })
         }
       })
 
