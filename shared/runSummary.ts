@@ -127,7 +127,9 @@ export function showRunSummary(scene: Phaser.Scene, opts: RunSummaryOptions): vo
   )
 
   const box = add(scene.add.graphics().setScrollFactor(0).setDepth(depth + 1))
-  box.fillStyle(pal.darkest, 0.96)
+  // Opaque, not near-opaque: at 0.96 a light ending card behind it ghosts
+  // through the panel and competes with 8px text.
+  box.fillStyle(pal.darkest, 1)
   box.fillRoundedRect(panelX, panelY, panelW, panelH, 4)
   box.lineStyle(1, pal.light, 1)
   box.strokeRoundedRect(panelX, panelY, panelW, panelH, 4)

@@ -440,6 +440,7 @@ export class DungeonScene extends Phaser.Scene {
       yoyo: true,
       onComplete: () => {
         if (enemy.hp <= 0) {
+          GameState.killsCount++
           // Gold drop
           const goldDrop = enemy.ai === 'boss' ? 20 : (enemy.isSplit ? 1 : 3)
           GameState.runGold += goldDrop

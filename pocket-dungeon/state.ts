@@ -24,6 +24,8 @@ export class GameState {
   static playerAtk: number = 4
   static playerBaseAtk: number = 4
   static turnsCount: number = 0
+  /** Enemies killed this run, for the end-of-run summary (#66). */
+  static killsCount: number = 0
   static uiBlocking: boolean = false
   static selectedClass: ClassName = 'knight'
 
@@ -85,6 +87,7 @@ export class GameState {
     this.playerBaseAtk = classDef.atk
     this.playerAtk = classDef.atk
     this.turnsCount = 0
+    this.killsCount = 0
     this.turnState = TurnState.PLAYER_TURN
     this.hunger = classDef.hunger
     this.maxHunger = classDef.hunger

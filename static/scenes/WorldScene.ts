@@ -14,6 +14,8 @@ import { StaticWorldFX } from '../fx/StaticWorldFX'
 import { sfx, music } from '../audio'
 import { NPCS, currentTarget } from '../dialogue'
 import { Darkness, type Light } from '../../shared/lighting'
+import { showRunSummary } from '../../shared/runSummary'
+import { ITEMS, TRANSFORMS } from '../items'
 import type { NpcDef } from '../dialogue'
 import {
   VALVE_DEF,
@@ -74,6 +76,16 @@ const LIGHT_RADIUS = { lit: 44, dim: 18 } as const
  * signal rather than a lamp.
  */
 const TV_GLOW = { radius: 30, flicker: 4, periodMs: 140 } as const
+
+/**
+ * How many items a run can actually collect.
+ *
+ * Derived rather than written down: the Static-side counterparts in TRANSFORMS
+ * are never granted, only swapped in by crossing over, so counting every entry
+ * in ITEMS would set a target two higher than anyone can reach.
+ */
+const COLLECTABLE_ITEMS =
+  Object.keys(ITEMS).length - new Set(TRANSFORMS.map((t) => t.statik)).size
 
 const GUS_HUT: Structure = { x0: 2, y0: 11, w: 3, roofRows: 2, wallRow: 13, doorX: 3 }
 const REN_HOUSE: Structure = { x0: 18, y0: 16, w: 3, roofRows: 2, wallRow: 18, doorX: 19 }
@@ -1073,7 +1085,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.time.delayedCall(3200, () => {
       const prompt = this.add
-        .text(GBC_WIDTH / 2, GBC_HEIGHT - 12, 'Z: title', {
+        .text(GBC_WIDTH / 2, GBC_HEIGHT - 12, 'Z: on', {
           fontFamily: '"Press Start 2P", monospace',
           fontSize: '8px',
           color: textColor,
@@ -1083,9 +1095,34 @@ export class WorldScene extends Phaser.Scene {
         .setScrollFactor(0)
         .setDepth(3001)
       this.tweens.add({ targets: prompt, alpha: 0.3, duration: 500, yoyo: true, repeat: -1 })
-      this.input.keyboard!.once('keydown-Z', () => this.scene.start('title'))
-      this.input.keyboard!.once('keydown-ENTER', () => this.scene.start('title'))
-      this.input.once('pointerdown', () => this.scene.start('title'))
+
+      // The tally comes *after* the ending card, never over it (#66). The
+      // ending is the point of the game and it is two sentences long; a stats
+      // panel on top of it would be reading the receipt over someone's
+      // shoulder. Acknowledge the ending, then see what the run added up to.
+      const showTally = () => {
+        this.tweens.killTweensOf(prompt)
+        prompt.destroy()
+        showRunSummary(this, {
+          title: 'THE RECORD',
+          subtitle: empathy ? 'You stayed' : 'You cut it loose',
+          palette: PAL,
+          stats: [
+            { label: 'CHAPTER', value: `${GameState.chapter}` },
+            { label: 'FLAGS', value: `${Object.keys(GameState.flags).length}` },
+            {
+              label: 'ITEMS',
+              value: `${GameState.itemsFound.length}/${COLLECTABLE_ITEMS}`,
+              highlight: GameState.itemsFound.length >= COLLECTABLE_ITEMS,
+            },
+          ],
+          prompt: 'Z: title',
+          onDismiss: () => this.scene.start('title'),
+        })
+      }
+      this.input.keyboard!.once('keydown-Z', showTally)
+      this.input.keyboard!.once('keydown-ENTER', showTally)
+      this.input.once('pointerdown', showTally)
     })
   }
 
