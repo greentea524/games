@@ -187,5 +187,17 @@
    "tileheight": 16,
    "tilewidth": 16
   }
+ ],
+ "properties": [
+  {
+   "name": "darkInStatic",
+   "type": "bool",
+   "value": true
+  },
+  {
+   "name": "darkInStaticAlpha",
+   "type": "float",
+   "value": 0.8
+  }
  ]
 }

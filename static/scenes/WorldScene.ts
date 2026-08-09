@@ -13,7 +13,7 @@ import { GameState } from '../state'
 import { StaticWorldFX } from '../fx/StaticWorldFX'
 import { sfx, music } from '../audio'
 import { NPCS, currentTarget } from '../dialogue'
-import { Darkness } from '../../shared/lighting'
+import { Darkness, type Light } from '../../shared/lighting'
 import type { NpcDef } from '../dialogue'
 import {
   VALVE_DEF,
@@ -64,6 +64,17 @@ const DESTINATION_NEAR_TILES = 4
  */
 const LIGHT_RADIUS = { lit: 44, dim: 18 } as const
 
+/**
+ * The TV lights itself in a dark room (#89).
+ *
+ * It is the only crossing between the worlds, so it is the one thing the
+ * player must never lose in the dark — a dead flashlight leaves barely more
+ * than arm's reach, and the Static-side house is unlit. A screen full of
+ * static is a light source anyway; the radius breathes so it reads as a
+ * signal rather than a lamp.
+ */
+const TV_GLOW = { radius: 30, flicker: 4, periodMs: 140 } as const
+
 const GUS_HUT: Structure = { x0: 2, y0: 11, w: 3, roofRows: 2, wallRow: 13, doorX: 3 }
 const REN_HOUSE: Structure = { x0: 18, y0: 16, w: 3, roofRows: 2, wallRow: 18, doorX: 19 }
 // Chapter 1's bakery is stamped in inline rather than via placeStructure
@@ -110,8 +121,10 @@ export class WorldScene extends Phaser.Scene {
   private interactKey!: Phaser.Input.Keyboard.Key
   private prompt?: Phaser.GameObjects.Container
 
-  // Darkness overlay, only on maps flagged `dark` in Tiled (#73)
+  // Darkness overlay, only on maps flagged `dark`/`darkInStatic` in Tiled (#73, #89)
   private darkness?: Darkness
+  // Where the TV is on this map, if it has one — it lights itself (#89).
+  private tvPos?: { x: number; y: number }
 
   // Minimap (only on maps larger than one screen)
   private blip?: Phaser.GameObjects.Graphics
@@ -151,6 +164,7 @@ export class WorldScene extends Phaser.Scene {
   create() {
     this.transitioning = false
     this.doors = []
+    this.tvPos = undefined
     this.doorLockUntil = this.time.now + 800
     this.cameras.main.fadeIn(250, 15, 56, 15)
 
@@ -276,6 +290,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.mapKey === 'house') {
       const tv = this.add.image(7 * TILE + TILE / 2, 1 * TILE + TILE / 2, 'tv')
       this.interactables.push({ x: tv.x, y: tv.y, action: () => this.useTV() })
+      this.tvPos = { x: tv.x, y: tv.y }
     }
     // Chapter 5 (#20): the entity at the heart of the static.
     if (this.mapKey === 'core') {
@@ -1015,7 +1030,18 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * Darkness overlay for maps flagged `dark` in Tiled (#73).
+   * Darkness overlay for maps flagged dark in Tiled (#73, #89).
+   *
+   * Two flags, because a room can be dark in one world and not the other:
+   * - `dark` / `darkAlpha` — unlit in both worlds (the cellar, town_static).
+   * - `darkInStatic` / `darkInStaticAlpha` — unlit only on the Static side.
+   *
+   * The second exists so the interiors can keep their lights in the normal
+   * world and lose them across the crossing, without a duplicate map file per
+   * house. It is what makes "Flashlight dies." a thing the player watches
+   * happen rather than a caption: the TV is in the living room, so every
+   * crossing takes place in a room that goes dark on the way over and comes
+   * back up on the way home.
    *
    * Depth 20 puts it over the world and the player but under the minimap
    * (1000), the interact prompt (2000) and the dialogue box, so the UI stays
@@ -1030,9 +1056,13 @@ export class WorldScene extends Phaser.Scene {
     const raw = map.properties as unknown
     const props = Array.isArray(raw) ? (raw as { name: string; value: unknown }[]) : []
     const prop = (n: string) => props.find((x) => x.name === n)?.value
-    if (prop('dark') !== true) return
+    const num = (n: string) => (typeof prop(n) === 'number' ? (prop(n) as number) : undefined)
 
-    const alpha = typeof prop('darkAlpha') === 'number' ? (prop('darkAlpha') as number) : 0.9
+    const alwaysDark = prop('dark') === true
+    const darkHere = GameState.world === 'static' && prop('darkInStatic') === true
+    if (!alwaysDark && !darkHere) return
+
+    const alpha = (darkHere ? num('darkInStaticAlpha') : undefined) ?? num('darkAlpha') ?? 0.9
     this.darkness = new Darkness(this, {
       width: GBC_WIDTH,
       height: GBC_HEIGHT,
@@ -1055,9 +1085,18 @@ export class WorldScene extends Phaser.Scene {
 
   private redrawDarkness() {
     if (!this.darkness) return
-    this.darkness.redraw([
+    const lights: Light[] = [
       { x: this.player.x, y: this.player.y, radius: this.playerLightRadius() },
-    ])
+    ]
+    // The TV is the only way between the worlds. Leaving it to be found by a
+    // dead flashlight in an unlit room is how a dark house turns into a
+    // softlock, so it carries its own glow — reachable from anywhere in the
+    // room, and the correct look for a screen showing nothing but static.
+    if (this.tvPos) {
+      const flicker = Math.sin(this.time.now / TV_GLOW.periodMs) * TV_GLOW.flicker
+      lights.push({ x: this.tvPos.x, y: this.tvPos.y, radius: TV_GLOW.radius + flicker })
+    }
+    this.darkness.redraw(lights)
   }
 
   // Deliberately no interaction gating here.
