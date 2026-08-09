@@ -80,6 +80,22 @@ const REN_HOUSE: Structure = { x0: 18, y0: 16, w: 3, roofRows: 2, wallRow: 18, d
 // Chapter 1's bakery is stamped in inline rather than via placeStructure
 // (it has two wall rows), but still needs a door zone.
 const BAKER_HOUSE: Structure = { x0: 3, y0: 16, w: 5, roofRows: 2, wallRow: 19, doorX: 5 }
+
+/**
+ * Where the Static-side copy of Gus stands (#93).
+ *
+ * He used to be at (4,14), inside the fence line, with all four neighbouring
+ * tiles blocked — so he could not be examined, `seen_gus_static` could not be
+ * set, `ch3_done` never fired, and Chapters 4 and 5 were unreachable. That is
+ * the whole game, so this tile is load-bearing.
+ *
+ * (5,13) is against the hut's east wall, in the part of town that is reachable
+ * from the player's spawn no matter what else changes. Deliberately not in the
+ * hut's own front yard: that yard is only reachable through a corridor the
+ * frozen Baker stands in, and a softlock fix should not depend on a second fix
+ * staying correct.
+ */
+const GUS_STATIC_TILE = { tx: 5, ty: 13 }
 import type { UIScene } from './UIScene'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
@@ -422,27 +438,47 @@ export class WorldScene extends Phaser.Scene {
     ;(this.scene.get('ui') as UIScene).startDialogue(def)
     this.player.setVelocity(0, 0)
   }
+  /**
+   * A solid prop occupying a `w`x`h` tile footprint with its top-left at
+   * (tx,ty), placed so its collision box covers exactly the tiles it is drawn
+   * on (#94).
+   *
+   * Centred on the footprint, deliberately. The old form — `staticImage` at
+   * the tile corner followed by `setOrigin(0, 0)` — built the body while the
+   * image still had its default 0.5 origin, so the body stayed centred on the
+   * corner while the sprite moved down and right. Every prop then collided
+   * half its own size up and to the left of where it appeared: invisible walls
+   * beside each one, and no collision at all on the half you could see. Three
+   * fences overlapping that way is what sealed the frozen Gus in (#93).
+   *
+   * This is how the fountain has always been placed; the props now match it.
+   */
+  private solidProp(tx: number, ty: number, w: number, h: number, key: string) {
+    const prop = this.physics.add.staticImage(
+      tx * TILE + (w * TILE) / 2,
+      ty * TILE + (h * TILE) / 2,
+      key,
+    )
+    prop.body.setSize(w * TILE, h * TILE)
+    this.physics.add.collider(this.player, prop)
+    return prop
+  }
+
   // Add decorative props to the map based on the mapKey
   private placeDecorations(mode: string) {
     const interiors = ['house', 'house2', 'bakery', 'gus_hut', 'ren_house']
     if (interiors.includes(this.mapKey)) {
       // Bed top left corner
-      const bed = this.physics.add.staticImage(2 * TILE, 2 * TILE, `prop_bed_${mode}`).setOrigin(0, 0)
-      bed.body.setSize(32, 32)
-      this.physics.add.collider(this.player, bed)
+      this.solidProp(2, 2, 2, 2, `prop_bed_${mode}`)
 
-      // Rug in middle
+      // Rug in middle (no body — the player walks over it)
       this.add.image(4 * TILE, 4 * TILE, `prop_rug_${mode}`).setOrigin(0, 0)
 
       // Bookshelf top right
-      const shelf = this.physics.add.staticImage(8 * TILE, 2 * TILE, `prop_bookshelf_${mode}`).setOrigin(0, 0)
-      shelf.body.setSize(16, 32)
-      this.physics.add.collider(this.player, shelf)
+      this.solidProp(8, 2, 1, 2, `prop_bookshelf_${mode}`)
 
       // Plant bottom left
-      const plant = this.physics.add.staticImage(2 * TILE, 7 * TILE, `prop_plant_${mode}`).setOrigin(0, 0)
-      plant.body.setSize(16, 16)
-      this.physics.add.collider(this.player, plant)
+      this.solidProp(2, 7, 1, 1, `prop_plant_${mode}`)
 
       // Examine points sit ON the prop, so the player triggers them by
       // standing on the adjacent floor tile and facing it. These tiles are
@@ -470,27 +506,28 @@ export class WorldScene extends Phaser.Scene {
         this.examine(6, 2, BAKERY_PHOTO_DEF)
       }
     } else if (this.mapKey === 'town' || this.mapKey === 'town_static') {
-      // Add bushes
-      const bushCoords = [[5, 5], [6, 15], [25, 4], [28, 20], [15, 25]]
+      // Add bushes. The town is 24x22, so anything past (23,21) was being
+      // placed off the edge of the map: three of these five never rendered,
+      // while still registering an examine point nothing could reach (#94).
+      const bushCoords = [[5, 5], [6, 15]]
       for (const [bx, by] of bushCoords) {
-        const bush = this.physics.add.staticImage(bx * TILE, by * TILE, `prop_bush_${mode}`).setOrigin(0, 0)
-        bush.body.setSize(16, 16)
-        this.physics.add.collider(this.player, bush)
+        this.solidProp(bx, by, 1, 1, `prop_bush_${mode}`)
         this.examine(bx, by, BUSH_DEF)
       }
-      
-      // Add flowers
-      const flwCoords = [[8, 6], [9, 6], [7, 7], [22, 10], [23, 11], [14, 28], [15, 29]]
+
+      // Add flowers (no bodies — dressing only). Same bounds problem: the last
+      // two sat off the south edge.
+      const flwCoords = [[8, 6], [9, 6], [7, 7], [22, 10], [23, 11]]
       for (const [fx, fy] of flwCoords) {
         this.add.image(fx * TILE, fy * TILE, `prop_flower_${mode}`).setOrigin(0, 0)
       }
-      
-      // Add a small fence near Gus's hut (x0: 2, y0: 11)
+
+      // Add a small fence near Gus's hut (x0: 2, y0: 11). The gap at (3,14) is
+      // the way in to the hut door — keep it, and keep the Static-side Gus off
+      // the fence line (see GUS_STATIC_TILE).
       const fenceCoords = [[1, 14], [2, 14], [4, 14], [5, 14], [1, 15], [5, 15]]
       for (const [fx, fy] of fenceCoords) {
-        const f = this.physics.add.staticImage(fx * TILE, fy * TILE, `prop_fence_${mode}`).setOrigin(0, 0)
-        f.body.setSize(16, 16)
-        this.physics.add.collider(this.player, f)
+        this.solidProp(fx, fy, 1, 1, `prop_fence_${mode}`)
       }
     }
   }
@@ -571,8 +608,8 @@ export class WorldScene extends Phaser.Scene {
         ground.setCollision(SOLID_TILES)
         this.addStructureDoor(GUS_HUT, 'gus_hut')
         const sprite = this.npcGroup.create(
-          4 * TILE + TILE / 2,
-          14 * TILE + TILE / 2,
+          GUS_STATIC_TILE.tx * TILE + TILE / 2,
+          GUS_STATIC_TILE.ty * TILE + TILE / 2,
           `npc_${mode}_gus_down`,
         ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
         sprite.body.setSize(12, 12).setOffset(2, 3)
