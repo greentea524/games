@@ -80,6 +80,22 @@ const REN_HOUSE: Structure = { x0: 18, y0: 16, w: 3, roofRows: 2, wallRow: 18, d
 // Chapter 1's bakery is stamped in inline rather than via placeStructure
 // (it has two wall rows), but still needs a door zone.
 const BAKER_HOUSE: Structure = { x0: 3, y0: 16, w: 5, roofRows: 2, wallRow: 19, doorX: 5 }
+
+/**
+ * Where the Static-side copy of Gus stands (#93).
+ *
+ * He used to be at (4,14), inside the fence line, with all four neighbouring
+ * tiles blocked — so he could not be examined, `seen_gus_static` could not be
+ * set, `ch3_done` never fired, and Chapters 4 and 5 were unreachable. That is
+ * the whole game, so this tile is load-bearing.
+ *
+ * (5,13) is against the hut's east wall, in the part of town that is reachable
+ * from the player's spawn no matter what else changes. Deliberately not in the
+ * hut's own front yard: that yard is only reachable through a corridor the
+ * frozen Baker stands in, and a softlock fix should not depend on a second fix
+ * staying correct.
+ */
+const GUS_STATIC_TILE = { tx: 5, ty: 13 }
 import type { UIScene } from './UIScene'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
@@ -120,6 +136,11 @@ export class WorldScene extends Phaser.Scene {
   private npcs: NpcInstance[] = []
   private interactKey!: Phaser.Input.Keyboard.Key
   private prompt?: Phaser.GameObjects.Container
+
+  // Story beats re-check themselves whenever a flag changes (#95).
+  private unsubscribeFlags?: () => void
+  private armedBeats = new Set<string>()
+  private beaconPlaced = false
 
   // Darkness overlay, only on maps flagged `dark`/`darkInStatic` in Tiled (#73, #89)
   private darkness?: Darkness
@@ -165,7 +186,19 @@ export class WorldScene extends Phaser.Scene {
     this.transitioning = false
     this.doors = []
     this.tvPos = undefined
+    this.armedBeats.clear()
+    this.beaconPlaced = false
     this.doorLockUntil = this.time.now + 800
+
+    // Re-check the chapter beats whenever a flag changes, not only here (#95).
+    // Dropped on shutdown, and on re-entry to create(), so a scene restart
+    // cannot leave an old subscription pointed at a dead scene.
+    this.unsubscribeFlags?.()
+    this.unsubscribeFlags = GameState.onFlagChange(() => this.checkStoryBeats())
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.unsubscribeFlags?.()
+      this.unsubscribeFlags = undefined
+    })
     this.cameras.main.fadeIn(250, 15, 56, 15)
 
     const mode = GameState.paletteMode
@@ -350,6 +383,7 @@ export class WorldScene extends Phaser.Scene {
 
     if (!this.scene.isActive('ui')) this.scene.launch('ui')
     this.announceLocation()
+    this.checkStoryBeats()
   }
 
   // Human-readable name per map. The Static-side suffix is only used where
@@ -422,27 +456,47 @@ export class WorldScene extends Phaser.Scene {
     ;(this.scene.get('ui') as UIScene).startDialogue(def)
     this.player.setVelocity(0, 0)
   }
+  /**
+   * A solid prop occupying a `w`x`h` tile footprint with its top-left at
+   * (tx,ty), placed so its collision box covers exactly the tiles it is drawn
+   * on (#94).
+   *
+   * Centred on the footprint, deliberately. The old form — `staticImage` at
+   * the tile corner followed by `setOrigin(0, 0)` — built the body while the
+   * image still had its default 0.5 origin, so the body stayed centred on the
+   * corner while the sprite moved down and right. Every prop then collided
+   * half its own size up and to the left of where it appeared: invisible walls
+   * beside each one, and no collision at all on the half you could see. Three
+   * fences overlapping that way is what sealed the frozen Gus in (#93).
+   *
+   * This is how the fountain has always been placed; the props now match it.
+   */
+  private solidProp(tx: number, ty: number, w: number, h: number, key: string) {
+    const prop = this.physics.add.staticImage(
+      tx * TILE + (w * TILE) / 2,
+      ty * TILE + (h * TILE) / 2,
+      key,
+    )
+    prop.body.setSize(w * TILE, h * TILE)
+    this.physics.add.collider(this.player, prop)
+    return prop
+  }
+
   // Add decorative props to the map based on the mapKey
   private placeDecorations(mode: string) {
     const interiors = ['house', 'house2', 'bakery', 'gus_hut', 'ren_house']
     if (interiors.includes(this.mapKey)) {
       // Bed top left corner
-      const bed = this.physics.add.staticImage(2 * TILE, 2 * TILE, `prop_bed_${mode}`).setOrigin(0, 0)
-      bed.body.setSize(32, 32)
-      this.physics.add.collider(this.player, bed)
+      this.solidProp(2, 2, 2, 2, `prop_bed_${mode}`)
 
-      // Rug in middle
+      // Rug in middle (no body — the player walks over it)
       this.add.image(4 * TILE, 4 * TILE, `prop_rug_${mode}`).setOrigin(0, 0)
 
       // Bookshelf top right
-      const shelf = this.physics.add.staticImage(8 * TILE, 2 * TILE, `prop_bookshelf_${mode}`).setOrigin(0, 0)
-      shelf.body.setSize(16, 32)
-      this.physics.add.collider(this.player, shelf)
+      this.solidProp(8, 2, 1, 2, `prop_bookshelf_${mode}`)
 
       // Plant bottom left
-      const plant = this.physics.add.staticImage(2 * TILE, 7 * TILE, `prop_plant_${mode}`).setOrigin(0, 0)
-      plant.body.setSize(16, 16)
-      this.physics.add.collider(this.player, plant)
+      this.solidProp(2, 7, 1, 1, `prop_plant_${mode}`)
 
       // Examine points sit ON the prop, so the player triggers them by
       // standing on the adjacent floor tile and facing it. These tiles are
@@ -470,27 +524,28 @@ export class WorldScene extends Phaser.Scene {
         this.examine(6, 2, BAKERY_PHOTO_DEF)
       }
     } else if (this.mapKey === 'town' || this.mapKey === 'town_static') {
-      // Add bushes
-      const bushCoords = [[5, 5], [6, 15], [25, 4], [28, 20], [15, 25]]
+      // Add bushes. The town is 24x22, so anything past (23,21) was being
+      // placed off the edge of the map: three of these five never rendered,
+      // while still registering an examine point nothing could reach (#94).
+      const bushCoords = [[5, 5], [6, 15]]
       for (const [bx, by] of bushCoords) {
-        const bush = this.physics.add.staticImage(bx * TILE, by * TILE, `prop_bush_${mode}`).setOrigin(0, 0)
-        bush.body.setSize(16, 16)
-        this.physics.add.collider(this.player, bush)
+        this.solidProp(bx, by, 1, 1, `prop_bush_${mode}`)
         this.examine(bx, by, BUSH_DEF)
       }
-      
-      // Add flowers
-      const flwCoords = [[8, 6], [9, 6], [7, 7], [22, 10], [23, 11], [14, 28], [15, 29]]
+
+      // Add flowers (no bodies — dressing only). Same bounds problem: the last
+      // two sat off the south edge.
+      const flwCoords = [[8, 6], [9, 6], [7, 7], [22, 10], [23, 11]]
       for (const [fx, fy] of flwCoords) {
         this.add.image(fx * TILE, fy * TILE, `prop_flower_${mode}`).setOrigin(0, 0)
       }
-      
-      // Add a small fence near Gus's hut (x0: 2, y0: 11)
+
+      // Add a small fence near Gus's hut (x0: 2, y0: 11). The gap at (3,14) is
+      // the way in to the hut door — keep it, and keep the Static-side Gus off
+      // the fence line (see GUS_STATIC_TILE).
       const fenceCoords = [[1, 14], [2, 14], [4, 14], [5, 14], [1, 15], [5, 15]]
       for (const [fx, fy] of fenceCoords) {
-        const f = this.physics.add.staticImage(fx * TILE, fy * TILE, `prop_fence_${mode}`).setOrigin(0, 0)
-        f.body.setSize(16, 16)
-        this.physics.add.collider(this.player, f)
+        this.solidProp(fx, fy, 1, 1, `prop_fence_${mode}`)
       }
     }
   }
@@ -548,9 +603,14 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  // Chapter beats (#16/#18): the world reflects story flags on every map load.
-  private applyStoryState(ground: Phaser.Tilemaps.TilemapLayer, mode: 'dmg' | 'gbc') {
-    // Chapter reconciliation from flags (covers loaded saves too).
+  /**
+   * Brings `GameState.chapter` in line with the flags that have been set.
+   *
+   * Runs on map entry and on every flag change, not just on entry: the flag
+   * that advances a chapter is usually set out in the world (the photo pickup
+   * ends Chapter 2), and a stale chapter number gates the next beat.
+   */
+  private reconcileChapter() {
     if (GameState.getFlag('ch4_done') && GameState.chapter < 5) {
       GameState.chapter = 5
     } else if (GameState.getFlag('ch3_done') && GameState.chapter < 4) {
@@ -560,6 +620,11 @@ export class WorldScene extends Phaser.Scene {
     } else if (GameState.getFlag('heard_about_house') && GameState.chapter < 2) {
       GameState.chapter = 2
     }
+  }
+
+  // Chapter beats (#16/#18): the world reflects story flags on every map load.
+  private applyStoryState(ground: Phaser.Tilemaps.TilemapLayer, mode: 'dmg' | 'gbc') {
+    this.reconcileChapter()
 
     if (this.mapKey !== 'town') return
 
@@ -571,39 +636,17 @@ export class WorldScene extends Phaser.Scene {
         ground.setCollision(SOLID_TILES)
         this.addStructureDoor(GUS_HUT, 'gus_hut')
         const sprite = this.npcGroup.create(
-          4 * TILE + TILE / 2,
-          14 * TILE + TILE / 2,
+          GUS_STATIC_TILE.tx * TILE + TILE / 2,
+          GUS_STATIC_TILE.ty * TILE + TILE / 2,
           `npc_${mode}_gus_down`,
         ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
         sprite.body.setSize(12, 12).setOffset(2, 3)
         this.npcs.push({ sprite, def: GUS_STATIC_DEF, facing: 'down' })
-
-        // The pattern clicks once both standing houses have been examined.
-        if (
-          GameState.getFlag('seen_baker_static') &&
-          GameState.getFlag('seen_gus_static') &&
-          !GameState.getFlag('ch3_done')
-        ) {
-          this.time.delayedCall(800, () => {
-            if (GameState.uiBlocking || this.transitioning) return
-            this.openNarration(PATTERN_DEF)
-          })
-        }
       }
-      // Chapter 4 (#19): Ren's house half-written on the static side,
-      // with the beacon copying it at the door.
-      if (GameState.getFlag('ch3_done') && !GameState.getFlag('ch4_done')) {
-        this.placeStructure(ground, REN_HOUSE, true)
-        ground.setCollision(SOLID_TILES)
-        const bx = REN_HOUSE.doorX * TILE + TILE / 2
-        const by = REN_HOUSE.wallRow * TILE + TILE / 2
-        this.add.image(bx, by - 4, 'beacon')
-        this.interactables.push({
-          x: bx,
-          y: by,
-          action: () => this.openNarration(BEACON_DEF),
-        })
-      }
+      // Chapter 4 (#19): Ren's house half-written on the static side, with the
+      // beacon copying it at the door. The pattern that unlocks it fires on
+      // this same map, so it is placed on demand rather than only here.
+      this.placeStaticBeacon()
       return
     }
 
@@ -627,24 +670,6 @@ export class WorldScene extends Phaser.Scene {
       ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
       sprite.body.setSize(12, 12).setOffset(2, 3)
       this.npcs.push({ sprite, def: BAKER_NORMAL_DEF, facing: 'down' })
-
-      // The vanishing triggers shortly after the player has the
-      // flashlight (i.e. talked to Mom) and is out in town.
-      if (GameState.getFlag('got_flashlight')) {
-        this.time.delayedCall(1200, () => this.vanishBakerHouse())
-      }
-    }
-
-    // Chapter 3 hook after the first crossover puzzle is solved.
-    if (
-      GameState.getFlag('chapter2_done') &&
-      !GameState.getFlag('ch3_hint_shown')
-    ) {
-      this.time.delayedCall(800, () => {
-        if (GameState.uiBlocking) return
-        GameState.setFlag('ch3_hint_shown')
-        this.openNarration(CH3_HINT_DEF)
-      })
     }
 
     // ---- Chapter 3 (#18): more of the town, and the second vanishing ----
@@ -662,26 +687,9 @@ export class WorldScene extends Phaser.Scene {
     if (!renAnchorActive) {
       this.addStructureDoor(REN_HOUSE, 'ren_house')
     }
-    if (
-      GameState.chapter >= 3 &&
-      GameState.getFlag('ch3_hint_shown') &&
-      !GameState.getFlag('gus_hut_vanished')
-    ) {
-      this.time.delayedCall(1500, () =>
-        this.vanishStructure(GUS_HUT, 'gus_hut_vanished', GUS_VANISH_DEF),
-      )
-    }
 
     // ---- Chapter 4 (#19): the race to anchor Ren's house ----
     if (GameState.getFlag('ch3_done') && !GameState.getFlag('ch4_done')) {
-      // One-time urgency beat when the race begins.
-      if (!GameState.getFlag('race_started')) {
-        this.time.delayedCall(900, () => {
-          if (GameState.uiBlocking || this.transitioning) return
-          GameState.setFlag('race_started')
-          this.openNarration(RACE_START_DEF)
-        })
-      }
       // The anchoring act at Ren's door (gated by key + beacon_found).
       this.interactables.push({
         x: REN_HOUSE.doorX * TILE + TILE / 2,
@@ -690,18 +698,151 @@ export class WorldScene extends Phaser.Scene {
       })
     }
 
-    // ---- Chapter 5 (#20): the calling. Point the player home. ----
+  }
+
+  /**
+   * Chapter 4's beacon, and the Static-side copy of Ren's house it is writing.
+   *
+   * Split out of `applyStoryState` because `ch3_done` is set by PATTERN_DEF,
+   * which fires on this very map — so on the visit where the pattern lands,
+   * the beacon has to appear without waiting for a rebuild. The journal sends
+   * the player straight to Ren's house to find it (#95).
+   *
+   * Idempotent: a later map entry re-runs it and it does nothing.
+   */
+  private placeStaticBeacon() {
+    if (this.beaconPlaced) return
+    if (!GameState.getFlag('ch3_done') || GameState.getFlag('ch4_done')) return
+    this.beaconPlaced = true
+    this.placeStructure(this.groundLayer, REN_HOUSE, true)
+    this.groundLayer.setCollision(SOLID_TILES)
+    const bx = REN_HOUSE.doorX * TILE + TILE / 2
+    const by = REN_HOUSE.wallRow * TILE + TILE / 2
+    this.add.image(bx, by - 4, 'beacon')
+    this.interactables.push({
+      x: bx,
+      y: by,
+      action: () => this.openNarration(BEACON_DEF),
+    })
+  }
+
+  /**
+   * The chapter beats that are pure consequence — the narrations and the
+   * vanishings — as opposed to the world building in `applyStoryState`, which
+   * needs a freshly created map to stamp tiles into.
+   *
+   * Runs on map entry *and* on every flag change (#95). It used to run only on
+   * entry, which meant a beat whose trigger flag was set while the player was
+   * already standing on the map it belongs to was never seen. That was five
+   * beats in a single playthrough — both vanishings among them — because the
+   * flags are typically set by something on that same map: Mom hands over the
+   * flashlight in town, the photo is picked up in town, the pattern needs two
+   * figures examined in the Static town. The player was told to go somewhere
+   * they already were, and only a chance walk through a door unstuck it.
+   *
+   * Every beat is guarded by its own done-flag, so repeated runs are a no-op
+   * once each has fired. `armedBeats` exists only to stop duplicate timers
+   * stacking while one is pending.
+   */
+  private checkStoryBeats() {
+    this.reconcileChapter()
+    // No isActive() guard here on purpose: during create() the scene's status
+    // is still CREATING, so isActive() is false and the entry-time call would
+    // do nothing — leaving beats that have no accompanying flag change (the
+    // Chapter 4 race, armed by a flag set over in the other world) unarmed
+    // forever. The subscription is dropped on shutdown, so a dead scene is
+    // never called here anyway.
+    if (this.mapKey !== 'town') return
+
+    if (GameState.world === 'static') {
+      // The pattern clicks once both standing houses have been examined.
+      if (
+        GameState.getFlag('gus_hut_vanished') &&
+        GameState.getFlag('seen_baker_static') &&
+        GameState.getFlag('seen_gus_static') &&
+        !GameState.getFlag('ch3_done')
+      ) {
+        this.armBeat('pattern', 800, () => this.openNarration(PATTERN_DEF))
+      }
+      this.placeStaticBeacon()
+      return
+    }
+
+    // Chapter 1: the vanishing, once the player has the flashlight and is out
+    // in town. Mom stands in town, so this is normally armed by her dialogue.
+    if (GameState.getFlag('got_flashlight') && !GameState.getFlag('baker_vanished')) {
+      this.armBeat('baker_vanish', 1200, () => this.vanishBakerHouse())
+    }
+
+    // Chapter 3 hook after the first crossover puzzle is solved.
+    if (GameState.getFlag('chapter2_done') && !GameState.getFlag('ch3_hint_shown')) {
+      this.armBeat('ch3_hint', 800, () => {
+        GameState.setFlag('ch3_hint_shown')
+        this.openNarration(CH3_HINT_DEF)
+      })
+    }
+
+    // Chapter 3: the second vanishing. Chained off the hook above — setting
+    // `ch3_hint_shown` re-enters this method, which is what arms it.
+    if (
+      GameState.chapter >= 3 &&
+      GameState.getFlag('ch3_hint_shown') &&
+      !GameState.getFlag('gus_hut_vanished')
+    ) {
+      this.armBeat('gus_vanish', 1500, () =>
+        this.vanishStructure(GUS_HUT, 'gus_hut_vanished', GUS_VANISH_DEF),
+      )
+    }
+
+    // Chapter 4: the urgency beat when the race begins.
+    if (
+      GameState.getFlag('ch3_done') &&
+      !GameState.getFlag('ch4_done') &&
+      !GameState.getFlag('race_started')
+    ) {
+      this.armBeat('race_start', 900, () => {
+        GameState.setFlag('race_started')
+        this.openNarration(RACE_START_DEF)
+      })
+    }
+
+    // Chapter 5: the calling. Point the player home.
     if (
       GameState.getFlag('ch4_done') &&
       !GameState.getFlag('game_ended') &&
       !GameState.getFlag('ch5_started')
     ) {
-      this.time.delayedCall(900, () => {
-        if (GameState.uiBlocking || this.transitioning) return
+      this.armBeat('ch5_start', 900, () => {
         GameState.setFlag('ch5_started')
         this.openNarration(CH5_START_DEF)
       })
     }
+  }
+
+  /**
+   * Schedules a beat, once.
+   *
+   * Waits rather than gives up when the player is mid-dialogue. The old code
+   * dropped a beat that came due behind an open dialogue box, and with beats
+   * now driven by flag changes there is nothing to retrigger a dropped one —
+   * so dropping it would be a fresh way to stall the story.
+   */
+  private armBeat(id: string, delay: number, fn: () => void) {
+    if (this.armedBeats.has(id)) return
+    this.armedBeats.add(id)
+    const run = () => {
+      if (!this.scene.isActive()) {
+        this.armedBeats.delete(id)
+        return
+      }
+      if (GameState.uiBlocking || this.transitioning) {
+        this.time.delayedCall(400, run)
+        return
+      }
+      this.armedBeats.delete(id)
+      fn()
+    }
+    this.time.delayedCall(delay, run)
   }
 
   // Structures stamped in by code (Baker/Gus/Ren) paint a DOOR tile but

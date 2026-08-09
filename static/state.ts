@@ -66,9 +66,31 @@ class GameStateClass {
     return this.dialogueActive || this.inventoryOpen
   }
 
+  /**
+   * Notified whenever a story flag is newly set (#95).
+   *
+   * Story flags are the only thing the world reacts to, so a change to one is
+   * exactly the signal a scene needs to re-check which chapter beats are due.
+   * Before this, beats were only evaluated when a map was built, so a beat
+   * whose trigger flag was set while the player was already standing on the
+   * map it belongs to was never seen at all.
+   *
+   * Subscribers must unsubscribe when their scene shuts down — a scene restart
+   * would otherwise leave the old one holding a destroyed scene.
+   */
+  private flagListeners = new Set<() => void>()
+
+  onFlagChange(fn: () => void): () => void {
+    this.flagListeners.add(fn)
+    return () => this.flagListeners.delete(fn)
+  }
+
   setFlag(key: string) {
+    if (this.flags[key]) return // already set: nothing changed, notify nobody
     this.flags[key] = true
     this.save() // flags are story progress: always autosave
+    // Copied, because a listener is allowed to set another flag in response.
+    for (const fn of [...this.flagListeners]) fn()
   }
   getFlag(key: string): boolean {
     return !!this.flags[key]

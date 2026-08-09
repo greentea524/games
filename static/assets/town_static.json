@@ -658,8 +658,8 @@
     {
      "name": "npc",
      "type": "npc",
-     "x": 112,
-     "y": 320,
+     "x": 128,
+     "y": 304,
      "width": 16,
      "height": 16,
      "visible": true,
