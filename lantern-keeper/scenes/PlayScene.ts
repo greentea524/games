@@ -9,9 +9,11 @@ import {
   WALL,
   DARKNESS_ALPHA,
   DECO,
+  PAL,
 } from '../constants'
 import { Darkness, type Light } from '../../shared/lighting'
 import { loadProgress, saveProgress } from '../progress'
+import { showRunSummary, formatRunTime } from '../../shared/runSummary'
 
 // Tuned to the KAN-110 movement budget: single jump ~2.8 tiles,
 // double jump ~5.6 tiles, so the 5-tile cliff gate needs the Ember lantern.
@@ -70,6 +72,10 @@ export class PlayScene extends Phaser.Scene {
   private dashBufferedUntil = 0
   private airDashUsed = false
   private respawnPoint = { ...SPAWN_POINT }
+  /** Wall-clock start of this level's play segment, banked by persist() (#66). */
+  private segmentStartedAt = 0
+  private runElapsedMs = 0
+  private deaths = 0
   
   private dashParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -83,6 +89,10 @@ export class PlayScene extends Phaser.Scene {
   }
 
   create() {
+    const saved = loadProgress()
+    this.runElapsedMs = saved.elapsedMs
+    this.deaths = saved.deaths
+    this.segmentStartedAt = Date.now()
     this.persist()
     music.play('adventure')
     this.cameras.main.fadeIn(500, 0, 0, 0)
@@ -489,16 +499,64 @@ export class PlayScene extends Phaser.Scene {
       
       this.time.delayedCall(5000, () => {
         if (treeToast) treeToast.destroy()
-        
-        this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 32, 'GAME CLEARED\nTHANKS FOR PLAYING', {
-          fontFamily: '"Press Start 2P", monospace', fontSize: '8px', color: '#e0f8cf',
-          backgroundColor: '#0f1a12', padding: { x: 4, y: 4 },
-          align: 'center', resolution: 1, lineSpacing: 4,
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(20)
+        this.hudText.setVisible(false)
+
+        // Replaces a static GAME CLEARED card that reported nothing about the
+        // run it had just ended (#66).
+        const total = this.countAllLanterns()
+        showRunSummary(this, {
+          title: 'GAME CLEARED',
+          palette: PAL,
+          subtitle: 'The tree burns',
+          stats: [
+            { label: 'TIME', value: formatRunTime(this.runElapsedMs) },
+            {
+              label: 'LANTERNS',
+              value: total > 0 ? `${this.totalLanternsLit}/${total}` : `${this.totalLanternsLit}`,
+              highlight: total > 0 && this.totalLanternsLit >= total,
+            },
+            { label: 'DEATHS', value: `${this.deaths}` },
+          ],
+          prompt: 'Z: title',
+          onDismiss: () => this.scene.start('menu'),
+        })
       })
     }
     
     this.updateHud()
+  }
+
+  /**
+   * Every lightable lantern in the game, across all four levels.
+   *
+   * All four maps are preloaded in BootScene, so this counts from the tilemap
+   * cache rather than hardcoding a number that would drift the moment a level
+   * was edited.
+   *
+   * The rule has to match how `create()` reads the same layer, which is by
+   * exclusion: anything in `lanterns` that is not a mushroom, a crumbling
+   * platform or the Heart Tree becomes a lantern. There is no `name: lantern`
+   * to look for — most are named for what they are ('ember', 'gale',
+   * 'canopy_grand') and several have no name at all.
+   *
+   * Returns 0 if the cache is not shaped as expected, and the summary then
+   * shows a bare count rather than a wrong denominator.
+   */
+  private countAllLanterns(): number {
+    const notLanterns = new Set(['mushroom', 'crumble', 'heart_tree'])
+    let total = 0
+    for (const key of ['level1', 'level2', 'level3', 'level4']) {
+      const data = this.cache.tilemap.get(key)?.data as
+        | { layers?: { name?: string; objects?: { name?: string }[] }[] }
+        | undefined
+      for (const layer of data?.layers ?? []) {
+        if (layer.name !== 'lanterns') continue
+        for (const obj of layer.objects ?? []) {
+          if (!notLanterns.has(obj.name ?? '')) total++
+        }
+      }
+    }
+    return total
   }
 
   /**
@@ -507,12 +565,21 @@ export class PlayScene extends Phaser.Scene {
    * the game rather than the state of the current run.
    */
   private persist(completed = false) {
+    // Bank the segment as we write, so `elapsedMs` is always the total played
+    // and never double-counts: the marker resets on every call.
+    const now = Date.now()
+    if (this.segmentStartedAt > 0) {
+      this.runElapsedMs += now - this.segmentStartedAt
+      this.segmentStartedAt = now
+    }
     saveProgress({
       levelKey: this.levelKey,
       hasDoubleJump: this.hasDoubleJump,
       hasDash: this.hasDash,
       hasWallCling: this.hasWallCling,
       totalLanternsLit: this.totalLanternsLit,
+      elapsedMs: this.runElapsedMs,
+      deaths: this.deaths,
       completed: completed || loadProgress().completed,
     })
   }
@@ -598,6 +665,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private respawn() {
+    this.deaths++
     this.player.setPosition(this.respawnPoint.x, this.respawnPoint.y)
     this.player.setVelocity(0, 0)
     sfx.die()

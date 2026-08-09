@@ -1,8 +1,9 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT, PAL } from '../constants'
 import { GameState } from '../state'
 import { LEVELS } from '../levels'
 import { sfx, music } from '../audio'
+import { showRunSummary, formatRunTime } from '../../shared/runSummary'
 
 type Facing = 'left' | 'right'
 
@@ -130,6 +131,7 @@ export class PlatformerScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.pickups, (_p, pickup) => {
       pickup.destroy()
       GameState.addEnergy(20)
+      GameState.energyPickups++
     })
 
     this.physics.add.overlap(this.player, this.goals, () => this.reachGoal())
@@ -138,30 +140,45 @@ export class PlatformerScene extends Phaser.Scene {
   private reachGoal() {
     if (this.isTransitioning) return
     this.isTransitioning = true
-    // The victory text below reads this. It was never declared in this scope,
-    // so clearing level 32 threw a ReferenceError instead of showing VICTORY!.
-    const mode = GameState.paletteMode
-
     if (GameState.levelIndex === 32) {
       // Run over: bank the last segment so the HUD freezes on the final time.
       GameState.speedrunBank()
       GameState.completed = true
+
+      const runMs = GameState.speedrunElapsedMs
+      const isBest = GameState.bestRunMs === null || runMs < GameState.bestRunMs
+      const previousBest = GameState.bestRunMs
+      if (isBest) GameState.bestRunMs = runMs
       GameState.saveGame()
 
-      this.cameras.main.fadeOut(2000)
-      this.add.text(GBC_WIDTH / 2, GBC_HEIGHT / 2 - 10, 'VICTORY!', {
-        fontFamily: '"Press Start 2P", monospace',
-        fontSize: '16px',
-        color: mode === 'dmg' ? '#0f380f' : '#ffffff'
-      }).setOrigin(0.5).setDepth(100)
-
-      this.time.delayedCall(3000, () => {
-        GameState.levelIndex = 1
-        GameState.speedrunElapsedMs = 0
-        GameState.speedrunResumedAt = null
-        GameState.saveGame()
-        sfx.win()
-        this.scene.restart()
+      sfx.win()
+      // The HUD is its own scene, so it renders above anything this one adds,
+      // depth or not — the running timer would sit across the panel's top edge
+      // showing the same number the panel does.
+      this.scene.setVisible(false, 'ui')
+      // The run summary replaces a bare VICTORY! and a three-second timer
+      // (#66). The time has been tracked since #79 and was thrown away here.
+      showRunSummary(this, {
+        title: 'RUN COMPLETE',
+        palette: PAL,
+        stats: [
+          { label: 'TIME', value: formatRunTime(runMs), highlight: isBest },
+          { label: 'ENERGY', value: `${GameState.energyPickups}` },
+          { label: 'DEATHS', value: `${GameState.deaths}` },
+          {
+            label: 'BEST',
+            value: formatRunTime(isBest ? runMs : (previousBest ?? runMs)),
+          },
+        ],
+        subtitle: isBest && previousBest !== null ? 'New best!' : undefined,
+        onDismiss: () => {
+          this.cameras.main.fadeOut(600)
+          this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.scene.setVisible(true, 'ui')
+            GameState.reset()
+            this.scene.restart()
+          })
+        },
       })
       return
     }
@@ -306,6 +323,7 @@ export class PlatformerScene extends Phaser.Scene {
 
   private respawnAtCheckpoint() {
     sfx.hit()
+    GameState.deaths++
     GameState.refillEnergy()
     this.player.setPosition(GameState.checkpointX, GameState.checkpointY)
     this.player.setVelocity(0, 0)

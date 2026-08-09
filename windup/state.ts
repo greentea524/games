@@ -8,6 +8,9 @@ interface Saved {
   paletteMode: 'dmg' | 'gbc'
   speedrunElapsedMs: number
   completed: boolean
+  energyPickups: number
+  deaths: number
+  bestRunMs: number | null
 }
 
 export class GameState {
@@ -32,6 +35,17 @@ export class GameState {
   /** Set once level 32 is cleared. Read by the hub to badge the card. */
   static completed = false
 
+  // ---- Run tally, for the end-of-run summary (#66) ----
+  /** Energy canisters picked up this run. */
+  static energyPickups = 0
+  /** Times the spring wound all the way down and the toy respawned. */
+  static deaths = 0
+  /**
+   * Fastest completed run, or null until the game has been finished once.
+   * Survives `reset()` — it is a record of this player, not of this run.
+   */
+  static bestRunMs: number | null = null
+
   static setPaletteMode(mode: 'dmg' | 'gbc') {
     this.paletteMode = mode
   }
@@ -55,6 +69,8 @@ export class GameState {
     this.energy = this.maxEnergy
     this.speedrunElapsedMs = 0
     this.speedrunResumedAt = null
+    this.energyPickups = 0
+    this.deaths = 0
     // `completed` deliberately survives reset: it records that this player
     // has finished the game, not the state of the current run.
     this.saveGame()
@@ -89,6 +105,9 @@ export class GameState {
       // In-memory state is left alone; the segment keeps running.
       speedrunElapsedMs: this.speedrunDisplayMs,
       completed: this.completed,
+      energyPickups: this.energyPickups,
+      deaths: this.deaths,
+      bestRunMs: this.bestRunMs,
     })
   }
 
@@ -113,6 +132,11 @@ export class GameState {
               ? p.speedrunTimeMillis
               : 0,
         completed: p.completed === true,
+        // Absent from pre-#66 saves, which is why each is defaulted rather
+        // than the whole payload being rejected.
+        energyPickups: typeof p.energyPickups === 'number' ? p.energyPickups : 0,
+        deaths: typeof p.deaths === 'number' ? p.deaths : 0,
+        bestRunMs: typeof p.bestRunMs === 'number' ? p.bestRunMs : null,
       }
       // Note: no version gate. Every field is checked individually, so an
       // older save is read on its merits rather than discarded wholesale.
@@ -122,6 +146,9 @@ export class GameState {
     this.paletteMode = s.paletteMode
     this.speedrunElapsedMs = s.speedrunElapsedMs
     this.completed = s.completed
+    this.energyPickups = s.energyPickups
+    this.deaths = s.deaths
+    this.bestRunMs = s.bestRunMs
     this.speedrunResumedAt = null
   }
 }

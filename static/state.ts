@@ -7,6 +7,7 @@ interface Saved {
   chapter: number
   flags: Record<string, boolean>
   inventory: string[]
+  itemsFound: string[]
   world: 'normal' | 'static'
   mapKey: string
   tx: number
@@ -19,6 +20,18 @@ const SAVE_VERSION = 1
 class GameStateClass {
   flags: Record<string, boolean> = {}
   inventory: string[] = []
+  /**
+   * Every item id ever picked up, for the end-of-run summary (#66).
+   *
+   * Separate from `inventory` because the story spends things: the flower is
+   * taken when it is delivered, Ren's key when the door is anchored. Counting
+   * what you are still holding at the end would report about two.
+   *
+   * Only ever written by `addItem`, so it holds the ids the game *grants* —
+   * `toggleWorld` rewrites the inventory in place and does not go through
+   * addItem, which is why the Static-side counterparts never land here.
+   */
+  itemsFound: string[] = []
   dialogueActive = false
   inventoryOpen = false
   uiClosedAt = 0
@@ -97,6 +110,7 @@ class GameStateClass {
   }
 
   addItem(id: string): boolean {
+    if (!this.itemsFound.includes(id)) this.itemsFound.push(id)
     if (!this.inventory.includes(id)) {
       this.inventory.push(id)
       return true
@@ -122,6 +136,7 @@ class GameStateClass {
       chapter: this.chapter,
       flags: this.flags,
       inventory: this.inventory,
+      itemsFound: this.itemsFound,
       world: this.world,
       ...this.lastMap,
     })
@@ -149,6 +164,13 @@ class GameStateClass {
             ? (d.flags as Record<string, boolean>)
             : {},
         inventory: Array.isArray(d.inventory) ? (d.inventory as string[]) : [],
+        // Absent from pre-#66 saves. Falling back to the current inventory
+        // beats an empty tally for a run already in progress.
+        itemsFound: Array.isArray(d.itemsFound)
+          ? (d.itemsFound as string[])
+          : Array.isArray(d.inventory)
+            ? (d.inventory as string[])
+            : [],
         world: d.world === 'static' ? 'static' : 'normal',
         mapKey: typeof d.mapKey === 'string' ? d.mapKey : 'town',
         tx: typeof d.tx === 'number' ? d.tx : 11,
@@ -163,6 +185,7 @@ class GameStateClass {
     this.chapter = d.chapter
     this.flags = d.flags
     this.inventory = d.inventory
+    this.itemsFound = d.itemsFound
     this.world = d.world
     this.lastMap = { mapKey: d.mapKey, tx: d.tx, ty: d.ty }
     return true
@@ -171,6 +194,7 @@ class GameStateClass {
   reset() {
     this.flags = {}
     this.inventory = []
+    this.itemsFound = []
     this.world = 'normal'
     this.chapter = 1
     this.lastMap = null

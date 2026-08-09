@@ -20,6 +20,17 @@ export interface Progress {
   hasDash: boolean
   hasWallCling: boolean
   totalLanternsLit: number
+  /**
+   * Time played across the whole run, in ms (#66).
+   *
+   * A duration, not a timestamp — it survives a reload with its meaning
+   * intact, which is the mistake Windup had to unpick in #79. Banked at level
+   * boundaries, matching the rest of this save's granularity: a run abandoned
+   * mid-level loses that segment, same as it loses the lanterns.
+   */
+  elapsedMs: number
+  /** Times the dark closed in. */
+  deaths: number
   /** Set when the Heart Tree is reached. Read by the hub to badge the card. */
   completed: boolean
 }
@@ -33,6 +44,8 @@ export function defaultProgress(): Progress {
     hasDash: false,
     hasWallCling: false,
     totalLanternsLit: 0,
+    elapsedMs: 0,
+    deaths: 0,
     completed: false,
   }
 }
@@ -57,6 +70,10 @@ export function loadProgress(): Progress {
         typeof p.totalLanternsLit === 'number' && p.totalLanternsLit >= 0
           ? p.totalLanternsLit
           : 0,
+      // Absent from pre-#66 saves, so defaulted individually rather than
+      // rejecting the whole payload.
+      elapsedMs: typeof p.elapsedMs === 'number' && p.elapsedMs >= 0 ? p.elapsedMs : 0,
+      deaths: typeof p.deaths === 'number' && p.deaths >= 0 ? p.deaths : 0,
       completed: p.completed === true,
     }
   })
