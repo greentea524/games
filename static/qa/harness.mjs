@@ -13,9 +13,9 @@
 // and every map entry writes that save, so it tracks the real flags and
 // inventory.
 //
-// Deliberately not clicks, anywhere: a canvas click advances dialogue *and* is
-// a tap-to-walk order to the world scene, so a click-driven reader sends the
-// player marching off the moment the box closes.
+// Input is keys throughout, including for dialogue. Clicks would work — the
+// canvas carries only dialogue and menu handlers, no movement — but keeping to
+// one input path means a failure is never ambiguous about which caused it.
 import fs from 'node:fs'
 import { chromium } from 'playwright-core'
 
@@ -369,14 +369,7 @@ export class Driver {
     return null
   }
 
-  /**
-   * Reads dialogue to the end with the Z key, picking `choice` if one appears.
-   *
-   * Deliberately not clicks. A canvas click advances the dialogue *and* is a
-   * tap-to-walk order to the world scene, so a click-driven reader sends the
-   * player marching off toward the tap point the moment the box closes — which
-   * looks exactly like a pathing failure on the next step.
-   */
+  /** Reads dialogue to the end with the Z key, picking `choice` if one appears. */
   async readDialogue({ choice = 0, max = 30 } = {}) {
     const seen = []
     for (let i = 0; i < max; i++) {

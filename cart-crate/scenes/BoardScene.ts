@@ -619,6 +619,13 @@ export class BoardScene extends Phaser.Scene {
 
     if (totalTargets > 0 && dockedCrates === totalTargets) {
       GameState.uiBlocking = true
+      // Claimed here, not when the panel opens ~900ms later at the end of the
+      // victory bounce. The advance-on-any-input paths key off `uiBlocking`,
+      // so that gap was a window in which a tap cleared the level immediately
+      // *and* left the fade to clear the next one — two stages from one press.
+      // A touch player taps during the bounce constantly; on a keyboard you
+      // would have to press a key during the animation to see it (#97).
+      this.summaryOpen = true
       const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
       // Read before saving: afterwards `bestMoves` includes this attempt, and
       // every clear would look like a personal best.
@@ -648,7 +655,6 @@ export class BoardScene extends Phaser.Scene {
           // The level used to fade straight into the next one, so the numbers
           // it already tracked — moves against par, stars, your best — were
           // never shown (#66).
-          this.summaryOpen = true
           // The HUD is its own scene and renders above anything added here.
           this.scene.setVisible(false, 'ui')
           // Stars as a plain count, not glyphs: Press Start 2P has no U+2605,
@@ -666,7 +672,14 @@ export class BoardScene extends Phaser.Scene {
               },
             ],
             onDismiss: () => {
-              this.summaryOpen = false
+              // `summaryOpen` deliberately stays true here; `setupLevelLayout`
+              // clears it when the next level builds.
+              //
+              // The panel dismisses on pointerdown. Clearing the gate here left
+              // the matching *pointerup* — same tap, milliseconds later — to
+              // find it already false and run the advance-on-any-input path on
+              // top of the fade, so a tap cleared two levels at once. Keyboard
+              // never saw it, because Z produces no pointerup (#97).
               this.scene.setVisible(true, 'ui')
               this.cameras.main.fadeOut(400, 0, 0, 0)
             },

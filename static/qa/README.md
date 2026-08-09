@@ -56,9 +56,9 @@ a map re-entry.
 
 - **Never hardcode an NPC tile.** Where they stand is exactly what #93 and #96
   changed. Look them up with `npcAt(id)`.
-- **Drive dialogue with Z, not clicks.** A canvas click advances the box *and*
-  is a tap-to-walk order to the world scene, so a click-driven reader sends the
-  player marching off the moment the box closes.
+- **Drive everything with keys, including dialogue.** Clicks advance the box
+  fine — the canvas has no movement handler — but staying on one input path
+  means a failure is never ambiguous about which path caused it.
 - **Hold keys, don't press them.** Phaser polls `Key.isDown` once a frame, and
   a zero-length press falls between two frames.
 - **The walker squares up on the tile centre between steps.** The body is 10px
