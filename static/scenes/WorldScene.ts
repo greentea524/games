@@ -524,10 +524,12 @@ export class WorldScene extends Phaser.Scene {
         this.examine(6, 2, BAKERY_PHOTO_DEF)
       }
     } else if (this.mapKey === 'town' || this.mapKey === 'town_static') {
-      // Add bushes. The town is 24x22, so anything past (23,21) was being
-      // placed off the edge of the map: three of these five never rendered,
-      // while still registering an examine point nothing could reach (#94).
-      const bushCoords = [[5, 5], [6, 15]]
+      // Add bushes. Two constraints, both of which the original five broke:
+      // the town is 24x22, so anything past (23,21) is off the map entirely,
+      // and a hedge has to sit on ground the player can stand beside — (5,5)
+      // was a ROOF tile, so it drew a hedge on top of a house and registered
+      // an examine point with no reachable approach (#94).
+      const bushCoords = [[9, 4], [6, 15]]
       for (const [bx, by] of bushCoords) {
         this.solidProp(bx, by, 1, 1, `prop_bush_${mode}`)
         this.examine(bx, by, BUSH_DEF)
