@@ -70,6 +70,24 @@ const SIZE = 8
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0')
 
 /**
+ * Warns when text is too wide for the panel, in dev only.
+ *
+ * The screen is 160px and the font is a fixed 8px cell, so the panel fits
+ * about 17 characters — and nothing about passing a 20-character subtitle
+ * looks wrong until you see it hanging over both borders. Caught that way
+ * once; this catches it at the source instead.
+ */
+function warnIfTooWide(text: string, budget: number, what: string) {
+  if (!import.meta.env?.DEV) return
+  if (text.length * SIZE > budget) {
+    console.warn(
+      `[runSummary] ${what} "${text}" is ${text.length} chars; the panel fits ` +
+        `${Math.floor(budget / SIZE)} at ${SIZE}px and it will overhang.`,
+    )
+  }
+}
+
+/**
  * Renders the panel over `scene` and calls `onDismiss` once, when the player
  * acknowledges it.
  *
@@ -113,6 +131,13 @@ export function showRunSummary(scene: Phaser.Scene, opts: RunSummaryOptions): vo
   box.fillRoundedRect(panelX, panelY, panelW, panelH, 4)
   box.lineStyle(1, pal.light, 1)
   box.strokeRoundedRect(panelX, panelY, panelW, panelH, 4)
+
+  const textBudget = panelW - 12
+  warnIfTooWide(opts.title, textBudget, 'title')
+  if (opts.subtitle) warnIfTooWide(opts.subtitle, textBudget, 'subtitle')
+  for (const s of stats) {
+    warnIfTooWide(`${s.label}${s.value}`, textBudget - SIZE, `row "${s.label}"`)
+  }
 
   let y = panelY + padding
 
