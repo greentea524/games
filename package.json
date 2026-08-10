@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "qa:static": "node static/qa/run.mjs"
+    "qa:static": "node static/qa/run.mjs",
+    "qa:touch": "node qa/touch/run.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0",
