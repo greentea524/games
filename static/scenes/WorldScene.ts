@@ -1116,7 +1116,9 @@ export class WorldScene extends Phaser.Scene {
               highlight: GameState.itemsFound.length >= COLLECTABLE_ITEMS,
             },
           ],
-          prompt: 'Z: title',
+          // No `prompt` override: the panel picks 'Z: continue' or 'Tap to
+          // continue' from the pointer type. Hardcoding the key spelled out an
+          // input a phone does not have, on the last screen of the game (#97).
           onDismiss: () => this.scene.start('title'),
         })
       }
