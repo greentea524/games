@@ -4,6 +4,7 @@ import {
   GBC_WIDTH,
   GBC_HEIGHT,
   GLOW,
+  FUEL,
   DASH,
   JUMP_ASSIST,
   WALL,
@@ -72,6 +73,17 @@ export class PlayScene extends Phaser.Scene {
   private dashBufferedUntil = 0
   private airDashUsed = false
   private respawnPoint = { ...SPAWN_POINT }
+  /**
+   * Lantern fuel remaining, in ms (#70). Drains on a timer rather than on
+   * movement, so standing still is not a way to conserve it.
+   */
+  // Annotated: `FUEL.maxMs` is a literal type through `as const`, so an
+  // inferred field would be typed `30000` and reject every later assignment.
+  private fuelMs: number = FUEL.maxMs
+  /** So the low-fuel cue sounds once per tank, not once per frame. */
+  private lowFuelCued = false
+  private fuelGfx!: Phaser.GameObjects.Graphics
+  private flasks: { sprite: Phaser.GameObjects.Image; taken: boolean }[] = []
   /** Wall-clock start of this level's play segment, banked by persist() (#66). */
   private segmentStartedAt = 0
   private runElapsedMs = 0
@@ -206,6 +218,25 @@ export class PlayScene extends Phaser.Scene {
       }
     }
 
+    // Oil flasks (#70) live in their own object layer rather than in
+    // `lanterns`. Membership of that layer is decided by exclusion — anything
+    // not a mushroom, a crumble or the heart tree is a lantern — so a flask
+    // dropped in there would silently count toward the stage's lantern total
+    // and the "all lanterns lit" gate.
+    this.flasks = []
+    for (const obj of map.getObjectLayer('flasks')?.objects ?? []) {
+      const sprite = this.add.image(obj.x!, obj.y!, 'oil_flask')
+      this.tweens.add({
+        targets: sprite,
+        y: sprite.y - 2,
+        yoyo: true,
+        repeat: -1,
+        duration: Phaser.Math.Between(1100, 1500),
+        ease: 'Sine.easeInOut',
+      })
+      this.flasks.push({ sprite, taken: false })
+    }
+
     this.physics.add.collider(this.player, this.crumbleGroup, this.onCrumbleTouch, undefined, this)
 
     this.cursors = this.input.keyboard!.createCursorKeys()
@@ -239,6 +270,15 @@ export class PlayScene extends Phaser.Scene {
       }
     })
     this.hudText.setScrollFactor(0).setDepth(30)
+
+    // Fuel gauge (#70). A gauge rather than the carried-lantern-dimming the
+    // issue preferred: the player sprite is drawn procedurally with no lantern
+    // in hand to dim, and inventing one would change the character silhouette
+    // in every frame of the walk cycle to serve a HUD readout.
+    //
+    // The shrinking light radius is the real feedback; this only answers "how
+    // much is left", which the radius alone cannot at a glance.
+    this.fuelGfx = this.add.graphics().setScrollFactor(0).setDepth(30)
     
     this.guidanceArrow = this.add.image(0, 0, 'guidance_arrow')
     this.guidanceArrow.setOrigin(0.5, 0.5).setDepth(15).setVisible(false)
@@ -253,6 +293,9 @@ export class PlayScene extends Phaser.Scene {
     })
 
     this.respawnPoint = { x: spawnX, y: spawnY }
+    // Every level starts on a full tank. `create()` runs on level advance and
+    // on restart alike, so this is the one place that needs to say so.
+    this.refillFuel()
     this.lastGroundedAt = 0
     this.jumpBufferedUntil = 0
     this.dashingUntil = 0
@@ -391,7 +434,10 @@ export class PlayScene extends Phaser.Scene {
       this.totalLanternsLit++
     }
     this.respawnPoint = { x: lantern.sprite.x, y: lantern.sprite.y - 6 }
-    
+    // Lanterns are already the checkpoints; #70 makes them the supply too, so
+    // running for the next one is a real decision rather than a guess.
+    this.refillFuel()
+
     if (lantern.name !== 'crown') {
       sfx.lantern()
       this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 10)
@@ -670,11 +716,15 @@ export class PlayScene extends Phaser.Scene {
     this.deaths++
     this.player.setPosition(this.respawnPoint.x, this.respawnPoint.y)
     this.player.setVelocity(0, 0)
+    // Respawning puts you back at a lantern, so the tank comes back with you.
+    // Without this, dying on a low tank would hand the player a fresh attempt
+    // they had no light to make.
+    this.refillFuel()
     sfx.die()
     this.toast('THE DARK CLOSES IN...', 1500)
   }
 
-  update(time: number) {
+  update(time: number, delta: number) {
     if (this.justResumed) {
       this.justResumed = false
       // Consume the stale pause/info keys queued during the pause so they
@@ -715,6 +765,19 @@ export class PlayScene extends Phaser.Scene {
       this.redrawDarkness()
       return
     }
+
+    // Burn fuel (#70). On the clock, not on distance — draining per-pixel
+    // would make standing still a conserving strategy, and a game about
+    // pushing on into the dark should never reward waiting.
+    if (this.fuelMs > 0) {
+      this.fuelMs = Math.max(0, this.fuelMs - delta)
+      if (!this.lowFuelCued && this.fuelRatio() <= FUEL.lowRatio) {
+        this.lowFuelCued = true
+        sfx.lowFuel()
+      }
+    }
+    this.collectFlasks()
+    this.drawFuelGauge()
 
     // Instant hazard respawn (replaces the old 30s glow-timeout death —
     // no more waiting in the dark): landing on the bare world-bounds
@@ -890,8 +953,66 @@ export class PlayScene extends Phaser.Scene {
     this.redrawDarkness()
   }
 
+  /** Fuel remaining as a fraction of a tank, 1 full and 0 empty. */
+  private fuelRatio(): number {
+    return Phaser.Math.Clamp(this.fuelMs / FUEL.maxMs, 0, 1)
+  }
+
   private playerLightRadius(): number {
-    return GLOW.maxRadius
+    // Empty is `GLOW.minRadius` — under a tile, so near-blind — but never
+    // zero, and never a death. The level darkness tops out at 0.82 alpha, so
+    // terrain outlines stay faintly readable and a dry player can still feel
+    // their way back to a lit lantern, which keeps its own glow forever.
+    return GLOW.minRadius + (GLOW.maxRadius - GLOW.minRadius) * this.fuelRatio()
+  }
+
+  /** Fills the tank and re-arms the low-fuel cue. */
+  private refillFuel(): void {
+    this.fuelMs = FUEL.maxMs
+    this.lowFuelCued = false
+  }
+
+  /**
+   * Draws the fuel gauge, top-right so it does not collide with the two lines
+   * of lantern-count text at the top-left.
+   */
+  private drawFuelGauge(): void {
+    const ratio = this.fuelRatio()
+    const w = 30
+    const h = 4
+    const x = GBC_WIDTH - w - 4
+    const y = 9
+    this.fuelGfx.clear()
+    this.fuelGfx.fillStyle(PAL.darkest, 0.7)
+    this.fuelGfx.fillRect(x - 1, y - 1, w + 2, h + 2)
+    this.fuelGfx.lineStyle(1, PAL.light, 1)
+    this.fuelGfx.strokeRect(x - 1, y - 1, w + 2, h + 2)
+    if (ratio > 0) {
+      // Warm while there is fuel, pale once it is nearly out — the palette has
+      // no red, so the warning has to be a shift in value rather than in hue.
+      this.fuelGfx.fillStyle(ratio <= FUEL.lowRatio ? PAL.lightest : PAL.warm, 1)
+      this.fuelGfx.fillRect(x, y, Math.max(1, Math.round(w * ratio)), h)
+    }
+  }
+
+  /** Oil flasks top the tank up between lanterns. */
+  private collectFlasks(): void {
+    for (const flask of this.flasks) {
+      if (flask.taken) continue
+      const d = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        flask.sprite.x,
+        flask.sprite.y,
+      )
+      if (d > LIGHT_TOUCH_DISTANCE) continue
+      flask.taken = true
+      flask.sprite.setVisible(false)
+      this.fuelMs = Math.min(FUEL.maxMs, this.fuelMs + FUEL.maxMs * FUEL.flaskRatio)
+      if (this.fuelRatio() > FUEL.lowRatio) this.lowFuelCued = false
+      sfx.flask()
+      this.sparkParticles.emitParticleAt(flask.sprite.x, flask.sprite.y, 4)
+    }
   }
 
   private redrawDarkness() {

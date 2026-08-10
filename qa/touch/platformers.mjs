@@ -142,11 +142,45 @@ async function lanternKeeper() {
         grounded: p.body.blocked.down,
         wall: p.body.blocked.left ? 'left' : p.body.blocked.right ? 'right' : null,
         dashing: s.dashingUntil > s.time.now,
+        fuel: s.fuelRatio(),
+        radius: s.playerLightRadius(),
       }
     })
 
   const start = await st()
   check('A starts the level', start.active, `player at x=${start.x | 0}`)
+
+  // #70: the lantern burns down, and the light goes with it. Drains on a
+  // timer, so this needs no input at all — which is also the point: standing
+  // still must not conserve it.
+  const t0 = await st()
+  await page.waitForTimeout(3000)
+  const t3 = await st()
+  check(
+    'the lantern burns fuel while standing still',
+    t3.fuel < t0.fuel - 0.05,
+    `${t0.fuel.toFixed(2)} -> ${t3.fuel.toFixed(2)}`,
+  )
+  check(
+    'the light radius shrinks with the fuel',
+    t3.radius < t0.radius && t3.radius >= 5,
+    `${t0.radius.toFixed(1)} -> ${t3.radius.toFixed(1)} (floor is GLOW.minRadius 5)`,
+  )
+
+  // Lighting a lantern is the refuel. Driving to one by input would be a
+  // platforming run; what is under test is the refill, so it is called
+  // directly.
+  await page.evaluate(() => {
+    const s = window.__game.scene.getScene('play')
+    s.lightLantern(s.lanterns.find((l) => !l.lit && l.name !== 'heart_tree'))
+  })
+  await page.waitForTimeout(200)
+  const refuelled = await st()
+  check(
+    'lighting a lantern refills the tank',
+    refuelled.fuel > 0.95,
+    `${t3.fuel.toFixed(2)} -> ${refuelled.fuel.toFixed(2)}`,
+  )
 
   await hand.down(PAD, c.arm('ArrowRight').x, c.arm('ArrowRight').y)
   await page.waitForTimeout(600)

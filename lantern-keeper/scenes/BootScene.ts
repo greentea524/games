@@ -366,6 +366,18 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('lanternLit', 6, 6)
     g.clear()
 
+    // Oil flask (#70). Deliberately not lantern-shaped: a lantern is a fixed
+    // checkpoint and a flask is a one-shot pickup, and at 6px the only thing
+    // that separates them legibly is silhouette. Squat body, narrow neck.
+    g.fillStyle(PAL.dark)
+    g.fillRect(2, 0, 2, 2) // neck
+    g.fillStyle(PAL.warm)
+    g.fillRect(1, 2, 4, 4) // body
+    g.fillStyle(PAL.lightest)
+    g.fillRect(2, 3, 1, 1) // highlight, so it reads as glass not stone
+    g.generateTexture('oil_flask', 6, 6)
+    g.clear()
+
     // The light brushes for the darkness overlay (KAN-109) used to be built
     // here. shared/lighting.ts now generates one per radius on demand, so a
     // shrinking or growing light gets a native-size circle instead of a

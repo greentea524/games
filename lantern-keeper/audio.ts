@@ -95,6 +95,14 @@ export const sfx = {
   },
   land: () => playTone('triangle', 80, 40, 0.1, 0.05),
   lantern: () => playTone('sine', 400, 800, 0.3, 0.1),
+  // Low fuel (#70): falling, and deliberately unlike `lantern`, which rises.
+  // The two are the only cues tied to light, so they must not be confusable.
+  lowFuel: () => {
+    playTone('sine', 300, 200, 0.25, 0.06)
+    setTimeout(() => playTone('sine', 220, 140, 0.35, 0.06), 180)
+  },
+  // Picking up an oil flask: a short rise, quieter than lighting a lantern.
+  flask: () => playTone('sine', 350, 620, 0.18, 0.07),
   win: () => {
     playTone('square', 400, 400, 0.2, 0.1)
     setTimeout(() => playTone('square', 500, 500, 0.2, 0.1), 200)
