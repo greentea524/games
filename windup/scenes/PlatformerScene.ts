@@ -1,11 +1,33 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, PAL } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT, PAL, FONT, CSS_MID } from '../constants'
 import { GameState } from '../state'
 import { LEVELS } from '../levels'
 import { sfx, music } from '../audio'
 import { showRunSummary, formatRunTime } from '../../shared/runSummary'
 
 type Facing = 'left' | 'right'
+
+// Backdrop (#52).
+//
+// The issue asks for two parallax layers on `scrollFactor`. That cannot work
+// here: every Windup level is exactly one screen (10x9 tiles at 16px = 160x144),
+// the camera is bounded to those same dimensions and never follows the player,
+// so nothing ever scrolls and `scrollFactor` is a no-op. Two layers set to
+// 0.25 and 0.5 would sit perfectly still, relative to each other and to the
+// foreground.
+//
+// What is used instead is the player's own position: each layer slides a few
+// pixels against the toy as it crosses the room. That is the depth cue the
+// issue was actually after, and on a fixed camera it is the only one
+// available short of making the levels bigger than the screen.
+const BACKDROP = {
+  /** How far the far layer slides across the full width of the room. */
+  farShiftPx: 3,
+  /** The near layer moves further, which is what sells the depth. */
+  nearShiftPx: 7,
+  /** Seconds for a full turn of the large gear. The small one runs faster. */
+  gearPeriodMs: 9000,
+} as const
 
 /** Ground speed, px/s, at a full spring. */
 const MOVE_SPEED = 80
@@ -43,6 +65,10 @@ export class PlatformerScene extends Phaser.Scene {
   private coyoteTimer = 0
   private wallJumpTimer = 0
   private isTransitioning = false
+  /** Backdrop layers (#52); the far one slides less than the near one. */
+  private backdropFar!: Phaser.GameObjects.Container
+  private backdropNear!: Phaser.GameObjects.Container
+  private gears: { sprite: Phaser.GameObjects.Image; periodMs: number; dir: number }[] = []
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
@@ -58,6 +84,7 @@ export class PlatformerScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, GBC_WIDTH, GBC_HEIGHT)
     this.isTransitioning = false
 
+    this.renderBackdrop()
     this.renderLevel()
 
     this.cursors = this.input.keyboard!.createCursorKeys()
@@ -252,6 +279,8 @@ export class PlatformerScene extends Phaser.Scene {
       return
     }
 
+    this.updateBackdrop(time)
+
     const mode = GameState.paletteMode
     const isGrounded = this.player.body.blocked.down
     const isWalledLeft = this.player.body.blocked.left
@@ -334,6 +363,69 @@ export class PlatformerScene extends Phaser.Scene {
     if (GameState.energy <= 0 && isGrounded && moveX === 0) {
       this.respawnAtCheckpoint()
     }
+  }
+
+  /**
+   * Builds the factory behind the platforms (#52).
+   *
+   * Laid out by hand rather than scattered randomly: at 160x144 there is only
+   * room for a handful of pieces, and where they sit decides whether the room
+   * reads as a place or as noise. Everything is deliberately kept away from
+   * the lower middle, which is where the levels put their platforms.
+   */
+  private renderBackdrop() {
+    const mode = GameState.paletteMode
+    this.gears = []
+
+    this.backdropFar = this.add.container(0, 0).setDepth(-20)
+    this.backdropNear = this.add.container(0, 0).setDepth(-10)
+
+    // Far: the big machinery and the painted wall sign.
+    const bigGear = this.add.image(30, 34, `bg_gear_lg_${mode}`)
+    const smallGear = this.add.image(56, 22, `bg_gear_sm_${mode}`)
+    this.gears.push({ sprite: bigGear, periodMs: BACKDROP.gearPeriodMs, dir: 1 })
+    // Counter-rotating, because two gears turning the same way reads as two
+    // wheels rather than as a mechanism.
+    this.gears.push({ sprite: smallGear, periodMs: BACKDROP.gearPeriodMs * 0.62, dir: -1 })
+
+    const sign = this.add
+      .text(110, 46, 'WINDUP', {
+        fontFamily: FONT,
+        fontSize: '8px',
+        color: mode === 'dmg' ? CSS_MID : '#2e3a52',
+        resolution: 1,
+      })
+      .setOrigin(0.5)
+    // Faded and slightly askew, like paint on brick rather than a UI label.
+    sign.setAlpha(0.75).setRotation(-0.04)
+
+    this.backdropFar.add([bigGear, smallGear, sign])
+
+    // Near: pipework and structure, at the edges so the middle stays clear.
+    const near: Phaser.GameObjects.GameObject[] = []
+    for (let y = 0; y < GBC_HEIGHT; y += 16) {
+      near.push(this.add.image(9, y + 8, `bg_pipe_${mode}`))
+      near.push(this.add.image(GBC_WIDTH - 9, y + 8, `bg_pipe_${mode}`))
+    }
+    // y is kept below the HUD: the PWR bar and the run clock own the top ~24px,
+    // and the first layout put the girders and the lamp straight behind them.
+    near.push(this.add.image(26, 40, `bg_girder_${mode}`))
+    near.push(this.add.image(GBC_WIDTH - 26, 64, `bg_girder_${mode}`))
+    near.push(this.add.image(80, 30, `bg_lamp_${mode}`))
+    this.backdropNear.add(near)
+  }
+
+  /** Slides the backdrop against the player, and turns the gears. */
+  private updateBackdrop(time: number) {
+    for (const gear of this.gears) {
+      gear.sprite.setRotation(((time % gear.periodMs) / gear.periodMs) * Math.PI * 2 * gear.dir)
+    }
+    if (!this.player) return
+    // -0.5 at the left wall, +0.5 at the right.
+    const across = this.player.x / GBC_WIDTH - 0.5
+    const rise = this.player.y / GBC_HEIGHT - 0.5
+    this.backdropFar.setPosition(-across * BACKDROP.farShiftPx, -rise * BACKDROP.farShiftPx)
+    this.backdropNear.setPosition(-across * BACKDROP.nearShiftPx, -rise * BACKDROP.nearShiftPx)
   }
 
   /** Spring charge, 1 at full and 0 at empty. */

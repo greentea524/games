@@ -19,6 +19,7 @@ export class BootScene extends Phaser.Scene {
       this.buildStation(mode)
       this.buildEnergy(mode)
       this.buildGoal(mode)
+      this.buildBackdrop(mode)
     })
     this.scene.start('mainmenu')
   }
@@ -199,6 +200,78 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(4, 0, 5, 4); g.fillRect(9, 4, 5, 4)
 
     g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  /**
+   * The factory behind the platforms (#52).
+   *
+   * Windup was the only one of the five games with nothing at all behind its
+   * tilemap — just `setBackgroundColor('#0b0f0c')`.
+   *
+   * Everything here is drawn in the two darkest tones available, and never in
+   * the tones the tileset uses for solid ground. On a 160x144 screen a
+   * backdrop that competes with the platforms is worse than no backdrop: the
+   * player has to be able to tell in one glance what they can stand on.
+   */
+  private buildBackdrop(mode: 'dmg' | 'gbc') {
+    if (this.textures.exists(`bg_gear_lg_${mode}`)) return
+    const g = this.make.graphics({}, false)
+
+    // Two tones, and in DMG the accent is the *background* colour rather than
+    // a lighter green. The obvious choice there was PAL.dark — but that is
+    // exactly the tone the tileset paints brick in, so pipe collars and rivets
+    // came out the same shade as a platform and the backdrop started reading
+    // as something you could stand on. Cutting the detail out in the camera's
+    // own background colour keeps every backdrop pixel at or below `darkest`.
+    const mass = mode === 'dmg' ? PAL.darkest : 0x1c2436
+    const edge = mode === 'dmg' ? 0x0b0f0c : 0x2e3a52
+
+    const gear = (size: number, teeth: number, key: string) => {
+      const r = size / 2
+      const c = r
+      g.fillStyle(mass)
+      g.fillCircle(c, c, r - 3)
+      // Teeth as blocks around the rim, so the silhouette reads at this size
+      // where a drawn cog outline would just alias into a circle.
+      for (let i = 0; i < teeth; i++) {
+        const a = (i / teeth) * Math.PI * 2
+        g.fillRect(c + Math.cos(a) * (r - 3) - 2, c + Math.sin(a) * (r - 3) - 2, 4, 4)
+      }
+      g.fillStyle(edge)
+      g.fillCircle(c, c, 2) // hub
+      g.generateTexture(key, size, size)
+      g.clear()
+    }
+    gear(28, 8, `bg_gear_lg_${mode}`)
+    gear(18, 6, `bg_gear_sm_${mode}`)
+
+    // Vertical pipe run, tiled down a wall.
+    g.fillStyle(mass)
+    g.fillRect(0, 0, 6, 16)
+    g.fillStyle(edge)
+    g.fillRect(0, 6, 6, 2) // collar
+    g.generateTexture(`bg_pipe_${mode}`, 6, 16)
+    g.clear()
+
+    // Horizontal girder with rivets.
+    g.fillStyle(mass)
+    g.fillRect(0, 0, 32, 6)
+    g.fillStyle(edge)
+    for (let x = 3; x < 32; x += 7) g.fillRect(x, 2, 2, 2)
+    g.generateTexture(`bg_girder_${mode}`, 32, 6)
+    g.clear()
+
+    // Hanging lamp: a stem and a shade. Unlit — it is scenery, and a glowing
+    // lamp at this depth would pull the eye off the player.
+    g.fillStyle(edge)
+    g.fillRect(4, 0, 1, 5)
+    g.fillStyle(mass)
+    g.fillRect(1, 5, 8, 4)
+    g.fillRect(3, 9, 4, 2)
+    g.generateTexture(`bg_lamp_${mode}`, 10, 12)
+    g.clear()
+
     g.destroy()
   }
 }
