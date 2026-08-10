@@ -35,6 +35,14 @@ function createGame() {
     zoom: integerZoom(),
     pixelArt: true,
     backgroundColor: '#0f380f',
+    // Phaser's `inputWindowEvents` default adds window-level touch handlers so
+    // it can track pointers that begin outside the canvas. Every game here
+    // puts its d-pad and A/B buttons in the DOM beside the canvas, so that
+    // default feeds every button press into the game's pointer system: one
+    // pointer sticks `isDown`, and the next real tap on the game is swallowed
+    // reconciling it. Touches outside the canvas are button presses here, not
+    // game input (#97).
+    input: { windowEvents: false },
     physics: {
       default: 'arcade',
       arcade: { gravity: { x: 0, y: 0 } },
