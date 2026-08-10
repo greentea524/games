@@ -8,6 +8,7 @@ import { UIScene } from './scenes/UIScene'
 import { PauseScene } from './scenes/PauseScene'
 import { setupDpad } from '../shared/dpad'
 import { exposeForQA } from '../shared/devtools'
+import { preventZoomGestures } from '../shared/noZoom'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -96,6 +97,12 @@ document.querySelectorAll('[data-key]:not(.d-btn)').forEach((btn) => {
   btn.addEventListener('mouseup', handleRelease)
   btn.addEventListener('mouseleave', handleRelease)
 })
+
+// A double tap in the dead space around the d-pad used to zoom the shell in,
+// with no way to zoom back out — the page has nothing scrollable to double-tap
+// on. Static and Lantern Keeper each had their own copy of the fix; this game
+// never did.
+preventZoomGestures()
 
 setupDpad({ dispatch: (type, code) => dispatchKey(code, type) })
 

@@ -6,6 +6,7 @@ import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 import { ensureCtx } from './audio'
 import { setupDpad } from '../shared/dpad'
 import { exposeForQA } from '../shared/devtools'
+import { preventZoomGestures } from '../shared/noZoom'
 
 function integerZoom(): number {
   const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -270,16 +271,9 @@ window.addEventListener('keyup', (e) => {
   if (btn) btn.classList.remove('active-kb')
 })
 
-// Prevent zooming via double-tap and pinch on iOS
-document.addEventListener('dblclick', (event) => {
-  event.preventDefault()
-}, { passive: false })
-
-document.addEventListener('touchstart', (event) => {
-  if (event.touches.length > 1) {
-    event.preventDefault()
-  }
-}, { passive: false })
+// This copy was missing the touchend guard, which is the part that actually
+// stops Safari zooming — so Lantern Keeper had the bug too, just unreported.
+preventZoomGestures()
 
 const initAudio = () => {
   ensureCtx()
