@@ -58,6 +58,14 @@ alone:
   genuinely has, unlike Static
 - Pocket Dungeon's game-over panel dismissing on a canvas tap
 
+**`zoom.mjs`** — the double-tap zoom guard (`shared/noZoom.ts`), in all five
+games. The zoom itself cannot be reproduced here, because Chromium honours
+`user-scalable=no` and never zooms; it is iOS Safari, which ignores that meta,
+where players hit it. What is testable is the mechanism: the second `touchend`
+of a double tap is cancelled, the first is not, and — the half that could
+regress silently — a rapid double tap still registers as two button presses,
+since cancelling `touchend` suppresses the synthesised `click`.
+
 The hover-dependent prompt strings are checked where a summary is already
 open: `shared/runSummary.ts` picks "Tap to continue" over "Z: continue" off
 `(hover: hover) and (pointer: fine)`, and Static's interact prompt is labelled

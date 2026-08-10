@@ -8,6 +8,7 @@ import { sfx, isMuted, setMuted, music } from './audio'
 import { GameState } from './state'
 import { setupDpad } from '../shared/dpad'
 import { exposeForQA } from '../shared/devtools'
+import { preventZoomGestures } from '../shared/noZoom'
 
 function integerZoom(): number {
   // Must match the #game box sizing in index.html's pre-init script, or
@@ -418,34 +419,6 @@ if (paletteBtn) {
   })
 }
 
-// Prevent double-tap zoom and multi-touch pinch zoom on mobile
-document.addEventListener(
-  'dblclick',
-  (event) => {
-    event.preventDefault()
-  },
-  { passive: false },
-)
-
-document.addEventListener(
-  'touchstart',
-  (event) => {
-    if (event.touches.length > 1) {
-      event.preventDefault()
-    }
-  },
-  { passive: false },
-)
-
-let lastTouchEnd = 0
-document.addEventListener(
-  'touchend',
-  (event) => {
-    const now = Date.now()
-    if (now - lastTouchEnd <= 300) {
-      event.preventDefault()
-    }
-    lastTouchEnd = now
-  },
-  { passive: false },
-)
+// Was three inline listeners here; the other four games needed the same and
+// three of them never got it, so it lives in shared/ now.
+preventZoomGestures()
