@@ -25,6 +25,9 @@
   "include": ["src", "shared", "lantern-keeper", "static", "windup", "pocket-dungeon", "cart-crate"],
   /* Offline tooling, not part of any bundle: cart-crate/scripts/solver.ts is a
      node script that imports fs/path/process and is never reached from app
-     code. It does not belong under a browser-targeted config. */
-  "exclude": ["cart-crate/scripts"]
+     code. It does not belong under a browser-targeted config.
+
+     `*_test.ts` files are the same case — they run under tsx via `npm run
+     qa:units` and use `process.exit` to report a result. */
+  "exclude": ["cart-crate/scripts", "**/*_test.ts"]
 }
