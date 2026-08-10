@@ -10,8 +10,8 @@
  "type": "map",
  "version": "1.10",
  "tiledversion": "1.10.2",
- "nextlayerid": 3,
- "nextobjectid": 3,
+ "nextlayerid": 4,
+ "nextobjectid": 5,
  "layers": [
   {
    "data": [
@@ -2385,6 +2385,40 @@
     {
      "name": "heart_tree",
      "x": 980,
+     "y": 117,
+     "point": true,
+     "rotation": 0,
+     "type": "",
+     "visible": true,
+     "width": 0,
+     "height": 0
+    }
+   ],
+   "opacity": 1,
+   "type": "objectgroup",
+   "visible": true,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "draworder": "topdown",
+   "id": 3,
+   "name": "flasks",
+   "objects": [
+    {
+     "name": "oil_flask",
+     "x": 468,
+     "y": 117,
+     "point": true,
+     "rotation": 0,
+     "type": "",
+     "visible": true,
+     "width": 0,
+     "height": 0
+    },
+    {
+     "name": "oil_flask",
+     "x": 724,
      "y": 117,
      "point": true,
      "rotation": 0,

@@ -9,6 +9,29 @@ export const GLOW = {
   durationMs: 30000, // time for a full glow to fade to minimum
 } as const
 
+// Lantern fuel (#70) — all tunable.
+//
+// The player's light used to be free and infinite: `playerLightRadius()`
+// returned `GLOW.maxRadius` and nothing ever reduced it, so the darkness only
+// ever receded and was scenery rather than a threat.
+//
+// `GLOW.durationMs` and `GLOW.minRadius` were the fossils of an earlier
+// attempt at this — a 30s glow timeout that *killed* you, removed because
+// running dry meant standing in the dark waiting to die (see the respawn
+// comment in PlayScene). Both constants were left behind, referenced nowhere.
+// This revives the idea without the part that was wrong with it: running dry
+// blinds, it does not kill, and it is always recoverable because lit lanterns
+// keep their own permanent glow and the level's darkness never reaches full
+// opacity (see DARKNESS_ALPHA), so terrain outlines stay readable at empty.
+export const FUEL = {
+  /** A full tank, in ms of play. Drains on a timer, not on movement. */
+  maxMs: GLOW.durationMs,
+  /** Below this fraction the HUD gauge warns and the low-fuel cue plays. */
+  lowRatio: 0.25,
+  /** What one oil flask restores, as a fraction of a tank. */
+  flaskRatio: 0.5,
+} as const
+
 // Dash (KAN-114) — all tunable
 export const SPAWN_POINT = { x: 32, y: 360 }
 export const DASH = {
