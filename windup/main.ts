@@ -7,6 +7,7 @@ import { PlatformerScene } from './scenes/PlatformerScene'
 import { UIScene } from './scenes/UIScene'
 import { PauseScene } from './scenes/PauseScene'
 import { setupDpad } from '../shared/dpad'
+import { exposeForQA } from '../shared/devtools'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -28,17 +29,8 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, MainMenuScene, PlatformerScene, UIScene, PauseScene],
 }
 
-// Exposed for the QA scripts, matching Static and Lantern Keeper. Without a
-// handle on the game there is no way to drive a scene from outside, and the
-// end-of-run screen is several minutes of play from the title.
-declare global {
-  interface Window {
-    __game?: Phaser.Game
-  }
-}
-
 export const game = new Phaser.Game(config)
-window.__game = game
+exposeForQA(game)
 
 const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
   const keyMap: Record<string, string> = {

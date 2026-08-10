@@ -5,6 +5,7 @@ import { PlayScene } from './scenes/PlayScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 import { ensureCtx } from './audio'
 import { setupDpad } from '../shared/dpad'
+import { exposeForQA } from '../shared/devtools'
 
 function integerZoom(): number {
   const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -16,12 +17,6 @@ function integerZoom(): number {
       Math.floor(availableHeight / GBC_HEIGHT),
     ),
   )
-}
-
-declare global {
-  interface Window {
-    __game?: Phaser.Game
-  }
 }
 
 let game: Phaser.Game
@@ -49,7 +44,7 @@ function createGame() {
       preStyle.innerHTML = `#game { width: ${GBC_WIDTH * zoom}px; height: ${GBC_HEIGHT * zoom}px; }`
     }
   })
-  window.__game = game
+  exposeForQA(game)
 }
 
 // Load the pixel font before booting so canvas text renders with it from

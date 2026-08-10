@@ -19,7 +19,19 @@
 import fs from 'node:fs'
 import { chromium } from 'playwright-core'
 
-export const BASE_URL = process.env.QA_URL ?? 'http://localhost:5178/games/static/'
+const RAW_URL = process.env.QA_URL ?? 'http://localhost:5178/games/static/'
+
+/**
+ * The game only publishes `window.__game` when the page asks for it with
+ * `?qa=1` (#98), so every load here has to carry the flag. Added by the
+ * harness rather than left to each caller's QA_URL, because forgetting it
+ * fails as "window.__game is undefined" several steps later.
+ */
+export const BASE_URL = (() => {
+  const u = new URL(RAW_URL)
+  u.searchParams.set('qa', '1')
+  return u.toString()
+})()
 
 // playwright-core ships no browsers, which keeps `npm ci` cheap for a
 // dependency only the QA scripts use. Point QA_BROWSER at a Chromium binary,
