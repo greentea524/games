@@ -7,6 +7,30 @@ import { showRunSummary, formatRunTime } from '../../shared/runSummary'
 
 type Facing = 'left' | 'right'
 
+/** Ground speed, px/s, at a full spring. */
+const MOVE_SPEED = 80
+/** Jump impulse, px/s, at a full spring. */
+const JUMP_VELOCITY = 170
+
+// The spring winds down (#68).
+//
+// Energy used to affect movement only as a cliff: `energy > 0 ? 1 : 0.2`, so
+// the toy ran at identical speed at 100 power and at 1, then fell off. That
+// made the HUD bar a countdown timer wearing a resource's clothes, and it is
+// the wrong fantasy for a game whose whole premise is a windup toy.
+//
+// Both curves are deliberately 1.0 at full charge, which is the property that
+// makes this safe to land against 32 levels tuned for constant speed: a fresh
+// or freshly-refilled run plays exactly as it always did, and no level becomes
+// unwinnable for a player who is not already drained. Levels only get harder
+// as the spring runs down, which is the point.
+//
+// A drained player is never stuck, either. If a required jump is out of reach
+// at low charge, moving drains to zero, and stopping on the ground respawns at
+// the last checkpoint with a full spring (see `respawnAtCheckpoint`).
+const SPEED_AT_EMPTY = 0.55
+const JUMP_AT_EMPTY = 0.75
+
 export class PlatformerScene extends Phaser.Scene {
   private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
   private platforms!: Phaser.Physics.Arcade.StaticGroup
@@ -258,9 +282,9 @@ export class PlatformerScene extends Phaser.Scene {
       plat.prevX = plat.x
     })
 
-    // Zero-Energy Speed Drain Penalty
-    const speedMultiplier = GameState.energy > 0 ? 1 : 0.2
-    const moveSpeed = 80 * speedMultiplier
+    // Wind down continuously rather than falling off a cliff at zero (#68).
+    const charge = this.chargeRatio()
+    const moveSpeed = MOVE_SPEED * (SPEED_AT_EMPTY + (1 - SPEED_AT_EMPTY) * charge)
 
     let moveX = 0
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
@@ -283,15 +307,21 @@ export class PlatformerScene extends Phaser.Scene {
 
     // Jump with Coyote Time & Wall Jump
     const canJump = isGrounded || time < this.coyoteTimer
+    const jumpVelocity =
+      -JUMP_VELOCITY * (JUMP_AT_EMPTY + (1 - JUMP_AT_EMPTY) * charge)
     if (Phaser.Input.Keyboard.JustDown(this.jumpKey) && GameState.energy > 0) {
       if (canJump) {
-        this.player.setVelocityY(-170)
+        this.player.setVelocityY(jumpVelocity)
         this.coyoteTimer = 0
         GameState.drainEnergy(5) // Extra jump cost
         sfx.jump()
       } else if (isWalled) {
-        // Wall Jump
-        this.player.setVelocityY(-170)
+        // Wall Jump. The vertical impulse winds down with the spring like any
+        // other jump, but the horizontal kick does not: it is what gets the
+        // player off the wall, and input is locked out for 250ms after it, so
+        // a weakened kick risks dropping them straight back against the same
+        // wall with no way to steer out.
+        this.player.setVelocityY(jumpVelocity)
         this.player.setVelocityX(isWalledLeft ? 150 : -150)
         this.facing = isWalledLeft ? 'right' : 'left'
         this.wallJumpTimer = time + 250 // Lock out D-pad for 250ms
@@ -304,6 +334,12 @@ export class PlatformerScene extends Phaser.Scene {
     if (GameState.energy <= 0 && isGrounded && moveX === 0) {
       this.respawnAtCheckpoint()
     }
+  }
+
+  /** Spring charge, 1 at full and 0 at empty. */
+  private chargeRatio(): number {
+    if (GameState.maxEnergy <= 0) return 0
+    return Phaser.Math.Clamp(GameState.energy / GameState.maxEnergy, 0, 1)
   }
 
   private reachStation(station: Phaser.Types.Physics.Arcade.SpriteWithStaticBody) {

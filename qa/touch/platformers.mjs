@@ -43,6 +43,19 @@ async function windup() {
   const moved = await st()
   check('holding the d-pad moves the player', moved.x - start.x > 8, `${(moved.x - start.x).toFixed(1)}px`)
 
+  // #68's safety property, asserted here because this is where a driven Windup
+  // already exists. The spring now scales movement continuously, and the whole
+  // reason that was safe to land against 32 levels tuned for constant speed is
+  // that a full spring still runs at exactly the old speed. If that drifts,
+  // every level's jumps get retuned by accident.
+  // Tolerance is 4 rather than 1: the toy has been walking for 600ms by now
+  // and has burnt a little spring, so it reads slightly under 80.
+  check(
+    'a full spring still runs at the original 80 px/s',
+    Math.abs(Math.abs(moved.vx) - 80) < 4,
+    `vx ${Math.abs(moved.vx).toFixed(1)}`,
+  )
+
   // Second finger on A while the first stays put.
   await hand.down(ACT, c.A.x, c.A.y)
   await page.waitForTimeout(120)
@@ -57,6 +70,19 @@ async function windup() {
   await hand.up(PAD)
   await page.waitForTimeout(300)
   check('releasing the d-pad stops the player', Math.abs((await st()).vx) < 1)
+
+  // And the other half of #68: a run-down spring is slower. Holding a
+  // direction burns 8/s, so a few seconds is plenty to see the curve move.
+  await hand.down(PAD, c.arm('ArrowLeft').x, c.arm('ArrowLeft').y)
+  await page.waitForTimeout(4000)
+  const drained = await st()
+  await hand.release()
+  await page.waitForTimeout(200)
+  check(
+    'a run-down spring moves slower than a full one',
+    Math.abs(drained.vx) < 78 && Math.abs(drained.vx) >= 44,
+    `vx ${Math.abs(drained.vx).toFixed(1)} (floor is 0.55 x 80 = 44)`,
+  )
 
   // Roll the thumb across the pad without lifting — the case setupDpad exists
   // for.
