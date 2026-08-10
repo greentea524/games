@@ -14,6 +14,7 @@ const FOG_SIGHTED = 0.3
 const TORCH_RADIUS = 3.5
 const TORCH_LIFT = 0.42
 const TORCH_FLICKER = 0.05
+
 import { GameState, TurnState } from '../state'
 import { MapGenerator } from '../MapGenerator'
 import { RNG } from '../rng'
@@ -23,10 +24,14 @@ import {
   chaserAI, cowardAI, rangerAI, sleeperAI, splitterAI,
 } from '../enemies'
 import { music, sfx, setMuted, isMuted } from '../audio'
+import { rollModifier, modifierSeed, type Modifier } from '../modifiers'
 import { bossAI } from '../boss'
 import type { BossState } from '../boss'
 import { rollFloorItems } from '../items'
 import type { ItemDef, TurnSnapshot } from '../items'
+
+/** What `GameState.hungerDrainRate` is on an unmodified floor (#69). */
+const BASE_HUNGER_DRAIN = 1
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -69,6 +74,9 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0b0f0c')
 
     this.renderDungeon()
+    // After the fade-in, so the banner is not competing with the floor
+    // appearing underneath it.
+    this.time.delayedCall(400, () => this.announceModifier())
 
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<string, Phaser.Input.Keyboard.Key>
@@ -134,6 +142,9 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
+  /** This floor's modifier, or null for an ordinary floor (#69). */
+  private modifier: Modifier | null = null
+
   private fogTiles: Phaser.GameObjects.Rectangle[][] = []
   /**
    * Light each tile receives from wall torches, 0..1, computed once per floor
@@ -157,6 +168,20 @@ export class DungeonScene extends Phaser.Scene {
     } else {
       music.play('dungeon')
     }
+
+    // This floor's modifier (#69). Rolled from a stream of its own rather
+    // than from `this.rng`: taking a draw from the generator's stream would
+    // shift every value after it and change the dungeon that every existing
+    // seed produces.
+    this.modifier = rollModifier(
+      GameState.floorDepth,
+      new RNG(modifierSeed(GameState.seed, GameState.floorDepth)),
+    )
+
+    // `hungerDrainRate` is a static that nothing else ever resets, so Famine
+    // would follow the player down for the rest of the run if this were not
+    // reasserted on every floor.
+    GameState.hungerDrainRate = BASE_HUNGER_DRAIN * (this.modifier?.hungerRateMultiplier ?? 1)
 
     const generator = new MapGenerator(this.mapWidth, this.mapHeight, GameState.seed + GameState.floorDepth)
     const { grid, startX, startY } = generator.generate(GameState.floorDepth)
@@ -185,7 +210,7 @@ export class DungeonScene extends Phaser.Scene {
         else if (char === '#') frameIndex = 1
         else if (char === 'T') frameIndex = 5
         else if (char === 'B') frameIndex = 6
-        else if (char === 'S') frameIndex = 2
+        else if (char === 'S') frameIndex = this.modifier?.hideStairs ? 0 : 2
         else if (char === 'c') frameIndex = 3
         else if (char === 'r') frameIndex = 7
         else if (char === 'k') frameIndex = 4
@@ -203,7 +228,7 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     // Spawn enemies using budget system
-    const spawnList = rollEnemies(GameState.floorDepth, this.rng)
+    const spawnList = rollEnemies(GameState.floorDepth, this.rng, this.modifier?.spawnBudgetBonus ?? 0)
     
     // Collect all 'E' positions from the grid
     const spawnPositions: { x: number; y: number }[] = []
@@ -233,7 +258,9 @@ export class DungeonScene extends Phaser.Scene {
         maxHp: def.hp,
         atk: def.atk,
         ai: def.ai,
-        awake: def.ai !== 'sleeper',
+        // Silent Halls holds every enemy unaware, whatever its AI would
+        // normally do on spawn.
+        awake: this.modifier?.enemiesStartAsleep ? false : def.ai !== 'sleeper',
       })
     }
 
@@ -268,7 +295,11 @@ export class DungeonScene extends Phaser.Scene {
 
     // Spawn floor items
     this.floorItems = []
-    const itemDefs = rollFloorItems(GameState.floorDepth, this.rng)
+    const itemDefs = rollFloorItems(GameState.floorDepth, this.rng, {
+      extra: this.modifier?.extraItems,
+      suppressFood: this.modifier?.suppressFood,
+      guaranteedRare: this.modifier?.guaranteedRare,
+    })
     const floorTiles: { x: number; y: number }[] = []
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
@@ -422,7 +453,7 @@ export class DungeonScene extends Phaser.Scene {
   private executeMeleeAttack(enemy: EnemyInstance) {
     sfx.attack()
     GameState.turnState = TurnState.ANIMATING
-    const damage = GameState.playerAtk
+    const damage = this.scaleDamage(GameState.playerAtk)
     enemy.hp -= damage
 
     const origX = this.player.x
@@ -553,7 +584,9 @@ export class DungeonScene extends Phaser.Scene {
 
         if (action.type === 'attack') {
           sfx.hit()
-          const dmg = enemy.bossState.phase === 'desperate' ? enemy.atk * 2 : enemy.atk
+          const dmg = this.scaleDamage(
+            enemy.bossState.phase === 'desperate' ? enemy.atk * 2 : enemy.atk,
+          )
           GameState.playerHp = Math.max(0, GameState.playerHp - dmg)
           this.showDamageText(this.player.x, this.player.y - 6, `-${dmg}`, '#ffcc00')
           this.tweens.add({
@@ -613,8 +646,8 @@ export class DungeonScene extends Phaser.Scene {
 
       if (result.action === 'attack') {
         sfx.hit()
-        GameState.playerHp = Math.max(0, GameState.playerHp - enemy.atk)
-        this.showDamageText(this.player.x, this.player.y - 6, `-${enemy.atk}`, '#ffcc00')
+        GameState.playerHp = Math.max(0, GameState.playerHp - this.scaleDamage(enemy.atk))
+        this.showDamageText(this.player.x, this.player.y - 6, `-${this.scaleDamage(enemy.atk)}`, '#ffcc00')
         this.tweens.add({
           targets: enemy.sprite,
           x: enemy.sprite.x + (this.player.x - enemy.sprite.x) * 0.3,
@@ -625,8 +658,8 @@ export class DungeonScene extends Phaser.Scene {
       } else if (result.action === 'shoot') {
         // Ranged attack: deal damage from distance
         sfx.hit()
-        GameState.playerHp = Math.max(0, GameState.playerHp - enemy.atk)
-        this.showDamageText(this.player.x, this.player.y - 6, `-${enemy.atk}`, '#ff8800')
+        GameState.playerHp = Math.max(0, GameState.playerHp - this.scaleDamage(enemy.atk))
+        this.showDamageText(this.player.x, this.player.y - 6, `-${this.scaleDamage(enemy.atk)}`, '#ff8800')
         // Flash enemy to indicate shot
         this.tweens.add({
           targets: enemy.sprite,
@@ -695,6 +728,46 @@ export class DungeonScene extends Phaser.Scene {
         return // Only spawn 1 minion per summon
       }
     }
+  }
+
+  /**
+   * Applies the floor's damage modifier (#69). Brittle doubles it in both
+   * directions, so fights end in a turn or two either way — which is only
+   * fair if the player's own hits scale too.
+   */
+  private scaleDamage(amount: number): number {
+    return Math.max(1, Math.round(amount * (this.modifier?.damageMultiplier ?? 1)))
+  }
+
+  /**
+   * Announces the floor's modifier, in the banner style the game already uses
+   * for tile descriptions.
+   */
+  private announceModifier() {
+    if (!this.modifier) return
+    // Same look as the tile-description banners, but not `showDamageText`:
+    // that fades in 500ms, which is right for a damage number and far too
+    // brief for two lines of 8px text the player has to carry for a whole
+    // floor. Screen-space, so it does not drift with the camera.
+    const text = this.add
+      .text(TILE * 2, 24, `${this.modifier.name}\n${this.modifier.blurb}`, {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '8px',
+        color: '#ffd700',
+        align: 'center',
+        resolution: 1,
+        shadow: { offsetX: 1, offsetY: 1, color: '#000000', fill: true },
+      })
+      .setScrollFactor(0)
+      .setDepth(60)
+    text.setX((this.cameras.main.width - text.width) / 2)
+    this.tweens.add({
+      targets: text,
+      alpha: 0,
+      delay: 2000,
+      duration: 600,
+      onComplete: () => text.destroy(),
+    })
   }
 
   private showDamageText(x: number, y: number, text: string, color: string) {
@@ -844,7 +917,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private updateFogOfWar() {
-    const sightRadius = 4
+    const sightRadius = this.modifier?.sightRadius ?? 4
     const px = this.playerTX
     const py = this.playerTY
 

@@ -197,10 +197,18 @@ export function getSpawnBudget(depth: number): number {
   return depth + 3
 }
 
-export function rollEnemies(depth: number, rng: RNG): { defKey: string; def: EnemyDef }[] {
+/**
+ * @param budgetBonus Added to the depth-derived budget by a floor modifier
+ *   (#69) — Overgrown and Treasury both crowd the floor.
+ */
+export function rollEnemies(
+  depth: number,
+  rng: RNG,
+  budgetBonus = 0,
+): { defKey: string; def: EnemyDef }[] {
   const biome = getBiome(depth)
   const table = BIOME_SPAWN_TABLES[biome]
-  let budget = getSpawnBudget(depth)
+  let budget = getSpawnBudget(depth) + budgetBonus
   const result: { defKey: string; def: EnemyDef }[] = []
 
   // Build weighted pool

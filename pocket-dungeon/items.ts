@@ -198,9 +198,23 @@ export class Inventory {
  * change rather than a signature change — but choosing that curve is design
  * work, not a cleanup, so it is left as-is and named to say so.
  */
-export function rollFloorItems(_depth: number, rng: RNG): ItemDef[] {
-  const pool = Object.values(ITEMS).filter(i => i.weight > 0)
-  const count = rng.nextInt(2, 4) // 2-4 items per floor
+/**
+ * @param opts Floor-modifier adjustments (#69): `extra` adds items beyond the
+ *   usual 2-4, `suppressFood` drops everything that restores hunger (Famine),
+ *   and `guaranteedRare` appends one of the scarcest items in the pool
+ *   (Treasury). "Rare" is defined by spawn weight, since the pool has no
+ *   rarity tier of its own.
+ */
+export function rollFloorItems(
+  _depth: number,
+  rng: RNG,
+  opts: { extra?: number; suppressFood?: boolean; guaranteedRare?: boolean } = {},
+): ItemDef[] {
+  let pool = Object.values(ITEMS).filter(i => i.weight > 0)
+  if (opts.suppressFood) {
+    pool = pool.filter(i => !i.hungerRestore)
+  }
+  const count = rng.nextInt(2, 4) + (opts.extra ?? 0)
   const result: ItemDef[] = []
 
   const totalWeight = pool.reduce((s, i) => s + i.weight, 0)
@@ -218,6 +232,11 @@ export function rollFloorItems(_depth: number, rng: RNG): ItemDef[] {
 
   // Always add 1 hourglass per floor
   result.push({ ...ITEMS.hourglass })
+
+  if (opts.guaranteedRare && pool.length > 0) {
+    const rarest = pool.reduce((a, b) => (b.weight < a.weight ? b : a))
+    result.push({ ...rarest })
+  }
 
   return result
 }

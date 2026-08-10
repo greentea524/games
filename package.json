@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "qa:static": "node static/qa/run.mjs",
-    "qa:touch": "node qa/touch/run.mjs"
+    "qa:touch": "node qa/touch/run.mjs",
+    "qa:units": "tsx pocket-dungeon/modifiers_test.ts"
   },
   "dependencies": {
     "phaser": "^3.90.0",

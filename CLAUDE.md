@@ -36,7 +36,12 @@ npm run build      # tsc -b && vite build — typecheck included
 npm run lint       # oxlint; a handful of pre-existing warnings are expected
 npm run qa:static  # Static: reachability + a full scripted playthrough
 npm run qa:touch   # all five games under real multi-touch, on a phone viewport
+npm run qa:units   # pure-logic checks (Pocket Dungeon floor modifiers)
 ```
+
+`*_test.ts` files run under `tsx` and use `process.exit`, so they are excluded
+from `tsconfig.app.json` — that config targets the browser and has no node
+types.
 
 Both QA suites start their own dev server and exit non-zero on failure, and
 treat any page or console error as a failure. Point `QA_URL` at a running
