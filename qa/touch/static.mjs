@@ -119,6 +119,27 @@ check(
   await page.evaluate(() => !document.getElementById('overlay').classList.contains('hidden')),
 )
 
+// The interact prompt over an NPC's head is labelled off
+// `(hover: hover) and (pointer: fine)` — 'Z' on a desktop, 'A' on a phone,
+// matching the button the player can actually see. This is the only one of
+// the hover-dependent strings that is drawn into the game rather than into
+// the DOM, so nothing else would catch it flipping.
+check(
+  'the interact prompt is labelled for the on-screen button',
+  await page.evaluate(() => {
+    const w = window.__game.scene.getScene('world')
+    const labels = []
+    w.children.list.forEach((o) => {
+      if (o.type === 'Container') o.list?.forEach((k) => k.type === 'Text' && labels.push(k.text))
+      if (o.type === 'Text') labels.push(o.text)
+    })
+    // Positive *and* negative: asserting only the absence of 'Z' would pass
+    // just as happily if the traversal never found the prompt at all.
+    return { labels, ok: labels.includes('A') && !labels.includes('Z') }
+  }).then((r) => r.ok),
+  "a phone has no Z key, so the prompt reads 'A'",
+)
+
 const ok = finish(t.log)
 await t.browser.close()
 process.exit(ok ? 0 : 1)
