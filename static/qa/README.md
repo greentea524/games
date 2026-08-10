@@ -67,6 +67,17 @@ a map re-entry.
 - `scene.isActive()` is `false` during `create()` — the status is `CREATING`,
   not `RUNNING`. A guard using it inside scene setup silently does nothing.
 
+## The `?qa=1` flag
+
+The games only publish `window.__game` when the page is opened with `?qa=1`
+(#98). The harness appends it to every load, so `QA_URL` can be a plain game
+URL — but a browser opened by hand needs it, or the scripts will report that
+`window.__game` is undefined.
+
+The gate is a query parameter rather than a dev-only build flag so the suite
+can be pointed at a production build or the deployed site, which is the
+artefact players actually get.
+
 ## Requirements
 
 `playwright-core` (a devDependency) ships no browsers, which keeps `npm ci`

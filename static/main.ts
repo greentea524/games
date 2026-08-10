@@ -7,6 +7,7 @@ import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 import { sfx, isMuted, setMuted, music } from './audio'
 import { GameState } from './state'
 import { setupDpad } from '../shared/dpad'
+import { exposeForQA } from '../shared/devtools'
 
 function integerZoom(): number {
   // Must match the #game box sizing in index.html's pre-init script, or
@@ -21,12 +22,6 @@ function integerZoom(): number {
       Math.floor(availableHeight / GBC_HEIGHT),
     ),
   )
-}
-
-declare global {
-  interface Window {
-    __game?: Phaser.Game
-  }
 }
 
 let game: Phaser.Game
@@ -54,8 +49,7 @@ function createGame() {
       preStyle.innerHTML = `#game { width: ${GBC_WIDTH * zoom}px; height: ${GBC_HEIGHT * zoom}px; }`
     }
   })
-  window.__game = game
-  ;(window as any).__state = GameState
+  exposeForQA(game)
   ;(window as any).__music = music
 }
 
