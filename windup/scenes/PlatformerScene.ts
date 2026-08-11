@@ -69,6 +69,18 @@ const STEAM = {
   drift: { min: -6, max: 6 },
 } as const
 
+// Conveyors (#55).
+//
+// The push is added to the player's own input rather than replacing it, so
+// walking against a belt slows you to 40px/s instead of locking you in place.
+// That keeps the belt a force in the world rather than a loss of control,
+// which is the difference between a movement verb and a trap.
+const CONVEYOR = {
+  speed: 40,
+  /** ms between chevron frames. Fast enough to read direction at a glance. */
+  frameMs: 140,
+} as const
+
 /** Ground speed, px/s, at a full spring. */
 const MOVE_SPEED = 80
 /** Jump impulse, px/s, at a full spring. */
@@ -115,6 +127,7 @@ export class PlatformerScene extends Phaser.Scene {
   private arcs: { a: { x: number; y: number }; b: { x: number; y: number } }[] = []
   private arcGfx!: Phaser.GameObjects.Graphics
   private vents: Phaser.GameObjects.Particles.ParticleEmitter[] = []
+  private conveyors!: Phaser.Physics.Arcade.StaticGroup
   private invulnUntil = 0
   /**
    * Frame stamp of the last lava tick. Arcade fires the overlap callback once
@@ -178,6 +191,7 @@ export class PlatformerScene extends Phaser.Scene {
     this.goals = this.physics.add.staticGroup()
     this.spikes = this.physics.add.staticGroup()
     this.lava = this.physics.add.staticGroup()
+    this.conveyors = this.physics.add.staticGroup()
 
     const level = LEVELS[GameState.levelIndex] || LEVELS[1]
 
@@ -213,6 +227,35 @@ export class PlatformerScene extends Phaser.Scene {
       })
     })
 
+    // Conveyors (#55). Solid like a platform — the belt is something you
+    // stand on — with the direction carried on the sprite.
+    level.conveyors.forEach(p => {
+      const frame = p.dir > 0 ? 6 : 8
+      const belt = this.conveyors.create(p.x, p.y, `tiles_${mode}`, frame) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      belt.setData('dir', p.dir)
+      belt.setData('baseFrame', frame)
+    })
+    if (level.conveyors.length > 0) {
+      // Frame cycling rather than a tween: the chevrons are baked into the
+      // tileset, and swapping frames is what makes the belt look like it is
+      // running. Not gated on reduced motion — this is how the player reads
+      // which way the belt pushes, not decoration.
+      this.time.addEvent({
+        delay: CONVEYOR.frameMs,
+        loop: true,
+        callback: () => {
+          this.conveyors.getChildren().forEach((c) => {
+            const belt = c as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+            const base = belt.getData('baseFrame') as number
+            // Number(), not String(): frames added via `tex.add(i, ...)` carry
+            // a numeric name, so comparing against a string never matched and
+            // the belt sat on one frame forever.
+            belt.setFrame(Number(belt.frame.name) === base ? base + 1 : base)
+          })
+        },
+      })
+    }
+
     // Hazards (#54). Spike bodies are shortened to the visible points so the
     // player is not hit by the empty air above them.
     level.spikes.forEach(p => {
@@ -247,6 +290,7 @@ export class PlatformerScene extends Phaser.Scene {
 
     this.physics.add.collider(this.player, this.platforms)
     this.physics.add.collider(this.player, this.movingPlatforms)
+    this.physics.add.collider(this.player, this.conveyors)
     this.physics.add.overlap(this.player, this.stations, (_p, s) => this.reachStation(s as Phaser.Types.Physics.Arcade.SpriteWithStaticBody))
 
     this.physics.add.overlap(this.player, this.spikes, () => this.hitHazard(HAZARD.spikeCost))
@@ -413,7 +457,8 @@ export class PlatformerScene extends Phaser.Scene {
     }
 
     if (time > this.wallJumpTimer) {
-      this.player.setVelocityX(moveX)
+      // Added to the input, not substituted for it (#55).
+      this.player.setVelocityX(moveX + this.conveyorPush())
     }
     this.player.setTexture(`windup_${mode}_${this.facing}`)
 
@@ -633,6 +678,26 @@ export class PlatformerScene extends Phaser.Scene {
         return
       }
     }
+  }
+
+  /**
+   * Sideways push from a belt the toy is standing on, or 0 (#55).
+   *
+   * Grounded only, as the issue asks: a belt should carry what rests on it,
+   * not steer anything that happens to brush past in mid-air.
+   */
+  private conveyorPush(): number {
+    const body = this.player.body
+    if (!body.blocked.down) return 0
+    for (const child of this.conveyors.getChildren()) {
+      const belt = child as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      const bb = belt.body
+      // Standing *on* it: feet within a couple of px of the belt's top.
+      if (Math.abs(body.bottom - bb.top) > 2) continue
+      if (body.right <= bb.left || body.left >= bb.right) continue
+      return (belt.getData('dir') as number) * CONVEYOR.speed
+    }
+    return 0
   }
 
   /** Spring charge, 1 at full and 0 at empty. */

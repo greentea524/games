@@ -73,6 +73,27 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(PAL.light); g.fillRect(at(5), 0, T, 4)
       g.fillStyle(PAL.lightest)
       g.fillRect(at(5) + 1, 1, 3, 1); g.fillRect(at(5) + 8, 2, 4, 1)
+
+      // 6-9: Conveyor (#55). Two frames per direction; cycling them is what
+      // shows which way the belt runs, so the chevrons are offset by half
+      // their spacing between frames rather than redrawn.
+      for (let f = 0; f < 4; f++) {
+        const i = 6 + f
+        const dir = f < 2 ? 1 : -1
+        const phase = (f % 2) * 4
+        g.fillStyle(PAL.dark); g.fillRect(at(i), 0, T, T)
+        g.fillStyle(PAL.darkest); g.fillRect(at(i), 0, T, 2); g.fillRect(at(i), T - 2, T, 2)
+        g.fillStyle(PAL.lightest)
+        for (let x = -8; x < T; x += 8) {
+          const cx = at(i) + x + phase
+          // A chevron: two diagonals meeting at the point, drawn as steps.
+          for (let k = 0; k < 3; k++) {
+            const px = dir > 0 ? cx + k : cx + 4 - k
+            g.fillRect(px, 6 + k, 1, 1)
+            g.fillRect(px, 10 - k, 1, 1)
+          }
+        }
+      }
     } else {
       // GBC Color
       // 0: Grass Ground
@@ -111,13 +132,31 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(GBC_PAL.brickWall); g.fillRect(at(5), 0, T, 4)
       g.fillStyle(GBC_PAL.stationBody)
       g.fillRect(at(5) + 1, 1, 3, 1); g.fillRect(at(5) + 8, 2, 4, 1)
+
+      // 6-9: Conveyor (#55)
+      for (let f = 0; f < 4; f++) {
+        const i = 6 + f
+        const dir = f < 2 ? 1 : -1
+        const phase = (f % 2) * 4
+        g.fillStyle(GBC_PAL.platformBody); g.fillRect(at(i), 0, T, T)
+        g.fillStyle(GBC_PAL.brickLine); g.fillRect(at(i), 0, T, 2); g.fillRect(at(i), T - 2, T, 2)
+        g.fillStyle(GBC_PAL.stationLight)
+        for (let x = -8; x < T; x += 8) {
+          const cx = at(i) + x + phase
+          for (let k = 0; k < 3; k++) {
+            const px = dir > 0 ? cx + k : cx + 4 - k
+            g.fillRect(px, 6 + k, 1, 1)
+            g.fillRect(px, 10 - k, 1, 1)
+          }
+        }
+      }
     }
 
-    g.generateTexture(key, T * 6, T)
+    g.generateTexture(key, T * 10, T)
     g.destroy()
     
     const tex = this.textures.get(key)
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 10; i++) {
       tex.add(i, 0, i * T, 0, T, T)
     }
   }

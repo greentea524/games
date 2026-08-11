@@ -19,11 +19,13 @@ export interface LevelData {
    * levels for pure ambience.
    */
   vents: { x: number; y: number }[]
+  /** Conveyors (#55). `dir` is +1 for a belt running right, -1 for left. */
+  conveyors: { x: number; y: number; dir: 1 | -1 }[]
 }
 
 const parseGrid = (
   layout: string[],
-  config: { [key: string]: 'platform' | 'spring' | 'pickup' | 'station' | 'spawn' | 'goal' | 'moving' | 'spike' | 'lava' | 'arc' | 'vent' },
+  config: { [key: string]: 'platform' | 'spring' | 'pickup' | 'station' | 'spawn' | 'goal' | 'moving' | 'spike' | 'lava' | 'arc' | 'vent' | 'conveyorR' | 'conveyorL' },
   movingConfig?: Record<string, { dx: number; dy: number; duration: number }>
 ): LevelData => {
   const data: LevelData = {
@@ -38,6 +40,7 @@ const parseGrid = (
     lava: [],
     arcs: [],
     vents: [],
+    conveyors: [],
   }
 
   layout.forEach((row, ry) => {
@@ -55,6 +58,8 @@ const parseGrid = (
       else if (type === 'lava') data.lava.push({ x: px, y: py })
       else if (type === 'arc') data.arcs.push({ x: px, y: py })
       else if (type === 'vent') data.vents.push({ x: px, y: py })
+      else if (type === 'conveyorR') data.conveyors.push({ x: px, y: py, dir: 1 })
+      else if (type === 'conveyorL') data.conveyors.push({ x: px, y: py, dir: -1 })
       else if (type === 'spawn') data.spawn = { x: px, y: py }
       else if (type === 'goal') data.goal = { x: px, y: py }
       else if (type === 'moving' && movingConfig && movingConfig[char]) {
@@ -84,7 +89,10 @@ const legend: Record<string, any> = {
   '~': 'lava',
   'e': 'arc',
   // 'v' is a steam vent (#53) — ambience only, never collidable.
-  'v': 'vent'
+  'v': 'vent',
+  // Conveyors (#55). Solid like a platform, but they push what stands on them.
+  '>': 'conveyorR',
+  '<': 'conveyorL'
 }
 
 export const LEVELS: Record<number, LevelData> = {
@@ -135,7 +143,7 @@ export const LEVELS: Record<number, LevelData> = {
     "..........",
     "..X.S.....",
     ".@......G.",
-    "XXXXXXXXXX"
+    "XXXX>>>XXX"
   ], legend, {
     'M': { dx: 32, dy: 0, duration: 1500 }
   }),
