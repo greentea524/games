@@ -20,6 +20,7 @@ export class BootScene extends Phaser.Scene {
       this.buildEnergy(mode)
       this.buildGoal(mode)
       this.buildBackdrop(mode)
+      this.buildPuff(mode)
     })
     this.scene.start('mainmenu')
   }
@@ -306,6 +307,31 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture(`bg_lamp_${mode}`, 10, 12)
     g.clear()
 
+    g.destroy()
+  }
+
+  /**
+   * Steam puff (#53).
+   *
+   * Soft-edged by stacking two sizes rather than by alpha, because the games
+   * are drawn at 160x144 and a genuinely feathered 4px sprite just reads as a
+   * smudge. The emitter fades the whole particle instead.
+   */
+  private buildPuff(mode: 'dmg' | 'gbc') {
+    const key = `puff_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+
+    const core = mode === 'dmg' ? PAL.light : 0xb8c8d8
+    const halo = mode === 'dmg' ? PAL.dark : 0x60707c
+
+    g.fillStyle(halo)
+    g.fillRect(1, 0, 3, 5)
+    g.fillRect(0, 1, 5, 3)
+    g.fillStyle(core)
+    g.fillRect(1, 1, 3, 3)
+
+    g.generateTexture(key, 5, 5)
     g.destroy()
   }
 }

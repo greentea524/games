@@ -4,6 +4,7 @@ import { GameState } from '../state'
 import { LEVELS } from '../levels'
 import { sfx, music } from '../audio'
 import { showRunSummary, formatRunTime } from '../../shared/runSummary'
+import { prefersReducedMotion } from '../../shared/motion'
 
 type Facing = 'left' | 'right'
 
@@ -59,6 +60,15 @@ const HAZARD = {
   arcLiveMs: 500,
 } as const
 
+// Steam (#53). Ambience only — low rate, slow drift, long fade.
+const STEAM = {
+  /** ms between puffs from one vent. Deliberately sparse. */
+  frequencyMs: 900,
+  lifespanMs: 1500,
+  riseSpeed: { min: 10, max: 18 },
+  drift: { min: -6, max: 6 },
+} as const
+
 /** Ground speed, px/s, at a full spring. */
 const MOVE_SPEED = 80
 /** Jump impulse, px/s, at a full spring. */
@@ -104,6 +114,7 @@ export class PlatformerScene extends Phaser.Scene {
   private lava!: Phaser.Physics.Arcade.StaticGroup
   private arcs: { a: { x: number; y: number }; b: { x: number; y: number } }[] = []
   private arcGfx!: Phaser.GameObjects.Graphics
+  private vents: Phaser.GameObjects.Particles.ParticleEmitter[] = []
   private invulnUntil = 0
   /**
    * Frame stamp of the last lava tick. Arcade fires the overlap callback once
@@ -490,6 +501,48 @@ export class PlatformerScene extends Phaser.Scene {
     near.push(this.add.image(GBC_WIDTH - 26, 64, `bg_girder_${mode}`))
     near.push(this.add.image(80, 30, `bg_lamp_${mode}`))
     this.backdropNear.add(near)
+
+    this.renderVents(mode)
+  }
+
+  /**
+   * Steam from the pipework (#53).
+   *
+   * Vents come from the level definition, with a default pair off the pipe
+   * runs when a level declares none — every room gets steam without
+   * hand-authoring 32 levels for something that is pure ambience.
+   *
+   * The emitters are added to the near backdrop container, so they inherit
+   * its player-relative slide (#52) and stay attached to the pipes they are
+   * meant to be venting from.
+   */
+  private renderVents(mode: 'dmg' | 'gbc') {
+    this.vents = []
+    // Decoration, so it is the kind of motion reduced-motion should remove.
+    // Nothing the player reads to make a decision is gated on this.
+    if (prefersReducedMotion()) return
+
+    const level = LEVELS[GameState.levelIndex] || LEVELS[1]
+    const points = level.vents.length > 0 ? level.vents : [
+      { x: 9, y: GBC_HEIGHT - 34 },
+      { x: GBC_WIDTH - 9, y: GBC_HEIGHT - 58 },
+    ]
+
+    for (const p of points) {
+      const emitter = this.add.particles(p.x, p.y, `puff_${mode}`, {
+        frequency: STEAM.frequencyMs,
+        quantity: 1,
+        lifespan: STEAM.lifespanMs,
+        speedY: { min: -STEAM.riseSpeed.max, max: -STEAM.riseSpeed.min },
+        speedX: STEAM.drift,
+        // Fades rather than pops: the texture has no soft edge of its own.
+        alpha: { start: 0.55, end: 0 },
+        scale: { start: 0.8, end: 1.6 },
+      })
+      emitter.setDepth(-10)
+      this.backdropNear.add(emitter)
+      this.vents.push(emitter)
+    }
   }
 
   /** Slides the backdrop against the player, and turns the gears. */
