@@ -8,11 +8,16 @@ export interface LevelData {
   movingPlatforms: { x: number; y: number; dx: number; dy: number; duration: number }[]
   pickups: { x: number; y: number }[]
   stations: { x: number; y: number }[]
+  /** Hazards (#54): contact spends the energy budget rather than killing. */
+  spikes: { x: number; y: number }[]
+  lava: { x: number; y: number }[]
+  /** Arc emitters, paired left-to-right; the bolt runs between each pair. */
+  arcs: { x: number; y: number }[]
 }
 
 const parseGrid = (
   layout: string[],
-  config: { [key: string]: 'platform' | 'spring' | 'pickup' | 'station' | 'spawn' | 'goal' | 'moving' },
+  config: { [key: string]: 'platform' | 'spring' | 'pickup' | 'station' | 'spawn' | 'goal' | 'moving' | 'spike' | 'lava' | 'arc' },
   movingConfig?: Record<string, { dx: number; dy: number; duration: number }>
 ): LevelData => {
   const data: LevelData = {
@@ -23,6 +28,9 @@ const parseGrid = (
     movingPlatforms: [],
     pickups: [],
     stations: [],
+    spikes: [],
+    lava: [],
+    arcs: [],
   }
 
   layout.forEach((row, ry) => {
@@ -36,6 +44,9 @@ const parseGrid = (
       else if (type === 'spring') data.springs.push({ x: px, y: py })
       else if (type === 'pickup') data.pickups.push({ x: px, y: py })
       else if (type === 'station') data.stations.push({ x: px, y: py })
+      else if (type === 'spike') data.spikes.push({ x: px, y: py })
+      else if (type === 'lava') data.lava.push({ x: px, y: py })
+      else if (type === 'arc') data.arcs.push({ x: px, y: py })
       else if (type === 'spawn') data.spawn = { x: px, y: py }
       else if (type === 'goal') data.goal = { x: px, y: py }
       else if (type === 'moving' && movingConfig && movingConfig[char]) {
@@ -58,7 +69,12 @@ const legend: Record<string, any> = {
   '@': 'spawn',
   'G': 'goal',
   's': 'spring',
-  'M': 'moving'
+  'M': 'moving',
+  // Hazards (#54). '^' spikes, '~' lava, 'e' an arc emitter — emitters are
+  // paired in reading order, so a row needs an even number of them.
+  '^': 'spike',
+  '~': 'lava',
+  'e': 'arc'
 }
 
 export const LEVELS: Record<number, LevelData> = {
@@ -95,7 +111,7 @@ export const LEVELS: Record<number, LevelData> = {
     ".....X....",
     "..........",
     "....S.....",
-    ".@......G.",
+    ".@..^...G.",
     "XXXXXXXXXX"
   ], legend, {
     'M': { dx: 32, dy: 0, duration: 1500 }
@@ -121,7 +137,7 @@ export const LEVELS: Record<number, LevelData> = {
     ".......X..",
     "..........",
     "....S.....",
-    ".@......G.",
+    ".@.~~...G.",
     "XXXXXXXsXX"
   ], legend, {
     'M': { dx: 32, dy: 0, duration: 1500 }
@@ -157,10 +173,10 @@ export const LEVELS: Record<number, LevelData> = {
     "..........",
     "..........",
     "......X...",
-    "..........",
+    "......e...",
     "....X.....",
     "....S.....",
-    ".@......G.",
+    ".@....e.G.",
     "XXsXXXXXXX"
   ], legend, {
     'M': { dx: 32, dy: 0, duration: 1500 }

@@ -53,6 +53,25 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(PAL.dark); g.fillRect(at(3), 0, T, 8)
       g.fillStyle(PAL.light); g.fillRect(at(3), 0, T, 2)
       g.fillStyle(PAL.light); g.fillRect(at(3), 6, T, 2)
+
+      // 4: Spikes (#54). Points up, base sitting on the tile floor. Drawn in
+      // the lightest tone the palette has: a hazard the player misses is a
+      // hazard that feels unfair, so it is the highest-contrast thing on
+      // screen after the toy itself.
+      g.fillStyle(PAL.dark); g.fillRect(at(4), 12, T, 4)
+      g.fillStyle(PAL.lightest)
+      for (let i = 0; i < 4; i++) {
+        const x = at(4) + i * 4
+        g.fillRect(x + 1, 8, 2, 4)
+        g.fillRect(x + 1, 6, 1, 2)
+      }
+
+      // 5: Lava. A surface, not a full tile — the drain happens on contact
+      // with the top, and a solid block would read as standable.
+      g.fillStyle(PAL.dark); g.fillRect(at(5), 0, T, T)
+      g.fillStyle(PAL.light); g.fillRect(at(5), 0, T, 4)
+      g.fillStyle(PAL.lightest)
+      g.fillRect(at(5) + 1, 1, 3, 1); g.fillRect(at(5) + 8, 2, 4, 1)
     } else {
       // GBC Color
       // 0: Grass Ground
@@ -76,13 +95,28 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(GBC_PAL.platformBody); g.fillRect(at(3), 0, T, 8)
       g.fillStyle(GBC_PAL.platformEdge); g.fillRect(at(3), 0, T, 2)
       g.fillStyle(GBC_PAL.platformEdge); g.fillRect(at(3), 6, T, 2)
+
+      // 4: Spikes (#54)
+      g.fillStyle(GBC_PAL.platformBody); g.fillRect(at(4), 12, T, 4)
+      g.fillStyle(GBC_PAL.springCoil)
+      for (let i = 0; i < 4; i++) {
+        const x = at(4) + i * 4
+        g.fillRect(x + 1, 8, 2, 4)
+        g.fillRect(x + 1, 6, 1, 2)
+      }
+
+      // 5: Lava
+      g.fillStyle(GBC_PAL.brickLine); g.fillRect(at(5), 0, T, T)
+      g.fillStyle(GBC_PAL.brickWall); g.fillRect(at(5), 0, T, 4)
+      g.fillStyle(GBC_PAL.stationBody)
+      g.fillRect(at(5) + 1, 1, 3, 1); g.fillRect(at(5) + 8, 2, 4, 1)
     }
 
-    g.generateTexture(key, T * 4, T)
+    g.generateTexture(key, T * 6, T)
     g.destroy()
     
     const tex = this.textures.get(key)
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       tex.add(i, 0, i * T, 0, T, T)
     }
   }

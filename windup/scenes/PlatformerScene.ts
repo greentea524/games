@@ -29,6 +29,36 @@ const BACKDROP = {
   gearPeriodMs: 9000,
 } as const
 
+// Hazards (#54).
+//
+// Nothing here kills. Windup's whole loop is a draining energy budget, and
+// the zero-energy respawn in update() is already the fail state — a hazard
+// that killed outright would bypass the resource the game is about and add a
+// second death path beside the one that exists.
+//
+// Since #68 the budget is continuous, so spending it has a graduated cost:
+// a spike hit now visibly slows the toy and shortens its next jump, where
+// before it would have changed nothing at all until the bar hit zero.
+const HAZARD = {
+  /** Energy taken by a spike or an arc, out of 100. */
+  spikeCost: 22,
+  arcCost: 26,
+  /** Lava drains per second of contact rather than in one bite. */
+  lavaCostPerSec: 45,
+  knockbackX: 110,
+  knockbackY: -150,
+  /**
+   * Invulnerability after a hit. This is what stops the acceptance
+   * criterion's failure case: knocked into a second hazard, chain-drained to
+   * zero with no chance to react.
+   */
+  invulnMs: 900,
+  /** Arc cycle: telegraph, then live, then idle for the remainder. */
+  arcPeriodMs: 2400,
+  arcTelegraphMs: 400,
+  arcLiveMs: 500,
+} as const
+
 /** Ground speed, px/s, at a full spring. */
 const MOVE_SPEED = 80
 /** Jump impulse, px/s, at a full spring. */
@@ -69,6 +99,18 @@ export class PlatformerScene extends Phaser.Scene {
   private backdropFar!: Phaser.GameObjects.Container
   private backdropNear!: Phaser.GameObjects.Container
   private gears: { sprite: Phaser.GameObjects.Image; periodMs: number; dir: number }[] = []
+  /** Hazards (#54). */
+  private spikes!: Phaser.Physics.Arcade.StaticGroup
+  private lava!: Phaser.Physics.Arcade.StaticGroup
+  private arcs: { a: { x: number; y: number }; b: { x: number; y: number } }[] = []
+  private arcGfx!: Phaser.GameObjects.Graphics
+  private invulnUntil = 0
+  /**
+   * Frame stamp of the last lava tick. Arcade fires the overlap callback once
+   * per overlapping *tile*, so standing across a two-tile pool drained at
+   * double the configured rate — 100 energy in a second instead of 45.
+   */
+  private lavaDrainedAt = -1
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
@@ -123,6 +165,8 @@ export class PlatformerScene extends Phaser.Scene {
     this.pickups = this.physics.add.staticGroup()
     this.stations = this.physics.add.staticGroup()
     this.goals = this.physics.add.staticGroup()
+    this.spikes = this.physics.add.staticGroup()
+    this.lava = this.physics.add.staticGroup()
 
     const level = LEVELS[GameState.levelIndex] || LEVELS[1]
 
@@ -158,6 +202,26 @@ export class PlatformerScene extends Phaser.Scene {
       })
     })
 
+    // Hazards (#54). Spike bodies are shortened to the visible points so the
+    // player is not hit by the empty air above them.
+    level.spikes.forEach(p => {
+      const sp = this.spikes.create(p.x, p.y, `tiles_${mode}`, 4) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      sp.body.setSize(14, 10).setOffset(1, 6)
+      sp.body.updateFromGameObject()
+    })
+    level.lava.forEach(p => {
+      const lv = this.lava.create(p.x, p.y, `tiles_${mode}`, 5) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      lv.body.setSize(16, 12).setOffset(0, 4)
+      lv.body.updateFromGameObject()
+    })
+    // Emitters pair off in reading order; the bolt runs between each pair.
+    this.arcs = []
+    for (let i = 0; i + 1 < level.arcs.length; i += 2) {
+      this.arcs.push({ a: level.arcs[i], b: level.arcs[i + 1] })
+    }
+    this.arcGfx = this.add.graphics().setDepth(5)
+    this.invulnUntil = 0
+
     this.goals.create(level.goal.x, level.goal.y, `goal_${mode}`)
 
     // Player
@@ -173,6 +237,18 @@ export class PlatformerScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.platforms)
     this.physics.add.collider(this.player, this.movingPlatforms)
     this.physics.add.overlap(this.player, this.stations, (_p, s) => this.reachStation(s as Phaser.Types.Physics.Arcade.SpriteWithStaticBody))
+
+    this.physics.add.overlap(this.player, this.spikes, () => this.hitHazard(HAZARD.spikeCost))
+    this.physics.add.overlap(this.player, this.lava, (_p, _l) => {
+      // Continuous rather than a single bite, and it still respects the
+      // i-frames from a spike so the two cannot stack into an instant drain.
+      if (this.time.now < this.invulnUntil) return
+      if (this.lavaDrainedAt === this.time.now) return // once per frame, not per tile
+      this.lavaDrainedAt = this.time.now
+      GameState.drainEnergy((this.game.loop.delta / 1000) * HAZARD.lavaCostPerSec)
+      this.player.setTint(0xff8888)
+      this.time.delayedCall(80, () => this.player.clearTint())
+    })
 
     this.physics.add.overlap(this.player, this.springs, () => {
       this.player.setVelocityY(-350)
@@ -280,6 +356,7 @@ export class PlatformerScene extends Phaser.Scene {
     }
 
     this.updateBackdrop(time)
+    this.updateArcs(time)
 
     const mode = GameState.paletteMode
     const isGrounded = this.player.body.blocked.down
@@ -426,6 +503,83 @@ export class PlatformerScene extends Phaser.Scene {
     const rise = this.player.y / GBC_HEIGHT - 0.5
     this.backdropFar.setPosition(-across * BACKDROP.farShiftPx, -rise * BACKDROP.farShiftPx)
     this.backdropNear.setPosition(-across * BACKDROP.nearShiftPx, -rise * BACKDROP.nearShiftPx)
+  }
+
+  /**
+   * Spends energy for touching a hazard, knocks the toy clear, and grants
+   * invulnerability.
+   *
+   * No death here on purpose. Draining is the cost; if that empties the
+   * spring, the existing zero-energy respawn in `update()` handles it, so
+   * there is exactly one failure path in the game rather than two.
+   */
+  private hitHazard(cost: number) {
+    if (this.time.now < this.invulnUntil) return
+    this.invulnUntil = this.time.now + HAZARD.invulnMs
+    GameState.drainEnergy(cost)
+    // Away from the hazard, which is behind whichever way the toy was facing.
+    this.player.setVelocity(
+      this.facing === 'right' ? -HAZARD.knockbackX : HAZARD.knockbackX,
+      HAZARD.knockbackY,
+    )
+    // The knockback would otherwise be overridden by a held arrow on the very
+    // next frame; this reuses the wall-jump lockout for the same reason.
+    this.wallJumpTimer = this.time.now + 200
+    sfx.hit()
+    this.tweens.add({
+      targets: this.player,
+      alpha: 0.3,
+      duration: 90,
+      yoyo: true,
+      repeat: 4,
+      onComplete: () => this.player.setAlpha(1),
+    })
+  }
+
+  /**
+   * Runs the electric arcs.
+   *
+   * Telegraphed before it becomes dangerous, so it reads as a rhythm to time
+   * rather than as a gotcha: the bolt is drawn faint for `arcTelegraphMs`
+   * first, and only then does it start taking energy.
+   */
+  private updateArcs(time: number) {
+    if (this.arcs.length === 0) return
+    const phase = time % HAZARD.arcPeriodMs
+    const telegraphing = phase < HAZARD.arcTelegraphMs
+    const live = phase >= HAZARD.arcTelegraphMs && phase < HAZARD.arcTelegraphMs + HAZARD.arcLiveMs
+
+    this.arcGfx.clear()
+    if (!telegraphing && !live) return
+
+    const mode = GameState.paletteMode
+    const colour = mode === 'dmg' ? PAL.lightest : 0x8fd8ff
+    this.arcGfx.lineStyle(live ? 2 : 1, colour, live ? 1 : 0.4)
+    for (const arc of this.arcs) {
+      this.arcGfx.beginPath()
+      this.arcGfx.moveTo(arc.a.x, arc.a.y)
+      // A couple of kinks, so it reads as electricity rather than a rod.
+      const midX = (arc.a.x + arc.b.x) / 2
+      const midY = (arc.a.y + arc.b.y) / 2
+      const jitter = live ? 3 : 1
+      this.arcGfx.lineTo(midX - 4, midY + Math.sin(time / 40) * jitter)
+      this.arcGfx.lineTo(midX + 4, midY - Math.sin(time / 40) * jitter)
+      this.arcGfx.lineTo(arc.b.x, arc.b.y)
+      this.arcGfx.strokePath()
+    }
+
+    if (!live) return
+    // Segment test against the player, so a bolt between two emitters hurts
+    // anywhere along its length rather than only at the ends.
+    for (const arc of this.arcs) {
+      const line = new Phaser.Geom.Line(arc.a.x, arc.a.y, arc.b.x, arc.b.y)
+      const body = this.player.body
+      const rect = new Phaser.Geom.Rectangle(body.x, body.y, body.width, body.height)
+      if (Phaser.Geom.Intersects.LineToRectangle(line, rect)) {
+        this.hitHazard(HAZARD.arcCost)
+        return
+      }
+    }
   }
 
   /** Spring charge, 1 at full and 0 at empty. */
