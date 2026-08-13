@@ -212,6 +212,26 @@ export class BootScene extends Phaser.Scene {
       this.drawWindupToy(g, `windup_${mode}_${f}`, f, mode)
     })
     g.destroy()
+
+    // HUD portrait (#56): the head, copied out of the toy's own pixels.
+    //
+    // The issue asks for it to be derived from the player texture rather than
+    // separately maintained, so this reads the generated sprite back and
+    // blits its head region — one drawing, two uses. `drawWindupToy` puts the
+    // head at x 4-12, y 2-10 of the 16x16 sprite; body and treads sit below.
+    //
+    // Deliberately a new texture, not a named frame on the player's own.
+    // Phaser sets `firstFrame` to the first frame added after __BASE, and
+    // every sprite created from that texture without naming a frame then gets
+    // it — adding a 'head' frame made the *player in the world* render as a
+    // floating head.
+    const headKey = `windup_${mode}_head`
+    if (!this.textures.exists(headKey)) {
+      const src = this.textures.get(`windup_${mode}_right`).getSourceImage() as CanvasImageSource
+      const canvas = this.textures.createCanvas(headKey, 8, 8)
+      canvas?.context.drawImage(src, 4, 2, 8, 8, 0, 0, 8, 8)
+      canvas?.refresh()
+    }
   }
 
   private buildStation(mode: 'dmg' | 'gbc') {
