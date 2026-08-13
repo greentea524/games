@@ -20,6 +20,7 @@ export class BootScene extends Phaser.Scene {
       this.buildEnergy(mode)
       this.buildGoal(mode)
       this.buildBackdrop(mode)
+      this.buildPuff(mode)
     })
     this.scene.start('mainmenu')
   }
@@ -72,6 +73,27 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(PAL.light); g.fillRect(at(5), 0, T, 4)
       g.fillStyle(PAL.lightest)
       g.fillRect(at(5) + 1, 1, 3, 1); g.fillRect(at(5) + 8, 2, 4, 1)
+
+      // 6-9: Conveyor (#55). Two frames per direction; cycling them is what
+      // shows which way the belt runs, so the chevrons are offset by half
+      // their spacing between frames rather than redrawn.
+      for (let f = 0; f < 4; f++) {
+        const i = 6 + f
+        const dir = f < 2 ? 1 : -1
+        const phase = (f % 2) * 4
+        g.fillStyle(PAL.dark); g.fillRect(at(i), 0, T, T)
+        g.fillStyle(PAL.darkest); g.fillRect(at(i), 0, T, 2); g.fillRect(at(i), T - 2, T, 2)
+        g.fillStyle(PAL.lightest)
+        for (let x = -8; x < T; x += 8) {
+          const cx = at(i) + x + phase
+          // A chevron: two diagonals meeting at the point, drawn as steps.
+          for (let k = 0; k < 3; k++) {
+            const px = dir > 0 ? cx + k : cx + 4 - k
+            g.fillRect(px, 6 + k, 1, 1)
+            g.fillRect(px, 10 - k, 1, 1)
+          }
+        }
+      }
     } else {
       // GBC Color
       // 0: Grass Ground
@@ -110,13 +132,31 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(GBC_PAL.brickWall); g.fillRect(at(5), 0, T, 4)
       g.fillStyle(GBC_PAL.stationBody)
       g.fillRect(at(5) + 1, 1, 3, 1); g.fillRect(at(5) + 8, 2, 4, 1)
+
+      // 6-9: Conveyor (#55)
+      for (let f = 0; f < 4; f++) {
+        const i = 6 + f
+        const dir = f < 2 ? 1 : -1
+        const phase = (f % 2) * 4
+        g.fillStyle(GBC_PAL.platformBody); g.fillRect(at(i), 0, T, T)
+        g.fillStyle(GBC_PAL.brickLine); g.fillRect(at(i), 0, T, 2); g.fillRect(at(i), T - 2, T, 2)
+        g.fillStyle(GBC_PAL.stationLight)
+        for (let x = -8; x < T; x += 8) {
+          const cx = at(i) + x + phase
+          for (let k = 0; k < 3; k++) {
+            const px = dir > 0 ? cx + k : cx + 4 - k
+            g.fillRect(px, 6 + k, 1, 1)
+            g.fillRect(px, 10 - k, 1, 1)
+          }
+        }
+      }
     }
 
-    g.generateTexture(key, T * 6, T)
+    g.generateTexture(key, T * 10, T)
     g.destroy()
     
     const tex = this.textures.get(key)
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 10; i++) {
       tex.add(i, 0, i * T, 0, T, T)
     }
   }
@@ -172,6 +212,26 @@ export class BootScene extends Phaser.Scene {
       this.drawWindupToy(g, `windup_${mode}_${f}`, f, mode)
     })
     g.destroy()
+
+    // HUD portrait (#56): the head, copied out of the toy's own pixels.
+    //
+    // The issue asks for it to be derived from the player texture rather than
+    // separately maintained, so this reads the generated sprite back and
+    // blits its head region — one drawing, two uses. `drawWindupToy` puts the
+    // head at x 4-12, y 2-10 of the 16x16 sprite; body and treads sit below.
+    //
+    // Deliberately a new texture, not a named frame on the player's own.
+    // Phaser sets `firstFrame` to the first frame added after __BASE, and
+    // every sprite created from that texture without naming a frame then gets
+    // it — adding a 'head' frame made the *player in the world* render as a
+    // floating head.
+    const headKey = `windup_${mode}_head`
+    if (!this.textures.exists(headKey)) {
+      const src = this.textures.get(`windup_${mode}_right`).getSourceImage() as CanvasImageSource
+      const canvas = this.textures.createCanvas(headKey, 8, 8)
+      canvas?.context.drawImage(src, 4, 2, 8, 8, 0, 0, 8, 8)
+      canvas?.refresh()
+    }
   }
 
   private buildStation(mode: 'dmg' | 'gbc') {
@@ -306,6 +366,31 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture(`bg_lamp_${mode}`, 10, 12)
     g.clear()
 
+    g.destroy()
+  }
+
+  /**
+   * Steam puff (#53).
+   *
+   * Soft-edged by stacking two sizes rather than by alpha, because the games
+   * are drawn at 160x144 and a genuinely feathered 4px sprite just reads as a
+   * smudge. The emitter fades the whole particle instead.
+   */
+  private buildPuff(mode: 'dmg' | 'gbc') {
+    const key = `puff_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+
+    const core = mode === 'dmg' ? PAL.light : 0xb8c8d8
+    const halo = mode === 'dmg' ? PAL.dark : 0x60707c
+
+    g.fillStyle(halo)
+    g.fillRect(1, 0, 3, 5)
+    g.fillRect(0, 1, 5, 3)
+    g.fillStyle(core)
+    g.fillRect(1, 1, 3, 3)
+
+    g.generateTexture(key, 5, 5)
     g.destroy()
   }
 }

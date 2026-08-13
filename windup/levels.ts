@@ -13,11 +13,19 @@ export interface LevelData {
   lava: { x: number; y: number }[]
   /** Arc emitters, paired left-to-right; the bolt runs between each pair. */
   arcs: { x: number; y: number }[]
+  /**
+   * Steam vents (#53). A level that declares none gets a default pair off the
+   * backdrop pipework, so every room has some, without hand-authoring 32
+   * levels for pure ambience.
+   */
+  vents: { x: number; y: number }[]
+  /** Conveyors (#55). `dir` is +1 for a belt running right, -1 for left. */
+  conveyors: { x: number; y: number; dir: 1 | -1 }[]
 }
 
 const parseGrid = (
   layout: string[],
-  config: { [key: string]: 'platform' | 'spring' | 'pickup' | 'station' | 'spawn' | 'goal' | 'moving' | 'spike' | 'lava' | 'arc' },
+  config: { [key: string]: 'platform' | 'spring' | 'pickup' | 'station' | 'spawn' | 'goal' | 'moving' | 'spike' | 'lava' | 'arc' | 'vent' | 'conveyorR' | 'conveyorL' },
   movingConfig?: Record<string, { dx: number; dy: number; duration: number }>
 ): LevelData => {
   const data: LevelData = {
@@ -31,6 +39,8 @@ const parseGrid = (
     spikes: [],
     lava: [],
     arcs: [],
+    vents: [],
+    conveyors: [],
   }
 
   layout.forEach((row, ry) => {
@@ -47,6 +57,9 @@ const parseGrid = (
       else if (type === 'spike') data.spikes.push({ x: px, y: py })
       else if (type === 'lava') data.lava.push({ x: px, y: py })
       else if (type === 'arc') data.arcs.push({ x: px, y: py })
+      else if (type === 'vent') data.vents.push({ x: px, y: py })
+      else if (type === 'conveyorR') data.conveyors.push({ x: px, y: py, dir: 1 })
+      else if (type === 'conveyorL') data.conveyors.push({ x: px, y: py, dir: -1 })
       else if (type === 'spawn') data.spawn = { x: px, y: py }
       else if (type === 'goal') data.goal = { x: px, y: py }
       else if (type === 'moving' && movingConfig && movingConfig[char]) {
@@ -74,7 +87,12 @@ const legend: Record<string, any> = {
   // paired in reading order, so a row needs an even number of them.
   '^': 'spike',
   '~': 'lava',
-  'e': 'arc'
+  'e': 'arc',
+  // 'v' is a steam vent (#53) — ambience only, never collidable.
+  'v': 'vent',
+  // Conveyors (#55). Solid like a platform, but they push what stands on them.
+  '>': 'conveyorR',
+  '<': 'conveyorL'
 }
 
 export const LEVELS: Record<number, LevelData> = {
@@ -125,7 +143,7 @@ export const LEVELS: Record<number, LevelData> = {
     "..........",
     "..X.S.....",
     ".@......G.",
-    "XXXXXXXXXX"
+    "XXXX>>>XXX"
   ], legend, {
     'M': { dx: 32, dy: 0, duration: 1500 }
   }),
