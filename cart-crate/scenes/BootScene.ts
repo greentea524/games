@@ -15,6 +15,7 @@ export class BootScene extends Phaser.Scene {
         this.buildTileset(mode, w)
         this.buildCrate(mode, w)
         this.buildTarget(mode, w)
+        this.buildTargetLit(mode, w)
         this.buildSpecialTerrain(mode, w)
         this.buildBorderDressing(mode, w)
       }
@@ -241,6 +242,45 @@ export class BootScene extends Phaser.Scene {
       g.fillRect(6, 3, 4, 10)
       g.fillStyle(0xffffff)
       g.fillCircle(8, 8, 2)
+    }
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildTargetLit(mode: 'dmg' | 'gbc', world: number) {
+    const keyPrefix = mode === 'gbc' ? `_w${world}` : ''
+    const pal = mode === 'gbc' ? (WORLD_PALS[world - 1] || GBC_PAL) : GBC_PAL
+    const key = `target_lit_${mode}${keyPrefix}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+    if (mode === 'dmg') {
+      // DMG has no colour: render the lit pad as a lighter X with a dithered glow.
+      g.fillStyle(PAL.light)
+      g.fillRect(3, 6, 10, 4)
+      g.fillRect(6, 3, 4, 10)
+      g.fillStyle(PAL.lightest)
+      for (let y = 6; y < 10; y++) {
+        for (let x = 3; x < 13; x++) {
+          if ((x + y) % 2 === 0) g.fillRect(x, y, 1, 1)
+        }
+      }
+      for (let y = 3; y < 13; y++) {
+        for (let x = 6; x < 10; x++) {
+          if ((x + y) % 2 === 1) g.fillRect(x, y, 1, 1)
+        }
+      }
+      g.fillStyle(PAL.lightest)
+      g.fillCircle(8, 8, 2)
+    } else {
+      // Colour glow: a soft halo in the world's target colour around a bright core.
+      g.fillStyle(pal.targetBg)
+      g.fillRect(2, 6, 12, 4)
+      g.fillRect(6, 2, 4, 12)
+      g.fillStyle(0xffe8b0)
+      g.fillRect(3, 6, 10, 4)
+      g.fillRect(6, 3, 4, 10)
+      g.fillStyle(0xffffff)
+      g.fillCircle(8, 8, 3)
     }
     g.generateTexture(key, 16, 16)
     g.destroy()
