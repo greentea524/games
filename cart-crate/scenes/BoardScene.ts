@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { TILE, FONT, PAL, GBC_PAL, WORLD_PALS } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
-import { SaveSystem } from '../save'
+import { SaveSystem, recordHighestUnlocked } from '../save'
 import { MoveCommand } from '../commands'
 import type { StepRecord } from '../commands'
 import type { UIScene } from './UIScene'
@@ -635,11 +635,7 @@ export class BoardScene extends Phaser.Scene {
       const isBest = !previous.completed || moves < previous.bestMoves
 
       const nextLevel = GameState.currentLevelIndex + 1
-      const savedStr = localStorage.getItem('cart-crate-level')
-      const savedLvl = savedStr ? parseInt(savedStr, 10) : 0
-      if (nextLevel > savedLvl && nextLevel < CAMPAIGN_LEVELS.length) {
-        localStorage.setItem('cart-crate-level', nextLevel.toString())
-      }
+      if (nextLevel < CAMPAIGN_LEVELS.length) recordHighestUnlocked(nextLevel)
 
       import('../audio').then(a => a.playWin())
 
@@ -704,11 +700,7 @@ export class BoardScene extends Phaser.Scene {
     GameState.uiBlocking = true
 
     const nextLevel = GameState.currentLevelIndex + 1
-    const savedStr = localStorage.getItem('cart-crate-level')
-    const savedLvl = savedStr ? parseInt(savedStr, 10) : 0
-    if (nextLevel > savedLvl && nextLevel < CAMPAIGN_LEVELS.length) {
-      localStorage.setItem('cart-crate-level', nextLevel.toString())
-    }
+    if (nextLevel < CAMPAIGN_LEVELS.length) recordHighestUnlocked(nextLevel)
 
     this.cameras.main.fadeOut(400, 0, 0, 0)
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {

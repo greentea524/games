@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
-import { SaveSystem } from '../save'
+import { SaveSystem, loadHighestUnlocked } from '../save'
 
 export class LevelSelectScene extends Phaser.Scene {
   private pages: Phaser.GameObjects.Container[] = []
@@ -23,8 +23,7 @@ export class LevelSelectScene extends Phaser.Scene {
     this.levelNodes = []
     this.cameras.main.setBackgroundColor('#081820')
 
-    const savedStr = localStorage.getItem('cart-crate-level')
-    this.highestUnlocked = savedStr ? parseInt(savedStr, 10) : 0
+    this.highestUnlocked = loadHighestUnlocked()
 
     // Header
     this.add.text(GBC_WIDTH / 2, 8, 'SELECT STAGE', {

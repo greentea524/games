@@ -1,3 +1,5 @@
+import { migrateKey } from '../shared/storage'
+
 let zzfxV = 0.3
 export let zzfxX: AudioContext
 
@@ -113,7 +115,9 @@ export const playMenuSelect = () => zzfx(0.5,0.05,600,0,0,0.02,0,1,0,0,0,0,0,0,0
 export const playMenuConfirm = () => zzfx(1,0.05,900,0,0.05,0.05,0,1,0,0,0,0,0,0,0,0,0,1,0,0)
 
 let master: GainNode | null = null
-let muted = localStorage.getItem('cartcrate_muted') === '1'
+// Renamed from 'cartcrate_muted' (#104); carry the old setting across.
+migrateKey('cartcrate_muted', 'cart_crate_muted')
+let muted = localStorage.getItem('cart_crate_muted') === '1'
 
 export function ensureCtx(): AudioContext | null {
   zzfxInit()
@@ -129,7 +133,7 @@ export function ensureCtx(): AudioContext | null {
 export function isMuted(): boolean { return muted }
 export function setMuted(m: boolean) {
   muted = m
-  localStorage.setItem('cartcrate_muted', m ? '1' : '0')
+  localStorage.setItem('cart_crate_muted', m ? '1' : '0')
   if (master) master.gain.value = m ? 0 : 1
 }
 
