@@ -65,6 +65,12 @@ export class MoveCommand implements ICommand {
       } else {
         this.record.crate.sprite.clearTint()
       }
+
+      // Restore the target pads to match the crate's docked state.
+      if (this.record.crateNextDocked && this.record.crateNextTX !== null && this.record.crateNextTY !== null) {
+        this.scene.refreshTargetState(this.record.crateNextTX, this.record.crateNextTY, false)
+      }
+      this.scene.refreshTargetState(this.record.cratePrevTX, this.record.cratePrevTY, !!this.record.cratePrevDocked)
     }
   }
 }

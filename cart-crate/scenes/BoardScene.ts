@@ -40,6 +40,9 @@ export class BoardScene extends Phaser.Scene {
 
   private floorGrid: string[][] = []
   private floorSprites: Phaser.GameObjects.Image[][] = []
+  private targetSprites: (Phaser.GameObjects.Image | null)[][] = []
+  private targetPulses = new Map<string, Phaser.Tweens.Tween>()
+  private targetDitherEvents = new Map<string, Phaser.Time.TimerEvent>()
   private crates: CrateInstance[] = []
   private undoStack: MoveCommand[] = []
 
@@ -156,6 +159,9 @@ export class BoardScene extends Phaser.Scene {
     const mode = GameState.paletteMode
     this.crates = []
     this.floorSprites = Array(this.mapHeight).fill(null).map(() => Array(this.mapWidth).fill(null))
+    this.targetSprites = Array(this.mapHeight).fill(null).map(() => Array(this.mapWidth).fill(null))
+    this.targetPulses.clear()
+    this.targetDitherEvents.clear()
     let crateIdCounter = 1
 
     for (let y = 0; y < this.mapHeight; y++) {
@@ -175,13 +181,8 @@ export class BoardScene extends Phaser.Scene {
         } else if (char === 'T') {
           this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'))
           const targetSprite = this.add.image(px, py, tKey('target'))
-          this.tweens.add({
-            targets: targetSprite,
-            alpha: 0.2,
-            duration: 800,
-            yoyo: true,
-            repeat: -1,
-          })
+          this.targetSprites[y][x] = targetSprite
+          this.setTargetEmpty(x, y)
         } else if (char === 'I') {
           this.floorSprites[y][x] = this.add.image(px, py, tKey('ice'))
         } else if (char === 'X') {
@@ -199,13 +200,8 @@ export class BoardScene extends Phaser.Scene {
           if (isTarget) {
             this.add.image(px, py, tKey('floor'))
             const targetSprite = this.add.image(px, py, tKey('target'))
-            this.tweens.add({
-              targets: targetSprite,
-              alpha: 0.2,
-              duration: 800,
-              yoyo: true,
-              repeat: -1,
-            })
+            this.targetSprites[y][x] = targetSprite
+            this.setTargetLit(x, y, false, false)
           }
           
           const crateSprite = this.add.sprite(px, py, tKey('crate')).setDepth(5)
@@ -249,7 +245,6 @@ export class BoardScene extends Phaser.Scene {
         const key = child.texture.key
         if (key.startsWith('floor_')) child.setTexture(tKey('floor'))
         else if (key.startsWith('wall_')) child.setTexture(tKey('wall'))
-        else if (key.startsWith('target_')) child.setTexture(tKey('target'))
         else if (key.startsWith('ice_')) child.setTexture(tKey('ice'))
         else if (key.startsWith('cracked_')) child.setTexture(tKey('cracked'))
         else if (key.startsWith('hole_')) child.setTexture(tKey('hole'))
@@ -261,6 +256,15 @@ export class BoardScene extends Phaser.Scene {
           child.setTexture(`player_${mode}_${this.facing}`)
         }
       }
+    })
+
+    // Re-apply each pad's glow state (empty pulse vs. satisfied lit).
+    this.targetSprites.forEach((row, y) => {
+      row.forEach((sprite, x) => {
+        if (!sprite) return
+        const docked = this.crates.some((c) => !c.destroyed && c.docked && c.tx === x && c.ty === y)
+        this.refreshTargetState(x, y, docked)
+      })
     })
 
     const world = CAMPAIGN_LEVELS[GameState.currentLevelIndex]?.world || 1
@@ -277,6 +281,176 @@ export class BoardScene extends Phaser.Scene {
     this.updateCamera()
     
     this.cameras.main.setBackgroundColor(mode === 'dmg' ? '#0f380f' : '#181818')
+  }
+
+  private targetKey(tx: number, ty: number) {
+    return `${tx},${ty}`
+  }
+
+  private stopTargetEffects(tx: number, ty: number) {
+    const key = this.targetKey(tx, ty)
+    const pulse = this.targetPulses.get(key)
+    if (pulse) {
+      pulse.stop()
+      this.targetPulses.delete(key)
+    }
+    const dither = this.targetDitherEvents.get(key)
+    if (dither) {
+      dither.remove()
+      this.targetDitherEvents.delete(key)
+    }
+  }
+
+  private clearTargetEffects() {
+    this.targetPulses.forEach((pulse) => pulse.stop())
+    this.targetPulses.clear()
+    this.targetDitherEvents.forEach((dither) => dither.remove())
+    this.targetDitherEvents.clear()
+  }
+
+  private reducedMotion() {
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  }
+
+  private setTargetEmpty(tx: number, ty: number) {
+    const sprite = this.targetSprites[ty]?.[tx]
+    if (!sprite) return
+    this.stopTargetEffects(tx, ty)
+    sprite.setTexture(this.getTextureKey('target'))
+    sprite.setAlpha(1)
+    sprite.setScale(1)
+    sprite.setFlipX(false)
+    if (this.reducedMotion()) return
+    const pulse = this.tweens.add({
+      targets: sprite,
+      alpha: 0.6,
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+    this.targetPulses.set(this.targetKey(tx, ty), pulse)
+  }
+
+  private setTargetLit(tx: number, ty: number, flash: boolean, isWin: boolean) {
+    const sprite = this.targetSprites[ty]?.[tx]
+    if (!sprite) return
+    this.stopTargetEffects(tx, ty)
+    sprite.setTexture(this.getTextureKey('target_lit'))
+    sprite.setAlpha(1)
+    sprite.setScale(1)
+    sprite.setFlipX(false)
+
+    if (GameState.paletteMode === 'dmg' && !this.reducedMotion()) {
+      // DMG has no colour, so cycle the dither pattern to suggest glow.
+      const dither = this.time.addEvent({
+        delay: 450,
+        loop: true,
+        callback: () => sprite.setFlipX(!sprite.flipX),
+      })
+      this.targetDitherEvents.set(this.targetKey(tx, ty), dither)
+    }
+
+    if (flash && !this.reducedMotion()) {
+      this.tweens.add({
+        targets: sprite,
+        scale: isWin ? 1.7 : 1.35,
+        duration: isWin ? 320 : 150,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+        onComplete: () => sprite.setScale(1),
+      })
+    }
+  }
+
+  refreshTargetState(tx: number, ty: number, docked: boolean) {
+    if (docked) this.setTargetLit(tx, ty, false, false)
+    else this.setTargetEmpty(tx, ty)
+  }
+
+  private playWinFlourish(tx: number, ty: number) {
+    const px = tx * TILE + TILE / 2
+    const py = ty * TILE + TILE / 2
+    const color = GameState.paletteMode === 'dmg' ? 0x9bbc0f : 0xffff88
+    const ring = this.add.graphics().setDepth(20)
+    const state = { radius: 2 }
+
+    // Expanding shockwave ring, now sweeping across the whole board.
+    this.tweens.add({
+      targets: state,
+      radius: 96,
+      duration: 480,
+      ease: 'Quad.easeOut',
+      onUpdate: () => {
+        ring.clear()
+        ring.lineStyle(2, color, Math.max(0, 1 - state.radius / 96))
+        ring.strokeCircle(px, py, state.radius)
+      },
+      onComplete: () => ring.destroy(),
+    })
+
+    if (!this.reducedMotion()) {
+      // Double full-board flash.
+      const { r, g, b } = Phaser.Display.Color.IntegerToRGB(color)
+      this.cameras.main.flash(300, r, g, b)
+      this.time.delayedCall(170, () => this.cameras.main.flash(180, r, g, b))
+
+      // Confetti bursting out of every docked crate.
+      this.spawnCrateConfetti()
+    }
+
+    this.crates.forEach((c) => {
+      if (!c.destroyed && c.docked) {
+        const sprite = this.targetSprites[c.ty]?.[c.tx]
+        if (sprite) {
+          this.tweens.add({
+            targets: sprite,
+            scale: 1.35,
+            duration: 140,
+            yoyo: true,
+            ease: 'Sine.easeInOut',
+          })
+        }
+      }
+    })
+  }
+
+  private spawnCrateConfetti() {
+    const texKey = 'confetti'
+    if (!this.textures.exists(texKey)) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false)
+      g.fillStyle(0xffffff, 1)
+      g.fillRect(0, 0, 2, 2)
+      g.generateTexture(texKey, 2, 2)
+      g.destroy()
+    }
+
+    const colors = GameState.paletteMode === 'dmg'
+      ? [0x9bbc0f, 0x8bac0f, 0x306230]
+      : [0xff6b6b, 0xffd93d, 0x6bcb77, 0x4d96ff, 0xff9ff3, 0xffffff]
+
+    const sources = this.crates.filter((c) => !c.destroyed && c.docked)
+
+    sources.forEach((c, i) => {
+      this.time.delayedCall(i * 40, () => {
+        const cx = c.tx * TILE + TILE / 2
+        const cy = c.ty * TILE + TILE / 2
+        const emitter = this.add.particles(cx, cy, texKey, {
+          speed: { min: 60, max: 150 },
+          angle: { min: 0, max: 360 },
+          gravityY: 260,
+          lifespan: { min: 500, max: 900 },
+          quantity: 16,
+          scale: { start: 1, end: 0.3 },
+          rotate: { min: 0, max: 360 },
+          alpha: { start: 1, end: 0 },
+          tint: colors,
+          emitting: false,
+        }).setDepth(30)
+        emitter.explode(16)
+        this.time.delayedCall(1100, () => emitter.destroy())
+      })
+    })
   }
 
   private updateCamera() {
@@ -324,6 +498,7 @@ export class BoardScene extends Phaser.Scene {
 
   resetLevel() {
     if (this.isMoving) return
+    this.clearTargetEffects()
     this.children.removeAll()
     this.setupLevelLayout()
     this.renderBoard()
@@ -537,6 +712,11 @@ export class BoardScene extends Phaser.Scene {
           crateAtTarget.sprite.clearTint()
         }
       }
+
+      // If the crate was docked and is now pushed off, the pad reverts to pulsing.
+      if (!crateFell && record.cratePrevDocked && !crateAtTarget.docked && record.cratePrevTX !== null && record.cratePrevTY !== null) {
+        this.setTargetEmpty(record.cratePrevTX, record.cratePrevTY)
+      }
     }
 
     this.player.setTexture(`player_${mode}_${this.facing}`)
@@ -582,6 +762,11 @@ export class BoardScene extends Phaser.Scene {
           } else {
             if (crateAtTarget.docked) {
               import('../audio').then(a => a.playDock())
+              const totalTargets = this.floorGrid.flat().filter((t) => t === 'T').length
+              const dockedCount = this.crates.filter((c) => !c.destroyed && c.docked).length
+              const isWin = totalTargets > 0 && dockedCount === totalTargets
+              this.setTargetLit(pushTX, pushTY, true, isWin)
+              if (isWin) this.playWinFlourish(pushTX, pushTY)
               this.tweens.add({
                 targets: crateAtTarget.sprite,
                 scale: 1.2,
