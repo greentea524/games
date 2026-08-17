@@ -16,7 +16,15 @@ QA_URL=http://localhost:5173/games/ npm run qa:touch
 ```
 
 Both suites exit non-zero on failure and treat any page or console error as
-one.
+one, plus any request from the game's own origin that fails or returns an
+error status. Third-party requests are ignored — the only one left on these
+pages is the analytics tag (#102), which an offline or proxied machine always
+fails.
+
+Note that a missing asset only shows up against a **built** site. Both the
+Vite dev server and `vite preview` fall back to serving index.html for an
+unmatched path, so everything answers 200 there; GitHub Pages returns a real
+404. Point `QA_URL` at a static server over `dist/` to exercise that path.
 
 ## What they check
 

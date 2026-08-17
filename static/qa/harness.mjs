@@ -78,9 +78,11 @@ export class Driver {
       }
     })
     // A request that fails is only the game's problem when it was the game's
-    // request. The page pulls its font from a CDN, so an offline or
-    // proxied machine will always fail that one, and failing the suite over it
-    // would train everyone to ignore the output.
+    // request. The font is self-hosted; the one third party left on these
+    // pages is the analytics tag (#102), which an offline or proxied machine
+    // will always fail — and failing the suite over that would train everyone
+    // to ignore the output. If #102 lands on dropping analytics, nothing
+    // external remains and this origin filter can go with it.
     page.on('requestfailed', (req) => {
       if (!req.url().startsWith(new URL(BASE_URL).origin)) return
       // ERR_ABORTED is a cancellation, not a failure. Every boot navigates and
@@ -89,6 +91,14 @@ export class Driver {
       const why = req.failure()?.errorText ?? 'unknown'
       if (why.includes('ERR_ABORTED')) return
       d.log.push({ kind: 'requestfailed', text: `${req.url()} — ${why}` })
+    })
+    // A 404 on a game asset is not a requestfailed — that fires for network
+    // failures, not error statuses — so a missing sprite or map used to pass
+    // silently. Same-origin error statuses are always the game's problem.
+    page.on('response', (res) => {
+      if (!res.url().startsWith(new URL(BASE_URL).origin)) return
+      if (res.status() < 400) return
+      d.log.push({ kind: 'badstatus', text: `${res.status()} ${res.url()}` })
     })
     d.browser = browser
     return d

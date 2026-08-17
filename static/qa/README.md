@@ -15,9 +15,10 @@ QA_URL=http://localhost:5173/games/static/ npm run qa:static
 ```
 
 Both exit non-zero on failure, and treat any page or console error as one.
-Failed network requests only count when they were the game's own — the page
-pulls its font from a CDN, and failing the suite because a machine is offline
-would just train everyone to ignore the output.
+Failed network requests only count when they were the game's own. The font is
+self-hosted; the one third party left on these pages is the analytics tag
+(#102), which an offline or proxied machine always fails — and failing the
+suite over that would just train everyone to ignore the output.
 
 ## What they check
 
