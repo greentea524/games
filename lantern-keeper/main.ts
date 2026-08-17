@@ -5,6 +5,7 @@ import { PlayScene } from './scenes/PlayScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 import { ensureCtx } from './audio'
 import { setupDpad } from '../shared/dpad'
+import { setupButtons } from '../shared/buttons'
 import { exposeForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
 import '../shared/shell.css'
@@ -84,35 +85,7 @@ const dispatchSimulatedKey = (type: 'keydown' | 'keyup', keyName: string) => {
 
 // Set up mobile on-screen controls. The d-pad is driven as one control by
 // setupDpad below, not as four buttons.
-document.querySelectorAll('.a-btn').forEach((btn) => {
-  const key = btn.getAttribute('data-key')
-  if (!key) return
-
-  let isDown = false
-  const press = (e: Event) => {
-    e.preventDefault()
-    if (!isDown) {
-      isDown = true
-      dispatchSimulatedKey('keydown', key)
-    }
-  }
-
-  const release = (e: Event) => {
-    e.preventDefault()
-    if (isDown) {
-      isDown = false
-      dispatchSimulatedKey('keyup', key)
-    }
-  }
-
-  btn.addEventListener('pointerdown', press)
-  btn.addEventListener('pointerup', release)
-  btn.addEventListener('pointercancel', release)
-  btn.addEventListener('pointerout', release)
-  btn.addEventListener('pointerleave', release)
-  btn.addEventListener('touchend', release)
-  btn.addEventListener('touchcancel', release)
-})
+setupButtons({ dispatch: (type, code) => dispatchSimulatedKey(type, code) })
 
 setupDpad({ dispatch: dispatchSimulatedKey })
 
@@ -198,38 +171,7 @@ function toggleOverlay(mode: 'pause' | 'info') {
 }
 (window as any).toggleOverlay = toggleOverlay;
 
-const setupSysBtn = (id: string, key: string) => {
-  const btn = document.getElementById(id)
-  if (!btn) return
-  
-  let isDown = false
-  const press = (e: Event) => {
-    e.preventDefault()
-    if (!isDown) {
-      isDown = true
-      dispatchSimulatedKey('keydown', key)
-    }
-  }
 
-  const release = (e: Event) => {
-    e.preventDefault()
-    if (isDown) {
-      isDown = false
-      dispatchSimulatedKey('keyup', key)
-    }
-  }
-
-  btn.addEventListener('pointerdown', press)
-  btn.addEventListener('pointerup', release)
-  btn.addEventListener('pointercancel', release)
-  btn.addEventListener('pointerout', release)
-  btn.addEventListener('pointerleave', release)
-  btn.addEventListener('touchend', release)
-  btn.addEventListener('touchcancel', release)
-}
-
-setupSysBtn('btn-start', 'Enter')
-setupSysBtn('btn-select', 'Shift')
 
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return

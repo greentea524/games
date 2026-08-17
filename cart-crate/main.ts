@@ -7,6 +7,7 @@ import { LevelSelectScene } from './scenes/LevelSelectScene'
 import { BoardScene } from './scenes/BoardScene'
 import { UIScene } from './scenes/UIScene'
 import { setupDpad } from '../shared/dpad'
+import { setupButtons } from '../shared/buttons'
 import { exposeForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
 
@@ -67,28 +68,7 @@ const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
 }
 
 // The d-pad arms are excluded: setupDpad below drives them as one control.
-document.querySelectorAll('[data-key]:not(.d-btn)').forEach((btn) => {
-  const code = btn.getAttribute('data-key')
-  if (!code) return
-
-  const handlePress = (e: Event) => {
-    e.preventDefault()
-    btn.classList.add('active-kb')
-    dispatchKey(code, 'keydown')
-  }
-
-  const handleRelease = (e: Event) => {
-    e.preventDefault()
-    btn.classList.remove('active-kb')
-    dispatchKey(code, 'keyup')
-  }
-
-  btn.addEventListener('touchstart', handlePress, { passive: false })
-  btn.addEventListener('touchend', handleRelease, { passive: false })
-  btn.addEventListener('mousedown', handlePress)
-  btn.addEventListener('mouseup', handleRelease)
-  btn.addEventListener('mouseleave', handleRelease)
-})
+setupButtons({ dispatch: (type, code) => dispatchKey(code, type) })
 
 // A double tap in the dead space around the d-pad used to zoom the shell in,
 // with no way to zoom back out — the page has nothing scrollable to double-tap
