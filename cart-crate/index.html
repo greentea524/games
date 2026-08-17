@@ -2,6 +2,29 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Content-Security-Policy (#101). Hardening, not a fix: these pages have
+         no XSS sink, no eval, and saves are parsed through shared/storage, so
+         nothing here is currently exploitable. What it buys is that the one
+         third-party script on the page — the analytics tag (#102) — is the
+         *only* third party the browser will ever talk to, and that a future
+         XSS sink meets a policy that already exists.
+
+         Written off a measurement of what the pages actually request, not a
+         guess. Notes on the non-obvious parts:
+
+         - 'unsafe-inline' for scripts is unavoidable today: every shell has an
+           inline pre-init sizing script, and the gtag bootstrap is inline. If
+           #102 drops analytics, this can become script-src 'self' plus hashes,
+           which is most of the value here.
+         - data: and blob: for img/media because every sprite in all five games
+           is generated at runtime through canvas, not loaded as a file.
+         - The google-analytics and analytics.google.com entries are for GA's
+           beacons, which never fire in this sandbox (the tag itself cannot be
+           reached) — so they are allowed on the documented behaviour rather
+           than on something observed here. Drop them with the tag.
+         - frame-ancestors and report-uri are deliberately absent: a meta CSP
+           ignores both, and including them only logs a console warning. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <title>Cart &amp; Crate - GBC Sokoban Puzzle</title>
