@@ -1,9 +1,13 @@
 // audio.ts
 // Lightweight Web Audio API synth for 8-bit sound effects
 
+import { migrateKey } from '../shared/storage'
+
 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
 let master: GainNode | null = null
-let muted = localStorage.getItem('lantern_muted') === '1'
+// Renamed from 'lantern_muted' (#104); carry the old setting across.
+migrateKey('lantern_muted', 'lantern_keeper_muted')
+let muted = localStorage.getItem('lantern_keeper_muted') === '1'
 
 export function ensureCtx() {
   if (audioCtx.state === 'suspended') audioCtx.resume()
@@ -17,7 +21,7 @@ export function ensureCtx() {
 export function isMuted(): boolean { return muted }
 export function setMuted(m: boolean) {
   muted = m
-  localStorage.setItem('lantern_muted', m ? '1' : '0')
+  localStorage.setItem('lantern_keeper_muted', m ? '1' : '0')
   if (master) master.gain.value = m ? 0 : 1
 }
 

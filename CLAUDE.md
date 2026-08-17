@@ -36,7 +36,7 @@ npm run build      # tsc -b && vite build — typecheck included
 npm run lint       # oxlint; a handful of pre-existing warnings are expected
 npm run qa:static  # Static: reachability + a full scripted playthrough
 npm run qa:touch   # all five games under real multi-touch, on a phone viewport
-npm run qa:units   # pure-logic checks (Pocket Dungeon floor modifiers)
+npm run qa:units   # pure-logic checks (floor modifiers, storage migration)
 ```
 
 `*_test.ts` files run under `tsx` and use `process.exit`, so they are excluded

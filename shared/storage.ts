@@ -120,3 +120,36 @@ export function clearSave(key: string): boolean {
     return false
   }
 }
+
+/**
+ * Moves a value from an old key to a new one, once (#104).
+ *
+ * Renaming a storage key on a deployed site silently orphans every existing
+ * save: the old key is simply never read again, and the player's progress
+ * appears to vanish. This copies the raw string across the first time the new
+ * key is found empty, then removes the old one.
+ *
+ * Raw, not parsed, so it works for envelopes and for the plain `'1'`/`'0'`
+ * flags the mute settings use.
+ *
+ * Safe to call on every startup: once the new key exists this does nothing,
+ * and a player who never had the old key is unaffected.
+ *
+ * @returns whether anything was moved.
+ */
+export function migrateKey(oldKey: string, newKey: string): boolean {
+  if (oldKey === newKey) return false
+  // Never clobber a newer value with a stale one.
+  if (readRaw(newKey) !== null) return false
+  const legacy = readRaw(oldKey)
+  if (legacy === null) return false
+  try {
+    localStorage.setItem(newKey, legacy)
+    localStorage.removeItem(oldKey)
+    return true
+  } catch {
+    // Storage full or disabled. Leaving the old key in place is the right
+    // failure: the next startup tries again rather than losing the save.
+    return false
+  }
+}

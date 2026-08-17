@@ -10,7 +10,7 @@
 // synthesised mouse events, and a control wired to `click` rather than to
 // touchstart/pointerdown would go dead under a fast thumb. So this also
 // asserts a rapid double tap still registers as two button presses.
-import { launchTouch, centreOf, controls, gameUrl, checker, ACT } from './driver.mjs'
+import { launchTouch, controls, gameUrl, checker, ACT } from './driver.mjs'
 
 const { check, finish } = checker()
 let ok = true

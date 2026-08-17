@@ -1,7 +1,11 @@
+import { migrateKey } from '../shared/storage'
+
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 
-let muted = localStorage.getItem('pd_muted') === '1'
+// Renamed from 'pd_muted' (#104); carry the old setting across.
+migrateKey('pd_muted', 'pocket_dungeon_muted')
+let muted = localStorage.getItem('pocket_dungeon_muted') === '1'
 
 export function ensureCtx(): AudioContext | null {
   if (!ctx) {
@@ -19,7 +23,7 @@ export function ensureCtx(): AudioContext | null {
 export function isMuted(): boolean { return muted }
 export function setMuted(m: boolean) {
   muted = m
-  localStorage.setItem('pd_muted', m ? '1' : '0')
+  localStorage.setItem('pocket_dungeon_muted', m ? '1' : '0')
   if (master) master.gain.value = m ? 0 : 1
 }
 
