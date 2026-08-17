@@ -177,6 +177,7 @@ if (paletteBtn) {
 }
 
 import { ensureCtx } from './audio'
+import '../shared/shell.css'
 const initAudio = () => {
   ensureCtx()
   document.removeEventListener('click', initAudio)

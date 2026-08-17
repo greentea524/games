@@ -7,6 +7,7 @@ import { ensureCtx } from './audio'
 import { setupDpad } from '../shared/dpad'
 import { exposeForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
+import '../shared/shell.css'
 
 function integerZoom(): number {
   const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;

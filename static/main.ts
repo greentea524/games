@@ -9,6 +9,7 @@ import { GameState } from './state'
 import { setupDpad } from '../shared/dpad'
 import { exposeForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
+import '../shared/shell.css'
 
 function integerZoom(): number {
   // Must match the #game box sizing in index.html's pre-init script, or
