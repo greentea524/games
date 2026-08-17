@@ -57,13 +57,40 @@ export async function launchTouch(url) {
   const log = []
   page.on('pageerror', (e) => log.push({ kind: 'pageerror', text: e.message }))
   page.on('console', (m) => {
-    // "Failed to load resource" is the console echo of a failed request; the
-    // page pulls its font from a CDN, and failing a run because a machine is
-    // offline would only teach everyone to ignore the output.
+    // "Failed to load resource" is the console echo of a failed request, and
+    // it carries no URL — so it cannot be told apart from a third-party
+    // failure here. The requestfailed handler below does that properly, by
+    // origin, which is why dropping these is safe rather than blind.
     if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) {
       log.push({ kind: 'console.error', text: m.text() })
     }
   })
+  // A failed request is only the game's problem when it was the game's
+  // request. The font is self-hosted; the one third party left on these pages
+  // is the analytics tag (#102), which an offline or proxied machine always
+  // fails — in this sandbox it reports ERR_TUNNEL_CONNECTION_FAILED on every
+  // run. Everything from the game's own origin is a real failure.
+  //
+  // Without this the suite noticed nothing at all: the console echo above was
+  // dropped wholesale, so a 404 on a game asset passed silently.
+  page.on('requestfailed', (req) => {
+    if (!req.url().startsWith(new URL(BASE_URL).origin)) return
+    // ERR_ABORTED is a cancellation, not a failure — a reload cancels
+    // in-flight requests, and the Static suite reloads to seed its save.
+    const why = req.failure()?.errorText ?? 'unknown'
+    if (why.includes('ERR_ABORTED')) return
+    log.push({ kind: 'requestfailed', text: `${req.url()} — ${why}` })
+  })
+  // A 404 on a game asset is *not* a requestfailed — that fires for network
+  // failures, not error statuses, so a missing sprite or map used to sail
+  // through both suites silently. Same-origin error statuses are always the
+  // game's problem. Measured across all five games: a clean run produces none.
+  page.on('response', (res) => {
+    if (!res.url().startsWith(new URL(BASE_URL).origin)) return
+    if (res.status() < 400) return
+    log.push({ kind: 'badstatus', text: `${res.status()} ${res.url()}` })
+  })
+
   const cdp = await context.newCDPSession(page)
 
   // The games only publish window.__game when asked (#98).
