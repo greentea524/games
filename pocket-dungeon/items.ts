@@ -2,7 +2,31 @@ import { RNG } from './rng'
 
 // --- Item Types ---
 
-export type ItemCategory = 'weapon' | 'armor' | 'food' | 'potion' | 'scroll' | 'rewind'
+export type ItemCategory =
+  | 'weapon'
+  | 'armor'
+  | 'accessory'
+  | 'food'
+  | 'potion'
+  | 'scroll'
+  | 'rewind'
+
+/**
+ * What an accessory does while worn (#82). Data, not code, so the effect is
+ * visible next to the item that grants it and testable without a scene.
+ *
+ * Every value here is chosen to stay integral. Hunger and gold are both
+ * rendered as whole numbers in a 160px HUD, so a 0.5x hunger rate or a 1.5x
+ * gold multiplier would put "FD:99.5" and "+4.5g" on screen.
+ */
+export interface AccessoryPassive {
+  /** Hunger drains on alternate turns rather than every turn. */
+  halfHunger?: boolean
+  /** Restores 1 HP once every this many turns. */
+  regenEvery?: number
+  /** Multiplies gold dropped by kills. Whole numbers only. */
+  goldMultiplier?: number
+}
 
 export interface ItemDef {
   id: string
@@ -14,6 +38,8 @@ export interface ItemDef {
   defBonus?: number
   healAmount?: number
   hungerRestore?: number
+  // Accessory-specific
+  passive?: AccessoryPassive
   // Scroll-specific
   scrollEffect?: string
   // Drop weight per biome tier (higher = more common)
@@ -49,6 +75,24 @@ export const ITEMS: Record<string, ItemDef> = {
   plate_armor: {
     id: 'plate_armor', name: 'Plate Armor', category: 'armor',
     description: 'Heavy plate. +15 Max HP', defBonus: 15, weight: 1,
+  },
+
+  // Accessories (#82). Rarer than weapons and armour, because a passive runs
+  // for the rest of the floor rather than for one swing.
+  ring_bronze: {
+    id: 'ring_bronze', name: 'Bronze Ring', category: 'accessory',
+    description: 'Hunger drains half as fast.',
+    passive: { halfHunger: true }, weight: 3,
+  },
+  band_mending: {
+    id: 'band_mending', name: 'Mending Band', category: 'accessory',
+    description: 'Restores 1 HP every 8 turns.',
+    passive: { regenEvery: 8 }, weight: 2,
+  },
+  coin_lucky: {
+    id: 'coin_lucky', name: 'Lucky Coin', category: 'accessory',
+    description: 'Doubles gold from kills.',
+    passive: { goldMultiplier: 2 }, weight: 2,
   },
 
   // Food
@@ -157,6 +201,7 @@ export class Inventory {
   items: InventoryItem[] = []
   equippedWeapon: ItemDef | null = null
   equippedArmor: ItemDef | null = null
+  equippedAccessory: ItemDef | null = null
   readonly maxSize = 8
 
   add(def: ItemDef): boolean {
