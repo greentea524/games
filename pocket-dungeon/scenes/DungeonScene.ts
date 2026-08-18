@@ -27,8 +27,8 @@ import { music, sfx, setMuted, isMuted } from '../audio'
 import { rollModifier, modifierSeed, type Modifier } from '../modifiers'
 import { bossAI } from '../boss'
 import type { BossState } from '../boss'
-import { rollFloorItems } from '../items'
-import { rollChests, rollChestLoot, type ChestTier } from '../chests'
+import { rollFloorItems, ITEMS } from '../items'
+import { rollChests, rollChestLoot, keysForFloor, type ChestTier } from '../chests'
 import type { ItemDef, TurnSnapshot } from '../items'
 
 /** What `GameState.hungerDrainRate` is on an unmodified floor (#69). */
@@ -441,6 +441,14 @@ export class DungeonScene extends Phaser.Scene {
     )
     if (chestAtTarget) {
       this.player.setTexture(`hero_${mode}_${this.facing}`)
+      if (chestAtTarget.tier === 'locked' && !GameState.inventory.has('key')) {
+        // Costs no turn, the same as walking into a wall. Probing a locked
+        // chest to find out it is locked should not hand the floor a free
+        // round of attacks.
+        this.showDamageText(this.player.x, this.player.y - 10, 'NEED A KEY', '#ff8888')
+        sfx.menuCancel()
+        return
+      }
       this.openChest(chestAtTarget)
       return
     }
@@ -906,6 +914,33 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   /**
+   * Where a chest's contents land (#59).
+   *
+   * One item sits on the chest's own tile. A locked chest yields two, and
+   * stacking both on one tile hides the second — the sprite is drawn over and
+   * the player has to step off and back on to collect it. So extras spill
+   * onto adjacent walkable tiles that nothing else occupies, falling back to
+   * the chest tile only when the chest is genuinely boxed in.
+   */
+  private lootSpots(tx: number, ty: number, count: number): { x: number; y: number }[] {
+    const spots = [{ x: tx, y: ty }]
+    const around = [
+      { x: tx + 1, y: ty }, { x: tx - 1, y: ty },
+      { x: tx, y: ty + 1 }, { x: tx, y: ty - 1 },
+    ]
+    for (const p of around) {
+      if (spots.length >= count) break
+      const cell = this.grid[p.y]?.[p.x]
+      if (cell === undefined || cell === '#' || cell === ' ' || cell === 'S') continue
+      if (this.floorItems.some((i) => i.tx === p.x && i.ty === p.y)) continue
+      if (this.chests.some((c) => c.tx === p.x && c.ty === p.y)) continue
+      spots.push(p)
+    }
+    while (spots.length < count) spots.push({ x: tx, y: ty })
+    return spots
+  }
+
+  /**
    * Places this floor's chests (#83).
    *
    * Rooms only — corridor tiles are excluded. A closed chest blocks its tile,
@@ -935,6 +970,19 @@ export class DungeonScene extends Phaser.Scene {
         .setDepth(3)
       this.chests.push({ tier, tx: pos.x, ty: pos.y, opened: false, sprite })
     }
+
+    // One key per locked chest actually placed, not per locked chest rolled —
+    // if the floor ran out of room and a locked chest was never built, its key
+    // would be a loose item with nothing to open on this floor.
+    const keyCount = keysForFloor(this.chests.map((c) => c.tier))
+    const keySpots = inRoom.slice(this.chests.length)
+    for (let i = 0; i < Math.min(keyCount, keySpots.length); i++) {
+      const pos = keySpots[i]
+      const sprite = this.add
+        .sprite(pos.x * TILE + TILE / 2, pos.y * TILE + TILE / 2, `item_key_${mode}`)
+        .setDepth(3)
+      this.floorItems.push({ def: { ...ITEMS.key }, tx: pos.x, ty: pos.y, sprite })
+    }
   }
 
   /**
@@ -957,18 +1005,31 @@ export class DungeonScene extends Phaser.Scene {
   }) {
     chest.opened = true
     const mode = GameState.paletteMode
+    if (chest.tier === 'locked') {
+      GameState.inventory.remove('key')
+      this.showDamageText(this.player.x, this.player.y - 10, 'UNLOCKED', '#ffd700')
+    }
     chest.sprite.setTexture(`chest_${chest.tier}_open_${mode}`)
     sfx.pickup()
 
-    const def = rollChestLoot(chest.tier, this.rng)
+    const loot = rollChestLoot(chest.tier, this.rng)
     const px = chest.tx * TILE + TILE / 2
     const py = chest.ty * TILE + TILE / 2
-    const sprite = this.add.sprite(px, py - 6, `item_${def.category}_${mode}`).setDepth(4)
-    this.floorItems.push({ def, tx: chest.tx, ty: chest.ty, sprite })
-    // Pops up out of the chest and settles onto the tile, so it is clear the
-    // item came from the chest rather than having always been there.
-    this.tweens.add({ targets: sprite, y: py, duration: 220, ease: 'Bounce.easeOut' })
-    this.showDamageText(px, py - 14, def.name, '#ffd700')
+    // A locked chest yields two, so they are fanned across neighbouring tiles
+    // rather than stacked: two floor items on one tile means the second is
+    // invisible and takes a second walk-off-and-back to collect.
+    const spots = this.lootSpots(chest.tx, chest.ty, loot.length)
+    loot.forEach((def, i) => {
+      const spot = spots[i] ?? { x: chest.tx, y: chest.ty }
+      const dx = spot.x * TILE + TILE / 2
+      const dy = spot.y * TILE + TILE / 2
+      const sprite = this.add.sprite(px, py - 6, `item_${def.category}_${mode}`).setDepth(4)
+      this.floorItems.push({ def, tx: spot.x, ty: spot.y, sprite })
+      // Pops up out of the chest and settles onto its tile, so it is clear the
+      // item came from the chest rather than having always been there.
+      this.tweens.add({ targets: sprite, x: dx, y: dy, duration: 220, ease: 'Bounce.easeOut' })
+    })
+    this.showDamageText(px, py - 14, loot.map((d) => d.name).join(' + '), '#ffd700')
 
     GameState.turnState = TurnState.ANIMATING
     this.time.delayedCall(220, () => {
@@ -1001,10 +1062,18 @@ export class DungeonScene extends Phaser.Scene {
     const inv = GameState.inventory
     const slot = (label: string, def: { name: string } | null) =>
       `${label} ${def ? def.name : '--'}`
+    const keys = inv.count('key')
     const body = [
       slot('WPN', inv.equippedWeapon),
       slot('ARM', inv.equippedArmor),
       slot('ACC', inv.equippedAccessory),
+      // Keys (#59) live here rather than in the HUD. Measured, not assumed:
+      // with "STARVING!" and a four-digit gold count on screen, the bottom bar
+      // leaves 18px between the gold readout and ATK, and "K:2" renders at
+      // 20px — so a HUD counter overlaps ATK at values the game actually
+      // reaches. The issue's premise that the HUD already displays keys was
+      // not true; there was no key counter, and there is no room for one.
+      `KEY ${keys > 0 ? `x${keys}` : '--'}`,
     ].join('\n')
     const worn = inv.equippedAccessory
     const lines = worn ? `${body}\n\n${worn.description}` : body
@@ -1069,6 +1138,14 @@ export class DungeonScene extends Phaser.Scene {
     } else if (def.category === 'rewind') {
       GameState.inventory.add(def)
       this.showDamageText(this.player.x, this.player.y - 10, 'HOURGLASS', '#ffd700')
+    } else if (def.category === 'key') {
+      GameState.inventory.add(def)
+      this.showDamageText(
+        this.player.x,
+        this.player.y - 10,
+        `KEY x${GameState.inventory.count('key')}`,
+        '#ffd700',
+      )
     }
     
     sfx.pickup()
