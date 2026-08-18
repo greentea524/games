@@ -149,7 +149,15 @@ export interface EnemyDef {
   atk: number
   spriteKey: string // base sprite key (mode will be appended)
   cost: number      // spawning budget cost
+  /**
+   * Gets back up once after being killed, at a fraction of its HP (#60).
+   * The scene owns the actual revive; this only marks which defs do it.
+   */
+  revives?: boolean
 }
+
+/** What a reviving enemy comes back with, as a fraction of its max HP. */
+export const REVIVE_HP_FRACTION = 0.5
 
 export const ENEMY_DEFS: Record<string, EnemyDef> = {
   rat: { name: 'Cellar Rat', ai: 'chaser', hp: 6, atk: 2, spriteKey: 'rat', cost: 1 },
@@ -157,6 +165,18 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
   archer: { name: 'Skeleton Archer', ai: 'ranger', hp: 8, atk: 3, spriteKey: 'archer', cost: 2 },
   spider: { name: 'Giant Spider', ai: 'sleeper', hp: 10, atk: 4, spriteKey: 'spider', cost: 2 },
   slime: { name: 'Gel Slime', ai: 'splitter', hp: 12, atk: 2, spriteKey: 'slime', cost: 3 },
+  // #60. 'Bonepile', not 'Skeleton' — `archer` is already the Skeleton
+  // Archer, and two enemies whose inspect text both begin "Skeleton" would
+  // be unreadable in a game where you identify things by a one-line banner.
+  //
+  // A plain chaser on paper, sitting between the rat and the archer. What
+  // makes it worth noticing is `revives`: it gets back up once, at reduced
+  // HP, so it costs the player two engagements rather than one. That is
+  // priced into cost 2 rather than into bigger numbers.
+  skeleton: {
+    name: 'Bonepile', ai: 'chaser', hp: 7, atk: 3, spriteKey: 'skeleton', cost: 2,
+    revives: true,
+  },
 }
 
 // --- Depth-scaled Spawning ---
@@ -178,11 +198,18 @@ const BIOME_SPAWN_TABLES: Record<string, SpawnEntry[]> = {
     { defKey: 'archer', weight: 4 },
     { defKey: 'spider', weight: 3 },
     { defKey: 'slime', weight: 2 },
+    // Bonepile enters at the catacombs (floor 5), not the cellar: floors 1-4
+    // are where the base game is learned, and an enemy that gets back up is a
+    // poor first lesson. Weighted below the archer so it adds to the mix
+    // rather than crowding it — see the distribution check in
+    // enemies_test.ts.
+    { defKey: 'skeleton', weight: 3 },
   ],
   vault: [
     { defKey: 'archer', weight: 4 },
     { defKey: 'spider', weight: 3 },
     { defKey: 'slime', weight: 4 },
+    { defKey: 'skeleton', weight: 3 },
   ],
 }
 

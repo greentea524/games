@@ -17,6 +17,7 @@ export class BootScene extends Phaser.Scene {
       this.buildArcher(mode)
       this.buildSpider(mode)
       this.buildSlime(mode)
+      this.buildSkeleton(mode)
       this.buildBoss(mode)
       this.buildItems(mode)
     })
@@ -208,6 +209,41 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(eye); g.fillRect(10, 7, 2, 2)
     // Feet
     g.fillStyle(dark); g.fillRect(3, 13, 2, 2); g.fillRect(9, 13, 2, 2)
+
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildSkeleton(mode: 'dmg' | 'gbc') {
+    const key = `skeleton_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+
+    // Deliberately NOT the Skeleton Archer's silhouette. That one is tall,
+    // narrow and vertical with a bow line down its right side; drawn the same
+    // way, the two were indistinguishable at 16px in a side-by-side — which
+    // is the whole problem this sprite has to avoid, since the game names
+    // what you are fighting in a one-line banner and nothing else.
+    //
+    // So Bonepile is squat and horizontal: a low heap with the skull sunk
+    // into it and arm bones jutting sideways. Same palette family, opposite
+    // mass — that reads apart at a glance even at this size.
+    const bone = mode === 'dmg' ? PAL.lightest : 0xd8d8c0
+    const shade = mode === 'dmg' ? PAL.dark : 0x807860
+    const socket = mode === 'dmg' ? PAL.darkest : 0x201810
+
+    // The heap it rises from — wide and low, the read at a distance.
+    g.fillStyle(shade); g.fillRect(2, 12, 12, 3)
+    g.fillStyle(bone)
+    g.fillRect(3, 11, 3, 1); g.fillRect(7, 11, 2, 1); g.fillRect(11, 11, 2, 1)
+
+    // Arm bones jutting sideways, widening the silhouette further.
+    g.fillStyle(bone); g.fillRect(1, 9, 3, 2); g.fillRect(12, 9, 3, 2)
+
+    // Skull, sunk low into the pile rather than perched on a spine.
+    g.fillStyle(bone); g.fillRect(5, 5, 6, 5)
+    g.fillStyle(socket); g.fillRect(6, 7, 2, 2); g.fillRect(9, 7, 2, 2)
+    g.fillStyle(shade); g.fillRect(7, 9, 2, 1) // jaw line
 
     g.generateTexture(key, 16, 16)
     g.destroy()
