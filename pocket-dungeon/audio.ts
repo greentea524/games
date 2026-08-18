@@ -71,6 +71,12 @@ export const sfx = {
   menuSelect: () => tone('square', 520, 780, 0.08, 0.05),
   menuCancel: () => tone('square', 400, 300, 0.08, 0.05),
   attack: () => tone('sawtooth', 300, 150, 0.08, 0.06),
+  // #60: a reviving Bonepile. Rising, and unlike `hit`, so the player can
+  // tell "it got back up" from "I hit something" without looking.
+  revive: () => {
+    tone('square', 90, 200, 0.18, 0.07)
+    tone('square', 140, 280, 0.2, 0.06, 0.11)
+  },
   hit: () => noise(0.15, 0.1, 400),
   pickup: () => {
     tone('square', 520, 520, 0.09, 0.06)

@@ -20,7 +20,7 @@ import { MapGenerator } from '../MapGenerator'
 import { RNG } from '../rng'
 import type { AIType, AIContext } from '../enemies'
 import {
-  rollEnemies, getBiome,
+  rollEnemies, getBiome, REVIVE_HP_FRACTION,
   chaserAI, cowardAI, rangerAI, sleeperAI, splitterAI,
 } from '../enemies'
 import { music, sfx, setMuted, isMuted } from '../audio'
@@ -46,6 +46,8 @@ interface EnemyInstance {
   atk: number
   ai: AIType | 'boss'
   awake?: boolean       // For sleeper AI
+  /** #60: a reviving enemy has not yet used its one comeback. */
+  canRevive?: boolean
   bossState?: BossState // For boss AI
   isSplit?: boolean     // Splitter children don't split again
 }
@@ -261,6 +263,7 @@ export class DungeonScene extends Phaser.Scene {
         // Silent Halls holds every enemy unaware, whatever its AI would
         // normally do on spawn.
         awake: this.modifier?.enemiesStartAsleep ? false : def.ai !== 'sleeper',
+        canRevive: def.revives === true,
       })
     }
 
@@ -470,7 +473,27 @@ export class DungeonScene extends Phaser.Scene {
       duration: 60,
       yoyo: true,
       onComplete: () => {
-        if (enemy.hp <= 0) {
+        if (enemy.hp <= 0 && enemy.canRevive) {
+          // #60: gets back up once, at half HP. Spent here rather than on
+          // death so it never stacks with the splitter path below, and so a
+          // reviving enemy cannot also drop gold twice.
+          enemy.canRevive = false
+          enemy.hp = Math.max(1, Math.round(enemy.maxHp * REVIVE_HP_FRACTION))
+          sfx.revive()
+          this.showDamageText(targetX, targetY - 6, 'IT RISES', '#d8d8c0')
+          // Collapse and reassemble, so the player sees what happened rather
+          // than just watching the health bar refill.
+          this.tweens.add({
+            targets: enemy.sprite,
+            scaleY: 0.2,
+            alpha: 0.4,
+            duration: 140,
+            yoyo: true,
+            onComplete: () => {
+              enemy.sprite.setScale(1).setAlpha(1)
+            },
+          })
+        } else if (enemy.hp <= 0) {
           GameState.killsCount++
           // Gold drop
           const goldDrop = enemy.ai === 'boss' ? 20 : (enemy.isSplit ? 1 : 3)
