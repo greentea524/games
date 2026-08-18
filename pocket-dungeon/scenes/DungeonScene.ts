@@ -28,6 +28,7 @@ import { rollModifier, modifierSeed, type Modifier } from '../modifiers'
 import { bossAI } from '../boss'
 import type { BossState } from '../boss'
 import { rollFloorItems } from '../items'
+import { rollChests, rollChestLoot, type ChestTier } from '../chests'
 import type { ItemDef, TurnSnapshot } from '../items'
 
 /** What `GameState.hungerDrainRate` is on an unmodified floor (#69). */
@@ -174,6 +175,14 @@ export class DungeonScene extends Phaser.Scene {
   private cobwebs: Phaser.GameObjects.Image[] = []
   /** The gear panel (#82), while it is open. */
   private gearPanel: Phaser.GameObjects.Container | null = null
+  /** Chests on this floor (#83); rebuilt with each floor. */
+  private chests: {
+    tier: ChestTier
+    tx: number
+    ty: number
+    opened: boolean
+    sprite: Phaser.GameObjects.Sprite
+  }[] = []
 
   renderDungeon() {
     const mode = GameState.paletteMode
@@ -339,6 +348,8 @@ export class DungeonScene extends Phaser.Scene {
       this.floorItems.push({ def, tx: pos.x, ty: pos.y, sprite: itemSprite })
     }
 
+    this.placeChests(mode, itemPositions.slice(itemDefs.length))
+
     // Place player sprite
     const px = this.playerTX * TILE + TILE / 2
     const py = this.playerTY * TILE + TILE / 2
@@ -419,6 +430,18 @@ export class DungeonScene extends Phaser.Scene {
     // Check wall/void collision
     if (this.grid[targetTY][targetTX] === '#' || this.grid[targetTY][targetTX] === ' ') {
       this.player.setTexture(`hero_${mode}_${this.facing}`)
+      return
+    }
+
+    // Check chest bump (#83). Before the enemy check: nothing spawns on a
+    // chest tile, so the two can never both match, and putting it first keeps
+    // the closed-chest block in one place.
+    const chestAtTarget = this.chests.find(
+      (c) => c.tx === targetTX && c.ty === targetTY && !c.opened,
+    )
+    if (chestAtTarget) {
+      this.player.setTexture(`hero_${mode}_${this.facing}`)
+      this.openChest(chestAtTarget)
       return
     }
 
@@ -879,6 +902,78 @@ export class DungeonScene extends Phaser.Scene {
       alpha: 0,
       duration: 500,
       onComplete: () => txt.destroy(),
+    })
+  }
+
+  /**
+   * Places this floor's chests (#83).
+   *
+   * Rooms only — corridor tiles are excluded. A closed chest blocks its tile,
+   * and a chest sitting in a one-wide corridor would wall off everything
+   * behind it until the player happened to walk into it. Opening one does
+   * clear the block, so this is belt and braces rather than a fix for a
+   * softlock, but a corridor chest is also just worse to come across.
+   *
+   * @param spare Floor tiles the item pass did not consume, already shuffled,
+   *   so a chest can never land on top of an item or on the player's start.
+   */
+  private placeChests(mode: 'dmg' | 'gbc', spare: { x: number; y: number }[]) {
+    for (const c of this.chests) c.sprite.destroy()
+    this.chests = []
+
+    const tiers = rollChests(GameState.floorDepth, this.rng, this.modifier?.guaranteedRare)
+    const inRoom = spare.filter(
+      (p) =>
+        this.grid[p.y][p.x] === '.' &&
+        !this.enemies.some((e) => e.tx === p.x && e.ty === p.y),
+    )
+    for (let i = 0; i < Math.min(tiers.length, inRoom.length); i++) {
+      const pos = inRoom[i]
+      const tier = tiers[i]
+      const sprite = this.add
+        .sprite(pos.x * TILE + TILE / 2, pos.y * TILE + TILE / 2, `chest_${tier}_closed_${mode}`)
+        .setDepth(3)
+      this.chests.push({ tier, tx: pos.x, ty: pos.y, opened: false, sprite })
+    }
+  }
+
+  /**
+   * Opens a chest and drops its contents onto its own tile (#83).
+   *
+   * The loot becomes an ordinary floor item rather than going straight into
+   * the player's hands, so it goes through the same pickup path as everything
+   * else — including the no-downgrade rule from #82. Opening a golden chest
+   * holding a Rusty Sword must not strip the Flame Brand off your back.
+   *
+   * Costs a turn, the same as an attack: bumping a chest while an enemy is
+   * closing in should be a decision.
+   */
+  private openChest(chest: {
+    tier: ChestTier
+    tx: number
+    ty: number
+    opened: boolean
+    sprite: Phaser.GameObjects.Sprite
+  }) {
+    chest.opened = true
+    const mode = GameState.paletteMode
+    chest.sprite.setTexture(`chest_${chest.tier}_open_${mode}`)
+    sfx.pickup()
+
+    const def = rollChestLoot(chest.tier, this.rng)
+    const px = chest.tx * TILE + TILE / 2
+    const py = chest.ty * TILE + TILE / 2
+    const sprite = this.add.sprite(px, py - 6, `item_${def.category}_${mode}`).setDepth(4)
+    this.floorItems.push({ def, tx: chest.tx, ty: chest.ty, sprite })
+    // Pops up out of the chest and settles onto the tile, so it is clear the
+    // item came from the chest rather than having always been there.
+    this.tweens.add({ targets: sprite, y: py, duration: 220, ease: 'Bounce.easeOut' })
+    this.showDamageText(px, py - 14, def.name, '#ffd700')
+
+    GameState.turnState = TurnState.ANIMATING
+    this.time.delayedCall(220, () => {
+      if (GameState.advanceTurn()) this.showRegenTick()
+      this.processEnemyTurn()
     })
   }
 

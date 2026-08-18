@@ -21,6 +21,7 @@ export class BootScene extends Phaser.Scene {
       this.buildCobweb(mode)
       this.buildBoss(mode)
       this.buildItems(mode)
+      this.buildChests(mode)
     })
     this.scene.start('title')
   }
@@ -425,6 +426,84 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(dark); g.fillRect(3, 13, 3, 3); g.fillRect(10, 13, 3, 3)
     g.generateTexture(key, 16, 16)
     g.destroy()
+  }
+
+  /**
+   * Chest sprites (#83), closed and open, per tier.
+   *
+   * A closed chest has to be legible as "bump this" at 16px next to the item
+   * bag, which is also a small box. The lid band, the seam and the lock plate
+   * are what separate them — the bag has none of those.
+   *
+   * The first version distinguished the tiers by lightness, which works in
+   * GBC and is actively wrong in DMG: the golden chest was drawn in PAL.light
+   * and PAL.lightest, and the DMG floor *is* PAL.lightest, so the lid band
+   * disappeared into the ground and the chest lost its silhouette. The
+   * screenshot showed two floating bars. Both DMG tiers are dark against the
+   * light floor now, and the tier reads from the accent and the studs
+   * instead — the one axis that palette leaves free.
+   */
+  private buildChests(mode: 'dmg' | 'gbc') {
+    const isDmg = mode === 'dmg'
+    interface ChestSkin {
+      body: number
+      trim: number
+      shadow: number
+      accent: number
+      ornate: boolean
+    }
+    const build = (key: string, c: ChestSkin, open: boolean) => {
+      if (this.textures.exists(key)) return
+      const g = this.make.graphics({}, false)
+      if (open) {
+        // Lid swung back, and the inside painted dark so the chest reads as
+        // emptied rather than just recoloured.
+        g.fillStyle(c.trim); g.fillRect(2, 3, 12, 3)
+        g.fillStyle(c.shadow); g.fillRect(3, 6, 10, 3)
+        g.fillStyle(c.body); g.fillRect(2, 9, 12, 5)
+        g.fillStyle(c.trim); g.fillRect(2, 9, 12, 1)
+        g.fillStyle(c.shadow); g.fillRect(2, 13, 12, 1)
+        if (c.ornate) { g.fillStyle(c.accent); g.fillRect(4, 11, 8, 1) }
+      } else {
+        g.fillStyle(c.body); g.fillRect(2, 5, 12, 9)
+        // Lid band, then the seam under it — the seam is what makes the lid
+        // read as a separate part rather than as a stripe.
+        g.fillStyle(c.trim); g.fillRect(2, 5, 12, 3)
+        g.fillStyle(c.shadow); g.fillRect(2, 8, 12, 1)
+        g.fillStyle(c.shadow); g.fillRect(2, 13, 12, 1)
+        // Lock plate, straddling the seam, in the accent so it survives on a
+        // lid band that is otherwise the darkest tone available.
+        g.fillStyle(c.accent); g.fillRect(7, 7, 2, 3)
+        if (c.ornate) {
+          g.fillStyle(c.accent)
+          g.fillRect(3, 6, 1, 1); g.fillRect(12, 6, 1, 1)
+          g.fillRect(4, 11, 8, 1)
+        }
+      }
+      g.generateTexture(key, 16, 16)
+      g.destroy()
+    }
+
+    const skins: Record<string, ChestSkin> = {
+      wooden: {
+        body: isDmg ? PAL.dark : 0x8a5a2b,
+        trim: isDmg ? PAL.darkest : 0xc0903a,
+        shadow: isDmg ? PAL.darkest : 0x4a2f18,
+        accent: isDmg ? PAL.light : 0xffd98a,
+        ornate: false,
+      },
+      golden: {
+        body: isDmg ? PAL.dark : 0xd4a017,
+        trim: isDmg ? PAL.darkest : 0xffe066,
+        shadow: isDmg ? PAL.darkest : 0x8a6a10,
+        accent: isDmg ? PAL.lightest : 0xfffbe0,
+        ornate: true,
+      },
+    }
+    for (const [tier, skin] of Object.entries(skins)) {
+      build(`chest_${tier}_closed_${mode}`, skin, false)
+      build(`chest_${tier}_open_${mode}`, skin, true)
+    }
   }
 
   private buildItems(mode: 'dmg' | 'gbc') {
