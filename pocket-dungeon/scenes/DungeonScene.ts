@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { TILE } from '../constants'
+import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST } from '../constants'
 
 // Fog alphas, and how far a wall torch pushes a tile back toward lit.
 //
@@ -88,12 +88,23 @@ export class DungeonScene extends Phaser.Scene {
 
     GameState.actionHistory.resetForFloor()
 
+    // Phaser reuses the scene instance across `restart()`, so field
+    // initialisers do not re-run and `gearPanel` would keep pointing at the
+    // destroyed panel from the previous floor — leaving uiBlocking stuck on
+    // and the game unplayable.
+    this.gearPanel = null
+    GameState.uiBlocking = false
+
     let touchStartX = 0
     let touchStartY = 0
     let touchStartTime = 0
 
     const mKey = this.input.keyboard!.addKey('M')
     mKey.on('down', () => setMuted(!isMuted()))
+
+    // B on the shell, which sends KeyX (#82).
+    const gearKey = this.input.keyboard!.addKey('X')
+    gearKey.on('down', () => this.toggleGearPanel())
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       touchStartX = pointer.x
@@ -161,6 +172,8 @@ export class DungeonScene extends Phaser.Scene {
   private explored: boolean[][] = []
   /** Cobweb overlays (#58); cleared and rebuilt with each floor. */
   private cobwebs: Phaser.GameObjects.Image[] = []
+  /** The gear panel (#82), while it is open. */
+  private gearPanel: Phaser.GameObjects.Container | null = null
 
   renderDungeon() {
     const mode = GameState.paletteMode
@@ -450,7 +463,7 @@ export class DungeonScene extends Phaser.Scene {
           this.scene.restart()
           return
         }
-        GameState.turnsCount++
+        if (GameState.advanceTurn()) this.showRegenTick()
         GameState.drainHunger()
         this.processEnemyTurn()
       },
@@ -501,8 +514,11 @@ export class DungeonScene extends Phaser.Scene {
           GameState.killsCount++
           // Gold drop
           const goldDrop = enemy.ai === 'boss' ? 20 : (enemy.isSplit ? 1 : 3)
-          GameState.runGold += goldDrop
-          this.showDamageText(targetX, targetY + 4, `+${goldDrop}g`, '#ffd700')
+          // The Lucky Coin's multiplier is applied inside addGold, and the
+          // banked figure is what gets shown — otherwise the float and the
+          // counter disagree.
+          const banked = GameState.addGold(goldDrop)
+          this.showDamageText(targetX, targetY + 4, `+${banked}g`, '#ffd700')
 
           // Splitter: spawn 2 mini-slimes on death
           if (enemy.ai === 'splitter' && !enemy.isSplit) {
@@ -517,7 +533,7 @@ export class DungeonScene extends Phaser.Scene {
             },
           })
         }
-        GameState.turnsCount++
+        if (GameState.advanceTurn()) this.showRegenTick()
         this.processEnemyTurn()
       },
     })
@@ -866,6 +882,63 @@ export class DungeonScene extends Phaser.Scene {
     })
   }
 
+  /** The Mending Band's +1, floated like every other HP change (#82). */
+  private showRegenTick() {
+    this.showDamageText(this.player.x, this.player.y - 10, '+1 HP', '#88ffcc')
+  }
+
+  /**
+   * The three equip slots, on B (#82).
+   *
+   * B, A and START are all dead keys inside the dungeon today, so this costs
+   * no existing binding. Screen-space and depth 60, matching the modifier
+   * banner. It is a panel rather than a HUD row because the bottom bar has
+   * roughly two free character cells between the gold and ATK readouts, which
+   * is not enough for three item names.
+   */
+  private toggleGearPanel() {
+    if (this.gearPanel) {
+      this.gearPanel.destroy()
+      this.gearPanel = null
+      GameState.uiBlocking = false
+      return
+    }
+    const inv = GameState.inventory
+    const slot = (label: string, def: { name: string } | null) =>
+      `${label} ${def ? def.name : '--'}`
+    const body = [
+      slot('WPN', inv.equippedWeapon),
+      slot('ARM', inv.equippedArmor),
+      slot('ACC', inv.equippedAccessory),
+    ].join('\n')
+    const worn = inv.equippedAccessory
+    const lines = worn ? `${body}\n\n${worn.description}` : body
+
+    const panel = this.add.container(0, 0).setScrollFactor(0).setDepth(60)
+    // Near-opaque. At 0.85 the dungeon read straight through the panel and
+    // item names sat on top of the red carpet tiles, which the screenshot
+    // made obvious and no functional check would ever have caught.
+    const backdrop = this.add
+      .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, 0x000000, 0.97)
+      .setOrigin(0, 0)
+    const text = this.add.text(8, 30, `- GEAR -\n\n${lines}`, {
+      fontFamily: FONT,
+      fontSize: '7px',
+      color: CSS_LIGHTEST,
+      align: 'left',
+      // Descriptions run past 20 characters at 7px on a 160px screen, and an
+      // unwrapped line just leaves the screen.
+      wordWrap: { width: GBC_WIDTH - 16 },
+      resolution: 2,
+      lineSpacing: 3,
+    })
+    panel.add([backdrop, text])
+    this.gearPanel = panel
+    // Movement is suppressed while it is open, the same way every other
+    // blocking overlay in this game does it.
+    GameState.uiBlocking = true
+  }
+
   private tryPickupItem(tx: number, ty: number) {
     const idx = this.floorItems.findIndex(i => i.tx === tx && i.ty === ty)
     if (idx === -1) return
@@ -874,11 +947,18 @@ export class DungeonScene extends Phaser.Scene {
     const def = item.def
 
     // Auto-use consumables, equip gear
-    if (def.category === 'weapon') {
-      GameState.equipWeapon(def)
-      this.showDamageText(this.player.x, this.player.y - 10, def.name, '#88ccff')
-    } else if (def.category === 'armor') {
-      GameState.equipArmor(def)
+    if (def.category === 'weapon' || def.category === 'armor' || def.category === 'accessory') {
+      // Gear is equipped by walking onto it, so this is the only guard against
+      // a downgrade — see GameState.isUpgrade. An item that loses the
+      // comparison is left on the floor rather than consumed, so the player
+      // can come back for it after a swap.
+      if (!GameState.isUpgrade(def)) {
+        this.showDamageText(this.player.x, this.player.y - 10, 'KEPT YOURS', '#a0a0a0')
+        return
+      }
+      if (def.category === 'weapon') GameState.equipWeapon(def)
+      else if (def.category === 'armor') GameState.equipArmor(def)
+      else GameState.equipAccessory(def)
       this.showDamageText(this.player.x, this.player.y - 10, def.name, '#88ccff')
     } else if (def.category === 'food') {
       GameState.hunger = Math.min(GameState.maxHunger, GameState.hunger + (def.hungerRestore ?? 0))

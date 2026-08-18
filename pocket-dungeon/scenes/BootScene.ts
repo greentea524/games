@@ -447,6 +447,9 @@ export class BootScene extends Phaser.Scene {
     const isDmg = mode === 'dmg'
     buildItem(`item_weapon_${mode}`, isDmg ? PAL.dark : 0xc0c0c0, isDmg ? PAL.darkest : 0x808080)
     buildItem(`item_armor_${mode}`, isDmg ? PAL.dark : 0x6080a0, isDmg ? PAL.darkest : 0x304060)
+    // #82. Without this the accessory pickups fall back to a missing texture,
+    // since the drop sprite key is `item_${category}_${mode}`.
+    buildItem(`item_accessory_${mode}`, isDmg ? PAL.light : 0xd0a020, isDmg ? PAL.darkest : 0x806010)
     buildItem(`item_food_${mode}`, isDmg ? PAL.light : 0xc09050, isDmg ? PAL.dark : 0x806030)
     buildItem(`item_potion_${mode}`, isDmg ? PAL.light : 0xff4060, isDmg ? PAL.dark : 0xa02040)
     buildItem(`item_scroll_${mode}`, isDmg ? PAL.lightest : 0xf0e8c0, isDmg ? PAL.light : 0xc0b080)
