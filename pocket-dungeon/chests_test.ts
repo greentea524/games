@@ -45,9 +45,10 @@ check('every loot id names a real item', unknown.length === 0, unknown.join(', '
 
 // --- no dead items in a reward ------------------------------------------
 //
-// Nothing in the game reads `scrollEffect` or calls ScrollIdentifier.identify,
-// so a scroll is an inventory slot that does nothing. They are in the floor
-// drop pool; they must not be what a chest hands back.
+// There is no action that uses an inventory item, so a scroll can be picked
+// up and never spent, and ScrollIdentifier.identify has no callers so its
+// label never resolves. They are in the floor drop pool; they must not also
+// be what a chest hands back. Remove this check when #105 lands.
 const scrolls = [...wooden, ...golden, ...locked].filter((id) => ITEMS[id].category === 'scroll')
 check('no scrolls in either table, while scrolls remain unusable', scrolls.length === 0, scrolls.join(', '))
 

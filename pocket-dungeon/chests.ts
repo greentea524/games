@@ -10,9 +10,11 @@ import { ITEMS, type ItemDef } from './items'
  * chest can never hand back a Rusty Sword.
  *
  * Scrolls are deliberately absent from both tables. They are in the floor
- * drop pool, but nothing in the game reads `scrollEffect` or ever calls
- * `ScrollIdentifier.identify` — a scroll is currently an inventory slot that
- * does nothing. Putting one in a chest would make opening it a punishment.
+ * drop pool, but there is no action that uses an inventory item, so a scroll
+ * can be picked up and never spent — and `ScrollIdentifier.identify` has no
+ * callers, so its cryptic label never resolves either. Putting one in a chest
+ * would make opening it a punishment. Tracked in #105; once that lands they
+ * belong in these tables.
  */
 export type ChestTier = 'wooden' | 'golden' | 'locked'
 
