@@ -18,6 +18,7 @@ export class BootScene extends Phaser.Scene {
       this.buildSpider(mode)
       this.buildSlime(mode)
       this.buildSkeleton(mode)
+      this.buildCobweb(mode)
       this.buildBoss(mode)
       this.buildItems(mode)
     })
@@ -209,6 +210,79 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(eye); g.fillRect(10, 7, 2, 2)
     // Feet
     g.fillStyle(dark); g.fillRect(3, 13, 2, 2); g.fillRect(9, 13, 2, 2)
+
+    g.generateTexture(key, 16, 16)
+    g.destroy()
+  }
+
+  private buildCobweb(mode: 'dmg' | 'gbc') {
+    const key = `cobweb_${mode}`
+    if (this.textures.exists(key)) return
+    const g = this.make.graphics({}, false)
+
+    // A quarter web filling one corner of a 16px tile. It is placed as an
+    // overlay sprite rather than a grid character on purpose — walkability
+    // here is `grid[y][x] !== '#'`, so inventing a wall-variant character
+    // would have made the corner walkable.
+    //
+    // Plotted a pixel at a time rather than stroked. `lineStyle(1)` rasterises
+    // diagonals two pixels wide, and at this size the five radials it produced
+    // merged into a clot that read as foliage, not a web.
+    //
+    // The two modes need opposite ends of their ramp: GBC floors are near
+    // black, DMG's floor is PAL.lightest. The first DMG attempt used PAL.light
+    // — the floor's own detail tone — and the web vanished into the floor in
+    // the screenshot while every functional check still passed.
+    const thread = mode === 'dmg' ? PAL.dark : 0x9a94a8
+    g.fillStyle(thread, 1)
+
+    const painted = new Set<number>()
+    const dot = (x: number, y: number) => {
+      if (x < 0 || y < 0 || x > 15 || y > 15) return
+      const k = y * 16 + x
+      if (painted.has(k)) return
+      painted.add(k)
+      g.fillRect(x, y, 1, 1)
+    }
+    const stroke = (x0: number, y0: number, x1: number, y1: number) => {
+      const dx = Math.abs(x1 - x0)
+      const dy = Math.abs(y1 - y0)
+      const sx = x0 < x1 ? 1 : -1
+      const sy = y0 < y1 ? 1 : -1
+      let err = dx - dy
+      let x = x0
+      let y = y0
+      for (;;) {
+        dot(x, y)
+        if (x === x1 && y === y1) return
+        const e2 = 2 * err
+        if (e2 > -dy) { err -= dy; x += sx }
+        if (e2 < dx) { err += dx; y += sy }
+      }
+    }
+
+    // Three radials — the two tile edges and the diagonal between them. Five
+    // were tried; three is what leaves room for the chords to read.
+    const RADIUS = 11
+    const rays: [number, number][] = [[1, 0], [1, 1], [0, 1]]
+    const along = ([dx, dy]: [number, number], t: number): [number, number] => {
+      const h = Math.hypot(dx, dy)
+      return [Math.round((dx * t) / h), Math.round((dy * t) / h)]
+    }
+    for (const ray of rays) {
+      const [x, y] = along(ray, RADIUS)
+      stroke(0, 0, x, y)
+    }
+    // Chords strung straight between neighbouring radials. The triangular
+    // cells they cut are the part that actually reads as a web — concentric
+    // arcs alone came out looking like scratches.
+    for (const t of [4, 8, RADIUS]) {
+      for (let i = 0; i < rays.length - 1; i++) {
+        const [ax, ay] = along(rays[i], t)
+        const [bx, by] = along(rays[i + 1], t)
+        stroke(ax, ay, bx, by)
+      }
+    }
 
     g.generateTexture(key, 16, 16)
     g.destroy()

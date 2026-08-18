@@ -159,6 +159,8 @@ export class DungeonScene extends Phaser.Scene {
   /** Base fog alpha before flicker, so flicker is applied, not accumulated. */
   private fogBase: number[][] = []
   private explored: boolean[][] = []
+  /** Cobweb overlays (#58); cleared and rebuilt with each floor. */
+  private cobwebs: Phaser.GameObjects.Image[] = []
 
   renderDungeon() {
     const mode = GameState.paletteMode
@@ -230,6 +232,8 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     // Spawn enemies using budget system
+    this.renderCobwebs(mode)
+
     const spawnList = rollEnemies(GameState.floorDepth, this.rng, this.modifier?.spawnBudgetBonus ?? 0)
     
     // Collect all 'E' positions from the grid
@@ -749,6 +753,58 @@ export class DungeonScene extends Phaser.Scene {
           ai: 'chaser',
         })
         return // Only spawn 1 minion per summon
+      }
+    }
+  }
+
+  /**
+   * Cobwebs in the inside corners of rooms (#58).
+   *
+   * Everything else the issue asked for already existed: cracked floor `k`,
+   * bone debris `b` and the room carpet `r` are all generated in
+   * MapGenerator and drawn here. Cobwebs were the genuinely missing piece.
+   *
+   * Overlay sprites rather than grid characters, deliberately. Walkability
+   * across this codebase is `grid[y][x] !== '#'`, so a wall-variant character
+   * would have quietly made the corner walkable — and a decoration that
+   * changes collision is exactly what the issue warns against.
+   *
+   * Only plain floor `.` qualifies, so a web can never land on the stairs, an
+   * item, an enemy spawn or a torch.
+   */
+  private renderCobwebs(mode: 'dmg' | 'gbc') {
+    for (const w of this.cobwebs) w.destroy()
+    this.cobwebs = []
+
+    // Seeded so a floor looks the same when revisited, and on its own stream:
+    // drawing from `this.rng` would shift every later value and change the
+    // enemies each existing seed produces (the lesson from #69).
+    const rng = new RNG(modifierSeed(GameState.seed ^ 0x5eed, GameState.floorDepth))
+    const isWall = (x: number, y: number) =>
+      this.grid[y]?.[x] === undefined || this.grid[y][x] === '#'
+
+    for (let y = 1; y < this.mapHeight - 1; y++) {
+      for (let x = 1; x < this.mapWidth - 1; x++) {
+        if (this.grid[y][x] !== '.') continue
+        // An inside corner: walls on two perpendicular sides.
+        const corners: [boolean, number, number][] = [
+          [isWall(x - 1, y) && isWall(x, y - 1), 0, 0],   // top-left
+          [isWall(x + 1, y) && isWall(x, y - 1), 1, 0],   // top-right
+          [isWall(x - 1, y) && isWall(x, y + 1), 0, 1],   // bottom-left
+          [isWall(x + 1, y) && isWall(x, y + 1), 1, 1],   // bottom-right
+        ]
+        for (const [isCorner, fx, fy] of corners) {
+          if (!isCorner) continue
+          if (rng.nextFloat(0, 1) > 0.35) continue
+          const img = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, `cobweb_${mode}`)
+          // The texture is drawn into its top-left corner, so flip it into
+          // whichever corner of the tile the walls actually meet in.
+          img.setFlipX(fx === 1).setFlipY(fy === 1)
+          img.setAlpha(0.8)
+          // Above the floor, below anything the player interacts with.
+          img.setDepth(0.5)
+          this.cobwebs.push(img)
+        }
       }
     }
   }
