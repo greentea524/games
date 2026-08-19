@@ -118,9 +118,16 @@ export class BootScene extends Phaser.Scene {
     g.clear()
 
     // item: Ren's key (old brass key)
-    g.fillStyle(p.accent); g.fillCircle(5, 6, 3)
-    g.fillStyle(p.stoneDark); g.fillCircle(5, 6, 1)
-    g.fillStyle(p.accent); g.fillRect(7, 5, 6, 2)
+    //
+    // Drawn in `keyMetal` rather than `p.accent` on DMG (#106). accent is
+    // PAL.light and the grass this is dropped on is PAL.lightest — one step
+    // apart, so the key had four pixels of real contrast and was effectively
+    // invisible on the ground. It is a plot-critical item, which makes that
+    // the worst place in the game for it to happen.
+    const keyMetal = mode === 'dmg' ? PAL.darkest : p.accent
+    g.fillStyle(keyMetal); g.fillCircle(5, 6, 3)
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : p.stoneDark); g.fillCircle(5, 6, 1)
+    g.fillStyle(keyMetal); g.fillRect(7, 5, 6, 2)
     g.fillRect(11, 7, 1, 2); g.fillRect(9, 7, 1, 2)
     tex(`item_${mode}_ren_key`, 16, 16)
 
@@ -164,8 +171,22 @@ export class BootScene extends Phaser.Scene {
     tex(`prop_fence_${mode}`, 16, 16)
 
     // prop_flower 16x16
-    g.fillStyle(mode === 'dmg' ? PAL.lightest : GBC_PAL.flowerBloom)
-    g.fillCircle(4, 4, 2); g.fillCircle(12, 8, 2); g.fillCircle(6, 12, 2)
+    //
+    // The DMG bloom was PAL.lightest, which is exactly the grass tone it sits
+    // on — the sprite scored zero contrasting pixels and was completely
+    // invisible (#106). Dark stems with a light bloom instead, so it reads as
+    // a flower rather than as nothing.
+    if (mode === 'dmg') {
+      g.fillStyle(PAL.dark)
+      g.fillRect(4, 5, 1, 4); g.fillRect(12, 9, 1, 4); g.fillRect(6, 13, 1, 3)
+      g.fillStyle(PAL.darkest)
+      g.fillCircle(4, 4, 2); g.fillCircle(12, 8, 2); g.fillCircle(6, 12, 2)
+      g.fillStyle(PAL.lightest)
+      g.fillRect(4, 4, 1, 1); g.fillRect(12, 8, 1, 1); g.fillRect(6, 12, 1, 1)
+    } else {
+      g.fillStyle(GBC_PAL.flowerBloom)
+      g.fillCircle(4, 4, 2); g.fillCircle(12, 8, 2); g.fillCircle(6, 12, 2)
+    }
     tex(`prop_flower_${mode}`, 16, 16)
 
     g.destroy()

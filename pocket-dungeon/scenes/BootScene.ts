@@ -567,7 +567,11 @@ export class BootScene extends Phaser.Scene {
     buildItem(`item_accessory_${mode}`, isDmg ? PAL.light : 0xd0a020, isDmg ? PAL.darkest : 0x806010)
     buildItem(`item_food_${mode}`, isDmg ? PAL.light : 0xc09050, isDmg ? PAL.dark : 0x806030)
     buildItem(`item_potion_${mode}`, isDmg ? PAL.light : 0xff4060, isDmg ? PAL.dark : 0xa02040)
-    buildItem(`item_scroll_${mode}`, isDmg ? PAL.lightest : 0xf0e8c0, isDmg ? PAL.light : 0xc0b080)
+    // The scroll and hourglass bags had a PAL.lightest body on a PAL.lightest
+    // floor (#106) — the bag *was* the floor, and all that showed was the 2x2
+    // white shine: four pixels of real contrast on a 16x16 sprite. Both are
+    // dark-bodied now. The GBC colours were always fine and are untouched.
+    buildItem(`item_scroll_${mode}`, isDmg ? PAL.dark : 0xf0e8c0, isDmg ? PAL.lightest : 0xc0b080)
     // #59. The key is drawn as a key rather than as another bag: it is the one
     // pickup whose count the HUD shows, so it has to be identifiable on the
     // floor without walking onto it.
@@ -587,6 +591,6 @@ export class BootScene extends Phaser.Scene {
     }
     buildKey(`item_key_${mode}`, isDmg ? PAL.dark : 0xd8d0a0, isDmg ? PAL.lightest : 0x6a6248)
 
-    buildItem(`item_rewind_${mode}`, isDmg ? PAL.lightest : 0xffd700, isDmg ? PAL.light : 0xc0a000)
+    buildItem(`item_rewind_${mode}`, isDmg ? PAL.darkest : 0xffd700, isDmg ? PAL.light : 0xc0a000)
   }
 }
