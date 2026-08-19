@@ -248,6 +248,22 @@ async function lanternKeeper() {
     await hand.release()
   }
 
+  /**
+   * Waits for the play scene to be the live one before driving it.
+   *
+   * Every stage transition now routes through the world map (#88), which takes
+   * a second or two. Without this the next section restarts a scene that is
+   * about to be replaced by the map's own handover, and the restart is lost.
+   */
+  const settleOnPlay = async () => {
+    for (let i = 0; i < 30; i++) {
+      const live = await page.evaluate(() => window.__game.scene.getScene('play').scene.isActive())
+      if (live) return true
+      await page.waitForTimeout(300)
+    }
+    return false
+  }
+
   // --- ambience (#65) ------------------------------------------------------
   //
   // Checked here because a browser and a loaded level are already open. The
@@ -316,6 +332,7 @@ async function lanternKeeper() {
   // *impossible* are all measurable. The gap width is the important one — the
   // movement budget puts a single jump at about 2.8 tiles, so a 4-tile gap on
   // the spine would be a wall for a player who arrives without the upgrades.
+  check('the previous stage handed back to play before the next check', await settleOnPlay())
   await page.evaluate(() => {
     window.__game.scene.getScene('play').scene.restart({ levelKey: 'grove' })
   })
@@ -379,6 +396,7 @@ async function lanternKeeper() {
   // The step sizes are the whole design. Re-derived from the tilemap rather
   // than read back from the generator, so this checks the level that shipped
   // rather than the intent behind it.
+  check('the previous stage handed back to play before the next check', await settleOnPlay())
   await page.evaluate(() => {
     window.__game.scene.getScene('play').scene.restart({ levelKey: 'climb' })
   })
@@ -485,6 +503,7 @@ async function lanternKeeper() {
   // world-bounds floor and respawns, which is what makes it a bridge. That
   // raises the stakes on gap width, so it is the number under test, along
   // with the fact that the deck is genuinely crossable end to end.
+  check('the previous stage handed back to play before the next check', await settleOnPlay())
   await page.evaluate(() => {
     window.__game.scene.getScene('play').scene.restart({ levelKey: 'bridge' })
   })
@@ -573,6 +592,54 @@ async function lanternKeeper() {
     bridgeLanded = await page.evaluate(() => window.__game.scene.getScene('play').levelKey)
   }
   check('crossing leads on to the hollow', bridgeLanded === 'level4', `landed on ${bridgeLanded}`)
+
+  // --- the world map, and stage registration (#88) --------------------------
+  //
+  // Every stage key must have a tilemap actually loaded. `stages.ts` is the
+  // list, but BootScene does the loading, and a key with no map behind it
+  // fails at `make.tilemap` the moment the player reaches it — which is a
+  // crash halfway through a run rather than at boot.
+  check('the bridge handed back to play', await settleOnPlay())
+  const registry = await page.evaluate(async () => {
+    const { STAGE_KEYS, STAGES } = await import('/games/lantern-keeper/stages.ts')
+    const g = window.__game
+    return {
+      keys: STAGE_KEYS,
+      missing: STAGE_KEYS.filter((k) => !g.cache.tilemap.has(k)),
+      titles: STAGES.map((s) => s.title),
+    }
+  })
+  check('every stage in the list has a tilemap loaded', registry.missing.length === 0,
+    registry.missing.join(', ') || `${registry.keys.length} stages`)
+
+  await page.evaluate(() => {
+    window.__game.scene.getScene('play').scene.start('map', { from: 'level1', levelKey: 'level3' })
+  })
+  await page.waitForTimeout(900)
+  const map = await page.evaluate(() => {
+    const s = window.__game.scene.getScene('map')
+    if (!s.scene.isActive()) return null
+    const nodes = []
+    for (let i = 0; i < 7; i++) nodes.push(s.nodeAt(i))
+    return {
+      onScreen: nodes.every((n) => n.x >= 4 && n.x <= 156 && n.y >= 20 && n.y <= 112),
+      nodes: nodes.length,
+      markers: s.children.list.filter((o) => o.texture && /lantern/.test(o.texture.key)).length,
+    }
+  })
+  check('the world map opens between stages', map !== null)
+  check('every node fits between the title and the label', map?.onScreen,
+    JSON.stringify(map?.nodes))
+  check('a node is drawn per stage, plus the travelling marker',
+    map?.markers === registry.keys.length + 1, `${map?.markers} sprites`)
+
+  // The map must hand over rather than becoming a dead end.
+  let handedOver = false
+  for (let i = 0; i < 24 && !handedOver; i++) {
+    await page.waitForTimeout(500)
+    handedOver = await page.evaluate(() => window.__game.scene.getScene('play').scene.isActive())
+  }
+  check('and it hands over to the stage', handedOver)
 
   ok = finish(t.log) && ok
   await t.browser.close()

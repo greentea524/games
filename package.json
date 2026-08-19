@@ -11,7 +11,7 @@
     "qa:static": "node static/qa/run.mjs",
     "qa:touch": "node qa/touch/run.mjs",
     "qa:contrast": "node qa/contrast/run.mjs",
-    "qa:units": "tsx pocket-dungeon/modifiers_test.ts && tsx shared/storage_test.ts && tsx pocket-dungeon/enemies_test.ts && tsx pocket-dungeon/equipment_test.ts && tsx pocket-dungeon/chests_test.ts && tsx pocket-dungeon/scrolls_test.ts"
+    "qa:units": "tsx pocket-dungeon/modifiers_test.ts && tsx shared/storage_test.ts && tsx pocket-dungeon/enemies_test.ts && tsx pocket-dungeon/equipment_test.ts && tsx pocket-dungeon/chests_test.ts && tsx pocket-dungeon/scrolls_test.ts && tsx lantern-keeper/stages_test.ts"
   },
   "dependencies": {
     "phaser": "^3.90.0",
