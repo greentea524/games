@@ -89,11 +89,31 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(p.stoneDark); g.fillRect(6, 7, 2, 2); g.fillRect(9, 6, 1, 1)
     tex(`item_${mode}_photo`, 16, 16)
 
+    // The whole photo (#74). Identical frame and mount to the one above —
+    // only the picture inside changes, because a counterpart drawn as a
+    // different object stops reading as the same thing seen from the other
+    // side. Two figures where the damaged one has a scratched-out gap.
+    g.fillStyle(p.wood); g.fillRect(3, 3, 10, 10)
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : 0xf0f0e0); g.fillRect(5, 5, 6, 6)
+    g.fillStyle(p.stoneDark)
+    g.fillRect(6, 7, 2, 2)
+    g.fillRect(9, 7, 2, 2)
+    tex(`item_${mode}_photo_intact`, 16, 16)
+
     // item: cellar ledger (worn book)
     g.fillStyle(p.stoneDark); g.fillRect(3, 4, 10, 9)
     g.fillStyle(mode === 'dmg' ? PAL.light : 0xb0a890); g.fillRect(4, 5, 8, 7)
     g.fillStyle(p.stoneDark); g.fillRect(5, 7, 6, 1); g.fillRect(5, 9, 4, 1)
     tex(`item_${mode}_ledger`, 16, 16)
+
+    // The unstruck ledger (#74): same book, same rules of text, with the
+    // struck-through line running unbroken instead of cut in half.
+    g.fillStyle(p.stoneDark); g.fillRect(3, 4, 10, 9)
+    g.fillStyle(mode === 'dmg' ? PAL.light : 0xb0a890); g.fillRect(4, 5, 8, 7)
+    g.fillStyle(p.stoneDark)
+    g.fillRect(5, 7, 6, 1)
+    g.fillRect(5, 9, 6, 1)
+    tex(`item_${mode}_ledger_unredacted`, 16, 16)
 
     // the entity: a dark figure with a static-filled screen for a face
     if (!this.textures.exists('entity')) {

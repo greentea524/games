@@ -17,7 +17,16 @@ export const ITEMS: Record<string, ItemDef> = {
   flower: { id: 'flower', name: 'Wilted Flower', icon: 'item_flower' },
   flower_fresh: { id: 'flower_fresh', name: 'Fresh Flower', icon: 'item_flower_fresh' },
   photo: { id: 'photo', name: 'Old Photo', icon: 'item_photo' },
+  // The counterparts (#74). Where the flower and the flashlight change what an
+  // item can *do*, these change what it can *tell you* — the payoff is a name
+  // and a date, and nothing in the inventory gets stronger.
+  photo_intact: { id: 'photo_intact', name: 'Whole Photo', icon: 'item_photo_intact' },
   ledger: { id: 'ledger', name: 'Water Ledger', icon: 'item_ledger' },
+  ledger_unredacted: {
+    id: 'ledger_unredacted',
+    name: 'Unstruck Ledger',
+    icon: 'item_ledger_unredacted',
+  },
   ren_key: { id: 'ren_key', name: "Ren's Key", icon: 'item_ren_key' },
   // Static-world-only (#75). Deliberately absent from TRANSFORMS: this is not
   // a thing that exists on both sides and changes when you cross, it is a
@@ -45,6 +54,23 @@ export interface Transform {
 }
 
 export const TRANSFORMS: Transform[] = [
+  // Information transforms (#74). Both are non-consumable on purpose: the
+  // flower is taken when it is delivered because handing it over is the
+  // puzzle, but an item whose whole purpose is to be carried and shown has to
+  // survive being shown.
+  {
+    normal: 'photo',
+    statik: 'photo_intact',
+    intoStatic: 'The tear closes.',
+    intoNormal: 'The tear returns.',
+  },
+  {
+    normal: 'ledger',
+    statik: 'ledger_unredacted',
+    intoStatic: 'The strikes lift.',
+    intoNormal: 'The strikes return.',
+  },
+
   {
     normal: 'flower',
     statik: 'flower_fresh',

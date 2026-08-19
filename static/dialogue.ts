@@ -215,6 +215,32 @@ export const NPCS: Record<string, NpcDef> = {
           { text: 'Their empty basket sways, though there is no wind.' },
         ],
       },
+      // What the whole photo tells you (#74).
+      //
+      // Here rather than at the photo on the bakery wall, which is where the
+      // question is asked: that interior is only enterable from the normal
+      // world, and `photo_intact` only exists while the player is across, so
+      // a branch there could never fire. The frozen Baker is on the Static
+      // side, which is the only place the counterpart can be held.
+      //
+      // Below the flower branches so it can never block the delivery, and it
+      // takes nothing — an item whose purpose is to be carried and shown has
+      // to survive being shown.
+      {
+        requiresItem: 'photo_intact',
+        lines: [
+          {
+            text: 'You hold the photo up beside their frozen face.',
+            setFlag: 'seen_baker_static',
+          },
+          { text: 'Whole here. The tear is gone, and the gap is filled.' },
+          {
+            text: 'Two children. A name inked under each. One reads REN.',
+            setFlag: 'learned_names',
+          },
+          { text: 'The other is theirs. The town forgot it. You do not.' },
+        ],
+      },
       {
         lines: [
           {
@@ -526,6 +552,35 @@ export const VALVE_DEF: NpcDef = {
   hair: 'dark',
   frozen: true,
   branches: [
+    // What the unstruck ledger adds (#74).
+    //
+    // On the valve rather than on the fountain, because the transform is
+    // bidirectional: `ledger_unredacted` only exists while the player is on
+    // the Static side, and the Static-side fountain is this valve — the
+    // normal-world FOUNTAIN_DEF is never open while the counterpart is in
+    // hand. Putting it there first made a branch that could not fire.
+    //
+    // Above the drain branch, so a player carrying it reads the record before
+    // heaving the valve; it grants nothing and takes nothing, because the
+    // payoff is knowing the date.
+    {
+      // `requires` is belt and braces: the ledger is found in the cellar, and
+      // the cellar hatch only appears once the fountain is drained, so this
+      // flag is always set by the time anyone can be holding the counterpart.
+      // Stated anyway, because without it a player carrying the ledger would
+      // match this branch ahead of the drain branch and could never turn the
+      // valve — a blocker that depends on an ordering nothing enforces.
+      requires: 'fountain_drained',
+      requiresItem: 'ledger_unredacted',
+      lines: [
+        { text: 'You open the ledger against the rim. Nothing struck out.' },
+        { text: 'The last entry is a date. It has not happened yet.' },
+        {
+          text: 'Someone kept this record forward, not back.',
+          setFlag: 'read_ledger',
+        },
+      ],
+    },
     {
       excludes: 'fountain_drained',
       lines: [
@@ -731,6 +786,11 @@ export const FOUNTAIN_DEF: NpcDef = {
   ],
 }
 
+// The photo on the bakery wall. Its closing line — wanting to know the
+// children's names — is the hook the whole photo answers, but the answering
+// happens at the frozen Baker on the Static side rather than here: this
+// interior is only enterable from the normal world, and `photo_intact` only
+// exists while the player is across. A branch here could never have fired.
 export const BAKERY_PHOTO_DEF = examine(
   'photo_wall',
   'FAMILY PHOTO',
