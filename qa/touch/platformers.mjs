@@ -298,6 +298,71 @@ async function lanternKeeper() {
       'could not reach map/groundLayer')
   }
 
+  // --- The Firefly Grove (#90) ---------------------------------------------
+  //
+  // Structural, not scripted play: a platformer's traversability cannot be
+  // proved by walking it in a check, but the things that make a stage
+  // *impossible* are all measurable. The gap width is the important one — the
+  // movement budget puts a single jump at about 2.8 tiles, so a 4-tile gap on
+  // the spine would be a wall for a player who arrives without the upgrades.
+  await page.evaluate(() => {
+    window.__game.scene.getScene('play').scene.restart({ levelKey: 'grove' })
+  })
+  await page.waitForTimeout(2200)
+  const grove = await page.evaluate(() => {
+    const s = window.__game.scene.getScene('play')
+    const g = s.groundLayer
+    const map = g.tilemap
+    const solid = (x, y) => {
+      const t = g.getTileAt(x, y)
+      return !!t && t.index >= 1
+    }
+    const FLOOR = 14
+    let widest = 0
+    let run = 0
+    for (let x = 1; x < map.width - 1; x++) {
+      if (!solid(x, FLOOR)) {
+        run++
+        widest = Math.max(widest, run)
+      } else run = 0
+    }
+    return {
+      key: s.levelKey,
+      widest,
+      lanterns: s.lanterns.length,
+      hasCloser: s.lanterns.some((l) => l.name === 'grove_heart'),
+      spawnGrounded: solid(Math.floor(s.player.x / 8), Math.floor(s.player.y / 8) + 1),
+      fireflies: s.fireflies.length,
+      grounded: s.lanterns.every((l) => {
+        const tx = Math.floor(l.sprite.x / 8)
+        const ty = Math.floor(l.sprite.y / 8)
+        for (let d = ty; d < Math.min(ty + 4, map.height); d++) if (solid(tx, d)) return true
+        return false
+      }),
+    }
+  })
+  check('the grove loads', grove.key === 'grove')
+  check('the player spawns on solid ground', grove.spawnGrounded)
+  check('no gap on the spine exceeds a single jump', grove.widest <= 3, `widest ${grove.widest} tiles`)
+  check('every lantern stands on ground', grove.grounded, `${grove.lanterns} lanterns`)
+  check('it carries enough lanterns to read as a grove', grove.lanterns >= 5 && grove.fireflies > 0,
+    `${grove.lanterns} lanterns, ${grove.fireflies} fireflies`)
+
+  // A stage that cannot be left is worse than a stage that is too hard, so the
+  // exit is exercised rather than inspected. An earlier version of this check
+  // read the call out of lightLantern's source text and stayed red after the
+  // wiring was already correct — it was testing the shape of the code.
+  await page.evaluate(() => {
+    const s = window.__game.scene.getScene('play')
+    s.lightLantern(s.lanterns.find((l) => l.name === 'grove_heart'))
+  })
+  let landed = grove.key
+  for (let i = 0; i < 20 && landed !== 'level2'; i++) {
+    await page.waitForTimeout(500)
+    landed = await page.evaluate(() => window.__game.scene.getScene('play').levelKey)
+  }
+  check('lighting the closing lantern leads on to the marsh', landed === 'level2', `landed on ${landed}`)
+
   ok = finish(t.log) && ok
   await t.browser.close()
 }
