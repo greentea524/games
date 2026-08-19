@@ -16,7 +16,6 @@
 // See qa/contrast/README.md before extending this.
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { launchTouch, controls, gameUrl, checker, ACT } from '../touch/driver.mjs'
 import { GAMES } from './manifest.mjs'
 import {
   PAGE_HELPERS, SAME_TONE, STRONG_TONE, MIN_STRONG_PIXELS,
@@ -55,6 +54,13 @@ if (!process.env.QA_URL) {
   }
   process.env.QA_URL = url
 }
+
+// Imported *after* QA_URL is set, deliberately. driver.mjs resolves its base
+// URL at module-evaluation time, so a static import here captures the default
+// port before the server above has claimed one — and the suite then quietly
+// tests whatever happens to be running on 5178, or fails outright when
+// nothing is. That is exactly what shipped in the first version of this file.
+const { launchTouch, controls, gameUrl, checker, ACT } = await import('../touch/driver.mjs')
 
 const { check, finish } = checker()
 let allOk = true

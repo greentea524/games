@@ -248,6 +248,56 @@ async function lanternKeeper() {
     await hand.release()
   }
 
+  // --- ambience (#65) ------------------------------------------------------
+  //
+  // Checked here because a browser and a loaded level are already open. The
+  // placement rule is the part worth asserting: this game has no fall damage,
+  // so a deep drop is not a hazard and only a fall to the world floor is. The
+  // first version signed any drop of six tiles or more, which put warnings on
+  // ledges that are completely safe to step off.
+  const ambience = await page.evaluate(() => {
+    const s = window.__game.scene.getScene('play')
+    // The scene keeps the layer, not the map — the map hangs off the layer.
+    const ground = s.groundLayer ?? null
+    const map = ground?.tilemap
+    const signs = s.children.list.filter((o) => o.texture && o.texture.key === 'signpost')
+    const solid = (x, y) => {
+      if (!ground || x < 0 || y < 0 || x >= map.width || y >= map.height) return false
+      const t = ground.getTileAt(x, y)
+      return !!t && t.index >= 1
+    }
+    // Every sign must have a void — empty all the way to the map floor — on
+    // the side it faces.
+    const misplaced = signs.filter((sign) => {
+      const tx = Math.floor(sign.x / 8)
+      const ty = Math.floor((sign.y + 6) / 8)
+      const side = sign.flipX ? tx - 1 : tx + 1
+      for (let d = ty; d < map.height; d++) if (solid(side, d)) return true
+      return false
+    })
+    return {
+      hasMap: !!map && !!ground,
+      signs: signs.length,
+      misplaced: misplaced.length,
+      fireflies: s.fireflies?.length ?? 0,
+      cap: s.fireflies?.length <= 40,
+      belowDarkness: (s.fireflies ?? []).every((f) => f.sprite.depth < 10),
+      noBodies: [...signs, ...(s.fireflies ?? []).map((f) => f.sprite)].every((o) => !o.body),
+    }
+  })
+  check('fireflies spawn and stay under the cap', ambience.fireflies > 0 && ambience.cap,
+    `${ambience.fireflies}`)
+  check('fireflies sit below the darkness, so unlit corners dim them', ambience.belowDarkness)
+  check('neither fireflies nor signposts carry a physics body', ambience.noBodies)
+  if (ambience.hasMap) {
+    check('every signpost faces a genuine void, not a survivable drop',
+      ambience.misplaced === 0,
+      `${ambience.signs} signs, ${ambience.misplaced} facing solid ground`)
+  } else {
+    check('the level exposes its tilemap for the signpost check', false,
+      'could not reach map/groundLayer')
+  }
+
   ok = finish(t.log) && ok
   await t.browser.close()
 }
