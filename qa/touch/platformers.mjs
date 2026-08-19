@@ -272,6 +272,13 @@ async function lanternKeeper() {
       const tx = Math.floor(sign.x / 8)
       const ty = Math.floor((sign.y + 6) / 8)
       const side = sign.flipX ? tx - 1 : tx + 1
+      // The side being warned about has to be a real column of the map. An
+      // earlier version of this check omitted that, which let it agree with
+      // the bug it was meant to catch: `solid` reads false past the map edge,
+      // so the outermost column looked like a bottomless drop and every level
+      // signposted its own border. The check passed because it made the same
+      // assumption the code did.
+      if (side < 0 || side >= map.width) return true
       for (let d = ty; d < map.height; d++) if (solid(side, d)) return true
       return false
     })
@@ -290,8 +297,12 @@ async function lanternKeeper() {
   check('fireflies sit below the darkness, so unlit corners dim them', ambience.belowDarkness)
   check('neither fireflies nor signposts carry a physics body', ambience.noBodies)
   if (ambience.hasMap) {
-    check('every signpost faces a genuine void, not a survivable drop',
-      ambience.misplaced === 0,
+    // Level 1 legitimately has no signposted ledge: nothing on it drops to the
+    // world floor. This asserts the absence is honest rather than accidental —
+    // it used to report one sign, which turned out to be the map's own border.
+    // The stage with real voids is the Mossy Bridge, checked further down.
+    check('level 1 signposts nothing, because nothing on it is a real drop',
+      ambience.misplaced === 0 && ambience.signs === 0,
       `${ambience.signs} signs, ${ambience.misplaced} facing solid ground`)
   } else {
     check('the level exposes its tilemap for the signpost check', false,
@@ -467,6 +478,101 @@ async function lanternKeeper() {
     climbLanded = await page.evaluate(() => window.__game.scene.getScene('play').levelKey)
   }
   check('lighting the summit leads on to the canopy', climbLanded === 'level3', `landed on ${climbLanded}`)
+
+  // --- The Mossy Bridge (#92) -----------------------------------------------
+  //
+  // This stage has no floor on purpose — a missed jump falls to the
+  // world-bounds floor and respawns, which is what makes it a bridge. That
+  // raises the stakes on gap width, so it is the number under test, along
+  // with the fact that the deck is genuinely crossable end to end.
+  await page.evaluate(() => {
+    window.__game.scene.getScene('play').scene.restart({ levelKey: 'bridge' })
+  })
+  await page.waitForTimeout(2200)
+  const bridge = await page.evaluate(() => {
+    const s = window.__game.scene.getScene('play')
+    const g = s.groundLayer
+    const map = g.tilemap
+    const solid = (x, y) => {
+      const t = g.getTileAt(x, y)
+      return !!t && t.index >= 1
+    }
+    const DECK = 9
+    let widest = 0
+    let run = 0
+    for (let x = 1; x < map.width - 1; x++) {
+      if (!solid(x, DECK)) {
+        run++
+        widest = Math.max(widest, run)
+      } else run = 0
+    }
+    // Walk the deck: every gap must be jumpable, so the far side is reachable.
+    let x = 1
+    let crossed = true
+    while (x < map.width - 1) {
+      if (solid(x, DECK)) {
+        x++
+        continue
+      }
+      let gap = 0
+      while (x + gap < map.width && !solid(x + gap, DECK)) gap++
+      if (gap > 3) crossed = false
+      x += gap
+    }
+    return {
+      key: s.levelKey,
+      widest,
+      crossable: crossed,
+      lanterns: s.lanterns.length,
+      hasEnd: s.lanterns.some((l) => l.name === 'bridge_end'),
+      spawnGrounded: solid(Math.floor(s.player.x / 8), Math.floor(s.player.y / 8) + 1),
+      // Every lantern must stand on the deck, not hang over a gap.
+      lanternsOnDeck: s.lanterns.every((l) => solid(Math.floor(l.sprite.x / 8), DECK)),
+      // The piers are decoration; none may reach the bottom, or a fall would
+      // land on one and turn the void into a route under the bridge.
+      pierClear: (() => {
+        for (let px = 1; px < map.width - 1; px++) {
+          if (solid(px, map.height - 1) && px > 8 && px < map.width - 10) return false
+        }
+        return true
+      })(),
+      signposts: (() => {
+        const signs = s.children.list.filter((o) => o.texture && o.texture.key === 'signpost')
+        const bad = signs.filter((sign) => {
+          const tx = Math.floor(sign.x / 8)
+          const ty = Math.floor((sign.y + 6) / 8)
+          const side = sign.flipX ? tx - 1 : tx + 1
+          if (side < 0 || side >= map.width) return true
+          for (let d = ty; d < map.height; d++) if (solid(side, d)) return true
+          return false
+        })
+        return { count: signs.length, bad: bad.length }
+      })(),
+    }
+  })
+  check('the bridge loads', bridge.key === 'bridge', `${bridge.lanterns} lanterns`)
+  check('the player spawns on the landing, not over the void', bridge.spawnGrounded)
+  check('no gap exceeds a single jump', bridge.widest <= 3, `widest ${bridge.widest} tiles`)
+  check('the deck can be crossed end to end', bridge.crossable)
+  check('every lantern stands on the deck', bridge.lanternsOnDeck)
+  check('nothing under the deck reaches the bottom', bridge.pierClear)
+  check('the far-side lantern is present', bridge.hasEnd)
+  // #65's signposts should find this stage on their own — it is the only one
+  // with real voids beside the walkway.
+  check('the gap edges are signposted', bridge.signposts.count >= 4, `${bridge.signposts.count} signs`)
+  check('and every sign faces a real gap rather than the map border',
+    bridge.signposts.bad === 0, `${bridge.signposts.bad} misplaced`)
+
+  await page.evaluate(() => {
+    const s = window.__game.scene.getScene('play')
+    s.lightLantern(s.lanterns.find((l) => l.name === 'bridge_end'))
+  })
+  let bridgeLanded = bridge.key
+  for (let i = 0; i < 20 && bridgeLanded !== 'level4'; i++) {
+    await page.waitForTimeout(500)
+    bridgeLanded = await page.evaluate(() => window.__game.scene.getScene('play').levelKey)
+  }
+  check('crossing leads on to the hollow', bridgeLanded === 'level4', `landed on ${bridgeLanded}`)
 
   ok = finish(t.log) && ok
   await t.browser.close()

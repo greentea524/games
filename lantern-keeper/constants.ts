@@ -68,6 +68,10 @@ export const DARKNESS_ALPHA: Record<string, number> = {
   // The Quiet Climb (#91) sits between the Marsh and the Canopy, so it is
   // pitched between their two settings rather than being another bright stage.
   climb: 0.78,
+  // The Mossy Bridge (#92) leads into the Hollow, the darkest stage in the
+  // game, so it is pitched just short of it — the approach should already
+  // feel like the finale rather than like the Canopy.
+  bridge: 0.81,
   level2: 0.80,
   level3: 0.80,
   level4: 0.82,
