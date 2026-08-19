@@ -72,6 +72,52 @@ export const DECO = {
   vineDensity: 0.22, // chance of a vine under an exposed tile bottom
 } as const
 
+/**
+ * Firefly ambience (#65).
+ *
+ * `max` is a hard cap rather than a density, because density alone tanks the
+ * frame rate on a large map: every firefly is a sprite moved every frame, and
+ * level 4 is wide enough that 2% of its open tiles would be hundreds of them.
+ *
+ * They are spawned near lanterns rather than uniformly. That is what "density
+ * varies with local light" means here, and it is also what makes them read as
+ * belonging to the lanterns rather than as screen dirt.
+ */
+export const FIREFLY = {
+  /** Hard ceiling on live fireflies, whatever the map size. */
+  max: 40,
+  /** How many to try to place around each lantern. */
+  perLantern: 6,
+  /** Radius around a lantern that fireflies are scattered into, in px. */
+  spread: 40,
+  /** Drift, as a slow sine on each axis. */
+  driftX: 5,
+  driftY: 3,
+  /** Seconds for a full drift cycle; each firefly gets its own phase. */
+  periodMs: 4200,
+  /** Resting alpha, and what a lit lantern nearby lifts it to. */
+  alpha: 0.45,
+  alphaLit: 0.9,
+} as const
+
+/**
+ * DANGER signposts (#65).
+ *
+ * This game has no fall damage. Landing six tiles lower costs nothing, so a
+ * deep drop is not a hazard — the only fall that hurts is one that reaches
+ * the world-bounds floor and respawns you. A signposted ledge is therefore
+ * one whose neighbouring column is empty all the way to the bottom of the
+ * map, not merely one with a long way down.
+ *
+ * `minDrop` is the shortest such void worth marking, so a sign never appears
+ * on a ledge one tile above the map floor.
+ */
+export const SIGNPOST = {
+  minDrop: 6,
+  /** Minimum gap between two signposts, in tiles, so ledges do not crowd. */
+  minSpacing: 8,
+} as const
+
 // GBC-inspired 4-color palette
 export const PAL = {
   darkest: 0x0f1a12,

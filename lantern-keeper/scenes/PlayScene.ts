@@ -10,9 +10,12 @@ import {
   WALL,
   DARKNESS_ALPHA,
   DECO,
+  FIREFLY,
+  SIGNPOST,
   PAL,
 } from '../constants'
 import { Darkness, type Light } from '../../shared/lighting'
+import { prefersReducedMotion } from '../../shared/motion'
 import { loadProgress, saveProgress } from '../progress'
 import { showRunSummary, formatRunTime } from '../../shared/runSummary'
 
@@ -36,6 +39,14 @@ export class PlayScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private darkness!: Darkness
   private lanterns: Lantern[] = []
+  /** Ambient fireflies (#65); rebuilt with each level. */
+  private fireflies: {
+    sprite: Phaser.GameObjects.Image
+    homeX: number
+    homeY: number
+    phase: number
+    lantern: Lantern
+  }[] = []
   private dashKey!: Phaser.Input.Keyboard.Key
   private jumpKey!: Phaser.Input.Keyboard.Key
   private enterKey!: Phaser.Input.Keyboard.Key
@@ -139,6 +150,7 @@ export class PlayScene extends Phaser.Scene {
 
     this.createBackground(map)
     this.decorate(map, ground)
+    this.placeSignposts(map, ground)
 
     this.player = this.physics.add.sprite(spawnX, spawnY, 'player_idle')
     this.player.setCollideWorldBounds(true)
@@ -219,6 +231,8 @@ export class PlayScene extends Phaser.Scene {
     }
 
     // Oil flasks (#70) live in their own object layer rather than in
+    this.spawnFireflies()
+
     // `lanterns`. Membership of that layer is decided by exclusion — anything
     // not a mushroom, a crumble or the heart tree is a lantern — so a flask
     // dropped in there would silently count toward the stage's lantern total
@@ -423,6 +437,119 @@ export class PlayScene extends Phaser.Scene {
           }
         }
       }
+    }
+  }
+
+  /**
+   * DANGER signposts beside real drops (#65).
+   *
+   * Derived from the tilemap the same way `decorate` is, so no level JSON has
+   * to be touched. A ledge qualifies when the tile beside it is empty and
+   * stays empty for SIGNPOST.minDrop tiles down — this game's only hazard is
+   * a fall, so that is what "before a hazard" means here.
+   *
+   * The sign goes on the ledge side, which is the side the player is standing
+   * on when they need it. A sign on the far side of a gap is a sign you read
+   * after you have already jumped.
+   */
+  private placeSignposts(
+    map: Phaser.Tilemaps.Tilemap,
+    ground: Phaser.Tilemaps.TilemapLayer,
+  ) {
+    const solid = (x: number, y: number) => {
+      if (x < 0 || y < 0 || x >= map.width || y >= map.height) return false
+      const t = ground.getTileAt(x, y)
+      return !!t && t.index >= 1
+    }
+    // A drop is only a hazard if it goes all the way down. This game has no
+    // fall damage — landing six tiles lower costs nothing, and the only fall
+    // that hurts is one that reaches the world-bounds floor and respawns you
+    // (see the void-floor check in `update`). The first version of this signed
+    // any drop of six tiles or more, which put warnings on ledges that are
+    // completely safe to step off; a sign that cries wolf is worse than none.
+    const isVoid = (x: number, y: number) => {
+      for (let d = y + 1; d < map.height; d++) {
+        if (solid(x, d)) return false
+      }
+      return map.height - y >= SIGNPOST.minDrop
+    }
+    let lastX = -Infinity
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        if (!solid(x, y) || solid(x, y - 1)) continue // needs an exposed top
+        // A ledge: open air to one side, with a long fall under it.
+        const leftEdge = !solid(x - 1, y) && isVoid(x - 1, y)
+        const rightEdge = !solid(x + 1, y) && isVoid(x + 1, y)
+        if (!leftEdge && !rightEdge) continue
+        if (x - lastX < SIGNPOST.minSpacing) continue
+        lastX = x
+        // Stand it a little back from the lip, on the solid side.
+        const sign = this.add.image(x * 8 + 4, y * 8 - 6, 'signpost')
+        sign.setFlipX(leftEdge && !rightEdge)
+        // Behind the player, in front of the parallax — the same band the
+        // other world decorations use. No physics body: it is scenery, and a
+        // sign you can stand on is a platform.
+        sign.setDepth(-0.1)
+      }
+    }
+  }
+
+  /**
+   * Fireflies drifting around the lanterns (#65).
+   *
+   * Spawned near lanterns rather than uniformly, which is what makes their
+   * density track the light, and drawn *below* the darkness overlay so an
+   * unlit corner dims its own fireflies for free — no per-firefly lighting
+   * maths, and it stays correct when a lantern is lit mid-level.
+   *
+   * Capped hard. Every one of these is moved every frame, and a density that
+   * looks right on level 1 puts hundreds on level 4.
+   */
+  private spawnFireflies() {
+    for (const f of this.fireflies) f.sprite.destroy()
+    this.fireflies = []
+    if (this.lanterns.length === 0) return
+
+    const rng = new Phaser.Math.RandomDataGenerator([`${this.levelKey}-fireflies`])
+    for (const lantern of this.lanterns) {
+      for (let i = 0; i < FIREFLY.perLantern; i++) {
+        if (this.fireflies.length >= FIREFLY.max) return
+        const homeX = lantern.sprite.x + rng.between(-FIREFLY.spread, FIREFLY.spread)
+        const homeY = lantern.sprite.y + rng.between(-FIREFLY.spread, FIREFLY.spread)
+        const sprite = this.add
+          .image(homeX, homeY, 'particle')
+          .setDepth(5)
+          .setAlpha(FIREFLY.alpha)
+        this.fireflies.push({
+          sprite,
+          homeX,
+          homeY,
+          phase: rng.frac() * Math.PI * 2,
+          lantern,
+        })
+      }
+    }
+  }
+
+  /**
+   * Drifts the fireflies and tracks their lantern's state (#65).
+   *
+   * Reduced motion stops the drift but keeps the fireflies: they are part of
+   * the scene's light, and removing them would take away information about
+   * where the lanterns are. Only the movement is decoration.
+   */
+  private updateFireflies(time: number) {
+    if (this.fireflies.length === 0) return
+    const still = prefersReducedMotion()
+    for (const f of this.fireflies) {
+      const target = f.lantern.lit ? FIREFLY.alphaLit : FIREFLY.alpha
+      f.sprite.setAlpha(target)
+      if (still) continue
+      const t = (time / FIREFLY.periodMs) * Math.PI * 2 + f.phase
+      f.sprite.x = f.homeX + Math.sin(t) * FIREFLY.driftX
+      // A different multiple on each axis, so the path is a slow figure
+      // rather than a circle — a circle reads as a mechanism, not an insect.
+      f.sprite.y = f.homeY + Math.sin(t * 1.7) * FIREFLY.driftY
     }
   }
 
@@ -725,6 +852,11 @@ export class PlayScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
+    // Ambience first, and unguarded by the pause checks below: fireflies
+    // should keep drifting while the info overlay is up, the same way the
+    // parallax does.
+    this.updateFireflies(time)
+
     if (this.justResumed) {
       this.justResumed = false
       // Consume the stale pause/info keys queued during the pause so they

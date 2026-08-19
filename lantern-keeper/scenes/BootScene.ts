@@ -263,6 +263,22 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('guidance_arrow', 8, 8)
     g.clear()
 
+    // DANGER signpost (#65), 8x12. Deliberately not in PAL.warm: warm is the
+    // language of the guidance arrow and the lanterns, and a signpost that
+    // glows like a lantern is a signpost the player walks toward. This one is
+    // wood and a pale board — it reads as authored furniture, not as a pickup.
+    g.fillStyle(PAL.dark) // post
+    g.fillRect(3, 5, 2, 7)
+    g.fillStyle(PAL.darkest) // board shadow
+    g.fillRect(0, 1, 8, 5)
+    g.fillStyle(PAL.light) // board face
+    g.fillRect(0, 0, 8, 5)
+    g.fillStyle(PAL.darkest) // an exclamation, the only mark legible at 8px
+    g.fillRect(4, 1, 1, 2)
+    g.fillRect(4, 4, 1, 1)
+    g.generateTexture('signpost', 8, 12)
+    g.clear()
+
     // Parallax background textures
     // Background Tree Trunk (8x24)
     g.fillStyle(PAL.darkest)
