@@ -61,6 +61,10 @@ export const JUMP_ASSIST = {
 // Later levels stay darker, but never fully opaque.
 export const DARKNESS_ALPHA: Record<string, number> = {
   level1: 0.76,
+  // The Firefly Grove (#90) is the lightest stage in the game on purpose: it
+  // is a breather whose whole point is looking at the lanterns and the
+  // fireflies around them, and darkness that hides them defeats it.
+  grove: 0.70,
   level2: 0.80,
   level3: 0.80,
   level4: 0.82,

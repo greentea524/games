@@ -35,7 +35,9 @@ export interface Progress {
   completed: boolean
 }
 
-const LEVELS = ['level1', 'level2', 'level3', 'level4']
+// Order matters only for validation, not for progression — the sequence
+// itself lives in PlayScene's advance calls. 'grove' (#90) sits after level1.
+const LEVELS = ['level1', 'grove', 'level2', 'level3', 'level4']
 
 export function defaultProgress(): Progress {
   return {

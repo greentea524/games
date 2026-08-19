@@ -4,6 +4,7 @@ import level1Url from '../assets/level1.json?url'
 import level2Url from '../assets/level2.json?url'
 import level3Url from '../assets/level3.json?url'
 import level4Url from '../assets/level4.json?url'
+import groveUrl from '../assets/grove.json?url'
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -11,6 +12,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload() {
+    this.load.tilemapTiledJSON('grove', groveUrl)
     this.load.tilemapTiledJSON('level1', level1Url)
     this.load.tilemapTiledJSON('level2', level2Url)
     this.load.tilemapTiledJSON('level3', level3Url)
