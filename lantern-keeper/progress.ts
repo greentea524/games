@@ -9,6 +9,7 @@
 // starts from a known spawn, so a level boundary is a natural checkpoint;
 // restoring mid-level would need the lit set and the player's position, which
 // is a bigger change than the gap it closes.
+import { STAGE_KEYS } from './stages'
 import { loadSave, saveSave, clearSave } from '../shared/storage'
 
 const SAVE_KEY = 'lantern_keeper_save'
@@ -37,7 +38,8 @@ export interface Progress {
 
 // Order matters only for validation, not for progression — the sequence
 // itself lives in PlayScene's advance calls. 'grove' (#90) sits after level1.
-const LEVELS = ['level1', 'grove', 'level2', 'climb', 'level3', 'bridge', 'level4']
+// Derived from the shared stage list (#88) rather than repeated here.
+const LEVELS = STAGE_KEYS
 
 export function defaultProgress(): Progress {
   return {

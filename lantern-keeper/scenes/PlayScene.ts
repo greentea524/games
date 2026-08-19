@@ -15,6 +15,7 @@ import {
   PAL,
 } from '../constants'
 import { Darkness, type Light } from '../../shared/lighting'
+import { STAGE_KEYS, stageFor } from '../stages'
 import { prefersReducedMotion } from '../../shared/motion'
 import { loadProgress, saveProgress } from '../progress'
 import { showRunSummary, formatRunTime } from '../../shared/runSummary'
@@ -132,30 +133,14 @@ export class PlayScene extends Phaser.Scene {
     ground.setCollisionBetween(1, 8)
     this.groundLayer = ground
 
-    let spawnX = 32
-    let spawnY = 72
-    let title = 'THE FOREST'
+    // Title and spawn come from the shared stage list (#88); they used to be
+    // an if-chain here, which is one of the five places a new stage had to be
+    // registered.
+    const stage = stageFor(this.levelKey)
+    const spawnX = stage.spawnX
+    const spawnY = stage.spawnY
+    const title = stage.title
 
-    if (this.levelKey === 'grove') {
-      spawnY = 104 // on top of the spine at row 14
-      title = 'THE FIREFLY GROVE'
-    } else if (this.levelKey === 'bridge') {
-      spawnX = 32
-      spawnY = 64 // on the left landing, deck row 9
-      title = 'THE MOSSY BRIDGE'
-    } else if (this.levelKey === 'climb') {
-      spawnY = 416 // on the floor at row 53
-      title = 'THE QUIET CLIMB'
-    } else if (this.levelKey === 'level2') {
-      spawnY = 72
-      title = 'THE MARSH'
-    } else if (this.levelKey === 'level3') {
-      spawnY = 384
-      title = 'THE CANOPY'
-    } else if (this.levelKey === 'level4') {
-      spawnY = 104 // land on the floor top (row 15) of the redesigned Hollow
-      title = 'THE HOLLOW'
-    }
     const initialDarkness = DARKNESS_ALPHA[this.levelKey] ?? 0.85
 
     this.createBackground(map)
@@ -781,7 +766,7 @@ export class PlayScene extends Phaser.Scene {
   private countAllLanterns(): number {
     const notLanterns = new Set(['mushroom', 'crumble', 'heart_tree'])
     let total = 0
-    for (const key of ['level1', 'grove', 'level2', 'climb', 'level3', 'bridge', 'level4']) {
+    for (const key of STAGE_KEYS) {
       const data = this.cache.tilemap.get(key)?.data as
         | { layers?: { name?: string; objects?: { name?: string }[] }[] }
         | undefined
@@ -822,9 +807,13 @@ export class PlayScene extends Phaser.Scene {
 
   /** Saves, then moves to the next level. */
   private advanceTo(levelKey: string) {
+    const from = this.levelKey
     this.levelKey = levelKey
     this.persist()
-    this.scene.start('play', {
+    // Through the world map (#88) rather than straight into the next stage,
+    // so the player sees the move they just earned.
+    this.scene.start('map', {
+      from,
       levelKey,
       hasDoubleJump: this.hasDoubleJump,
       hasDash: this.hasDash,

@@ -130,7 +130,7 @@ export class MenuScene extends Phaser.Scene {
   /** Resumes the saved run — level reached, abilities earned, lanterns lit. */
   continueGame() {
     const p = loadProgress()
-    this.scene.start('play', {
+    this.scene.start('map', {
       levelKey: p.levelKey,
       hasDoubleJump: p.hasDoubleJump,
       hasDash: p.hasDash,
@@ -142,7 +142,7 @@ export class MenuScene extends Phaser.Scene {
   /** Starts over. Clears the save so 'Continue' cannot resurrect the old run. */
   newGame() {
     clearProgress()
-    this.scene.start('play', { levelKey: 'level1', hasDoubleJump: false, hasDash: false, hasWallCling: false });
+    this.scene.start('map', { levelKey: 'level1', hasDoubleJump: false, hasDash: false, hasWallCling: false });
   }
   
   showControls() {

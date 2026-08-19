@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { BootScene } from './scenes/BootScene'
+import { MapScene } from './scenes/MapScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PlayScene } from './scenes/PlayScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
@@ -45,7 +46,7 @@ function createGame() {
     // reconciling it. Touches outside the canvas are button presses here, not
     // game input (#97).
     input: { windowEvents: false },
-    scene: [BootScene, MenuScene, PlayScene],
+    scene: [BootScene, MenuScene, MapScene, PlayScene],
   })
   window.addEventListener('resize', () => {
     const zoom = integerZoom()
