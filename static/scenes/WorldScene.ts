@@ -30,6 +30,7 @@ import {
   ANCHOR_DEF,
   ENTITY_DEF,
   CH5_START_DEF,
+  CORRUPTION_DEF,
   STATIC_DOOR_DEF,
   BOOKSHELF_DEF,
   JOURNAL_DEF,
@@ -541,6 +542,8 @@ export class WorldScene extends Phaser.Scene {
       // and a hedge has to sit on ground the player can stand beside — (5,5)
       // was a ROOF tile, so it drew a hedge on top of a house and registered
       // an examine point with no reachable approach (#94).
+      this.placeCorruption(mode)
+
       const bushCoords = [[9, 4], [6, 15]]
       for (const [bx, by] of bushCoords) {
         this.solidProp(bx, by, 1, 1, `prop_bush_${mode}`)
@@ -914,6 +917,44 @@ export class WorldScene extends Phaser.Scene {
     this.interactables = this.interactables.filter(
       (it) => Math.abs(it.x - cx) >= 1 || Math.abs(it.y - cy) >= 1,
     )
+  }
+
+  /**
+   * Corruption patches (#64): the same tear, solid in the normal town and
+   * passable on the Static side.
+   *
+   * This is the one place the world toggle is a movement verb rather than a
+   * change of texture — everything else that varies by world is what things
+   * look like or what your items are. Walking a route in the normal town and
+   * finding it open on the other side is the mechanic stating itself.
+   *
+   * Deliberately placed on open ground rather than in a chokepoint. The town
+   * is 24x22 and almost entirely open, so there is no gap that can be sealed
+   * without stranding tiles behind it — and stranded tiles are what
+   * `qa:static`'s reachability pass exists to reject. These block a line you
+   * would otherwise walk, not a route you have to.
+   *
+   * Examinable in both worlds through the ordinary interactable list, so the
+   * text is reachable whether or not you can cross the tile.
+   */
+  private placeCorruption(mode: string) {
+    const open = GameState.world === 'static'
+    const key = `corruption_${open ? 'open' : 'sealed'}_${mode}`
+    // Chosen against the town layout: open ground, clear of every door, NPC
+    // tile, bush and the fountain, in both the shared map and town_static.
+    const patches: [number, number][] = [
+      [10, 6],
+      [20, 13],
+      [11, 16],
+    ]
+    for (const [tx, ty] of patches) {
+      if (open) {
+        this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, key)
+      } else {
+        this.solidProp(tx, ty, 1, 1, key)
+      }
+      this.examine(tx, ty, CORRUPTION_DEF)
+    }
   }
 
   private examine(tx: number, ty: number, def: NpcDef) {

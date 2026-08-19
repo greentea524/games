@@ -230,6 +230,61 @@ await step('the entity offers a choice, and the ending plays', async () => {
   return 'empathy ending'
 })
 
+// The corruption patches (#64). The claim is that the world toggle is a
+// movement verb here and not just a change of texture, so the check is that
+// the same tiles are solid in one world and walkable in the other — asserted
+// against the collision grid rather than against the sprite that is drawn.
+console.log('\n=== the corruption patches ===')
+await step('the same ground is sealed in town and open on the static side', async () => {
+  const patches = [
+    [10, 6],
+    [20, 13],
+    [11, 16],
+  ]
+  const sv = await d.save()
+  await d.boot({ ...sv, world: 'normal', mapKey: 'town', tx: 11, ty: 18 })
+  const sealed = await d.grid()
+  await d.boot({ ...sv, world: 'static', mapKey: 'town', tx: 11, ty: 18 })
+  const open = await d.grid()
+  for (const [x, y] of patches) {
+    need(sealed[y][x] !== 1, `(${x},${y}) should be solid in the normal town`)
+    need(open[y][x] === 1, `(${x},${y}) should be walkable on the static side`)
+  }
+  return `${patches.length} patches, solid one side and open the other`
+})
+
+// The information transforms (#74). Both readers are on the Static side,
+// which is the constraint that decides where they can live at all: the
+// counterparts only exist while the player is across, so a branch on anything
+// reachable only from the normal world could never fire. Both were placed
+// wrongly first — the ledger on the normal-world fountain, the photo on the
+// bakery wall, whose interior has no Static-side door — and this step is what
+// caught it.
+console.log('\n=== the information transforms ===')
+await step('crossing over turns the photo whole and the ledger unstruck', async () => {
+  const sv = await d.save()
+  sv.inventory = ['photo', 'ledger']
+  sv.world = 'normal'
+  await d.boot({ ...sv, mapKey: 'house', tx: 5, ty: 6 })
+  await d.interactWith(7, 1) // the TV
+  await d.page.waitForTimeout(1700)
+  const after = await d.save()
+  need(after.world === 'static', `world is ${after.world}`)
+  need(after.inventory.includes('photo_intact'), `photo did not mend: ${after.inventory}`)
+  need(after.inventory.includes('ledger_unredacted'), `ledger did not clear: ${after.inventory}`)
+  return 'photo_intact, ledger_unredacted'
+})
+await step('the whole photo names the children, and survives being shown', async () => {
+  await goThroughDoor(5, 8, 'town')
+  const baker = await npcAt('baker')
+  const { speaker, lines } = await talkTo(baker.tx, baker.ty)
+  need(speaker === 'THE BAKER', `expected THE BAKER, got ${speaker}`)
+  need(lines.some((l) => /REN/.test(l)), `the names were never given: ${JSON.stringify(lines)}`)
+  need(await flag('learned_names'), 'learned_names never set')
+  need((await items()).includes('photo_intact'), 'the photo should not be consumed by showing it')
+  return 'learned_names'
+})
+
 // The Signal Shard's alternate anchoring (#75), checked from a save rather
 // than by replaying four chapters. The scripted run above never crosses to
 // fetch the shard, which is the point: the plain branch has to stay the

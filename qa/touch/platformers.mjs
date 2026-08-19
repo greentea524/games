@@ -256,9 +256,22 @@ async function lanternKeeper() {
    * about to be replaced by the map's own handover, and the restart is lost.
    */
   const settleOnPlay = async () => {
-    for (let i = 0; i < 30; i++) {
+    // Play has to be live *and stay* live. The map hands over from a
+    // `delayedCall`, so a check that fires the instant play first appears can
+    // still be overtaken: the restart lands, then a pending timer from the
+    // previous transition calls scene.start('play') again with the old level
+    // and silently replaces it. That showed up as the climb section measuring
+    // a different stage — once in about six runs, which is the worst kind of
+    // failure to leave in a suite.
+    for (let i = 0; i < 40; i++) {
       const live = await page.evaluate(() => window.__game.scene.getScene('play').scene.isActive())
-      if (live) return true
+      if (live) {
+        await page.waitForTimeout(700)
+        const stillLive = await page.evaluate(() =>
+          window.__game.scene.getScene('play').scene.isActive(),
+        )
+        if (stillLive) return true
+      }
       await page.waitForTimeout(300)
     }
     return false
