@@ -363,6 +363,111 @@ async function lanternKeeper() {
   }
   check('lighting the closing lantern leads on to the marsh', landed === 'level2', `landed on ${landed}`)
 
+  // --- The Quiet Climb (#91) ------------------------------------------------
+  //
+  // The step sizes are the whole design. Re-derived from the tilemap rather
+  // than read back from the generator, so this checks the level that shipped
+  // rather than the intent behind it.
+  await page.evaluate(() => {
+    window.__game.scene.getScene('play').scene.restart({ levelKey: 'climb' })
+  })
+  await page.waitForTimeout(2200)
+  const climb = await page.evaluate(() => {
+    const s = window.__game.scene.getScene('play')
+    const g = s.groundLayer
+    const map = g.tilemap
+    const solid = (x, y) => {
+      const t = g.getTileAt(x, y)
+      return !!t && t.index >= 1
+    }
+    // Find each platform: a run of solid tiles with open air above it.
+    const rows = []
+    for (let y = 1; y < map.height - 3; y++) {
+      let run = null
+      for (let x = 2; x < map.width - 2; x++) {
+        const isTop = solid(x, y) && !solid(x, y - 1)
+        if (isTop) {
+          if (!run) run = { y, x, w: 0 }
+          run.w++
+        } else if (run) {
+          rows.push(run)
+          run = null
+        }
+      }
+      if (run) rows.push(run)
+    }
+    rows.sort((a, b) => b.y - a.y) // bottom upward
+
+    // Climbability, proved rather than guessed at.
+    //
+    // The first version of this asserted two geometric rules — minimum
+    // platform width, and horizontal overlap between consecutive platforms —
+    // and both were the wrong question. What matters is whether the summit can
+    // actually be reached from the floor, so this walks a reachability graph:
+    // an edge exists where the rise is inside the jump budget and the
+    // horizontal offset is inside reach. If the summit is reachable, the stage
+    // is climbable, whatever shape the platforms happen to be.
+    const MAX_RISE = 2 // tiles, comfortably inside a single jump
+    const MAX_REACH = 4 // tiles of horizontal offset from a standing jump
+    const reaches = (a, b) => {
+      const rise = a.y - b.y
+      if (rise <= 0 || rise > MAX_RISE) return false
+      const gap = Math.max(0, Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w))
+      return gap <= MAX_REACH
+    }
+    const seen = new Set([0])
+    const queue = [0]
+    while (queue.length) {
+      const i = queue.shift()
+      for (let j = 0; j < rows.length; j++) {
+        if (seen.has(j) || !reaches(rows[i], rows[j])) continue
+        seen.add(j)
+        queue.push(j)
+      }
+    }
+    const topIndex = rows.reduce((best, r, i) => (r.y < rows[best].y ? i : best), 0)
+    let worstRise = 0
+    let narrowest = Infinity
+    for (let i = 1; i < rows.length; i++) {
+      worstRise = Math.max(worstRise, rows[i - 1].y - rows[i].y)
+      narrowest = Math.min(narrowest, rows[i].w)
+    }
+    return {
+      key: s.levelKey,
+      platforms: rows.length,
+      worstRise,
+      narrowest: rows.length ? narrowest : 0,
+      summitReachable: seen.has(topIndex),
+      reached: seen.size,
+      lanterns: s.lanterns.length,
+      hasSummit: s.lanterns.some((l) => l.name === 'climb_summit'),
+      // A solid floor is the safety story: the only fall that hurts reaches
+      // the world-bounds floor, so ground underneath means a missed jump costs
+      // height and nothing else.
+      floored: solid(Math.floor(map.width / 2), map.height - 3),
+      spawnGrounded: solid(Math.floor(s.player.x / 8), Math.floor(s.player.y / 8) + 1),
+    }
+  })
+  check('the climb loads', climb.key === 'climb', `${climb.platforms} platforms`)
+  check('the player spawns on solid ground', climb.spawnGrounded)
+  check('the stage has a floor, so a missed jump only costs height', climb.floored)
+  check('no step exceeds a single jump', climb.worstRise <= 2, `worst rise ${climb.worstRise} tiles`)
+  check('every platform is wide enough to land on', climb.narrowest >= 4, `narrowest ${climb.narrowest} tiles`)
+  check('the summit is reachable from the floor', climb.summitReachable,
+    `${climb.reached}/${climb.platforms} platforms reachable`)
+  check('the summit lantern is present', climb.hasSummit, `${climb.lanterns} lanterns`)
+
+  await page.evaluate(() => {
+    const s = window.__game.scene.getScene('play')
+    s.lightLantern(s.lanterns.find((l) => l.name === 'climb_summit'))
+  })
+  let climbLanded = climb.key
+  for (let i = 0; i < 20 && climbLanded !== 'level3'; i++) {
+    await page.waitForTimeout(500)
+    climbLanded = await page.evaluate(() => window.__game.scene.getScene('play').levelKey)
+  }
+  check('lighting the summit leads on to the canopy', climbLanded === 'level3', `landed on ${climbLanded}`)
+
   ok = finish(t.log) && ok
   await t.browser.close()
 }

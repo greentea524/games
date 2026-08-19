@@ -139,6 +139,9 @@ export class PlayScene extends Phaser.Scene {
     if (this.levelKey === 'grove') {
       spawnY = 104 // on top of the spine at row 14
       title = 'THE FIREFLY GROVE'
+    } else if (this.levelKey === 'climb') {
+      spawnY = 416 // on the floor at row 53
+      title = 'THE QUIET CLIMB'
     } else if (this.levelKey === 'level2') {
       spawnY = 72
       title = 'THE MARSH'
@@ -590,7 +593,7 @@ export class PlayScene extends Phaser.Scene {
         this.time.delayedCall(4000, () => {
           this.cameras.main.fadeOut(1000, 0, 0, 0)
           this.cameras.main.once('camerafadeoutcomplete', () => {
-            this.advanceTo('level3')
+            this.advanceTo('climb')
           })
         })
       }
@@ -613,6 +616,20 @@ export class PlayScene extends Phaser.Scene {
         this.cameras.main.fadeOut(1000, 0, 0, 0)
         this.cameras.main.once('camerafadeoutcomplete', () => {
           this.advanceTo('grove')
+        })
+      })
+    } else if (lantern.name === 'climb_summit') {
+      // The Quiet Climb's summit (#91). Grants nothing, same as the Grove's
+      // closer: this is a breather between the Marsh and the Canopy.
+      this.won = true
+      sfx.win()
+      this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 50)
+      this.toast('THE CLIMB IS LIT', 0)
+      this.tweens.add({ targets: this.darkness, alpha: 0, duration: 3000 })
+      this.time.delayedCall(4000, () => {
+        this.cameras.main.fadeOut(1000, 0, 0, 0)
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.advanceTo('level3')
         })
       })
     } else if (lantern.name === 'grove_heart') {
@@ -738,7 +755,7 @@ export class PlayScene extends Phaser.Scene {
   private countAllLanterns(): number {
     const notLanterns = new Set(['mushroom', 'crumble', 'heart_tree'])
     let total = 0
-    for (const key of ['level1', 'grove', 'level2', 'level3', 'level4']) {
+    for (const key of ['level1', 'grove', 'level2', 'climb', 'level3', 'level4']) {
       const data = this.cache.tilemap.get(key)?.data as
         | { layers?: { name?: string; objects?: { name?: string }[] }[] }
         | undefined
