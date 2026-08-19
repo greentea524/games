@@ -17,6 +17,15 @@ interface DialogueBranch {
   requires?: string // flag that must be set for this branch to apply
   excludes?: string // flag that must NOT be set
   requiresItem?: string // item the player must carry for this branch
+  /**
+   * Every item the player must carry, when one is not enough (#75).
+   *
+   * Added for the anchoring at Ren's door, where the Signal Shard branch also
+   * consumes the key: expressing it as `requiresItem: 'signal_shard'` alone
+   * let a player holding the shard but no key take a branch that then took a
+   * key they did not have, clearing Chapter 4 without it.
+   */
+  requiresItems?: string[]
   lines: DialogueLine[]
   /**
    * Town tile the minimap marker points at while this branch is current (#78).
@@ -380,6 +389,36 @@ export const ANCHOR_DEF: NpcDef = {
   hair: 'dark',
   frozen: true,
   branches: [
+    // Carrying the Signal Shard home (#75) does not open the door — the key
+    // still does that — but it changes what the anchoring costs. Placed above
+    // the plain branch so it wins when both match; it sets exactly the same
+    // flags and takes the same item, so a player who never crossed for it
+    // reaches the identical state by the branch below.
+    {
+      requires: 'beacon_found',
+      requiresItems: ['signal_shard', 'ren_key'],
+      excludes: 'ch4_done',
+      lines: [
+        { text: 'The shard in your pocket hums against the door frame.' },
+        {
+          // The shard is spent here, on the line that describes spending it,
+          // rather than on the closing line. `take` fires when a line is
+          // *shown*, and the line that sets ch4_done triggers the Chapter 5
+          // beat — so anything hung off a line after it may never be reached.
+          // Putting the consumption where the fiction puts it is also the only
+          // version that cannot be skipped.
+          text: 'You press it into the wood. The static in it goes still.',
+          setFlag: 'prevented_vanishing',
+          take: 'signal_shard',
+        },
+        {
+          text: 'Then Ren’s key, and REN’S NAME carved deep. A record.',
+          setFlag: 'ch4_done',
+          take: 'ren_key',
+        },
+        { text: 'The channel turns — and finds the house already spoken for.' },
+      ],
+    },
     {
       requires: 'beacon_found',
       requiresItem: 'ren_key',
@@ -816,6 +855,7 @@ function resolveBranch(npc: NpcDef): DialogueBranch | null {
     if (b.requires && !GameState.getFlag(b.requires)) continue
     if (b.excludes && GameState.getFlag(b.excludes)) continue
     if (b.requiresItem && !GameState.hasItem(b.requiresItem)) continue
+    if (b.requiresItems && !b.requiresItems.every((i) => GameState.hasItem(i))) continue
     return b
   }
   return null

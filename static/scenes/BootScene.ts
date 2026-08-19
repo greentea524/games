@@ -131,6 +131,20 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(11, 7, 1, 2); g.fillRect(9, 7, 1, 2)
     tex(`item_${mode}_ren_key`, 16, 16)
 
+    // item: Signal Shard (#75) — a splinter of what the beacon writes with.
+    // Angular and off-grid where every other item is drawn square, because it
+    // is the one object in the inventory that does not belong to this world.
+    // Dark body with a bright core in both palettes: it is picked up on the
+    // Static side, where #47's duotone flattens everything toward one tone.
+    g.fillStyle(mode === 'dmg' ? PAL.darkest : 0x2a2440)
+    g.fillTriangle(8, 1, 13, 9, 8, 15)
+    g.fillTriangle(8, 1, 3, 8, 8, 15)
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : 0xc8d8ff)
+    g.fillTriangle(8, 4, 11, 9, 8, 12)
+    g.fillStyle(mode === 'dmg' ? PAL.light : 0xffffff)
+    g.fillRect(7, 7, 2, 3)
+    tex(`item_${mode}_signal_shard`, 16, 16)
+
     // DECORATIONS
     // prop_bed 32x32
     g.fillStyle(p.wood); g.fillRect(2, 2, 28, 28) // bed frame

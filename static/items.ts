@@ -19,6 +19,12 @@ export const ITEMS: Record<string, ItemDef> = {
   photo: { id: 'photo', name: 'Old Photo', icon: 'item_photo' },
   ledger: { id: 'ledger', name: 'Water Ledger', icon: 'item_ledger' },
   ren_key: { id: 'ren_key', name: "Ren's Key", icon: 'item_ren_key' },
+  // Static-world-only (#75). Deliberately absent from TRANSFORMS: this is not
+  // a thing that exists on both sides and changes when you cross, it is a
+  // thing that should not be on this side at all. `toggleWorld` leaves items
+  // it cannot find in the table untouched, so carrying it home is the whole
+  // point and needs no extra machinery.
+  signal_shard: { id: 'signal_shard', name: 'Signal Shard', icon: 'item_signal_shard' },
 }
 
 /**

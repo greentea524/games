@@ -230,6 +230,35 @@ await step('the entity offers a choice, and the ending plays', async () => {
   return 'empathy ending'
 })
 
+// The Signal Shard's alternate anchoring (#75), checked from a save rather
+// than by replaying four chapters. The scripted run above never crosses to
+// fetch the shard, which is the point: the plain branch has to stay the
+// critical path, and this asserts the optional one without displacing it.
+console.log('\n=== the Signal Shard anchoring ===')
+await step('carrying the shard changes how Ren\'s door is anchored', async () => {
+  const sv = await d.save()
+  // The save this borrows from is a finished run, so the later flags have to
+  // come off too or the Chapter 5 beats fire the moment ch4_done is re-set.
+  for (const f of ['ch4_done', 'prevented_vanishing', 'ch5_started', 'ending_empathy',
+                   'ending_severance', 'game_ended']) {
+    delete sv.flags[f]
+  }
+  sv.flags.beacon_found = true
+  sv.inventory = ['ren_key', 'signal_shard']
+  await d.boot({ ...sv, mapKey: 'town', tx: 19, ty: 19, world: 'normal' })
+  const { speaker, lines } = await talkTo(19, 18)
+  need(speaker === "REN'S DOOR", `expected REN'S DOOR, got ${speaker}`)
+  need(
+    lines.some((l) => /shard/i.test(l)),
+    `the shard branch never fired: ${JSON.stringify(lines).slice(0, 120)}`,
+  )
+  need(await flag('ch4_done'), 'ch4_done never set by the shard branch')
+  const left = await items()
+  need(!left.includes('ren_key'), 'ren_key should still be spent')
+  need(!left.includes('signal_shard'), 'the shard should be spent too')
+  return 'ch4_done, both items spent'
+})
+
 // The other ending is a branch of one line, so it is checked from a save at
 // the entity rather than by replaying five chapters.
 console.log('\n=== the other ending ===')

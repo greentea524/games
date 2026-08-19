@@ -605,12 +605,26 @@ export class WorldScene extends Phaser.Scene {
         })
       }
       if (
-        world === 'normal' &&
         GameState.getFlag('flower_delivered') &&
         !GameState.getFlag('thread_flower_done')
       ) {
-        this.spawnPickup(5, 19, 'photo', 'thread_flower_done', mode, 'chapter2_done')
+        this.spawnPickup(5, 19, 'photo', 'thread_flower_done', mode, 'chapter2_done', 'normal')
       }
+
+      // The Signal Shard (#75): a splinter of what the beacon is writing with,
+      // lying on the Static side while the beacon runs. Retrieving it is the
+      // puzzle — cross, find it, carry it home — which is the mirror of the
+      // flower, that goes out and comes back changed. Nothing else in the game
+      // is sourced from the other side.
+      this.spawnPickup(
+        14,
+        11,
+        'signal_shard',
+        'shard_taken',
+        mode,
+        undefined,
+        'static',
+      )
     }
     if (this.mapKey === 'cellar' && !GameState.getFlag('thread_fountain_done')) {
       this.spawnPickup(5, 3, 'ledger', 'thread_fountain_done', mode, 'chapter2_done')
@@ -1003,7 +1017,15 @@ export class WorldScene extends Phaser.Scene {
     doneFlag: string,
     mode: 'dmg' | 'gbc',
     chapterFlag?: string,
+    /**
+     * Which world the item exists in (#75). Undefined means both, which is how
+     * every pickup behaved before — the photo's normal-world constraint used
+     * to live in an `if` at its call site instead, which worked but put the
+     * rule somewhere a reader of this function could not see it.
+     */
+    world?: 'normal' | 'static',
   ) {
+    if (world && GameState.world !== world) return
     const px = tx * TILE + TILE / 2
     const py = ty * TILE + TILE / 2
     const img = this.add.image(px, py, `item_${mode}_${itemId}`)
