@@ -93,6 +93,53 @@ async function cartCrate() {
     moves.map((m) => `${m.name}:${m.moved ? 'moved' : 'blocked'}`).join(' '),
   )
 
+  // #62. A lit target pad has to be findable on a DMG board, and that is not
+  // something the movement checks can see. The pad shipped drawn in PAL.light
+  // with a PAL.lightest dither and a PAL.lightest core — and the DMG floor
+  // *is* PAL.lightest, so two of the three tones were the floor exactly and a
+  // docked pad was an invisible smudge. Every functional check passed.
+  //
+  // Measured against the floor texture rather than against a hardcoded
+  // colour, so this keeps working if the DMG floor tone is ever changed.
+  const contrast = await page.evaluate(() => {
+    const g = window.__game
+    const sample = (key) => {
+      const src = g.textures.get(key).getSourceImage()
+      const c = document.createElement('canvas')
+      c.width = src.width
+      c.height = src.height
+      const ctx = c.getContext('2d')
+      ctx.drawImage(src, 0, 0)
+      return ctx.getImageData(0, 0, c.width, c.height).data
+    }
+    const floor = sample('floor_dmg')
+    const floorTone = [floor[0], floor[1], floor[2]]
+    const share = (key) => {
+      const d = sample(key)
+      let lit = 0
+      let differs = 0
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 40) continue
+        lit++
+        const dist =
+          Math.abs(d[i] - floorTone[0]) + Math.abs(d[i + 1] - floorTone[1]) + Math.abs(d[i + 2] - floorTone[2])
+        if (dist > 24) differs++
+      }
+      return lit ? differs / lit : 0
+    }
+    return { floorTone, empty: share('target_dmg'), lit: share('target_lit_dmg') }
+  })
+  check(
+    'a DMG empty pad is drawn in tones that are not the floor',
+    contrast.empty > 0.75,
+    `${Math.round(contrast.empty * 100)}% of its pixels differ from the floor`,
+  )
+  check(
+    'and so is a DMG lit pad — the one that shipped invisible',
+    contrast.lit > 0.75,
+    `${Math.round(contrast.lit * 100)}% of its pixels differ from the floor`,
+  )
+
   // A tap that does not travel far enough must not move anything. 15px in
   // game space is ~37 client px here, so a 10px client wobble is well under.
   const beforeTap = await st()

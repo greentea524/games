@@ -254,21 +254,45 @@ export class BootScene extends Phaser.Scene {
     if (this.textures.exists(key)) return
     const g = this.make.graphics({}, false)
     if (mode === 'dmg') {
-      // DMG has no colour: render the lit pad as a lighter X with a dithered glow.
-      g.fillStyle(PAL.light)
+      // DMG has no colour, so a lit pad has to read as *denser*, not lighter.
+      //
+      // The first version drew the cross in PAL.light with a PAL.lightest
+      // dither and a PAL.lightest core — and the DMG floor is PAL.lightest,
+      // so two of those three tones were the floor exactly. A docked pad was
+      // a faint smudge you could not find on the board. Every check passed;
+      // the screenshot is what showed it.
+      //
+      // Inverted here: the cross goes to the darkest tone the palette has,
+      // the dithered halo spreads *outside* it in the mid tone so the glow
+      // reads as spilling onto neighbouring floor, and the bright core sits
+      // inside the dark cross where it finally has something to contrast
+      // against. Empty stays a plain mid-tone cross, so lit is unmistakably
+      // the stronger of the two.
+      const inCross = (x: number, y: number) =>
+        (x >= 3 && x < 13 && y >= 6 && y < 10) || (x >= 6 && x < 10 && y >= 3 && y < 13)
+
+      // Halo: a dithered fringe on the floor around the cross.
+      g.fillStyle(PAL.dark)
+      for (let y = 1; y < 15; y++) {
+        for (let x = 1; x < 15; x++) {
+          if (inCross(x, y)) continue
+          const near = inCross(x + 1, y) || inCross(x - 1, y) || inCross(x, y + 1) || inCross(x, y - 1)
+          if (near && (x + y) % 2 === 0) g.fillRect(x, y, 1, 1)
+        }
+      }
+      // The cross itself, at maximum contrast against the floor.
+      g.fillStyle(PAL.darkest)
       g.fillRect(3, 6, 10, 4)
       g.fillRect(6, 3, 4, 10)
-      g.fillStyle(PAL.lightest)
-      for (let y = 6; y < 10; y++) {
-        for (let x = 3; x < 13; x++) {
-          if ((x + y) % 2 === 0) g.fillRect(x, y, 1, 1)
-        }
-      }
+      // Dither inside the cross, one step up, so it is textured rather than
+      // a flat block — this is the part the flipX cycling animates.
+      g.fillStyle(PAL.dark)
       for (let y = 3; y < 13; y++) {
-        for (let x = 6; x < 10; x++) {
-          if ((x + y) % 2 === 1) g.fillRect(x, y, 1, 1)
+        for (let x = 3; x < 13; x++) {
+          if (inCross(x, y) && (x + y) % 2 === 1) g.fillRect(x, y, 1, 1)
         }
       }
+      // Lit core.
       g.fillStyle(PAL.lightest)
       g.fillCircle(8, 8, 2)
     } else {
