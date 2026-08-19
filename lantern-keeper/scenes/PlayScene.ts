@@ -139,6 +139,10 @@ export class PlayScene extends Phaser.Scene {
     if (this.levelKey === 'grove') {
       spawnY = 104 // on top of the spine at row 14
       title = 'THE FIREFLY GROVE'
+    } else if (this.levelKey === 'bridge') {
+      spawnX = 32
+      spawnY = 64 // on the left landing, deck row 9
+      title = 'THE MOSSY BRIDGE'
     } else if (this.levelKey === 'climb') {
       spawnY = 416 // on the floor at row 53
       title = 'THE QUIET CLIMB'
@@ -474,6 +478,13 @@ export class PlayScene extends Phaser.Scene {
     // any drop of six tiles or more, which put warnings on ledges that are
     // completely safe to step off; a sign that cries wolf is worse than none.
     const isVoid = (x: number, y: number) => {
+      // Out of bounds is not a void. `solid` returns false past the edge of
+      // the map, so without this the outermost column of every level looks
+      // like a bottomless drop and the map border gets signposted — which is
+      // exactly what happened: level 1's only sign was on its right-hand wall,
+      // and the Mossy Bridge put both of its signs on the cliff faces instead
+      // of on the deck. The player cannot walk off the side of the world.
+      if (x < 0 || x >= map.width) return false
       for (let d = y + 1; d < map.height; d++) {
         if (solid(x, d)) return false
       }
@@ -618,6 +629,21 @@ export class PlayScene extends Phaser.Scene {
           this.advanceTo('grove')
         })
       })
+    } else if (lantern.name === 'bridge_end') {
+      // The far side of the Mossy Bridge (#92). The last stage before the
+      // Hollow, so this one does not clear the darkness the way the earlier
+      // breathers do — the approach should hand over to the finale still dim.
+      this.won = true
+      sfx.win()
+      this.sparkParticles.emitParticleAt(lantern.sprite.x, lantern.sprite.y, 80)
+      this.toast('THE FAR SIDE', 0)
+      this.tweens.add({ targets: this.darkness, alpha: 0.4, duration: 3000 })
+      this.time.delayedCall(4000, () => {
+        this.cameras.main.fadeOut(1000, 0, 0, 0)
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.advanceTo('level4')
+        })
+      })
     } else if (lantern.name === 'climb_summit') {
       // The Quiet Climb's summit (#91). Grants nothing, same as the Grove's
       // closer: this is a breather between the Marsh and the Canopy.
@@ -673,7 +699,7 @@ export class PlayScene extends Phaser.Scene {
       this.time.delayedCall(5000, () => {
         this.cameras.main.fadeOut(1000, 0, 0, 0)
         this.cameras.main.once('camerafadeoutcomplete', () => {
-          this.advanceTo('level4')
+          this.advanceTo('bridge')
         })
       })
     } else if (lantern.name === 'heart_tree') {
@@ -755,7 +781,7 @@ export class PlayScene extends Phaser.Scene {
   private countAllLanterns(): number {
     const notLanterns = new Set(['mushroom', 'crumble', 'heart_tree'])
     let total = 0
-    for (const key of ['level1', 'grove', 'level2', 'climb', 'level3', 'level4']) {
+    for (const key of ['level1', 'grove', 'level2', 'climb', 'level3', 'bridge', 'level4']) {
       const data = this.cache.tilemap.get(key)?.data as
         | { layers?: { name?: string; objects?: { name?: string }[] }[] }
         | undefined
