@@ -451,6 +451,8 @@ export class BootScene extends Phaser.Scene {
       shadow: number
       accent: number
       ornate: boolean
+      /** Draws a hasp and shackle over the seam, marking it as needing a key. */
+      padlock?: boolean
     }
     const build = (key: string, c: ChestSkin, open: boolean) => {
       if (this.textures.exists(key)) return
@@ -471,13 +473,36 @@ export class BootScene extends Phaser.Scene {
         g.fillStyle(c.trim); g.fillRect(2, 5, 12, 3)
         g.fillStyle(c.shadow); g.fillRect(2, 8, 12, 1)
         g.fillStyle(c.shadow); g.fillRect(2, 13, 12, 1)
-        // Lock plate, straddling the seam, in the accent so it survives on a
-        // lid band that is otherwise the darkest tone available.
-        g.fillStyle(c.accent); g.fillRect(7, 7, 2, 3)
+        if (c.padlock) {
+          // A padlock big enough to be the thing you notice. The first attempt
+          // kept the ordinary lock plate and tucked a small lock under it,
+          // and at 16px the locked chest was indistinguishable from the plain
+          // golden one — which defeats the point, since the player has to know
+          // which chest costs a key before walking to it.
+          //
+          // Shadow tone throughout, so it reads as an object bolted on rather
+          // than as more of the chest's own gilt, with the shackle arching
+          // clear above the lid band.
+          g.fillStyle(c.shadow)
+          g.fillRect(6, 4, 1, 5)
+          g.fillRect(9, 4, 1, 5)
+          g.fillRect(7, 3, 2, 1)
+          g.fillRect(4, 9, 8, 5)
+          g.fillStyle(c.accent)
+          g.fillRect(7, 10, 2, 2)
+          g.fillRect(7, 12, 2, 1)
+        } else {
+          // Lock plate, straddling the seam, in the accent so it survives on a
+          // lid band that is otherwise the darkest tone available.
+          g.fillStyle(c.accent); g.fillRect(7, 7, 2, 3)
+        }
         if (c.ornate) {
           g.fillStyle(c.accent)
           g.fillRect(3, 6, 1, 1); g.fillRect(12, 6, 1, 1)
-          g.fillRect(4, 11, 8, 1)
+          // The inlay bar is what the padlock body would sit on top of, so it
+          // is skipped there — drawn anyway, it cut a bright line straight
+          // through the lock.
+          if (!c.padlock) g.fillRect(4, 11, 8, 1)
         }
       }
       g.generateTexture(key, 16, 16)
@@ -498,6 +523,17 @@ export class BootScene extends Phaser.Scene {
         shadow: isDmg ? PAL.darkest : 0x8a6a10,
         accent: isDmg ? PAL.lightest : 0xfffbe0,
         ornate: true,
+      },
+      // Locked (#59). The same gilt as the golden chest, with a padlock — the
+      // player has to be able to tell at a glance which chest costs a key,
+      // from across a room, in both palettes.
+      locked: {
+        body: isDmg ? PAL.dark : 0xd4a017,
+        trim: isDmg ? PAL.darkest : 0xffe066,
+        shadow: isDmg ? PAL.darkest : 0x8a6a10,
+        accent: isDmg ? PAL.lightest : 0xfffbe0,
+        ornate: true,
+        padlock: true,
       },
     }
     for (const [tier, skin] of Object.entries(skins)) {
@@ -532,6 +568,25 @@ export class BootScene extends Phaser.Scene {
     buildItem(`item_food_${mode}`, isDmg ? PAL.light : 0xc09050, isDmg ? PAL.dark : 0x806030)
     buildItem(`item_potion_${mode}`, isDmg ? PAL.light : 0xff4060, isDmg ? PAL.dark : 0xa02040)
     buildItem(`item_scroll_${mode}`, isDmg ? PAL.lightest : 0xf0e8c0, isDmg ? PAL.light : 0xc0b080)
+    // #59. The key is drawn as a key rather than as another bag: it is the one
+    // pickup whose count the HUD shows, so it has to be identifiable on the
+    // floor without walking onto it.
+    const buildKey = (key: string, metal: number, shade: number) => {
+      if (this.textures.exists(key)) return
+      const g = this.make.graphics({}, false)
+      // Bow (the ring you hold), then the shaft, then two wards.
+      g.fillStyle(metal)
+      g.fillRect(4, 3, 5, 5)
+      g.fillStyle(shade); g.fillRect(5, 4, 3, 3)
+      g.fillStyle(metal)
+      g.fillRect(6, 8, 2, 6)
+      g.fillRect(8, 10, 3, 1)
+      g.fillRect(8, 12, 2, 1)
+      g.generateTexture(key, T, T)
+      g.destroy()
+    }
+    buildKey(`item_key_${mode}`, isDmg ? PAL.dark : 0xd8d0a0, isDmg ? PAL.lightest : 0x6a6248)
+
     buildItem(`item_rewind_${mode}`, isDmg ? PAL.lightest : 0xffd700, isDmg ? PAL.light : 0xc0a000)
   }
 }

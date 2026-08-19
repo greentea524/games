@@ -198,6 +198,29 @@ check(
   `${((sawAccessory / 400) * 100).toFixed(0)}% of floors carry at least one`,
 )
 
+// --- keys stack rather than eating slots (#59) ---------------------------
+//
+// The inventory holds eight things. Carrying three keys must cost one slot,
+// not three, or a player who saves keys for the deeper floors cannot carry
+// anything else.
+GameState.resetRun()
+for (let i = 0; i < 3; i++) GameState.inventory.add(ITEMS.key)
+check('three keys occupy one inventory slot', GameState.inventory.items.length === 1,
+  `${GameState.inventory.items.length} slots`)
+check('and the count reads back correctly', GameState.inventory.count('key') === 3,
+  `${GameState.inventory.count('key')}`)
+GameState.inventory.remove('key')
+check('spending one leaves two', GameState.inventory.count('key') === 2)
+GameState.inventory.remove('key')
+GameState.inventory.remove('key')
+check('spending the last one empties the slot', GameState.inventory.count('key') === 0 &&
+  GameState.inventory.items.length === 0)
+check('and `has` agrees with the count', GameState.inventory.has('key') === false)
+check('counting something never held returns 0', GameState.inventory.count('flame_brand') === 0)
+
+// A key is not gear and must not be routed through the equip rule.
+check('a key is not gear', GameState.isUpgrade(ITEMS.key) === false)
+
 // --- a run resets the slot ------------------------------------------------
 
 GameState.equipAccessory(ITEMS.coin_lucky)

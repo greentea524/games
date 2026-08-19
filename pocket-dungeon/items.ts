@@ -10,6 +10,7 @@ export type ItemCategory =
   | 'potion'
   | 'scroll'
   | 'rewind'
+  | 'key'
 
 /**
  * What an accessory does while worn (#82). Data, not code, so the effect is
@@ -137,6 +138,16 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Unknown scroll.', scrollEffect: 'strength', weight: 2,
   },
 
+  // Keys (#59). Weight 0, like the hourglass: they are placed deliberately
+  // rather than rolled into the loot pool, because a floor that generates a
+  // locked chest has to guarantee a key to go with it. A locked chest with no
+  // reachable key is dead content, and leaving that to a weighted roll makes
+  // it a matter of luck whether the feature exists on a given floor.
+  key: {
+    id: 'key', name: 'Iron Key', category: 'key',
+    description: 'Opens one locked chest.', weight: 0,
+  },
+
   // Turn Rewind (1 per floor)
   hourglass: {
     id: 'hourglass', name: 'Hourglass', category: 'rewind',
@@ -197,6 +208,13 @@ export interface InventoryItem {
   quantity: number
 }
 
+/**
+ * Categories that stack into one inventory entry rather than taking a slot
+ * each. Keys join this set in #59 — carrying three keys must not eat three of
+ * the eight slots.
+ */
+const STACKABLE = new Set<ItemCategory>(['food', 'potion', 'scroll', 'rewind', 'key'])
+
 export class Inventory {
   items: InventoryItem[] = []
   equippedWeapon: ItemDef | null = null
@@ -206,7 +224,7 @@ export class Inventory {
 
   add(def: ItemDef): boolean {
     // Stack consumables
-    if (def.category === 'food' || def.category === 'potion' || def.category === 'scroll' || def.category === 'rewind') {
+    if (STACKABLE.has(def.category)) {
       const existing = this.items.find(i => i.def.id === def.id)
       if (existing) {
         existing.quantity++
@@ -230,6 +248,11 @@ export class Inventory {
 
   has(defId: string): boolean {
     return this.items.some(i => i.def.id === defId && i.quantity > 0)
+  }
+
+  /** How many of `defId` are held. 0 when none — the HUD reads this (#59). */
+  count(defId: string): number {
+    return this.items.find(i => i.def.id === defId)?.quantity ?? 0
   }
 }
 
