@@ -230,6 +230,29 @@ await step('the entity offers a choice, and the ending plays', async () => {
   return 'empathy ending'
 })
 
+// The corruption patches (#64). The claim is that the world toggle is a
+// movement verb here and not just a change of texture, so the check is that
+// the same tiles are solid in one world and walkable in the other — asserted
+// against the collision grid rather than against the sprite that is drawn.
+console.log('\n=== the corruption patches ===')
+await step('the same ground is sealed in town and open on the static side', async () => {
+  const patches = [
+    [10, 6],
+    [20, 13],
+    [11, 16],
+  ]
+  const sv = await d.save()
+  await d.boot({ ...sv, world: 'normal', mapKey: 'town', tx: 11, ty: 18 })
+  const sealed = await d.grid()
+  await d.boot({ ...sv, world: 'static', mapKey: 'town', tx: 11, ty: 18 })
+  const open = await d.grid()
+  for (const [x, y] of patches) {
+    need(sealed[y][x] !== 1, `(${x},${y}) should be solid in the normal town`)
+    need(open[y][x] === 1, `(${x},${y}) should be walkable on the static side`)
+  }
+  return `${patches.length} patches, solid one side and open the other`
+})
+
 // The information transforms (#74). Both readers are on the Static side,
 // which is the constraint that decides where they can live at all: the
 // counterparts only exist while the player is across, so a branch on anything

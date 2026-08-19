@@ -115,6 +115,44 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(5, 9, 6, 1)
     tex(`item_${mode}_ledger_unredacted`, 16, 16)
 
+    // Corruption patch (#64): a jagged tear in the ground, drawn as broken
+    // scanlines rather than a shape with an outline — it has to read as the
+    // tilemap failing rather than as an object someone put there.
+    //
+    // Two forms. Sealed is what the normal town shows: dense, solid, and the
+    // thing you cannot walk through. Open is the Static side: the same tear
+    // with the fill gone, so it reads as a way through rather than a wall.
+    const tear = (key: string, sealed: boolean) => {
+      if (this.textures.exists(key)) return
+      const gg = this.make.graphics({}, false)
+      const edge = mode === 'dmg' ? PAL.darkest : 0x161a26
+      const fill = mode === 'dmg' ? PAL.dark : 0x3b4463
+      const spark = mode === 'dmg' ? PAL.lightest : 0xaab4cc
+      // The tear outline: a ragged column, same silhouette in both forms.
+      const rows: [number, number][] = [
+        [5, 6], [3, 10], [2, 12], [4, 9], [3, 11], [5, 7], [6, 5], [4, 8],
+        [3, 10], [5, 6], [6, 4], [7, 3],
+      ]
+      rows.forEach(([x, w], i) => {
+        const y = 2 + i
+        gg.fillStyle(edge)
+        gg.fillRect(x, y, w, 1)
+        if (sealed && i % 2 === 0) {
+          gg.fillStyle(fill)
+          gg.fillRect(x + 1, y, Math.max(1, w - 2), 1)
+        }
+      })
+      // A few bright bits of signal, so it is alive rather than a stain.
+      gg.fillStyle(spark)
+      gg.fillRect(7, 4, 1, 1)
+      gg.fillRect(5, 9, 1, 1)
+      if (sealed) gg.fillRect(9, 12, 1, 1)
+      gg.generateTexture(key, 16, 16)
+      gg.destroy()
+    }
+    tear(`corruption_sealed_${mode}`, true)
+    tear(`corruption_open_${mode}`, false)
+
     // the entity: a dark figure with a static-filled screen for a face
     if (!this.textures.exists('entity')) {
       g.fillStyle(0x141820); g.fillRect(3, 4, 10, 14)

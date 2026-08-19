@@ -598,6 +598,45 @@ export const VALVE_DEF: NpcDef = {
   ],
 }
 
+/**
+ * The corruption patches (#64), read differently as the town's state changes.
+ *
+ * Chapter-aware in the sense the bookshelf established: the same object, more
+ * legible each time you come back knowing more. The first reading is a child
+ * seeing a stain; the last is someone who understands what is writing it.
+ */
+export const CORRUPTION_DEF: NpcDef = {
+  id: 'corruption',
+  name: 'TORN GROUND',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      requires: 'ch3_done',
+      lines: [
+        { text: 'The ground is not torn. It is being overwritten.' },
+        { text: 'The same hand that is copying Ren’s house, working here.' },
+        { text: 'On the other side it is only a seam. You can step over it.' },
+      ],
+    },
+    {
+      requires: 'chapter2_done',
+      lines: [
+        { text: 'A jagged strip where the grass should be, and is not.' },
+        { text: 'It hums the way the television does.' },
+        { text: 'Solid here. You have felt it give, on the other side.' },
+      ],
+    },
+    {
+      lines: [
+        { text: 'A grey tear in the ground, edges crawling.' },
+        { text: 'You cannot step on it. It will not let you.' },
+      ],
+    },
+  ],
+}
+
 // ---- Examinable scenery ----
 // Small helper: most props are a fixed observation with no state.
 const examine = (id: string, name: string, ...text: string[]): NpcDef => ({
