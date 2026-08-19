@@ -20,6 +20,7 @@ import {
 } from './chests'
 import { ITEMS } from './items'
 import { getBiome } from './enemies'
+import { SCROLL_SPECS } from './scrolls'
 import { RNG } from './rng'
 
 let ok = true
@@ -43,14 +44,24 @@ const locked = chestLootIds('locked')
 const unknown = [...wooden, ...golden, ...locked].filter((id) => !ITEMS[id])
 check('every loot id names a real item', unknown.length === 0, unknown.join(', ') || 'all resolve')
 
-// --- no dead items in a reward ------------------------------------------
+// --- scrolls are a common-tier reward, not a key's payoff ----------------
 //
-// There is no action that uses an inventory item, so a scroll can be picked
-// up and never spent, and ScrollIdentifier.identify has no callers so its
-// label never resolves. They are in the floor drop pool; they must not also
-// be what a chest hands back. Remove this check when #105 lands.
-const scrolls = [...wooden, ...golden, ...locked].filter((id) => ITEMS[id].category === 'scroll')
-check('no scrolls in either table, while scrolls remain unusable', scrolls.length === 0, scrolls.join(', '))
+// They were excluded from both tables until #105, because nothing could use
+// an inventory item and a chest handing one back was a punishment. Now that
+// they work, a one-shot effect belongs in the wooden tier.
+const goldScrolls = [...golden, ...locked].filter((id) => ITEMS[id].category === 'scroll')
+check('no scrolls in the golden or locked tables', goldScrolls.length === 0, goldScrolls.join(', '))
+check(
+  'every scroll is reachable from a wooden chest',
+  Object.values(ITEMS).filter((i) => i.category === 'scroll').every((i) => wooden.includes(i.id)),
+)
+// Every scroll must have a declared effect and a spec, or using it is a no-op
+// that still costs the player a turn and the scroll.
+const specless = Object.values(ITEMS)
+  .filter((i) => i.category === 'scroll')
+  .filter((i) => !i.scrollEffect || !SCROLL_SPECS[i.scrollEffect])
+check('every scroll has an effect with a spec behind it', specless.length === 0,
+  specless.map((i) => i.id).join(', '))
 
 const hourglass = [...wooden, ...golden, ...locked].filter((id) => ITEMS[id].category === 'rewind')
 check('no hourglass either — one per floor is placed directly', hourglass.length === 0)

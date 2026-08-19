@@ -1,6 +1,15 @@
 import Phaser from 'phaser'
 import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST } from '../constants'
 
+/**
+ * How many usable items the gear panel shows at once (#105).
+ *
+ * The band between the two HUD bars is y=16 to y=129, and a 7px line with
+ * lineSpacing 1 costs 8px. Four gear lines and two headers leave room for
+ * five entries plus an overflow marker.
+ */
+const MAX_VISIBLE_USABLE = 5
+
 // Fog alphas, and how far a wall torch pushes a tile back toward lit.
 //
 // FOG_SIGHTED is the point of #57. It used to be 0: everything within the
@@ -29,6 +38,10 @@ import { bossAI } from '../boss'
 import type { BossState } from '../boss'
 import { rollFloorItems, ITEMS } from '../items'
 import { rollChests, rollChestLoot, keysForFloor, type ChestTier } from '../chests'
+import {
+  SCROLL_SPECS, FIRE_RADIUS, FIRE_DAMAGE, STRENGTH_BONUS,
+  blastTargets, teleportCandidates,
+} from '../scrolls'
 import type { ItemDef, TurnSnapshot } from '../items'
 
 /** What `GameState.hungerDrainRate` is on an unmodified floor (#69). */
@@ -107,6 +120,27 @@ export class DungeonScene extends Phaser.Scene {
     const gearKey = this.input.keyboard!.addKey('X')
     gearKey.on('down', () => this.toggleGearPanel())
 
+    // Panel navigation (#105). These have to be listeners rather than polls in
+    // `update()`, because `update()` returns early while `uiBlocking` is set —
+    // which is exactly when the panel is open. Each one is a no-op unless the
+    // panel is up, so the arrow keys still mean "walk" the rest of the time.
+    const useKey = this.input.keyboard!.addKey('Z')
+    useKey.on('down', () => {
+      if (this.gearPanel) this.useSelectedItem()
+    })
+    this.cursors.up.on('down', () => {
+      if (this.gearPanel) this.moveGearCursor(-1)
+    })
+    this.cursors.down.on('down', () => {
+      if (this.gearPanel) this.moveGearCursor(1)
+    })
+    this.wasd.W.on('down', () => {
+      if (this.gearPanel) this.moveGearCursor(-1)
+    })
+    this.wasd.S.on('down', () => {
+      if (this.gearPanel) this.moveGearCursor(1)
+    })
+
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       touchStartX = pointer.x
       touchStartY = pointer.y
@@ -175,6 +209,8 @@ export class DungeonScene extends Phaser.Scene {
   private cobwebs: Phaser.GameObjects.Image[] = []
   /** The gear panel (#82), while it is open. */
   private gearPanel: Phaser.GameObjects.Container | null = null
+  /** Which usable item the panel's cursor is on (#105). */
+  private gearCursor = 0
   /** Chests on this floor (#83); rebuilt with each floor. */
   private chests: {
     tier: ChestTier
@@ -1052,18 +1088,48 @@ export class DungeonScene extends Phaser.Scene {
    * roughly two free character cells between the gold and ATK readouts, which
    * is not enough for three item names.
    */
+  /** Everything the panel can act on: consumables held in the inventory. */
+  private usableItems(): { def: ItemDef; quantity: number }[] {
+    return GameState.inventory.items.filter(
+      (i) => i.def.category === 'potion' || i.def.category === 'scroll',
+    )
+  }
+
   private toggleGearPanel() {
     if (this.gearPanel) {
-      this.gearPanel.destroy()
-      this.gearPanel = null
-      GameState.uiBlocking = false
+      this.closeGearPanel()
       return
     }
+    this.gearCursor = 0
+    this.drawGearPanel()
+    // Movement is suppressed while it is open, the same way every other
+    // blocking overlay in this game does it.
+    GameState.uiBlocking = true
+  }
+
+  private closeGearPanel() {
+    this.gearPanel?.destroy()
+    this.gearPanel = null
+    GameState.uiBlocking = false
+  }
+
+  /**
+   * The three equip slots, the key count, and the usable items (#82, #59, #105).
+   *
+   * Redrawn rather than mutated on every cursor move: the panel is a handful
+   * of short text lines, so rebuilding it is cheaper than keeping a parallel
+   * set of Text objects in sync, and there is no animation to preserve.
+   *
+   * B, A and START were all dead keys inside the dungeon before #82. B opens
+   * and closes, up/down move the cursor, A uses.
+   */
+  private drawGearPanel() {
+    this.gearPanel?.destroy()
     const inv = GameState.inventory
     const slot = (label: string, def: { name: string } | null) =>
       `${label} ${def ? def.name : '--'}`
     const keys = inv.count('key')
-    const body = [
+    const gear = [
       slot('WPN', inv.equippedWeapon),
       slot('ARM', inv.equippedArmor),
       slot('ACC', inv.equippedAccessory),
@@ -1075,8 +1141,41 @@ export class DungeonScene extends Phaser.Scene {
       // not true; there was no key counter, and there is no room for one.
       `KEY ${keys > 0 ? `x${keys}` : '--'}`,
     ].join('\n')
-    const worn = inv.equippedAccessory
-    const lines = worn ? `${body}\n\n${worn.description}` : body
+
+    const usable = this.usableItems()
+    this.gearCursor = usable.length
+      ? Math.max(0, Math.min(this.gearCursor, usable.length - 1))
+      : 0
+
+    // Scrolls show whatever name they have earned. An unidentified one keeps
+    // its cryptic label, which is the whole point of the mechanic — you find
+    // out what FROTZ does by using it.
+    // The list is windowed. Five scrolls plus a potion is six lines, and with
+    // the four gear lines and two headers above them the panel ran off the
+    // bottom of the screen and under the HUD bar — "Health Potion" was drawn
+    // entirely behind it. Measured: the usable band is y=16 to y=129, which is
+    // 113px, and a line costs 8px here.
+    const first = Math.max(
+      0,
+      Math.min(this.gearCursor - MAX_VISIBLE_USABLE + 1, usable.length - MAX_VISIBLE_USABLE),
+    )
+    const window = usable.slice(first, first + MAX_VISIBLE_USABLE)
+    const usableLines = usable.length
+      ? window
+          .map((i, n) => {
+            const idx = first + n
+            const name =
+              i.def.category === 'scroll'
+                ? GameState.scrollIdentifier.getDisplayName(i.def)
+                : i.def.name
+            const qty = i.quantity > 1 ? ` x${i.quantity}` : ''
+            return `${idx === this.gearCursor ? '>' : ' '}${name}${qty}`
+          })
+          .concat(usable.length > first + MAX_VISIBLE_USABLE ? [' ...'] : [])
+          .join('\n')
+      : ' nothing to use'
+
+    const body = [gear, '- USE - (A)', usableLines].join('\n')
 
     const panel = this.add.container(0, 0).setScrollFactor(0).setDepth(60)
     // Near-opaque. At 0.85 the dungeon read straight through the panel and
@@ -1085,22 +1184,126 @@ export class DungeonScene extends Phaser.Scene {
     const backdrop = this.add
       .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, 0x000000, 0.97)
       .setOrigin(0, 0)
-    const text = this.add.text(8, 30, `- GEAR -\n\n${lines}`, {
+    const text = this.add.text(8, 17, `- GEAR -\n${body}`, {
       fontFamily: FONT,
       fontSize: '7px',
       color: CSS_LIGHTEST,
       align: 'left',
-      // Descriptions run past 20 characters at 7px on a 160px screen, and an
+      // Names run past 20 characters at 7px on a 160px screen, and an
       // unwrapped line just leaves the screen.
       wordWrap: { width: GBC_WIDTH - 16 },
       resolution: 2,
-      lineSpacing: 3,
+      lineSpacing: 1,
     })
     panel.add([backdrop, text])
     this.gearPanel = panel
-    // Movement is suppressed while it is open, the same way every other
-    // blocking overlay in this game does it.
-    GameState.uiBlocking = true
+  }
+
+  private moveGearCursor(delta: number) {
+    const usable = this.usableItems()
+    if (usable.length === 0) return
+    this.gearCursor = (this.gearCursor + delta + usable.length) % usable.length
+    sfx.menuMove()
+    this.drawGearPanel()
+  }
+
+  /**
+   * Uses whatever the panel's cursor is on (#105).
+   *
+   * Costs a turn, like attacking or opening a chest, and closes the panel —
+   * an effect the player cannot see because a full-screen backdrop is over it
+   * is not feedback.
+   */
+  private useSelectedItem() {
+    const usable = this.usableItems()
+    const entry = usable[this.gearCursor]
+    if (!entry) return
+    const def = entry.def
+    this.closeGearPanel()
+
+    if (def.category === 'potion') {
+      const healed = Math.min(GameState.maxHp - GameState.playerHp, def.healAmount ?? 0)
+      GameState.playerHp = Math.min(GameState.maxHp, GameState.playerHp + (def.healAmount ?? 0))
+      GameState.inventory.remove(def.id)
+      this.showDamageText(this.player.x, this.player.y - 10, `+${healed} HP`, '#ff88cc')
+    } else if (def.category === 'scroll' && def.scrollEffect) {
+      const effect = def.scrollEffect
+      GameState.inventory.remove(def.id)
+      // Identify on use — the one call that was missing. Without it
+      // getDisplayName could only ever return the cryptic label, so
+      // SCROLL_REAL_NAMES was unreachable and the player could never learn
+      // what any scroll was.
+      GameState.scrollIdentifier.identify(effect)
+      this.applyScroll(effect)
+    } else {
+      return
+    }
+
+    sfx.pickup()
+    GameState.turnState = TurnState.ANIMATING
+    this.time.delayedCall(160, () => {
+      if (GameState.advanceTurn()) this.showRegenTick()
+      this.processEnemyTurn()
+    })
+  }
+
+  private applyScroll(effect: string) {
+    const spec = SCROLL_SPECS[effect]
+    if (spec) {
+      this.showDamageText(this.player.x, this.player.y - 18, spec.banner, '#ffff88')
+    }
+
+    if (effect === 'fire') {
+      const hits = blastTargets(this.playerTX, this.playerTY, this.enemies, FIRE_RADIUS)
+      for (const i of hits) {
+        const enemy = this.enemies[i]
+        const damage = this.scaleDamage(FIRE_DAMAGE)
+        enemy.hp -= damage
+        this.showDamageText(enemy.sprite.x, enemy.sprite.y - 6, `-${damage}`, '#ffaa44')
+        if (enemy.hp <= 0) {
+          // Same bookkeeping as a melee kill, so a scroll kill still counts
+          // and still pays out. Reviving enemies are deliberately not spared
+          // here: the revive is spent on the melee path, and letting fire
+          // bypass it would make the scroll strictly better than a sword
+          // against exactly the enemy it should struggle with.
+          GameState.killsCount++
+          const banked = GameState.addGold(enemy.ai === 'boss' ? 20 : enemy.isSplit ? 1 : 3)
+          this.showDamageText(enemy.sprite.x, enemy.sprite.y + 4, `+${banked}g`, '#ffd700')
+          enemy.sprite.setVisible(false)
+        }
+      }
+      this.cameras.main.shake(180, 0.006)
+      return
+    }
+
+    if (effect === 'teleport') {
+      const blocked = [
+        ...this.enemies.filter((e) => e.hp > 0).map((e) => ({ tx: e.tx, ty: e.ty })),
+        ...this.chests.filter((c) => !c.opened).map((c) => ({ tx: c.tx, ty: c.ty })),
+      ]
+      const spots = teleportCandidates(this.grid, this.playerTX, this.playerTY, blocked)
+      if (spots.length === 0) return
+      const spot = spots[this.rng.nextInt(0, spots.length - 1)]
+      this.playerTX = spot.x
+      this.playerTY = spot.y
+      this.player.x = spot.x * TILE + TILE / 2
+      this.player.y = spot.y * TILE + TILE / 2
+      this.updateFogOfWar()
+      return
+    }
+
+    if (effect === 'map') {
+      for (let y = 0; y < this.mapHeight; y++) {
+        for (let x = 0; x < this.mapWidth; x++) this.explored[y][x] = true
+      }
+      this.updateFogOfWar()
+      return
+    }
+
+    if (effect === 'strength') {
+      GameState.playerBaseAtk += STRENGTH_BONUS
+      GameState.recalcAtk()
+    }
   }
 
   private tryPickupItem(tx: number, ty: number) {

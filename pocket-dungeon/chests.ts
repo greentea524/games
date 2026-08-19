@@ -9,12 +9,11 @@ import { ITEMS, type ItemDef } from './items'
  * explicit item lists, not a weight filter over the shared pool. A golden
  * chest can never hand back a Rusty Sword.
  *
- * Scrolls are deliberately absent from both tables. They are in the floor
- * drop pool, but there is no action that uses an inventory item, so a scroll
- * can be picked up and never spent — and `ScrollIdentifier.identify` has no
- * callers, so its cryptic label never resolves either. Putting one in a chest
- * would make opening it a punishment. Tracked in #105; once that lands they
- * belong in these tables.
+ * Scrolls sit in the wooden table only. They were excluded entirely until
+ * #105, because until then nothing could use an inventory item and a scroll
+ * was a slot that did nothing — a chest handing one back was a punishment.
+ * Now that they work they belong in the common tier: a scroll is a one-shot
+ * effect, which is a wooden-chest reward, not the payoff for a key.
  */
 export type ChestTier = 'wooden' | 'golden' | 'locked'
 
@@ -43,6 +42,10 @@ const CHEST_TABLES: Record<ChestTier, LootEntry[]> = {
     { id: 'rusty_sword', weight: 3 },
     { id: 'leather_vest', weight: 3 },
     { id: 'ring_bronze', weight: 2 },
+    { id: 'scroll_fire', weight: 2 },
+    { id: 'scroll_teleport', weight: 2 },
+    { id: 'scroll_map', weight: 2 },
+    { id: 'scroll_strength', weight: 1 },
   ],
   // No entry here overlaps the wooden table's gear, so opening a golden chest
   // cannot hand back something the wooden tier already gives.
