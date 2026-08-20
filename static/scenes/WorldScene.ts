@@ -31,6 +31,12 @@ import {
   ENTITY_DEF,
   CH5_START_DEF,
   CORRUPTION_DEF,
+  LAMP_DEF,
+  LAMP_STATIC_DEF,
+  SIGN_CROSSROADS_DEF,
+  SIGN_SOUTH_DEF,
+  SIGN_NORTH_DEF,
+  BARREL_DEF,
   STATIC_DOOR_DEF,
   BOOKSHELF_DEF,
   JOURNAL_DEF,
@@ -543,6 +549,7 @@ export class WorldScene extends Phaser.Scene {
       // was a ROOF tile, so it drew a hedge on top of a house and registered
       // an examine point with no reachable approach (#94).
       this.placeCorruption(mode)
+      this.placeStreetFurniture(mode)
 
       const bushCoords = [[9, 4], [6, 15]]
       for (const [bx, by] of bushCoords) {
@@ -937,6 +944,61 @@ export class WorldScene extends Phaser.Scene {
    * Examinable in both worlds through the ordinary interactable list, so the
    * text is reachable whether or not you can cross the tile.
    */
+  /**
+   * Street furniture (#63): lamp posts, signposts and water barrels.
+   *
+   * Fencing, hedges and flower beds were already here — this is the rest of
+   * the set. Every piece is solid, because every piece looks solid, and a post
+   * you can walk through is worse than no post.
+   *
+   * Positions are authored, not scattered: each was checked against the town
+   * layout so nothing lands on a door tile, an NPC tile, an existing prop or a
+   * corruption patch, and `qa:static`'s reachability pass re-checks that none
+   * of them closes a route.
+   *
+   * The signs name what is genuinely in that direction — the door tiles are
+   * house (6,8), house2 (17,12), the bakery (5,19), Gus's hut (3,13), Ren's
+   * house (19,18) and the fountain (16,18). They were written against the map
+   * rather than from memory, because a sign that lies is worse than no sign.
+   */
+  private placeStreetFurniture(mode: string) {
+    // The lamp reads differently across the toggle. Picked here, the way the
+    // fountain and the valve already are.
+    const lampDef = GameState.world === 'static' ? LAMP_STATIC_DEF : LAMP_DEF
+
+    for (const [lx, ly] of [
+      [12, 7],
+      [7, 12],
+      [18, 15],
+    ]) {
+      this.solidProp(lx, ly, 1, 1, `prop_lamp_${mode}`)
+      this.examine(lx, ly, lampDef)
+    }
+
+    const signs: [number, number, NpcDef][] = [
+      [12, 13, SIGN_CROSSROADS_DEF],
+      [9, 17, SIGN_SOUTH_DEF],
+      [20, 9, SIGN_NORTH_DEF],
+    ]
+    for (const [sx, sy, def] of signs) {
+      this.solidProp(sx, sy, 1, 1, `prop_sign_${mode}`)
+      this.examine(sx, sy, def)
+    }
+
+    // (4,20) was tried and rejected: on the Static side the Baker's house
+    // stands at rows 16-19, so row 20 is the only way into the south-west
+    // corner, and a barrel there sealed 16 tiles and Gus's hut door behind it.
+    // That is #96 exactly, and the reachability pass caught it again.
+    for (const [bx, by] of [
+      [9, 8],
+      [14, 10],
+      [20, 7],
+    ]) {
+      this.solidProp(bx, by, 1, 1, `prop_barrel_${mode}`)
+      this.examine(bx, by, BARREL_DEF)
+    }
+  }
+
   private placeCorruption(mode: string) {
     const open = GameState.world === 'static'
     const key = `corruption_${open ? 'open' : 'sealed'}_${mode}`
