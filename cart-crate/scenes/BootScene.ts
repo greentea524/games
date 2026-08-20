@@ -175,10 +175,17 @@ export class BootScene extends Phaser.Scene {
     } else if (facing === 'up') {
       g.fillStyle(furColor); g.fillRect(cx - 5, 3, 10, 6)
     } else if (facing === 'left') {
+      // #107: the side snout is the one part of this sprite that sticks out
+      // past the head, and `whiteColor` is PAL.lightest in DMG — the floor
+      // tone exactly. Facing left or right the fox lost its muzzle and read
+      // as a blunt-faced block. The forward-facing snout is safe because the
+      // head and the body enclose it; these two need their own edge.
+      g.fillStyle(darkColor); g.fillRect(cx - 7, 5, 6, 5)
       g.fillStyle(whiteColor); g.fillRect(cx - 6, 6, 4, 3)
       g.fillStyle(darkColor); g.fillRect(cx - 6, 6, 2, 2)
       g.fillRect(cx - 3, 4, 1, 1)
     } else {
+      g.fillStyle(darkColor); g.fillRect(cx + 1, 5, 6, 5)
       g.fillStyle(whiteColor); g.fillRect(cx + 2, 6, 4, 3)
       g.fillStyle(darkColor); g.fillRect(cx + 4, 6, 2, 2)
       g.fillRect(cx + 2, 4, 1, 1)

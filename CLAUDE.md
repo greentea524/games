@@ -49,13 +49,25 @@ treat any page or console error as a failure. Point `QA_URL` at a running
 server to skip the spawn — `static/qa/` takes a game URL, `qa/touch/` takes the
 games *base* URL.
 
-**DMG art is the repo's most repeated defect.** Four sprites have shipped
-invisible — #52, #58, #83, #62 — always the same way: the DMG ramp has four
-tones, three games draw their background in `PAL.lightest`, and a sprite that
-also reaches for `PAL.lightest` or `PAL.light` lands on ground of its own
-colour. Every one passed every functional check and was caught only by
-screenshot. `npm run qa:contrast` now guards this; run it after any sprite
-work, and read `qa/contrast/README.md` before adding art.
+**DMG art is the repo's most repeated defect.** Six sprites have shipped
+invisible — #52, #58, #83, #62, #85, #84 — always the same way: the DMG ramp
+has four tones, three games draw their background in `PAL.lightest`, and a
+sprite that also reaches for `PAL.lightest` or `PAL.light` lands on ground of
+its own colour. Every one passed every functional check and was caught only by
+screenshot. `npm run qa:contrast` guards this; run it after any sprite work,
+and read `qa/contrast/README.md` before adding art.
+
+Two of the six got past a *green* run of that suite, which is worth knowing
+before trusting it. Legibility is a whole-sprite score, so a dark body carries
+a sprite whose horns or lid band are painted in the floor tone; #107 added a
+silhouette rule for that. And the suite only checks sprites drawn on a floor
+or a sky — art on the HUD bar answers to a surface nothing measures yet.
+
+**When a light feature lands on the light floor, outline it — do not retone
+it.** There are four tones and the dark two are usually already in use, so a
+face or a bone drawn dark enough to survive the grass stops reading as a face
+or a bone. A one-pixel `PAL.darkest` edge costs one pixel of silhouette and
+lets everything inside stay light. DMG only; GBC's floors are dark.
 
 See `static/qa/README.md` and `qa/touch/README.md` before extending either.
 Both carry hard-won notes: `scene.isActive()` is false during `create()`,

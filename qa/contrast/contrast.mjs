@@ -45,6 +45,55 @@ export const STRONG_TONE = 120
 export const MIN_STRONG_PIXELS = 12
 
 /**
+ * How many pixels a sprite may lose off its silhouette before it fails (#107).
+ *
+ * `MIN_STRONG_PIXELS` above is a whole-sprite score and cannot express this.
+ * A body drawn two tones from the floor banks hundreds of strong pixels while
+ * an arm, a horn or a lid band painted in the floor tone is eaten off the
+ * outline — the suite stays green and the silhouette the player sees is not
+ * the one that was drawn. #85's boss horns and #84's relic pips both shipped
+ * that way, past a green run of this very suite.
+ *
+ * Calibrated the same way as `MIN_STRONG_PIXELS`: measured across every
+ * sprite in the manifest, defects confirmed by eye against the GBC twin.
+ *
+ * Known bad, every one of them missing a part of itself on the DMG floor:
+ *
+ *   pd      archer_dmg           55px  skull, ribs and legs, all bone-toned
+ *   pd      skeleton_dmg         39px  skull and arm bones
+ *   static  npc_dmg_baker_down   28px  hair and face
+ *   static  item_dmg_flower_fresh 28px the entire bloom
+ *   static  kid_dmg_left_0       17px  the face
+ *   pd      item_scroll_dmg      14px  the whole lid band
+ *   static  item_dmg_flashlight   8px  lens and housing
+ *   cc      player_dmg_left       8px  the muzzle
+ *
+ * Known good, all fixed and confirmed by eye, plus the two that were never
+ * broken:
+ *
+ *   static  corruption_sealed_dmg 2px  one tendril tip
+ *   static  corruption_open_dmg   1px  one tendril tip
+ *   everything else               0px
+ *
+ * 4 sits in the gap: twice the worst noise, half the smallest real defect.
+ */
+export const MAX_DISSOLVED_PIXELS = 4
+
+/**
+ * The merge threshold for the rule above, and it is deliberately `SAME_TONE`
+ * rather than `STRONG_TONE`.
+ *
+ * Widening it to a full tonal step was tried and is wrong. Windup draws its
+ * sprites against a near-black sky with a deliberate `PAL.darkest` outline,
+ * which is 48 from that sky — under a 120 threshold the outline reads as
+ * "merged" and the character is reported as having dissolved 100 pixels,
+ * when what is actually happening is an outline doing its job. The rule can
+ * only ask "is this region literally the background", not "is it weakly
+ * separated"; the second question is `MIN_STRONG_PIXELS`'s.
+ */
+export const DISSOLVE_TONE = SAME_TONE
+
+/**
  * Upper bound on how much a *backdrop* sprite may resemble the platform tile
  * (#52). Background scenery that reads like a solid platform is the defect,
  * so here a high score fails.
@@ -97,6 +146,56 @@ export const PAGE_HELPERS = `
       let best = 0, bestN = -1
       for (const [k, n] of counts) if (n > bestN) { best = k; bestN = n }
       return [(best >> 16) & 255, (best >> 8) & 255, best & 255]
+    },
+    /**
+     * Opaque pixels that have *dissolved* into the surface (#107).
+     *
+     * Flood-fills inward from the texture's edge through everything the eye
+     * cannot separate from the background — transparent pixels and opaque
+     * pixels within \`threshold\` of the surface tone alike — and returns how
+     * many opaque pixels that fill swallowed.
+     *
+     * This is the limb rule, and \`share\` above cannot express it. \`share\`
+     * is a whole-sprite score: a body drawn two tones from the floor banks
+     * hundreds of strong pixels while an arm, a horn or a lid band painted in
+     * the floor tone is eaten off the outline, and the silhouette that
+     * reaches the player is not the one that was drawn. That is exactly how
+     * #84's relic pips and #85's boss horns got through a green suite.
+     *
+     * An eye or a buckle in the floor tone is fine and stays fine here: it is
+     * enclosed by contrasting pixels, so the fill never reaches it. Only
+     * regions connected to the outside count.
+     */
+    dissolved(key, tone, threshold) {
+      const d = window.__contrast.pixels(key, null, null)
+      const src = window.__game.textures.get(key).getSourceImage()
+      const w = src.width, h = src.height
+      const merged = (i) => {
+        if (d[i + 3] < 40) return true
+        return (
+          Math.abs(d[i] - tone[0]) +
+            Math.abs(d[i + 1] - tone[1]) +
+            Math.abs(d[i + 2] - tone[2]) <=
+          threshold
+        )
+      }
+      const seen = new Uint8Array(w * h)
+      const stack = []
+      for (let x = 0; x < w; x++) stack.push([x, 0], [x, h - 1])
+      for (let y = 0; y < h; y++) stack.push([0, y], [w - 1, y])
+      let eaten = 0
+      while (stack.length) {
+        const [x, y] = stack.pop()
+        if (x < 0 || y < 0 || x >= w || y >= h) continue
+        const p = y * w + x
+        if (seen[p]) continue
+        const i = p * 4
+        if (!merged(i)) continue
+        seen[p] = 1
+        if (d[i + 3] >= 40) eaten++
+        stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1])
+      }
+      return eaten
     },
     /**
      * How a sprite stands out from \`tone\`.

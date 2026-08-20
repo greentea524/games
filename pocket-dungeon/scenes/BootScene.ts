@@ -308,6 +308,21 @@ export class BootScene extends Phaser.Scene {
     const shade = mode === 'dmg' ? PAL.dark : 0x807860
     const socket = mode === 'dmg' ? PAL.darkest : 0x201810
 
+    // #107: as with the archer, `bone` is the DMG floor tone. The heap and
+    // the jaw survived because they are `shade`; the skull, the arm bones and
+    // the bone chips along the top of the pile did not, and Bonepile reached
+    // the player as two sockets over a bare slab. The bones keep their colour
+    // and get an edge one pixel proud of each shape.
+    if (mode === 'dmg') {
+      g.fillStyle(PAL.darkest)
+      g.fillRect(4, 4, 8, 7)    // skull
+      g.fillRect(0, 8, 5, 4)    // left arm bone
+      g.fillRect(11, 8, 5, 4)   // right arm bone
+      g.fillRect(2, 10, 5, 2)   // bone chips along the heap
+      g.fillRect(6, 10, 4, 2)
+      g.fillRect(10, 10, 4, 2)
+    }
+
     // The heap it rises from — wide and low, the read at a distance.
     g.fillStyle(shade); g.fillRect(2, 12, 12, 3)
     g.fillStyle(bone)
@@ -351,6 +366,20 @@ export class BootScene extends Phaser.Scene {
     const bone = mode === 'dmg' ? PAL.lightest : 0xe8e0d0
     const dark = mode === 'dmg' ? PAL.darkest : 0x483828
     const bow = mode === 'dmg' ? PAL.dark : 0x906840
+    // #107: `bone` is PAL.lightest in DMG, which is the dungeon floor
+    // exactly. Every bone on this sprite — skull, ribs, legs — was drawn in
+    // the colour of the ground it stands on, and what reached the player was
+    // two eye sockets, two rib lines and a bow floating in mid-air. It cannot
+    // be retoned: a skeleton whose bones are dark is not reading as bone. So
+    // the bones keep their colour and get an edge, drawn one pixel proud of
+    // each shape and covered by the fills below.
+    if (mode === 'dmg') {
+      g.fillStyle(PAL.darkest)
+      g.fillRect(4, 0, 8, 8)    // skull
+      g.fillRect(5, 6, 6, 7)    // ribcage
+      g.fillRect(5, 11, 4, 5)   // left leg
+      g.fillRect(8, 11, 4, 5)   // right leg
+    }
     // Skull
     g.fillStyle(bone); g.fillRect(5, 1, 6, 6)
     g.fillStyle(dark); g.fillRect(6, 3, 2, 2); g.fillRect(10, 3, 2, 2)
@@ -674,6 +703,19 @@ export class BootScene extends Phaser.Scene {
     const buildItem = (key: string, color: number, accent: number) => {
       if (this.textures.exists(key)) return
       const g = this.make.graphics({}, false)
+      // #107. Six bags share this shape and four of them had a piece missing
+      // on the DMG floor: the scroll's whole lid band was PAL.lightest, the
+      // floor tone exactly, and the accessory, food and potion bodies were
+      // PAL.light, one notch off it and barely there. Retoning them would
+      // have collapsed six categories onto the two dark tones — weapon and
+      // armour already share theirs — so the bags keep their colours and get
+      // an edge instead, drawn one pixel proud of body, lid and tie.
+      if (mode === 'dmg') {
+        g.fillStyle(PAL.darkest)
+        g.fillRect(3, 5, 10, 10)
+        g.fillRect(4, 3, 8, 4)
+        g.fillRect(6, 2, 4, 4)
+      }
       // Bag body
       g.fillStyle(color); g.fillRect(4, 6, 8, 8)
       g.fillStyle(accent); g.fillRect(5, 4, 6, 2)

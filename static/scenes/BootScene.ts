@@ -77,10 +77,24 @@ export class BootScene extends Phaser.Scene {
     tex(`hatch_${mode}`, 16, 16)
 
     // item: fresh flower (upright, bright bloom)
+    //
+    // #107: in DMG the bloom was PAL.lightest and both leaves PAL.light —
+    // the grass tile and one notch off it. Lying on grass, which is where a
+    // flower is found, the entire bloom vanished and left a bare stem with
+    // two specks. The bloom keeps its bright centre and gains a dark ring to
+    // stand it off the ground; the leaves go dark and read against the stem
+    // by position rather than tone.
     g.fillStyle(mode === 'dmg' ? PAL.dark : GBC_PAL.flowerStem); g.fillRect(7, 7, 2, 7)
-    g.fillStyle(mode === 'dmg' ? PAL.lightest : GBC_PAL.flowerBloom); g.fillCircle(8, 4, 3)
-    g.fillStyle(mode === 'dmg' ? PAL.light : GBC_PAL.knobGlow); g.fillRect(7, 3, 2, 2)
-    g.fillStyle(mode === 'dmg' ? PAL.light : GBC_PAL.grassBg); g.fillRect(4, 9, 3, 1); g.fillRect(9, 10, 3, 1)
+    if (mode === 'dmg') {
+      g.fillStyle(PAL.darkest); g.fillCircle(8, 4, 3)
+      g.fillStyle(PAL.lightest); g.fillCircle(8, 4, 2)
+      g.fillStyle(PAL.dark); g.fillRect(7, 3, 2, 2)
+      g.fillStyle(PAL.darkest); g.fillRect(4, 9, 3, 1); g.fillRect(9, 10, 3, 1)
+    } else {
+      g.fillStyle(GBC_PAL.flowerBloom); g.fillCircle(8, 4, 3)
+      g.fillStyle(GBC_PAL.knobGlow); g.fillRect(7, 3, 2, 2)
+      g.fillStyle(GBC_PAL.grassBg); g.fillRect(4, 9, 3, 1); g.fillRect(9, 10, 3, 1)
+    }
     tex(`item_${mode}_flower_fresh`, 16, 16)
 
     // item: keepsake photo (small framed picture)
@@ -429,6 +443,26 @@ export class BootScene extends Phaser.Scene {
     g.destroy()
   }
 
+  /**
+   * One body for the kid and every NPC.
+   *
+   * `outlineColor` is the fix from #107 and it is DMG-only. In DMG the skin
+   * tone is `PAL.lightest`, which is the grass tile *exactly* — so every face
+   * in the game was drawn in its own background's colour and every character
+   * walked around as a hat, two eyes and a shirt with a hole between them.
+   * Gus's hair and the Baker's hair and apron did the same thing one notch
+   * further along the ramp.
+   *
+   * Retoning the skin was the obvious fix and the wrong one: there are four
+   * tones, the shirt and hair already use two of the dark ones, and a face
+   * drawn dark enough to survive the grass stops reading as a face. An
+   * outline is what the hardware's own artists did — it costs one pixel of
+   * silhouette and lets everything inside it stay light.
+   *
+   * GBC passes `undefined` and is untouched: its floors are dark, nothing
+   * dissolves into them, and outlining a game that already reads would be
+   * changing art for the benefit of a check rather than a player.
+   */
   private drawCharacter(
     g: Phaser.GameObjects.Graphics,
     key: string,
@@ -438,10 +472,20 @@ export class BootScene extends Phaser.Scene {
     pantsColor: number,
     hairColor: number,
     skinColor: number,
+    outlineColor?: number,
   ) {
     if (this.textures.exists(key)) return
     g.clear()
     const cx = 8
+    if (outlineColor !== undefined) {
+      // Drawn first and one pixel proud of every limb, so the fills below
+      // leave it showing as a border. Head and torso are one block because
+      // they are flush; the legs need their own, and they shift with `step`.
+      g.fillStyle(outlineColor)
+      g.fillRect(cx - 4, 1, 8, 13)
+      g.fillRect(cx - 4 + step, 13, 4, 3)
+      g.fillRect(cx - step, 13, 4, 3)
+    }
     g.fillStyle(pantsColor)
     g.fillRect(cx - 3 + step, 13, 2, 3)
     g.fillRect(cx + 1 - step, 13, 2, 3)
@@ -463,9 +507,12 @@ export class BootScene extends Phaser.Scene {
     const hair = mode === 'dmg' ? PAL.darkest : GBC_PAL.hairDark
     const skin = mode === 'dmg' ? PAL.lightest : GBC_PAL.skin
 
+    // #107: only DMG needs the outline — see drawCharacter.
+    const outline = mode === 'dmg' ? PAL.darkest : undefined
+
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
-      this.drawCharacter(g, `kid_${mode}_${f}_0`, f, 0, shirt, pants, hair, skin)
-      this.drawCharacter(g, `kid_${mode}_${f}_1`, f, 1, shirt, pants, hair, skin)
+      this.drawCharacter(g, `kid_${mode}_${f}_0`, f, 0, shirt, pants, hair, skin, outline)
+      this.drawCharacter(g, `kid_${mode}_${f}_1`, f, 1, shirt, pants, hair, skin, outline)
     })
     g.destroy()
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
@@ -489,7 +536,11 @@ export class BootScene extends Phaser.Scene {
             mom: { shirt: PAL.dark, pants: PAL.darkest, hair: PAL.darkest, skin: PAL.lightest },
             ren: { shirt: PAL.darkest, pants: PAL.darkest, hair: PAL.darkest, skin: PAL.lightest },
             gus: { shirt: PAL.dark, pants: PAL.darkest, hair: PAL.light, skin: PAL.lightest },
-            baker: { shirt: PAL.light, pants: PAL.dark, hair: PAL.lightest, skin: PAL.lightest },
+            // The outline (#107) saves the Baker's silhouette but not his
+            // hairline: hair and skin were both PAL.lightest, so the head
+            // read as one blank light block with two eyes in it. GBC gives
+            // him grey hair over skin; PAL.dark is the DMG equivalent.
+            baker: { shirt: PAL.light, pants: PAL.dark, hair: PAL.dark, skin: PAL.lightest },
           }
         : {
             mom: { shirt: GBC_PAL.shirtMom, pants: 0x403050, hair: GBC_PAL.hairDark, skin: GBC_PAL.skin },
@@ -515,6 +566,7 @@ export class BootScene extends Phaser.Scene {
           cfg.pants,
           cfg.hair,
           cfg.skin,
+          mode === 'dmg' ? PAL.darkest : undefined,
         )
       })
     }
@@ -525,9 +577,15 @@ export class BootScene extends Phaser.Scene {
     if (mode === 'dmg') {
       const keyFlash = 'item_dmg_flashlight'
       if (!this.textures.exists(keyFlash)) {
+        // #107: the head was PAL.light and the lens PAL.lightest, both on the
+        // outside of the silhouette and both the grass tone or a notch off
+        // it, so the business end of the flashlight was missing. The lens is
+        // still the brightest thing on the sprite — it is now boxed in by a
+        // dark housing rather than touching the ground directly.
         const g1 = this.make.graphics({}, false)
         g1.fillStyle(PAL.darkest); g1.fillRect(2, 5, 8, 4)
-        g1.fillStyle(PAL.light); g1.fillRect(9, 4, 4, 6)
+        g1.fillStyle(PAL.dark); g1.fillRect(9, 4, 3, 6)
+        g1.fillStyle(PAL.darkest); g1.fillRect(11, 3, 4, 8)
         g1.fillStyle(PAL.lightest); g1.fillRect(12, 5, 2, 4)
         g1.generateTexture(keyFlash, 16, 16)
         g1.destroy()
@@ -539,8 +597,9 @@ export class BootScene extends Phaser.Scene {
       if (!this.textures.exists(keyFlashDead)) {
         const g3 = this.make.graphics({}, false)
         g3.fillStyle(PAL.darkest); g3.fillRect(2, 5, 8, 4)
-        g3.fillStyle(PAL.dark); g3.fillRect(9, 4, 4, 6)
-        g3.fillStyle(PAL.darkest); g3.fillRect(12, 5, 2, 4)
+        g3.fillStyle(PAL.dark); g3.fillRect(9, 4, 3, 6)
+        g3.fillStyle(PAL.darkest); g3.fillRect(11, 3, 4, 8)
+        g3.fillStyle(PAL.dark); g3.fillRect(12, 5, 2, 4)
         g3.generateTexture(keyFlashDead, 16, 16)
         g3.destroy()
       }
