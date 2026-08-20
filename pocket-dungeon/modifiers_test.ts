@@ -15,6 +15,7 @@
 // identical floor for floor, which is the precise opposite of what this
 // feature exists to do.
 import { rollModifier, modifierSeed, MODIFIER_TABLE, MODIFIER_MIN_DEPTH, BOSS_DEPTH, MAX_BANNER_CHARS } from './modifiers'
+import { BOSS_DEPTHS, isBossFloor } from './bosses'
 import { rollFloorItems } from './items'
 import { RNG } from './rng'
 
@@ -27,8 +28,13 @@ const check = (name: string, pass: boolean, note?: string) => {
 const roll = (seed: number, depth: number) =>
   rollModifier(depth, new RNG(modifierSeed(seed, depth)))
 
+// Boss floors are excluded (#85), not just the last one. Without this the
+// list claims two floors are eligible that can never roll anything, and the
+// distribution below would be measured against a denominator that is wrong.
 const ELIGIBLE = [] as number[]
-for (let d = MODIFIER_MIN_DEPTH; d < BOSS_DEPTH; d++) ELIGIBLE.push(d)
+for (let d = MODIFIER_MIN_DEPTH; d < BOSS_DEPTH; d++) {
+  if (!isBossFloor(d)) ELIGIBLE.push(d)
+}
 
 // --- suppression -----------------------------------------------------------
 
@@ -40,6 +46,24 @@ for (let seed = 0; seed < 4000; seed++) {
 }
 check('floors below the minimum never roll a modifier', earlyHits === 0, `${earlyHits} hits`)
 check('the boss floor never rolls a modifier', bossHits === 0, `${bossHits} hits`)
+
+// Every boss floor, not only the last (#85). A modifier on a boss floor turns
+// that fight into a coin flip — Brittle doubles damage both ways, and against
+// the Cellar Brute's 22 HP that decides it before it starts.
+let bossFloorHits = 0
+for (let seed = 0; seed < 4000; seed++) {
+  for (const d of BOSS_DEPTHS) if (roll(seed, d)) bossFloorHits++
+}
+check(
+  'no boss floor rolls a modifier',
+  bossFloorHits === 0,
+  `${bossFloorHits} hits across floors ${BOSS_DEPTHS.join(', ')}`,
+)
+check(
+  'and the eligible list excludes them',
+  ELIGIBLE.every((d) => !isBossFloor(d)),
+  `eligible: ${ELIGIBLE.join(', ')}`,
+)
 
 // --- determinism -----------------------------------------------------------
 

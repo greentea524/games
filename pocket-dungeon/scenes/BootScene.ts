@@ -426,6 +426,53 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(dark); g.fillRect(3, 13, 3, 3); g.fillRect(10, 13, 3, 3)
     g.generateTexture(key, 16, 16)
     g.destroy()
+
+    // The two earlier bosses (#85). Same silhouette language as the Guardian —
+    // wide body, lit eyes — so they read as bosses at a glance, with the
+    // headpiece carrying which one it is: horns for the Brute, a ring of
+    // skulls for the Choir, a crown for the Guardian.
+    //
+    // All three are dark-bodied. The DMG floor is PAL.lightest, and the
+    // repo's most repeated defect is a sprite drawn in its own background's
+    // tone (see qa/contrast).
+    const brute = `boss_brute_${mode}`
+    if (!this.textures.exists(brute)) {
+      const b = this.make.graphics({}, false)
+      const hide = mode === 'dmg' ? PAL.dark : 0x7a4a2a
+      const hideDark = mode === 'dmg' ? PAL.darkest : 0x4a2a16
+      // The horns are the whole point of this silhouette, and they sit on the
+      // floor rather than on the body — so in DMG they answer to the floor,
+      // not to the hide. Drawn in PAL.lightest first, which is the DMG floor
+      // exactly: the screenshot showed a hornless block. PAL.darkest reads
+      // against both the floor and the hide.
+      const horn = mode === 'dmg' ? PAL.darkest : 0xe8d8b0
+      const eyeB = mode === 'dmg' ? PAL.lightest : 0xffa030
+      b.fillStyle(horn); b.fillRect(2, 1, 2, 4); b.fillRect(12, 1, 2, 4)
+      b.fillStyle(hide); b.fillRect(3, 4, 10, 5)
+      b.fillStyle(eyeB); b.fillRect(5, 6, 2, 2); b.fillRect(9, 6, 2, 2)
+      b.fillStyle(hide); b.fillRect(1, 9, 14, 4)
+      b.fillStyle(hideDark); b.fillRect(4, 10, 8, 2)
+      b.fillStyle(hideDark); b.fillRect(2, 13, 4, 3); b.fillRect(10, 13, 4, 3)
+      b.generateTexture(brute, 16, 16)
+      b.destroy()
+    }
+
+    const choir = `boss_choir_${mode}`
+    if (!this.textures.exists(choir)) {
+      const c = this.make.graphics({}, false)
+      const bone = mode === 'dmg' ? PAL.dark : 0x9a94a8
+      const boneDark = mode === 'dmg' ? PAL.darkest : 0x4a4658
+      const eyeC = mode === 'dmg' ? PAL.lightest : 0x80ffd0
+      c.fillStyle(bone)
+      c.fillRect(2, 0, 2, 2); c.fillRect(7, 0, 2, 2); c.fillRect(12, 0, 2, 2)
+      c.fillStyle(boneDark); c.fillRect(3, 3, 10, 6)
+      c.fillStyle(eyeC); c.fillRect(5, 6, 2, 2); c.fillRect(9, 6, 2, 2)
+      c.fillStyle(boneDark); c.fillRect(2, 9, 12, 4)
+      c.fillStyle(bone); c.fillRect(4, 10, 2, 2); c.fillRect(7, 10, 2, 2); c.fillRect(10, 10, 2, 2)
+      c.fillStyle(boneDark); c.fillRect(3, 13, 3, 3); c.fillRect(10, 13, 3, 3)
+      c.generateTexture(choir, 16, 16)
+      c.destroy()
+    }
   }
 
   /**
