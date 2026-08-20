@@ -20,6 +20,7 @@ import { GAMES } from './manifest.mjs'
 import {
   PAGE_HELPERS, SAME_TONE, STRONG_TONE, MIN_STRONG_PIXELS,
   MAX_BACKDROP_MATCH, MIN_VARIANT_MARK, MIN_VARIANT_PIXELS,
+  MAX_DISSOLVED_PIXELS, DISSOLVE_TONE,
 } from './contrast.mjs'
 
 const PORT = process.env.QA_PORT ?? '5179'
@@ -136,6 +137,31 @@ for (const entry of GAMES) {
     failures.length === 0,
     failures.length
       ? `under ${MIN_STRONG_PIXELS} strongly-contrasting pixels: ${failures.join(', ')}`
+      : 'all clear',
+  )
+
+  // --- silhouette: no limb may be eaten off the outline (#107) -------------
+  //
+  // The rule above scores the whole sprite, so a dark body carries a sprite
+  // whose horns, muzzle or lid band are painted in the floor tone. This one
+  // floods in from the texture edge through everything indistinguishable from
+  // the surface and counts what it swallows.
+  const dissolved = []
+  for (const [key, surfaceName] of legible) {
+    const n = await page.evaluate(
+      ({ key, tone, threshold }) => {
+        if (!window.__game.textures.exists(key)) return null
+        return window.__contrast.dissolved(key, tone, threshold)
+      },
+      { key, tone: tones[surfaceName], threshold: DISSOLVE_TONE },
+    )
+    if (n !== null && n > MAX_DISSOLVED_PIXELS) dissolved.push(`${key} ${n}px`)
+  }
+  check(
+    `no sprite has lost part of its silhouette (${legible.length} checked)`,
+    dissolved.length === 0,
+    dissolved.length
+      ? `over ${MAX_DISSOLVED_PIXELS}px eaten into the surface: ${dissolved.join(', ')}`
       : 'all clear',
   )
   check(
