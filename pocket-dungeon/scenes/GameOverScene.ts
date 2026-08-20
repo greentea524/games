@@ -5,6 +5,7 @@ import { recordRun, loadMeta } from '../meta'
 import type { RunStats } from '../meta'
 import { music, sfx } from '../audio'
 import { showRunSummary } from '../../shared/runSummary'
+import { RELIC_TARGET } from '../relics'
 
 export class GameOverScene extends Phaser.Scene {
   constructor() {
@@ -24,7 +25,13 @@ export class GameOverScene extends Phaser.Scene {
     const stats: RunStats = {
       date: new Date().toISOString(),
       className: GameState.selectedClass,
-      floorsCleared: GameState.floorDepth - 1,
+      // A win used to be recorded as floor 13: the old victory incremented
+      // the depth past the last floor and then ended the run, so
+      // `floorDepth - 1` came out at 12. The portal (#84) ends the run while
+      // the player is still standing on floor 12, so the same expression
+      // would now under-report a completed run as 11 floors and a victory
+      // would fail to beat a death on the last floor.
+      floorsCleared: victory ? GameState.floorDepth : GameState.floorDepth - 1,
       turnsUsed: GameState.turnsCount,
       goldEarned: GameState.runGold,
       victory,
@@ -37,11 +44,15 @@ export class GameOverScene extends Phaser.Scene {
     // adds the kill count, which nothing was tracking.
     showRunSummary(this, {
       title: victory ? 'VICTORY!' : 'YOU DIED',
-      subtitle: victory ? 'Vault cleared!' : GameState.selectedClass.toUpperCase(),
+      // Victory now means the relics were taken and the portal was walked
+      // into, not that a staircase was reached (#84) — so the line says what
+      // was actually done.
+      subtitle: victory ? 'You escaped!' : GameState.selectedClass.toUpperCase(),
       palette: PAL,
       stats: [
         { label: 'FLOOR', value: `${GameState.floorDepth}`, highlight: stats.floorsCleared > bestBefore },
         { label: 'KILLS', value: `${GameState.killsCount}` },
+        { label: 'RELICS', value: `${GameState.relics.length}/${RELIC_TARGET}` },
         { label: 'TURNS', value: `${GameState.turnsCount}` },
         { label: 'GOLD', value: `+${GameState.runGold}` },
         { label: 'BEST', value: `${Math.max(bestBefore, stats.floorsCleared)}` },

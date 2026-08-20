@@ -27,6 +27,16 @@ export class GameState {
   static turnsCount: number = 0
   /** Enemies killed this run, for the end-of-run summary (#66). */
   static killsCount: number = 0
+  /**
+   * Relic ids held this run (#84), in the order they were taken.
+   *
+   * Run-scoped and deliberately not persisted: the whole point is that a run
+   * ends when you have all three, so carrying one between runs would mean
+   * starting a later run one boss from winning. #86 is where carry-over gets
+   * decided, and relics should be argued about there rather than leaking in
+   * through here.
+   */
+  static relics: string[] = []
   static uiBlocking: boolean = false
   static selectedClass: ClassName = 'knight'
 
@@ -98,6 +108,19 @@ export class GameState {
     return total
   }
 
+  /**
+   * Takes a relic (#84). Idempotent, because the grant sits on the boss-death
+   * path and a boss that dies twice — a killing blow landing in the same turn
+   * as a fire scroll — must not hand out two.
+   *
+   * @returns true if this was a new relic, so the caller can announce it.
+   */
+  static addRelic(id: string): boolean {
+    if (this.relics.includes(id)) return false
+    this.relics.push(id)
+    return true
+  }
+
   static recalcAtk() {
     let atk = this.playerBaseAtk
     if (this.inventory.equippedWeapon?.atkBonus) {
@@ -165,6 +188,7 @@ export class GameState {
     this.playerAtk = classDef.atk
     this.turnsCount = 0
     this.killsCount = 0
+    this.relics = []
     this.turnState = TurnState.PLAYER_TURN
     this.hunger = classDef.hunger
     this.maxHunger = classDef.hunger

@@ -39,9 +39,15 @@ export const GAMES = [
       'chest_wooden_closed_dmg', 'chest_wooden_open_dmg',
       'chest_golden_closed_dmg', 'chest_golden_open_dmg',
       'chest_locked_closed_dmg', 'chest_locked_open_dmg',
+      'relic_dmg', 'portal_dmg',
     ],
     exclude: {
       tiles_dmg_v2: 'the tileset is the surface, not something drawn on it',
+      // The relic pips (#84) are 6px HUD glyphs drawn on the black status bar,
+      // not on the dungeon floor. Scoring them against the floor would demand
+      // they contrast with a surface they are never drawn against.
+      relicpip_held_dmg: 'a HUD pip on the status bar, not on the floor',
+      relicpip_empty_dmg: 'a HUD pip on the status bar, not on the floor',
     },
   },
   {

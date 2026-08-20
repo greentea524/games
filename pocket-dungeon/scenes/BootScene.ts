@@ -22,6 +22,7 @@ export class BootScene extends Phaser.Scene {
       this.buildBoss(mode)
       this.buildItems(mode)
       this.buildChests(mode)
+      this.buildRelics(mode)
     })
     this.scene.start('title')
   }
@@ -490,6 +491,84 @@ export class BootScene extends Phaser.Scene {
    * light floor now, and the tier reads from the accent and the studs
    * instead — the one axis that palette leaves free.
    */
+  /**
+   * The relic and the escape portal (#84).
+   *
+   * The relic is drawn twice at two sizes: a 16px world/summary icon and a
+   * 6px HUD pip. A pip is not the icon scaled down — at 6px a scaled 16px
+   * sprite is mush — so it is drawn as its own shape, filled for a relic held
+   * and hollow for one still out there.
+   *
+   * Both are dark-bodied in DMG for the usual reason: the DMG floor is
+   * PAL.lightest and this repo has shipped five sprites invisible into it.
+   * The portal's *inner* ring is the light tone, which is safe because it is
+   * enclosed by the dark rim rather than touching the floor.
+   */
+  private buildRelics(mode: 'dmg' | 'gbc') {
+    const isDmg = mode === 'dmg'
+    const rim = isDmg ? PAL.darkest : 0x6a4a90
+    const body = isDmg ? PAL.dark : 0xd8b040
+    const glow = isDmg ? PAL.lightest : 0xfff0a0
+
+    const relic = `relic_${mode}`
+    if (!this.textures.exists(relic)) {
+      const g = this.make.graphics({}, false)
+      // A faceted gem: dark rim all the way round so the silhouette holds
+      // against a light floor, with the bright facet enclosed inside it.
+      g.fillStyle(rim)
+      g.fillRect(6, 2, 4, 1); g.fillRect(4, 3, 8, 2); g.fillRect(3, 5, 10, 5)
+      g.fillRect(4, 10, 8, 2); g.fillRect(6, 12, 4, 2)
+      g.fillStyle(body)
+      g.fillRect(5, 4, 6, 2); g.fillRect(4, 6, 8, 4); g.fillRect(5, 10, 6, 1)
+      g.fillStyle(glow)
+      g.fillRect(6, 5, 2, 3)
+      g.generateTexture(relic, 16, 16)
+      g.destroy()
+    }
+
+    // HUD pips, 6x6. `_held` is the filled one.
+    for (const held of [true, false]) {
+      const key = `relicpip_${held ? 'held' : 'empty'}_${mode}`
+      if (this.textures.exists(key)) continue
+      const g = this.make.graphics({}, false)
+      // The pips sit on the black status bar, not on the dungeon floor, so
+      // they answer to *it*. Drawn in PAL.darkest and PAL.dark first, which is
+      // the same mistake as the floor sprites with the surface swapped: both
+      // tones vanished into the bar. A held pip is the lightest tone the ramp
+      // has; an empty one is a dimmer outline, and the fill-vs-outline shape
+      // is what separates them at 6px rather than the tone alone.
+      const tone = isDmg ? (held ? PAL.lightest : PAL.dark) : held ? 0xffd700 : 0x8a7a50
+      g.fillStyle(tone)
+      if (held) {
+        g.fillRect(2, 0, 2, 6); g.fillRect(1, 1, 4, 4); g.fillRect(0, 2, 6, 2)
+      } else {
+        g.fillRect(2, 0, 2, 1); g.fillRect(1, 1, 1, 1); g.fillRect(4, 1, 1, 1)
+        g.fillRect(0, 2, 1, 2); g.fillRect(5, 2, 1, 2)
+        g.fillRect(1, 4, 1, 1); g.fillRect(4, 4, 1, 1); g.fillRect(2, 5, 2, 1)
+      }
+      g.generateTexture(key, 6, 6)
+      g.destroy()
+    }
+
+    const portal = `portal_${mode}`
+    if (!this.textures.exists(portal)) {
+      const g = this.make.graphics({}, false)
+      // A ring standing on the stairs. The rim is the darkest tone in both
+      // palettes so the circle reads as a hole rather than a puddle.
+      g.fillStyle(rim)
+      g.fillRect(5, 1, 6, 1); g.fillRect(3, 2, 10, 1); g.fillRect(2, 3, 12, 2)
+      g.fillRect(1, 5, 14, 6); g.fillRect(2, 11, 12, 2); g.fillRect(3, 13, 10, 1)
+      g.fillRect(5, 14, 6, 1)
+      g.fillStyle(isDmg ? PAL.light : 0x8060c0)
+      g.fillRect(5, 3, 6, 1); g.fillRect(4, 4, 8, 2)
+      g.fillRect(3, 6, 10, 4); g.fillRect(4, 10, 8, 2); g.fillRect(5, 12, 6, 1)
+      g.fillStyle(glow)
+      g.fillRect(6, 5, 4, 1); g.fillRect(5, 6, 6, 4); g.fillRect(6, 10, 4, 1)
+      g.generateTexture(portal, 16, 16)
+      g.destroy()
+    }
+  }
+
   private buildChests(mode: 'dmg' | 'gbc') {
     const isDmg = mode === 'dmg'
     interface ChestSkin {
