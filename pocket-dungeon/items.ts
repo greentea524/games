@@ -318,6 +318,13 @@ export interface TurnSnapshot {
   hunger: number
   turnsCount: number
   enemyStates: { id: string; tx: number; ty: number; hp: number }[]
+  /**
+   * Relics held at this turn (#84). Rewinding restores enemy HP, so a rewind
+   * across a boss kill puts the boss back on its feet; without this the
+   * player would keep the relic it dropped and, on the final floor, walk out
+   * through a portal opened by a boss that is once again alive.
+   */
+  relics: string[]
 }
 
 export class ActionHistory {

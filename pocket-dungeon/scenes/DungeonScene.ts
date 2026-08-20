@@ -35,7 +35,8 @@ import {
 import { music, sfx, setMuted, isMuted } from '../audio'
 import { rollModifier, modifierSeed, type Modifier } from '../modifiers'
 import { bossAI } from '../boss'
-import { bossForFloor, type BossDef } from '../bosses'
+import { bossForFloor, isBossFloor, type BossDef } from '../bosses'
+import { relicForBoss, hasAllRelics, RELIC_TARGET, FINAL_DEPTH, RELIC_COPY } from '../relics'
 import type { BossState } from '../boss'
 import { rollFloorItems, ITEMS } from '../items'
 import { rollChests, rollChestLoot, keysForFloor, type ChestTier } from '../chests'
@@ -84,6 +85,8 @@ export class DungeonScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>
   private rewindKey!: Phaser.Input.Keyboard.Key
+  /** The escape portal (#84), while it is standing. */
+  private portalSprite?: Phaser.GameObjects.Image
 
   constructor() {
     super('dungeon')
@@ -226,9 +229,15 @@ export class DungeonScene extends Phaser.Scene {
   renderDungeon() {
     const mode = GameState.paletteMode
     this.enemies = []
+    // The portal handle is dropped here rather than in `create()`, because
+    // all three ways a floor gets rebuilt — first entry, `scene.restart()` on
+    // descent, and `reloadPalette()` on a palette toggle — come through this
+    // method, and only the first two go through `create()`. A stale handle
+    // makes `openPortal` return early and the portal never comes back.
+    this.portalSprite = undefined
     this.rng = new RNG(GameState.seed + GameState.floorDepth)
 
-    if (GameState.floorDepth === 12) {
+    if (isBossFloor(GameState.floorDepth)) {
       music.play('boss')
     } else {
       music.play('dungeon')
@@ -388,6 +397,12 @@ export class DungeonScene extends Phaser.Scene {
       loop: true,
       callback: () => this.applyTorchFlicker(),
     })
+
+    // The portal survives a floor rebuild (#84). It only ever opens on the
+    // final floor, which has nothing below it to descend to, so this is
+    // defensive rather than load-bearing — but a scene that draws itself
+    // differently depending on how it was entered breaks quietly later.
+    if (this.portalOpen) this.openPortal()
   }
 
   reloadPalette() {
@@ -501,14 +516,42 @@ export class DungeonScene extends Phaser.Scene {
         this.tryPickupItem(targetTX, targetTY)
 
         if (this.grid[targetTY][targetTX] === 'S') {
-          sfx.stairs()
-          GameState.floorDepth++
-          if (GameState.floorDepth > 12) {
-            // Victory!
+          // The escape portal stands on the stairs once the last relic is in
+          // hand (#84). It replaces the descent rather than sitting beside
+          // it, so a floor never offers two exits.
+          if (this.portalOpen) {
+            sfx.stairs()
             this.scene.stop('ui')
             this.scene.start('gameover', { victory: true })
             return
           }
+          // A boss floor's stairs stay shut while its boss lives (#84). The
+          // relics are the win condition and bosses are the only source, so
+          // without this a player can walk past every fight and arrive on
+          // floor 12 unable to finish — a softlock the game cannot recover
+          // from, since there is no way back up.
+          if (this.bossBlocksStairs()) {
+            sfx.menuMove()
+            this.showDamageText(px, py - 8, `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedByBoss}`, '#ff8888')
+            if (GameState.advanceTurn()) this.showRegenTick()
+            GameState.drainHunger()
+            this.processEnemyTurn()
+            return
+          }
+          // Nothing lies below the final floor: its only way out is the
+          // portal, handled above. Guarded rather than assumed. Reaching here
+          // means the Vault Guardian died without its relic being granted,
+          // which `relics_test.ts` proves cannot happen — and if it ever did,
+          // refusing to move is a far smaller failure than generating a
+          // thirteenth floor or handing out a free victory, which is what the
+          // unconditional `floorDepth > 12` win here used to do.
+          if (GameState.floorDepth >= FINAL_DEPTH) {
+            sfx.menuMove()
+            this.showDamageText(px, py - 8, `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedAtBottom}`, '#ff8888')
+            return
+          }
+          sfx.stairs()
+          GameState.floorDepth++
           GameState.turnState = TurnState.PLAYER_TURN
           this.scene.restart()
           return
@@ -569,7 +612,10 @@ export class DungeonScene extends Phaser.Scene {
           // counter disagree.
           const banked = GameState.addGold(goldDrop)
           this.showDamageText(targetX, targetY + 4, `+${banked}g`, '#ffd700')
-          if (enemy.bossDef) this.dropBossLoot(enemy)
+          if (enemy.bossDef) {
+            this.claimRelic(enemy)
+            this.dropBossLoot(enemy)
+          }
 
           // Splitter: spawn 2 mini-slimes on death
           if (enemy.ai === 'splitter' && !enemy.isSplit) {
@@ -891,12 +937,23 @@ export class DungeonScene extends Phaser.Scene {
    */
   private announceModifier() {
     if (!this.modifier) return
-    // Same look as the tile-description banners, but not `showDamageText`:
-    // that fades in 500ms, which is right for a damage number and far too
-    // brief for two lines of 8px text the player has to carry for a whole
-    // floor. Screen-space, so it does not drift with the camera.
+    this.announceBanner(`${this.modifier.name}\n${this.modifier.blurb}`)
+  }
+
+  /**
+   * A two-line banner across the top of the play area.
+   *
+   * Not `showDamageText`: that fades in 500ms, which is right for a damage
+   * number and far too brief for two lines of 8px text the player has to
+   * read and act on. Screen-space, so it does not drift with the camera.
+   *
+   * Split out of `announceModifier` for #84's portal announcement — the
+   * alternative was a second copy of the same fifteen lines, and the two
+   * would have diverged the first time either was restyled.
+   */
+  private announceBanner(body: string) {
     const text = this.add
-      .text(TILE * 2, 24, `${this.modifier.name}\n${this.modifier.blurb}`, {
+      .text(TILE * 2, 24, body, {
         fontFamily: '"Press Start 2P", monospace',
         fontSize: '8px',
         color: '#ffd700',
@@ -931,6 +988,96 @@ export class DungeonScene extends Phaser.Scene {
       duration: 500,
       onComplete: () => txt.destroy(),
     })
+  }
+
+  /**
+   * Whether this floor's stairs are held shut by a living boss (#84).
+   *
+   * Asked of the grid rather than remembered in a flag: a boss that has been
+   * killed is still in `this.enemies` with hp <= 0, and the sprite fade-out
+   * is a tween, so anything time-based here would open the stairs a frame
+   * early or late depending on the animation.
+   */
+  private bossBlocksStairs(): boolean {
+    if (!isBossFloor(GameState.floorDepth)) return false
+    return this.enemies.some((e) => e.bossDef && e.hp > 0)
+  }
+
+  /** Whether the escape portal is standing on the stairs (#84). */
+  private get portalOpen(): boolean {
+    return hasAllRelics(GameState.relics)
+  }
+
+  /**
+   * Takes the fallen boss's relic (#84), and opens the way out if it was the
+   * last one.
+   *
+   * The relic is granted rather than dropped, unlike the gear in #85. Gear is
+   * a floor item on purpose — it goes through the no-downgrade rule and the
+   * player may decline it. A relic is the win condition, and a win condition
+   * lying on the floor is one the player can walk down the stairs without,
+   * with no way back up to fetch it.
+   */
+  private claimRelic(enemy: EnemyInstance) {
+    const def = enemy.bossDef
+    if (!def) return
+    const relic = relicForBoss(def.id)
+    if (!relic || !GameState.addRelic(relic.id)) return
+
+    sfx.pickup()
+    // The relic lifts off the corpse. A win condition the player only ever
+    // reads about in a counter is a number, not a thing they took — and the
+    // 16px icon exists precisely so there is something to see here.
+    const risen = this.add
+      .image(enemy.sprite.x, enemy.sprite.y, `relic_${GameState.paletteMode}`)
+      .setDepth(12)
+    this.tweens.add({
+      targets: risen,
+      y: enemy.sprite.y - 14,
+      alpha: { from: 1, to: 0 },
+      duration: 900,
+      ease: 'Sine.easeOut',
+      onComplete: () => risen.destroy(),
+    })
+
+    const held = GameState.relics.length
+    this.showDamageText(
+      enemy.sprite.x,
+      enemy.sprite.y - 14,
+      `${relic.name}\nRELIC ${held}/${RELIC_TARGET}`,
+      '#ffd700',
+    )
+    if (this.portalOpen) this.openPortal()
+  }
+
+  /**
+   * Puts the escape portal on the stairs and says so (#84).
+   *
+   * On the stairs, not beside them: the player has spent the whole run being
+   * taught that the down-staircase is the way on, and the last thing this
+   * should do is hide the ending somewhere else on a fogged map.
+   */
+  private openPortal() {
+    if (this.portalSprite) return
+    const mode = GameState.paletteMode
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        if (this.grid[y][x] !== 'S') continue
+        const sprite = this.add
+          .image(x * TILE + TILE / 2, y * TILE + TILE / 2, `portal_${mode}`)
+          .setDepth(3)
+        this.portalSprite = sprite
+        this.tweens.add({
+          targets: sprite,
+          alpha: { from: 0.55, to: 1 },
+          duration: 700,
+          yoyo: true,
+          repeat: -1,
+        })
+        this.announceBanner(`${RELIC_COPY.portalTitle}\n${RELIC_COPY.portalBody}`)
+        return
+      }
+    }
   }
 
   /**
@@ -1311,7 +1458,10 @@ export class DungeonScene extends Phaser.Scene {
           GameState.killsCount++
           const banked = GameState.addGold(enemy.bossDef?.gold ?? (enemy.isSplit ? 1 : 3))
           this.showDamageText(enemy.sprite.x, enemy.sprite.y + 4, `+${banked}g`, '#ffd700')
-          if (enemy.bossDef) this.dropBossLoot(enemy)
+          if (enemy.bossDef) {
+            this.claimRelic(enemy)
+            this.dropBossLoot(enemy)
+          }
           enemy.sprite.setVisible(false)
         }
       }
@@ -1409,6 +1559,7 @@ export class DungeonScene extends Phaser.Scene {
       enemyStates: this.enemies.filter(e => e.hp > 0).map(e => ({
         id: e.id, tx: e.tx, ty: e.ty, hp: e.hp,
       })),
+      relics: [...GameState.relics],
     }
     GameState.actionHistory.save(snapshot)
   }
@@ -1421,6 +1572,10 @@ export class DungeonScene extends Phaser.Scene {
     GameState.playerHp = snap.playerHp
     GameState.hunger = snap.hunger
     GameState.turnsCount = snap.turnsCount
+    // Relics go back with the turn (#84): the loop below restores boss HP, so
+    // keeping them would leave the portal open over a boss that is alive
+    // again.
+    GameState.relics = [...snap.relics]
 
     // Move player sprite
     this.player.x = snap.playerTX * TILE + TILE / 2
@@ -1438,6 +1593,15 @@ export class DungeonScene extends Phaser.Scene {
         enemy.sprite.setVisible(es.hp > 0)
         enemy.sprite.setAlpha(es.hp > 0 ? 1 : 0)
       }
+    }
+
+    // A rewind that un-kills the final boss also un-opens the portal. The
+    // sprite is the only part that does not fall out of `portalOpen`, so it
+    // is taken down by hand.
+    if (!this.portalOpen && this.portalSprite) {
+      this.tweens.killTweensOf(this.portalSprite)
+      this.portalSprite.destroy()
+      this.portalSprite = undefined
     }
 
     this.updateFogOfWar()
@@ -1473,7 +1637,18 @@ export class DungeonScene extends Phaser.Scene {
 
     const char = this.grid[ty]?.[tx]
     if (char === 'S') {
-      this.showDamageText(px, py - 8, `STAIRS DOWN\nTo Floor ${GameState.floorDepth + 1}`, '#ffd700')
+      // The stairs are three different things now (#84), and the examine text
+      // is where a player finds out which — the tile art does not change when
+      // a boss seals it.
+      if (this.portalOpen) {
+        this.showDamageText(px, py - 8, `${RELIC_COPY.portalTitle}\nThe way home`, '#ffd700')
+      } else if (this.bossBlocksStairs()) {
+        this.showDamageText(px, py - 8, `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedByBoss}`, '#ff8888')
+      } else if (GameState.floorDepth >= FINAL_DEPTH) {
+        this.showDamageText(px, py - 8, `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedAtBottom}`, '#ff8888')
+      } else {
+        this.showDamageText(px, py - 8, `STAIRS DOWN\nTo Floor ${GameState.floorDepth + 1}`, '#ffd700')
+      }
     } else if (char === 'c') {
       this.showDamageText(px, py - 8, 'CORRIDOR PATH\nStone walkway', '#aa99bb')
     } else if (char === 'T') {
