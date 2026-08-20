@@ -9,6 +9,7 @@
 // A modifier changes one rule for one floor. It is rolled from the run's
 // seed, so a seeded run stays reproducible.
 import type { RNG } from './rng'
+import { isBossFloor } from './bosses'
 
 export interface Modifier {
   /** Stable id, used by saves and tests rather than the display name. */
@@ -128,7 +129,10 @@ export const MAX_BANNER_CHARS = 16
 
 /** Floors at or below this play as the plain game, so it can be learned. */
 export const MODIFIER_MIN_DEPTH = 3
-/** The boss floor. A modifier here would make that fight a coin flip. */
+/**
+ * The last floor. Kept as its own constant because it also means "the end of
+ * the run", which is not the same idea as "a floor with a boss on it".
+ */
 export const BOSS_DEPTH = 12
 
 /**
@@ -170,6 +174,10 @@ export function modifierSeed(runSeed: number, depth: number): number {
 export function rollModifier(depth: number, rng: RNG): Modifier | null {
   if (depth < MODIFIER_MIN_DEPTH) return null
   if (depth >= BOSS_DEPTH) return null
+  // Every boss floor, not just the last one (#85). A modifier on a boss floor
+  // makes that fight a coin flip — Brittle doubles damage in both directions,
+  // and against 22 HP with 4 ATK that decides the encounter before it starts.
+  if (isBossFloor(depth)) return null
 
   const total = MODIFIER_TABLE.reduce((sum, entry) => sum + entry.weight, 0)
   let roll = rng.nextFloat(0, total)

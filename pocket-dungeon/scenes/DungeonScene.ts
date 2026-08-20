@@ -35,6 +35,7 @@ import {
 import { music, sfx, setMuted, isMuted } from '../audio'
 import { rollModifier, modifierSeed, type Modifier } from '../modifiers'
 import { bossAI } from '../boss'
+import { bossForFloor, type BossDef } from '../bosses'
 import type { BossState } from '../boss'
 import { rollFloorItems, ITEMS } from '../items'
 import { rollChests, rollChestLoot, keysForFloor, type ChestTier } from '../chests'
@@ -63,6 +64,8 @@ interface EnemyInstance {
   /** #60: a reviving enemy has not yet used its one comeback. */
   canRevive?: boolean
   bossState?: BossState // For boss AI
+  /** Set for bosses (#85): what it drops and pays out when it dies. */
+  bossDef?: BossDef
   isSplit?: boolean     // Splitter children don't split again
 }
 
@@ -329,34 +332,14 @@ export class DungeonScene extends Phaser.Scene {
       })
     }
 
-    // Spawn boss on floor 12
-    if (GameState.floorDepth === 12) {
-      // Find the stairs position and place boss nearby
-      for (let y = 0; y < this.mapHeight; y++) {
-        for (let x = 0; x < this.mapWidth; x++) {
-          if (this.grid[y][x] === 'S') {
-            // Place boss 2 tiles from stairs
-            const bx = x - 2 >= 0 && this.grid[y][x - 2] !== '#' ? x - 2 : x
-            const by = y
-            const bpx = bx * TILE + TILE / 2
-            const bpy = by * TILE + TILE / 2
-            const bossSprite = this.add.sprite(bpx, bpy, `boss_${mode}`).setDepth(5)
-            this.enemies.push({
-              id: 'vault_guardian',
-              name: 'Vault Guardian',
-              sprite: bossSprite,
-              tx: bx,
-              ty: by,
-              hp: 40,
-              maxHp: 40,
-              atk: 6,
-              ai: 'boss',
-              bossState: { phase: 'rage', summonCooldown: 3 },
-            })
-          }
-        }
-      }
-    }
+    // The floor's boss, if it has one (#85). Was hardcoded to floor 12 and to
+    // the Vault Guardian's stats; the schedule and the stats are a table now,
+    // and there is a boss at the end of each biome rather than only the last.
+    //
+    // The old loop also had no `break`, so it pushed a boss for every 'S' tile
+    // it found. One set of stairs is generated, so it never bit — but a
+    // second would have spawned a second boss.
+    this.spawnBoss(mode)
 
     // Spawn floor items
     this.floorItems = []
@@ -580,12 +563,13 @@ export class DungeonScene extends Phaser.Scene {
         } else if (enemy.hp <= 0) {
           GameState.killsCount++
           // Gold drop
-          const goldDrop = enemy.ai === 'boss' ? 20 : (enemy.isSplit ? 1 : 3)
+          const goldDrop = enemy.bossDef?.gold ?? (enemy.isSplit ? 1 : 3)
           // The Lucky Coin's multiplier is applied inside addGold, and the
           // banked figure is what gets shown — otherwise the float and the
           // counter disagree.
           const banked = GameState.addGold(goldDrop)
           this.showDamageText(targetX, targetY + 4, `+${banked}g`, '#ffd700')
+          if (enemy.bossDef) this.dropBossLoot(enemy)
 
           // Splitter: spawn 2 mini-slimes on death
           if (enemy.ai === 'splitter' && !enemy.isSplit) {
@@ -950,6 +934,64 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   /**
+   * The boss's reward, dropped where it fell (#85).
+   *
+   * A floor item rather than a straight grant, so it goes through the same
+   * pickup path as everything else — including the no-downgrade rule from
+   * #82. A boss handing you gear worse than what you are wearing should be
+   * declinable in exactly the way a chest's is.
+   */
+  private dropBossLoot(enemy: EnemyInstance) {
+    const def = enemy.bossDef
+    if (!def) return
+    const item = ITEMS[def.drop]
+    if (!item) return
+    const mode = GameState.paletteMode
+    const spot = this.lootSpots(enemy.tx, enemy.ty, 1)[0]
+    const px = spot.x * TILE + TILE / 2
+    const py = spot.y * TILE + TILE / 2
+    const sprite = this.add.sprite(px, py - 6, `item_${item.category}_${mode}`).setDepth(4)
+    this.floorItems.push({ def: { ...item }, tx: spot.x, ty: spot.y, sprite })
+    this.tweens.add({ targets: sprite, y: py, duration: 240, ease: 'Bounce.easeOut' })
+    this.showDamageText(px, py - 16, item.name, '#ffd700')
+  }
+
+  /**
+   * Places this floor's boss, if the schedule has one (#85).
+   *
+   * Beside the stairs on purpose: the boss is the door out of a biome, so it
+   * should be standing in the way of the door rather than somewhere the
+   * player might miss.
+   */
+  private spawnBoss(mode: 'dmg' | 'gbc') {
+    const def = bossForFloor(GameState.floorDepth)
+    if (!def) return
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        if (this.grid[y][x] !== 'S') continue
+        const bx = x - 2 >= 0 && this.grid[y][x - 2] !== '#' ? x - 2 : x
+        const bpx = bx * TILE + TILE / 2
+        const bpy = y * TILE + TILE / 2
+        const sprite = this.add.sprite(bpx, bpy, `${def.spriteKey}_${mode}`).setDepth(5)
+        this.enemies.push({
+          id: def.id,
+          name: def.name,
+          sprite,
+          tx: bx,
+          ty: y,
+          hp: def.hp,
+          maxHp: def.hp,
+          atk: def.atk,
+          ai: 'boss',
+          bossState: { phase: 'rage', summonCooldown: 3 },
+          bossDef: def,
+        })
+        return
+      }
+    }
+  }
+
+  /**
    * Where a chest's contents land (#59).
    *
    * One item sits on the chest's own tile. A locked chest yields two, and
@@ -1267,8 +1309,9 @@ export class DungeonScene extends Phaser.Scene {
           // bypass it would make the scroll strictly better than a sword
           // against exactly the enemy it should struggle with.
           GameState.killsCount++
-          const banked = GameState.addGold(enemy.ai === 'boss' ? 20 : enemy.isSplit ? 1 : 3)
+          const banked = GameState.addGold(enemy.bossDef?.gold ?? (enemy.isSplit ? 1 : 3))
           this.showDamageText(enemy.sprite.x, enemy.sprite.y + 4, `+${banked}g`, '#ffd700')
+          if (enemy.bossDef) this.dropBossLoot(enemy)
           enemy.sprite.setVisible(false)
         }
       }

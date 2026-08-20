@@ -31,7 +31,7 @@ export const GAMES = [
     onFloor: [
       'hero_dmg_down', 'hero_dmg_up', 'hero_dmg_left', 'hero_dmg_right',
       'rat_dmg', 'bat_dmg', 'archer_dmg', 'spider_dmg', 'slime_dmg',
-      'skeleton_dmg', 'boss_dmg',
+      'skeleton_dmg', 'boss_dmg', 'boss_brute_dmg', 'boss_choir_dmg',
       'cobweb_dmg',
       'item_weapon_dmg', 'item_armor_dmg', 'item_accessory_dmg',
       'item_food_dmg', 'item_potion_dmg', 'item_scroll_dmg',
