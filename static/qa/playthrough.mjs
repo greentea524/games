@@ -230,6 +230,75 @@ await step('the entity offers a choice, and the ending plays', async () => {
   return 'empathy ending'
 })
 
+// The signposts (#63). The acceptance criterion is that they give directional
+// information matching the actual map, which is exactly the sort of claim that
+// rots the first time a door moves — so it is derived rather than eyeballed:
+// each sign's compass words are checked against the real door tiles.
+console.log('\n=== the signposts ===')
+await step('every signpost points where it says it does', async () => {
+  // A deliberately early state, not the run's own save: by this point in the
+  // playthrough both Gus's hut and the Baker's house have vanished, and their
+  // doors with them. The signs still name them, so the check needs the town
+  // as a player first meets it.
+  //
+  // The run's own save is put back at the end. Booting a different state and
+  // leaving it there is not a local decision — every later step reads
+  // `d.save()` to build on, and the first version of this silently rewound the
+  // run to Chapter 1, which surfaced two steps down as the Baker giving his
+  // opening lines again.
+  const resume = await d.save()
+  await d.boot({
+    chapter: 1,
+    flags: { got_flashlight: true },
+    inventory: ['flashlight'],
+    world: 'normal',
+    mapKey: 'town',
+    tx: 11,
+    ty: 18,
+  })
+  const scene = await d.scene()
+  const doorAt = (target) => {
+    const door = scene.doors.find((x) => x.target === target)
+    need(door, `no door to '${target}' on the town map`)
+    return door
+  }
+  const landmarks = {
+    'GUS’S PLOT': doorAt('gus_hut'),
+    'REN’S HOUSE': doorAt('ren_house'),
+    'THE BAKERY': doorAt('bakery'),
+    'THE NEIGHBOUR HOUSE': doorAt('house2'),
+    HOME: doorAt('house'),
+    'THE FOUNTAIN': { tx: 16, ty: 18 },
+  }
+  // Each sign: where it stands, and what it claims.
+  const claims = [
+    { at: [12, 13], says: [['WEST', 'GUS’S PLOT'], ['SOUTH-EAST', 'REN’S HOUSE'], ['SOUTH-EAST', 'THE FOUNTAIN']] },
+    { at: [9, 17], says: [['WEST', 'THE BAKERY'], ['EAST', 'THE FOUNTAIN']] },
+    { at: [20, 9], says: [['SOUTH-WEST', 'THE NEIGHBOUR HOUSE'], ['WEST', 'HOME']] },
+  ]
+  const bearing = (dx, dy) => {
+    // Eight-point compass with a generous band, so 'WEST' does not demand a
+    // landmark on exactly the same row.
+    const ns = dy > 2 ? 'SOUTH' : dy < -2 ? 'NORTH' : ''
+    const ew = dx > 2 ? 'EAST' : dx < -2 ? 'WEST' : ''
+    return ns && ew ? `${ns}-${ew}` : ns || ew || 'HERE'
+  }
+  for (const { at, says } of claims) {
+    for (const [dir, name] of says) {
+      const l = landmarks[name]
+      const got = bearing(l.tx - at[0], l.ty - at[1])
+      need(
+        got === dir,
+        `the sign at (${at}) says ${name} is ${dir}, but it is ${got} ` +
+          `(sign ${at} -> landmark ${l.tx},${l.ty})`,
+      )
+    }
+  }
+  const total = claims.reduce((n, c) => n + c.says.length, 0)
+  await d.boot({ ...resume, mapKey: 'town', tx: 11, ty: 18 })
+  return `${claims.length} signs, ${total} directions`
+})
+
 // The corruption patches (#64). The claim is that the world toggle is a
 // movement verb here and not just a change of texture, so the check is that
 // the same tiles are solid in one world and walkable in the other — asserted

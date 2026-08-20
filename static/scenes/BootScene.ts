@@ -153,6 +153,36 @@ export class BootScene extends Phaser.Scene {
     tear(`corruption_sealed_${mode}`, true)
     tear(`corruption_open_${mode}`, false)
 
+    // Street furniture (#63). Fencing, hedges and flower beds already existed
+    // — this is the rest of the set from the thumbnail.
+
+    // prop_lamp 16x16: a wrought-iron post with a lit head.
+    g.fillStyle(p.stoneDark); g.fillRect(7, 5, 2, 10)
+    g.fillStyle(p.stone); g.fillRect(6, 14, 4, 2)
+    g.fillStyle(p.stoneDark); g.fillRect(5, 2, 6, 4)
+    g.fillStyle(mode === 'dmg' ? PAL.lightest : 0xffe9a0); g.fillRect(6, 3, 4, 2)
+    tex(`prop_lamp_${mode}`, 16, 16)
+
+    // prop_sign 16x16: a board on a post, angled edge so it reads as a sign
+    // rather than a window. Deliberately not in the lamp's warm tone — a sign
+    // that glows looks like something to collect.
+    g.fillStyle(p.wood); g.fillRect(7, 8, 2, 8)
+    g.fillStyle(p.stoneDark); g.fillRect(2, 2, 12, 7)
+    g.fillStyle(mode === 'dmg' ? PAL.light : 0xc8a870); g.fillRect(3, 3, 10, 5)
+    g.fillStyle(p.stoneDark)
+    g.fillRect(4, 4, 6, 1)
+    g.fillRect(4, 6, 8, 1)
+    tex(`prop_sign_${mode}`, 16, 16)
+
+    // prop_barrel 16x16: staves and two hoops.
+    g.fillStyle(p.wood); g.fillRect(4, 4, 8, 11)
+    g.fillStyle(p.stoneDark)
+    g.fillRect(4, 6, 8, 1)
+    g.fillRect(4, 12, 8, 1)
+    g.fillRect(4, 4, 8, 1)
+    g.fillStyle(mode === 'dmg' ? PAL.light : 0x8a6a3a); g.fillRect(6, 5, 4, 1)
+    tex(`prop_barrel_${mode}`, 16, 16)
+
     // the entity: a dark figure with a static-filled screen for a face
     if (!this.textures.exists('entity')) {
       g.fillStyle(0x141820); g.fillRect(3, 4, 10, 14)

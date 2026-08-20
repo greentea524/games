@@ -605,6 +605,57 @@ export const VALVE_DEF: NpcDef = {
  * legible each time you come back knowing more. The first reading is a child
  * seeing a stain; the last is someone who understands what is writing it.
  */
+/**
+ * The street lamp (#63), which is the one piece of furniture the Static
+ * mechanic gets something out of.
+ *
+ * The issue called a lamp that behaves differently across the toggle cheap
+ * atmosphere, and it is — but it is also the only prop here where the two
+ * worlds have anything to say to each other, so it is worth having two.
+ *
+ * Two defs picked by WorldScene at placement, the way the fountain and the
+ * valve already are, rather than one def branching on a flag: `setFlag` only
+ * ever sets, and it autosaves, so a world marker written that way would
+ * persist into the save and never clear on the way back.
+ */
+export const LAMP_STATIC_DEF: NpcDef = {
+  id: 'lamp_static',
+  name: 'LAMP POST',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      lines: [
+        { text: 'The lamp is out. The glass is furred with grey.' },
+        { text: 'It has not been lit here for a long time.' },
+      ],
+    },
+  ],
+}
+
+export const LAMP_DEF: NpcDef = {
+  id: 'lamp',
+  name: 'LAMP POST',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      requires: 'chapter2_done',
+      lines: [
+        { text: 'The lamp hums, steady and warm.' },
+        { text: 'You have seen it dark. You keep looking at it anyway.' },
+      ],
+    },
+    {
+      lines: [
+        { text: 'A wrought-iron lamp post, lit against the grey afternoon.' },
+      ],
+    },
+  ],
+}
+
 export const CORRUPTION_DEF: NpcDef = {
   id: 'corruption',
   name: 'TORN GROUND',
@@ -647,6 +698,40 @@ const examine = (id: string, name: string, ...text: string[]): NpcDef => ({
   frozen: true,
   branches: [{ lines: text.map((t) => ({ text: t })) }],
 })
+
+// Signposts (#63). Each one names what is genuinely in that direction from
+// where it stands — the door tiles are house (6,8), house2 (17,12), the
+// bakery (5,19), Gus's hut (3,13), Ren's house (19,18) and the fountain
+// (16,18). A sign that lies is worse than no sign, so these were written
+// against the map rather than from memory.
+export const SIGN_CROSSROADS_DEF = examine(
+  'sign_cross',
+  'SIGNPOST',
+  'WEST — GUS\u2019S PLOT',
+  'SOUTH-EAST — REN\u2019S HOUSE, THE FOUNTAIN',
+)
+
+export const SIGN_SOUTH_DEF = examine(
+  'sign_south',
+  'SIGNPOST',
+  'WEST — THE BAKERY',
+  'EAST — THE FOUNTAIN',
+)
+
+export const SIGN_NORTH_DEF = examine(
+  'sign_north',
+  'SIGNPOST',
+  'SOUTH-WEST — THE NEIGHBOUR HOUSE',
+  'WEST — HOME',
+)
+
+export const BARREL_DEF = examine(
+  'barrel',
+  'WATER BARREL',
+  'Rainwater, nearly full. A leaf turns on the surface.',
+  'The town has never been short of water. That is the strange part.',
+)
+
 
 // The bookshelf carries the slow reveal: the same shelf reads differently
 // as the player learns what is happening to the town.

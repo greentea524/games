@@ -82,6 +82,7 @@ export const GAMES = [
       'item_dmg_flower_fresh', 'item_dmg_photo', 'item_dmg_ledger', 'item_dmg_ren_key',
       'item_dmg_signal_shard', 'item_dmg_photo_intact', 'item_dmg_ledger_unredacted',
       'corruption_sealed_dmg', 'corruption_open_dmg',
+      'prop_lamp_dmg', 'prop_sign_dmg', 'prop_barrel_dmg',
       'fountain_full_dmg', 'fountain_drained_dmg', 'hatch_dmg',
       'prop_bed_dmg', 'prop_bookshelf_dmg', 'prop_plant_dmg',
       'prop_bush_dmg', 'prop_fence_dmg', 'prop_flower_dmg',
