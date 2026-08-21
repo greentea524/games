@@ -1,7 +1,7 @@
 import { Inventory, ScrollIdentifier, ActionHistory, ITEMS } from './items'
 import type { AccessoryPassive, ItemDef } from './items'
 import { RNG } from './rng'
-import { CLASSES, loadMeta } from './meta'
+import { CLASSES, loadMeta, takeKeepsake } from './meta'
 import type { ClassName } from './meta'
 
 // A const object rather than an enum: `erasableSyntaxOnly` rejects enum
@@ -207,6 +207,18 @@ export class GameState {
     }
     if (meta.purchasedItems.includes('start_potion')) {
       this.inventory.add(ITEMS.potion_heal)
+    }
+
+    // The keepsake (#86), applied last so it wins over the shop's starting
+    // sword rather than being overwritten by it. Routed through the same
+    // no-downgrade rule as everything else (#82): a recovered Rusty Sword and
+    // a purchased one are the same item, and whichever lands second must not
+    // quietly replace better gear.
+    const kept = takeKeepsake()
+    if (kept && this.isUpgrade(kept)) {
+      if (kept.category === 'weapon') this.equipWeapon(kept)
+      else if (kept.category === 'armor') this.equipArmor(kept)
+      else if (kept.category === 'accessory') this.equipAccessory(kept)
     }
   }
 }

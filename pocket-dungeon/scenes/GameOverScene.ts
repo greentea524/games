@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { PAL } from '../constants'
 import { GameState } from '../state'
-import { recordRun, loadMeta } from '../meta'
+import { recordRun, loadMeta, recoverGear } from '../meta'
 import type { RunStats } from '../meta'
 import { music, sfx } from '../audio'
 import { showRunSummary } from '../../shared/runSummary'
@@ -37,6 +37,16 @@ export class GameOverScene extends Phaser.Scene {
       victory,
     }
     recordRun(stats)
+
+    // What the run was wearing when it ended, offered back in the shop (#86).
+    // Recorded on a victory too: finishing the game and starting again is a
+    // retry like any other, and the run that just won is exactly the one whose
+    // gear is worth buying back.
+    recoverGear([
+      GameState.inventory.equippedWeapon?.id,
+      GameState.inventory.equippedArmor?.id,
+      GameState.inventory.equippedAccessory?.id,
+    ])
 
     // This screen already reported class, floor, turns and gold — it was the
     // one game that did. #66 keeps all of it and moves the rendering to the
