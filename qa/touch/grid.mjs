@@ -306,6 +306,49 @@ async function pocketDungeon() {
     )
   }
 
+  // The AUTO button (#81), pressed with a real thumb rather than a keypress.
+  //
+  // This is the check that matters for that feature, because auto-play has a
+  // keyboard shortcut too and the keyboard route works even when the button
+  // is dead. It shipped dead once already: `data-key="KeyP"` was missing from
+  // the keyCode map in `main.ts`, so the shell animated the press, the button
+  // felt alive, and Phaser matched keyCode 0 against nothing. The system
+  // buttons are hidden on desktop, so touch is the *only* place this control
+  // exists — a keyboard-only check would have called it green.
+  const autoBtn = await centreOf(page, '#btn-auto')
+  const autoState = () =>
+    page.evaluate(() => ({
+      on: window.__game.scene.getScene('dungeon').autoPlay,
+      latched: !!document.querySelector('#btn-auto.latched'),
+    }))
+
+  check('auto-play starts off', !(await autoState()).on)
+  await hand.tap(ACT, autoBtn.x, autoBtn.y, 140)
+  await page.waitForTimeout(400)
+  const autoOn = await autoState()
+  check('tapping AUTO turns auto-play on', autoOn.on, `autoPlay=${autoOn.on}`)
+  check('and the button latches so the mode is visible', autoOn.latched)
+
+  // Turns taken, not tiles moved. The first version of this compared the
+  // player's position and failed intermittently: auto-play attacks an
+  // adjacent enemy without moving, so a sampling window that landed on a
+  // fight saw a stationary player and called the feature broken. Turns only
+  // advance when the player acts, which is exactly the claim being made.
+  const turns = () =>
+    page.evaluate(async () => (await import('/games/pocket-dungeon/state.ts')).GameState.turnsCount)
+  const actedOnItsOwn = async () => {
+    const a = await turns()
+    await page.waitForTimeout(1400)
+    return (await turns()) > a
+  }
+  check('and the game starts taking turns on its own', await actedOnItsOwn())
+
+  await hand.tap(ACT, autoBtn.x, autoBtn.y, 140)
+  await page.waitForTimeout(400)
+  const autoOff = await autoState()
+  check('tapping it again turns it off', !autoOff.on && !autoOff.latched)
+  check('and the game stops taking turns on its own', !(await actedOnItsOwn()))
+
   // The game-over panel. Reaching it by play would take a full run, so the
   // scene is started directly — what is under test is that the panel responds
   // to a touch, not the route to it.
