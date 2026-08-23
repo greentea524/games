@@ -656,6 +656,43 @@ export const LAMP_DEF: NpcDef = {
   ],
 }
 
+/**
+ * What is behind the sealed patch (#76).
+ *
+ * The alcove at (17,7)-(19,7) is walled off by the corruption at (16,7) in the
+ * normal world and open on the static side, so this is the first thing in the
+ * game you can only reach by crossing over — the toggle used as a way of
+ * getting somewhere rather than a way of seeing it differently.
+ *
+ * It says what that is worth. A place the town has stopped having is exactly
+ * the sort of thing the static side is for, and finding it should feel like
+ * catching the process mid-sentence rather than like a locked door opening.
+ */
+export const CORRUPTION_ALCOVE_DEF: NpcDef = {
+  id: 'corruption_alcove',
+  name: 'BEHIND THE TEAR',
+  shirt: 'dark',
+  hair: 'dark',
+  frozen: true,
+  branches: [
+    {
+      requires: 'ch3_done',
+      lines: [
+        { text: 'A dead end that is not on the other side.' },
+        { text: 'Whatever is copying the town has not been given this bit.' },
+        { text: 'So it is still here. Only here.' },
+      ],
+    },
+    {
+      lines: [
+        { text: 'A narrow gap between the houses, grey and quiet.' },
+        { text: 'You could not have walked in from the square.' },
+        { text: 'From this side there was never anything in the way.' },
+      ],
+    },
+  ],
+}
+
 export const CORRUPTION_DEF: NpcDef = {
   id: 'corruption',
   name: 'TORN GROUND',

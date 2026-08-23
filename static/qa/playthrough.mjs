@@ -305,14 +305,16 @@ await step('every signpost points where it says it does', async () => {
 // against the collision grid rather than against the sprite that is drawn.
 console.log('\n=== the corruption patches ===')
 await step('the same ground is sealed in town and open on the static side', async () => {
-  const patches = [
-    [10, 6],
-    [20, 13],
-    [11, 16],
-  ]
   const sv = await d.save()
   await d.boot({ ...sv, world: 'normal', mapKey: 'town', tx: 11, ty: 18 })
   const sealed = await d.grid()
+  // Read off the scene rather than written down here. The first version listed
+  // the three tiles as literals and went red the moment #76 moved one of them
+  // — a check that has to be edited whenever the thing it guards is edited is
+  // measuring the edit, not the behaviour. Same lesson as "never hardcode an
+  // NPC tile" in the README, which #93 and #96 taught the hard way.
+  const patches = (await d.scene()).worldGates.map((g) => [g.tx, g.ty])
+  need(patches.length > 0, 'the town should have corruption patches')
   await d.boot({ ...sv, world: 'static', mapKey: 'town', tx: 11, ty: 18 })
   const open = await d.grid()
   for (const [x, y] of patches) {
@@ -320,6 +322,40 @@ await step('the same ground is sealed in town and open on the static side', asyn
     need(open[y][x] === 1, `(${x},${y}) should be walkable on the static side`)
   }
   return `${patches.length} patches, solid one side and open the other`
+})
+
+// #76: the patch at (16,7) is the one that makes the toggle a way of *getting*
+// somewhere. The claim is not that it is solid — the step above covers that —
+// but that there is ground behind it you cannot stand on without crossing
+// over, and that there is something there when you do.
+await step('one patch seals ground that can only be reached from the other side', async () => {
+  const sv = await d.save()
+  await d.boot({ ...sv, world: 'normal', mapKey: 'town', tx: 11, ty: 18 })
+  const nGrid = await d.grid()
+  const nSeen = await d.reachable(nGrid)
+  await d.boot({ ...sv, world: 'static', mapKey: 'town', tx: 11, ty: 18 })
+  const sGrid = await d.grid()
+  const sSeen = await d.reachable(sGrid)
+  const sScene = await d.scene()
+
+  const gated = []
+  for (let y = 0; y < nGrid.length; y++) {
+    for (let x = 0; x < nGrid[0].length; x++) {
+      if (nGrid[y][x] === 1 && !nSeen.has(`${x},${y}`) && sSeen.has(`${x},${y}`)) {
+        gated.push([x, y])
+      }
+    }
+  }
+  need(gated.length > 0, 'no ground is reachable only by crossing over')
+  // And it is worth going to: an examine point the normal side cannot reach.
+  const withContent = gated.filter(([x, y]) =>
+    sScene.interactables.some((i) => i.tx === x && i.ty === y),
+  )
+  need(
+    withContent.length > 0,
+    `${gated.length} tile(s) gated but nothing to find there: ${gated.map((g) => g.join(',')).join(' ')}`,
+  )
+  return `${gated.length} tile(s) reachable only across, ${withContent.length} with something on them`
 })
 
 // The information transforms (#74). Both readers are on the Static side,

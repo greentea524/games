@@ -168,6 +168,7 @@ export class Driver {
           tx: Math.floor(i.x / 16),
           ty: Math.floor(i.y / 16),
         })),
+        worldGates: (w.worldGates ?? []).map((g) => ({ tx: g.tx, ty: g.ty })),
         doors: w.doors.map((d) => ({
           target: d.target,
           tx: Math.floor(d.zone.x / 16),

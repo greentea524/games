@@ -31,6 +31,7 @@ import {
   ENTITY_DEF,
   CH5_START_DEF,
   CORRUPTION_DEF,
+  CORRUPTION_ALCOVE_DEF,
   LAMP_DEF,
   LAMP_STATIC_DEF,
   SIGN_CROSSROADS_DEF,
@@ -164,6 +165,14 @@ export class WorldScene extends Phaser.Scene {
   // Darkness overlay, only on maps flagged `dark`/`darkInStatic` in Tiled (#73, #89)
   private darkness?: Darkness
   // Where the TV is on this map, if it has one — it lights itself (#89).
+  /**
+   * Tiles whose passability depends on the world (#76), for `qa:static`.
+   *
+   * The reachability pass has to tell a deliberately world-gated pocket from
+   * an accidentally sealed one. It cannot infer that from the collision grid —
+   * both look like a wall — so the scene names them.
+   */
+  worldGates: { tx: number; ty: number }[] = []
   private tvPos?: { x: number; y: number }
 
   // Minimap (only on maps larger than one screen)
@@ -1004,11 +1013,23 @@ export class WorldScene extends Phaser.Scene {
     const key = `corruption_${open ? 'open' : 'sealed'}_${mode}`
     // Chosen against the town layout: open ground, clear of every door, NPC
     // tile, bush and the fountain, in both the shared map and town_static.
+    //
+    // (16,7) is the one that earns the mechanic (#76). The other three block a
+    // line you would otherwise walk; this one blocks a *route*, sealing the
+    // north-east alcove at (17,7)-(19,7) in the normal world. That alcove is
+    // reachable only by crossing over, which makes the toggle a way of getting
+    // somewhere rather than a way of seeing it differently.
+    //
+    // It was picked by asking the map, not by eye. The town has exactly seven
+    // tiles whose sealing strands anything at all, and six of them strand one
+    // or two; this is the only one that closes a place rather than a corner.
+    // Choosing by eye is how #96 sealed twenty tiles by accident.
     const patches: [number, number][] = [
-      [10, 6],
+      [16, 7],
       [20, 13],
       [11, 16],
     ]
+    this.worldGates = patches.map(([tx, ty]) => ({ tx, ty }))
     for (const [tx, ty] of patches) {
       if (open) {
         this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, key)
@@ -1017,6 +1038,11 @@ export class WorldScene extends Phaser.Scene {
       }
       this.examine(tx, ty, CORRUPTION_DEF)
     }
+
+    // What the alcove is for. Only placed on the static side, because that is
+    // the only side you can stand here on — in the normal world the patch at
+    // (16,7) is solid and this ground is behind it.
+    if (open) this.examine(18, 7, CORRUPTION_ALCOVE_DEF)
   }
 
   private examine(tx: number, ty: number, def: NpcDef) {

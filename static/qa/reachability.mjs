@@ -43,7 +43,41 @@ const MAPS = [
 ]
 
 const failures = []
+const gatedByWorld = []
 const d = await Driver.launch()
+
+/**
+ * Everything captured per (map, world), so a map with two worlds can be judged
+ * as one place rather than as two unrelated ones. #76 made that necessary: a
+ * corruption patch is solid in the normal world and open in the static one, so
+ * the ground behind it is genuinely unreachable on one side and genuinely fine.
+ */
+const byMap = new Map()
+
+const flood = (grid, seeds, open = new Set()) => {
+  const H = grid.length
+  const W = grid[0].length
+  const seen = new Set()
+  const q = []
+  for (const [x, y] of seeds) {
+    if (grid[y]?.[x] !== 1 && !open.has(`${x},${y}`)) continue
+    seen.add(`${x},${y}`)
+    q.push([x, y])
+  }
+  while (q.length) {
+    const [x, y] = q.pop()
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx
+      const ny = y + dy
+      const k = `${nx},${ny}`
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H || seen.has(k)) continue
+      if (grid[ny][nx] !== 1 && !open.has(k)) continue
+      seen.add(k)
+      q.push([nx, ny])
+    }
+  }
+  return seen
+}
 
 for (const { mapKey, world, tx, ty } of MAPS) {
   const label = `${mapKey} / ${world}`
@@ -62,17 +96,38 @@ for (const { mapKey, world, tx, ty } of MAPS) {
   const seen = await d.reachable(grid)
   const problems = []
 
+  if (!byMap.has(mapKey)) byMap.set(mapKey, {})
+  byMap.get(mapKey)[world] = { grid, seen, scene, start: [tx, ty] }
+
   // 1. No walkable tile may be stranded. A pocket the player cannot enter is
   //    either dead content or, if a beat lives in it, a softlock.
+  //
+  //    One exception, and it is deliberately narrow (#76): ground sealed by a
+  //    *corruption patch* is meant to be unreachable on one side. The scene
+  //    names those tiles in `worldGates`, so this asks "would the flood reach
+  //    it if the patches were open?" rather than waving through every orphan.
+  //
+  //    Scoping it to the mechanism rather than to the map matters. A blanket
+  //    "reachable in either world is fine" rule would let #96 back in: the
+  //    Baker's body sealed twenty tiles of the *static* town that the normal
+  //    town reaches perfectly well, and the narration written for them was
+  //    dead. That still fails here, because the Baker is not a world gate.
+  const gateKeys = new Set((scene.worldGates ?? []).map((g) => `${g.tx},${g.ty}`))
+  const withGatesOpen = gateKeys.size ? flood(grid, [[tx, ty]], gateKeys) : seen
   const orphans = []
+  const gated = []
   for (let y = 0; y < grid.length; y++) {
     for (let x = 0; x < grid[0].length; x++) {
-      if (grid[y][x] === 1 && !seen.has(`${x},${y}`)) orphans.push(`(${x},${y})`)
+      const k = `${x},${y}`
+      if (grid[y][x] !== 1 || seen.has(k)) continue
+      if (withGatesOpen.has(k)) gated.push(`(${x},${y})`)
+      else orphans.push(`(${x},${y})`)
     }
   }
   if (orphans.length) {
     problems.push(`${orphans.length} walkable tile(s) cut off: ${orphans.join(' ')}`)
   }
+  if (gated.length) gatedByWorld.push({ label, mapKey, world, tiles: gated })
 
   // 2. Every NPC must have somewhere to be talked to from. This is #93.
   for (const npc of scene.npcs) {
@@ -107,6 +162,77 @@ for (const { mapKey, world, tx, ty } of MAPS) {
     for (const p of problems) console.log(`        ${p}`)
   } else {
     console.log(`ok    ${label}  (${seen.size} tiles reachable, ${scene.npcs.length} npc(s))`)
+  }
+}
+
+// --- what the toggle is for (#76) -------------------------------------------
+//
+// A corruption patch is supposed to *gate* ground, not delete it. Two things
+// have to hold for that, and neither is visible from one world at a time:
+//
+//   - every tile sealed on one side is reachable on the other, or the patch
+//     has quietly walled off content nobody can ever see;
+//   - every door is reachable in both worlds, because crossing over means
+//     walking to the TV in the house, and a player sealed away from a door is
+//     sealed away from the only way back.
+//
+// The second is the one that keeps a world-gated pocket from being a
+// softlock, and it is worth stating even though the town passes it today.
+if (gatedByWorld.length) console.log('\n--- world-gated ground ---')
+for (const g of gatedByWorld) {
+  const other = g.world === 'normal' ? 'static' : 'normal'
+  const pair = byMap.get(g.mapKey)?.[other]
+  if (!pair) {
+    failures.push({
+      label: g.label,
+      problems: [`${g.tiles.length} tile(s) are sealed here and ${other} is never checked`],
+      grid: byMap.get(g.mapKey)[g.world].grid,
+      seen: byMap.get(g.mapKey)[g.world].seen,
+      scene: byMap.get(g.mapKey)[g.world].scene,
+    })
+    console.log(`FAIL  ${g.label}  sealed ground, but '${other}' is not in MAPS`)
+    continue
+  }
+  const missed = g.tiles.filter((t) => {
+    const [x, y] = t.slice(1, -1).split(',')
+    return !pair.seen.has(`${x},${y}`)
+  })
+  if (missed.length) {
+    failures.push({
+      label: g.label,
+      problems: [`${missed.length} tile(s) sealed here and unreachable in ${other} too: ${missed.join(' ')}`],
+      grid: pair.grid,
+      seen: pair.seen,
+      scene: pair.scene,
+    })
+    console.log(`FAIL  ${g.label}  ${missed.length} tile(s) sealed in both worlds: ${missed.join(' ')}`)
+  } else {
+    console.log(`ok    ${g.label}  ${g.tiles.length} tile(s) gated behind a patch, open in '${other}'`)
+  }
+}
+
+for (const [mapKey, worlds] of byMap) {
+  if (!worlds.normal || !worlds.static) continue
+  for (const world of ['normal', 'static']) {
+    const { seen, grid, scene } = worlds[world]
+    const unreachable = scene.doors.filter(
+      (door) =>
+        !seen.has(`${door.tx},${door.ty}`) &&
+        !Driver.approaches(grid, door.tx, door.ty).some(([x, y]) => seen.has(`${x},${y}`)),
+    )
+    if (unreachable.length) {
+      failures.push({
+        label: `${mapKey} / ${world}`,
+        problems: [
+          `door(s) ${unreachable.map((x) => x.target).join(', ')} unreachable — ` +
+            'with no way out there is no way back to the TV, so the world cannot be changed',
+        ],
+        grid,
+        seen,
+        scene,
+      })
+      console.log(`FAIL  ${mapKey} / ${world}  no way back to a door`)
+    }
   }
 }
 

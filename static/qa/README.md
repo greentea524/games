@@ -31,6 +31,26 @@ player just as hard as walls do. Then it asserts:
 - every NPC has somewhere to be talked to from
 - every interactable can be reached
 - every door can be walked into
+- ground sealed by a corruption patch is open on the other side (#76)
+- every door is reachable in *both* worlds
+
+The last two are about the world toggle. A corruption patch is solid in the
+normal world and open on the static side, so the ground behind one is
+genuinely unreachable on one side and genuinely fine — the flood fill on its
+own cannot tell that from an accident.
+
+The exception is scoped to the mechanism, not to the map. The scene names its
+patch tiles in `worldGates`, and the pass asks "would the flood reach this if
+the patches were open?". A blanket "reachable in either world is fine" rule
+would have let #96 straight back in: the Baker's body sealed twenty tiles of
+the *static* town that the normal town reaches perfectly well, and the
+narration written for them was dead content. That still fails, because the
+Baker is not a world gate.
+
+The door rule is what keeps a gated pocket from being a softlock. Crossing
+over is not a free action — it happens at the TV, which is inside the
+`house` map — so a player sealed away from a door is sealed away from the only
+way to change worlds.
 
 **`playthrough.mjs`** (a couple of minutes) — plays a fresh save through to
 both endings with real input, asserting each story beat and each item
@@ -55,8 +75,11 @@ a map re-entry.
 
 ## Notes for anyone extending this
 
-- **Never hardcode an NPC tile.** Where they stand is exactly what #93 and #96
-  changed. Look them up with `npcAt(id)`.
+- **Never hardcode a tile.** Where NPCs stand is exactly what #93 and #96
+  changed; look them up with `npcAt(id)`. The same applies to props: the
+  corruption-patch check listed its three tiles as literals and went red the
+  moment #76 moved one, which measured the edit rather than the behaviour. It
+  reads `worldGates` off the scene now.
 - **Drive everything with keys, including dialogue.** Clicks advance the box
   fine — the canvas has no movement handler — but staying on one input path
   means a failure is never ambiguous about which path caused it.
