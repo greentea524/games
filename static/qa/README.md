@@ -15,10 +15,14 @@ QA_URL=http://localhost:5173/games/static/ npm run qa:static
 ```
 
 Both exit non-zero on failure, and treat any page or console error as one.
-Failed network requests only count when they were the game's own. The font is
-self-hosted; the one third party left on these pages is the analytics tag
-(#102), which an offline or proxied machine always fails — and failing the
-suite over that would just train everyone to ignore the output.
+Every failed network request counts, whatever its origin: #102 removed the
+analytics tag, so these pages request nothing from a host the repo does not
+control. The font is self-hosted and every sprite is generated at runtime.
+
+That was not always true. The origin filter these suites used to carry existed
+for the analytics tag alone — an offline or proxied machine failed it on every
+run, and failing the suite over that would have trained everyone to ignore the
+output.
 
 ## What they check
 

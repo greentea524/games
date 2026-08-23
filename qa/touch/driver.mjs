@@ -65,16 +65,18 @@ export async function launchTouch(url) {
       log.push({ kind: 'console.error', text: m.text() })
     }
   })
-  // A failed request is only the game's problem when it was the game's
-  // request. The font is self-hosted; the one third party left on these pages
-  // is the analytics tag (#102), which an offline or proxied machine always
-  // fails — in this sandbox it reports ERR_TUNNEL_CONNECTION_FAILED on every
-  // run. Everything from the game's own origin is a real failure.
+  // Every failed request is the game's problem now.
   //
-  // Without this the suite noticed nothing at all: the console echo above was
-  // dropped wholesale, so a 404 on a game asset passed silently.
+  // This used to ignore anything not from the game's own origin, because the
+  // analytics tag was the one third party on these pages and an offline or
+  // proxied machine fails it on every run — so the suite had to look past it.
+  // #102 removed the tag, so nothing external is requested at all and the
+  // filter would only be hiding a genuine regression. Measured: a clean run
+  // across all five games now reports zero failed requests of any origin.
+  //
+  // Without *some* handler here the suite noticed nothing at all: the console
+  // echo above is dropped wholesale, so a 404 on a game asset passed silently.
   page.on('requestfailed', (req) => {
-    if (!req.url().startsWith(new URL(BASE_URL).origin)) return
     // ERR_ABORTED is a cancellation, not a failure — a reload cancels
     // in-flight requests, and the Static suite reloads to seed its save.
     const why = req.failure()?.errorText ?? 'unknown'

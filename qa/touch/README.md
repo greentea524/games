@@ -16,10 +16,13 @@ QA_URL=http://localhost:5173/games/ npm run qa:touch
 ```
 
 Both suites exit non-zero on failure and treat any page or console error as
-one, plus any request from the game's own origin that fails or returns an
-error status. Third-party requests are ignored — the only one left on these
-pages is the analytics tag (#102), which an offline or proxied machine always
-fails.
+one, plus any request that fails outright — whatever its origin — and any
+same-origin request that returns an error status.
+
+Third-party requests used to be ignored entirely, because the analytics tag
+was the one external thing these pages loaded and an offline or proxied
+machine fails it every run. #102 removed the tag, so nothing is requested from
+a host the repo does not control and the exemption went with it.
 
 Note that a missing asset only shows up against a **built** site. Both the
 Vite dev server and `vite preview` fall back to serving index.html for an

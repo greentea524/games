@@ -295,6 +295,23 @@ async function pocketDungeon() {
       [-openDir.dx, -openDir.dy], // step back the way we came: known open
     )
     const beforeTap = await st()
+    // Enemies take a turn after the d-pad step above, so the tile we came from
+    // may not be empty any more — and a tap on an occupied tile is an *attack*,
+    // which leaves the player where they are. That made this check fail about
+    // one run in three with "23,5 -> 23,5, wanted 22,5". Clear the tile rather
+    // than assert around it, so the check still tests what it says it does.
+    await page.evaluate(
+      ([tx, ty]) => {
+        const s = window.__game.scene.getScene('dungeon')
+        for (const e of s.enemies) {
+          if (e.tx === tx && e.ty === ty && e.hp > 0) {
+            e.hp = 0
+            e.sprite.setVisible(false)
+          }
+        }
+      },
+      [target.tx, target.ty],
+    )
     const pt = cv.at(target.x, target.y)
     await hand.tap(ACT, pt.x, pt.y, 100)
     await page.waitForTimeout(700)
