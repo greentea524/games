@@ -16,17 +16,18 @@
            policy: nothing on these pages loads from an origin the repo does
            not control. script-src, connect-src and img-src are 'self' and
            local schemes only.
-         - 'unsafe-inline' for scripts is still here, but for one reason now
-           rather than two — every shell has an inline pre-init sizing script.
-           The analytics bootstrap was the other. Replacing that one with a
-           hash is the remaining step; it is worth doing on its own terms and
-           was not folded in here, because #102 was a decision about analytics
-           rather than a CSP change.
+         - script-src is 'self', with no 'unsafe-inline' and no hashes (#108).
+           This page has no inline script at all: the analytics bootstrap was
+           the only one and #102 removed it. The games still need a hash, for
+           their pre-init sizing script.
+         - style-src keeps 'unsafe-inline' — unmeasured here rather than known
+           to be needed. This is a bundled app and may set styles at runtime,
+           so tightening it wants its own measurement, not an assumption.
          - data: and blob: for img/media because every sprite in all five games
            is generated at runtime through canvas, not loaded as a file.
          - frame-ancestors and report-uri are deliberately absent: a meta CSP
            ignores both, and including them only logs a console warning. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>games</title>
