@@ -38,6 +38,7 @@ npm run qa:static  # Static: reachability + a full scripted playthrough
 npm run qa:touch   # all five games under real multi-touch, on a phone viewport
 npm run qa:contrast# DMG sprites must not be drawn in their background's tone
 npm run qa:units   # pure-logic checks (floor modifiers, storage migration)
+npm run qa:csp     # the CSP's script hashes still match the scripts (#108)
 ```
 
 `*_test.ts` files run under `tsx` and use `process.exit`, so they are excluded
@@ -74,6 +75,11 @@ Both carry hard-won notes: `scene.isActive()` is false during `create()`,
 Phaser polls `Key.isDown` once a frame so zero-length presses fall between
 frames, and CDP's `touchEnd` carries the contacts being *released* rather than
 those remaining.
+
+**The CSP hashes an inline script, and a stale hash fails silently.** Editing
+the pre-init sizing script in any `index.html` changes its hash; the browser
+then declines to run it, nothing throws, and every functional check goes on
+passing. `npm run qa:csp` recomputes it. If you touch that script, run it.
 
 **Make a check prove it can fail.** Several checks in this repo passed for the
 wrong reason when first written — asserting a fall speed was capped, against a

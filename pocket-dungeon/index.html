@@ -16,17 +16,21 @@
            policy: nothing on these pages loads from an origin the repo does
            not control. script-src, connect-src and img-src are 'self' and
            local schemes only.
-         - 'unsafe-inline' for scripts is still here, but for one reason now
-           rather than two — every shell has an inline pre-init sizing script.
-           The analytics bootstrap was the other. Replacing that one with a
-           hash is the remaining step; it is worth doing on its own terms and
-           was not folded in here, because #102 was a decision about analytics
-           rather than a CSP change.
+         - scripts are 'self' plus one sha256 hash (#108). The hash covers the
+           inline pre-init sizing script, which is the only inline script left
+           on these pages — the analytics bootstrap was the other, and #102
+           removed it. `npm run qa:csp` recomputes the hash from this file and
+           fails if it does not match, because a stale hash fails *silently*:
+           the browser simply declines to run the script, and the shell never
+           sizes itself.
+         - style-src keeps 'unsafe-inline'. That same script builds a <style>
+           element at runtime with a computed width and height, and a stylesheet
+           written after the policy is served cannot be hashed ahead of it.
          - data: and blob: for img/media because every sprite in all five games
            is generated at runtime through canvas, not loaded as a file.
          - frame-ancestors and report-uri are deliberately absent: a meta CSP
            ignores both, and including them only logs a console warning. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-tocenARxLNCLCKQwarBZsx3C+qtxhI395CjnNaqefDg='; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <title>Pocket Dungeon - GBC Roguelite Crawler</title>
