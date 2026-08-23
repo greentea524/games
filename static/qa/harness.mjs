@@ -77,14 +77,13 @@ export class Driver {
         d.log.push({ kind: 'console.error', text: m.text() })
       }
     })
-    // A request that fails is only the game's problem when it was the game's
-    // request. The font is self-hosted; the one third party left on these
-    // pages is the analytics tag (#102), which an offline or proxied machine
-    // will always fail — and failing the suite over that would train everyone
-    // to ignore the output. If #102 lands on dropping analytics, nothing
-    // external remains and this origin filter can go with it.
+    // Every failed request counts now. The origin filter here existed for one
+    // reason — the analytics tag, which an offline or proxied machine always
+    // fails, and failing the suite over that would have trained everyone to
+    // ignore the output. #102 dropped the tag, so nothing external is
+    // requested and the filter would only hide a real regression. That was
+    // the condition this comment set for removing it.
     page.on('requestfailed', (req) => {
-      if (!req.url().startsWith(new URL(BASE_URL).origin)) return
       // ERR_ABORTED is a cancellation, not a failure. Every boot navigates and
       // then reloads to seed the save, which cancels the in-flight favicon
       // fetch — the harness's own doing, not the game's.
@@ -168,6 +167,7 @@ export class Driver {
           tx: Math.floor(i.x / 16),
           ty: Math.floor(i.y / 16),
         })),
+        worldGates: (w.worldGates ?? []).map((g) => ({ tx: g.tx, ty: g.ty })),
         doors: w.doors.map((d) => ({
           target: d.target,
           tx: Math.floor(d.zone.x / 16),

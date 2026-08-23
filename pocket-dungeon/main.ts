@@ -47,6 +47,7 @@ const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
     KeyX: 'x',
     KeyR: 'r',
     KeyE: 'e',
+    KeyP: 'p',
     Enter: 'Enter',
     Escape: 'Escape',
   }
@@ -66,9 +67,15 @@ const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
     KeyX: 88,
     KeyR: 82,
     KeyE: 69,
+    KeyP: 80,
     Enter: 13,
     Escape: 27,
   }
+  // A `data-key` missing from these two maps dispatches keyCode 0, which
+  // Phaser matches against nothing — the button looks and feels alive, the
+  // shell animates it, and the game never hears it. #81's AUTO button shipped
+  // that way for an afternoon: it worked on a keyboard and was dead on touch,
+  // which is the only place the button is visible at all.
   Object.defineProperty(event, 'keyCode', { get: () => keyCodeMap[code] || 0 })
   Object.defineProperty(event, 'which', { get: () => keyCodeMap[code] || 0 })
 

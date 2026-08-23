@@ -37,6 +37,16 @@ import { rollModifier, modifierSeed, type Modifier } from '../modifiers'
 import { bossAI } from '../boss'
 import { bossForFloor, isBossFloor, type BossDef } from '../bosses'
 import { relicForBoss, hasAllRelics, RELIC_TARGET, FINAL_DEPTH, RELIC_COPY } from '../relics'
+import { chooseAction, type AutoWorld } from '../autoplay'
+
+/**
+ * Milliseconds between auto turns (#81).
+ *
+ * Fast enough to be worth switching on, slow enough that the player can see
+ * what happened — a move tween is 100ms, so anything under that would start
+ * the next turn before the last one finished drawing.
+ */
+const AUTO_TURN_MS = 180
 import type { BossState } from '../boss'
 import { rollFloorItems, ITEMS } from '../items'
 import { rollChests, rollChestLoot, keysForFloor, type ChestTier } from '../chests'
@@ -87,6 +97,9 @@ export class DungeonScene extends Phaser.Scene {
   private rewindKey!: Phaser.Input.Keyboard.Key
   /** The escape portal (#84), while it is standing. */
   private portalSprite?: Phaser.GameObjects.Image
+  /** Auto-play (#81): on, and when the next auto turn is due. */
+  private autoPlay = false
+  private nextAutoTurn = 0
 
   constructor() {
     super('dungeon')
@@ -125,6 +138,12 @@ export class DungeonScene extends Phaser.Scene {
     // B on the shell, which sends KeyX (#82).
     const gearKey = this.input.keyboard!.addKey('X')
     gearKey.on('down', () => this.toggleGearPanel())
+
+    // Auto-play (#81). A listener rather than a poll in `update()`, for the
+    // same reason the panel keys are: `update()` returns early while a panel
+    // is open, and turning auto-play *off* has to work from anywhere.
+    const autoKey = this.input.keyboard!.addKey('P')
+    autoKey.on('down', () => this.toggleAutoPlay())
 
     // Panel navigation (#105). These have to be listeners rather than polls in
     // `update()`, because `update()` returns early while `uiBlocking` is set —
@@ -235,6 +254,19 @@ export class DungeonScene extends Phaser.Scene {
     // method, and only the first two go through `create()`. A stale handle
     // makes `openPortal` return early and the portal never comes back.
     this.portalSprite = undefined
+    // Auto-play (#81) carries across floors — a hands-free mode that stops at
+    // every staircase is not hands-free — but not across runs. Floor 1 is the
+    // only way into a run, so it is where the mode is cleared.
+    //
+    // `nextAutoTurn` is reset unconditionally regardless. It is a `time.now`
+    // stamp and the clock does not survive `scene.restart()`, so a due-time
+    // set on floor 3 would sit in the future forever on floor 4 and auto-play
+    // would look switched on while doing nothing at all.
+    if (GameState.floorDepth === 1) {
+      this.autoPlay = false
+      document.querySelector('#btn-auto')?.classList.remove('latched')
+    }
+    this.nextAutoTurn = 0
     this.rng = new RNG(GameState.seed + GameState.floorDepth)
 
     if (isBossFloor(GameState.floorDepth)) {
@@ -444,9 +476,87 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     if (dx !== 0 || dy !== 0) {
+      // Touching the d-pad takes the wheel back. Auto-play is a convenience,
+      // and a convenience you have to switch off before you can move is not
+      // one — this is the same reflex as grabbing the wheel in a car.
+      if (this.autoPlay) this.setAutoPlay(false, 'AUTO OFF')
       this.facing = nextFacing
       this.saveTurnSnapshot()
       this.handlePlayerAction(dx, dy)
+      return
+    }
+
+    if (this.autoPlay) this.stepAutoPlay()
+  }
+
+  private toggleAutoPlay() {
+    this.setAutoPlay(!this.autoPlay, this.autoPlay ? 'AUTO OFF' : 'AUTO ON')
+  }
+
+  private setAutoPlay(on: boolean, banner: string) {
+    this.autoPlay = on
+    // Due immediately, so the first auto turn does not sit out a full tick
+    // after the button press and read as an unresponsive button.
+    this.nextAutoTurn = 0
+    this.showDamageText(this.player.x, this.player.y - 12, banner, on ? '#88ffcc' : '#a0a0a0')
+    document.querySelector('#btn-auto')?.classList.toggle('latched', on)
+  }
+
+  /**
+   * One auto turn, if one is due (#81).
+   *
+   * Rate-limited rather than run every frame: the game is turn-based and a
+   * player watching at 60 turns a second sees a blur, not a game. The cadence
+   * is roughly a brisk human's.
+   *
+   * The planner is pure and lives in `autoplay.ts`; everything here is about
+   * feeding it the world and turning its answer into the same call a keypress
+   * would have made.
+   */
+  private stepAutoPlay() {
+    const now = this.time.now
+    if (now < this.nextAutoTurn) return
+    this.nextAutoTurn = now + AUTO_TURN_MS
+
+    const action = chooseAction(this.autoWorld())
+    if (action.kind === 'halt') {
+      this.setAutoPlay(false, action.reason)
+      return
+    }
+
+    // Both cases are the same call: walking into an enemy is how you attack
+    // it, so `handlePlayerAction` already does the right thing with either.
+    this.facing =
+      action.dx === -1 ? 'left' : action.dx === 1 ? 'right' : action.dy === -1 ? 'up' : 'down'
+    this.saveTurnSnapshot()
+    this.handlePlayerAction(action.dx, action.dy)
+  }
+
+  /** The scene's state in the shape the planner takes. */
+  private autoWorld(): AutoWorld {
+    let stairs: { x: number; y: number } | null = null
+    for (let y = 0; y < this.mapHeight && !stairs; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        if (this.grid[y][x] === 'S') {
+          stairs = { x, y }
+          break
+        }
+      }
+    }
+    return {
+      grid: this.grid,
+      width: this.mapWidth,
+      height: this.mapHeight,
+      explored: this.explored,
+      player: { x: this.playerTX, y: this.playerTY },
+      playerHp: GameState.playerHp,
+      maxHp: GameState.maxHp,
+      enemies: this.enemies.map((e) => ({ tx: e.tx, ty: e.ty, hp: e.hp })),
+      items: this.floorItems.map((i) => ({ tx: i.tx, ty: i.ty })),
+      chests: this.chests.map((c) => ({ tx: c.tx, ty: c.ty, opened: c.opened })),
+      stairs,
+      // The portal is an exit worth walking to; a sealed staircase is not.
+      stairsSealed: this.bossBlocksStairs() && !this.portalOpen,
     }
   }
 
