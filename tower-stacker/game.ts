@@ -3,16 +3,11 @@
 // The shell was built around Phaser, and everything it provides — the d-pad,
 // the palette toggle, the save, the hub card, the touch suite — has to keep
 // working across the seam to a second renderer. The two things that make that
-// possible are both here:
-//
-//   - The render target is exactly 160x144 with `setPixelRatio(1)`, and CSS
-//     does the upscale, which is what Phaser's `Scale.FIT` plus
-//     `image-rendering: pixelated` already does for the other five games. It
-//     also keeps `canvasSpace` in `qa/touch/grid.mjs` usable here, since that
-//     helper derives its scale by assuming a 160-wide canvas.
-//   - A post pass quantises the image to four tones, so the MONO/COLOR toggle
-//     still means something in 3D rather than being a dead switch on a page
-//     that has no palette to swap.
+// possible — a 160x144 render target that CSS upscales, and a post pass that
+// quantises to four tones so MONO/COLOR still means something — landed here
+// first and now live in `shared/gb3d.ts`, where Tube Runner (#111) uses them
+// too. What is left in this file is Tower Stacker's own camera, lighting and
+// loop.
 //
 // The rest of the shell needs no adapter at all: `shared/dpad.ts` and
 // `shared/buttons.ts` dispatch synthetic key events on `window`, so this reads
@@ -28,22 +23,13 @@ import {
   type Axis,
   type Block,
 } from './stack'
-import { GBC_HEIGHT, GBC_WIDTH, PAL } from './constants'
+import { PAL } from './constants'
+import { GB_HEIGHT, GB_WIDTH, createGb3d, gbIntensity } from '../shared/gb3d'
 import { createHud, type Screen } from './hud'
 import { loadTowerSave, recordRun } from './save'
 import { playBlip, playLand, playMiss, playPerfect } from './audio'
 import { prefersReducedMotion } from '../shared/motion'
 
-// Colour management off, deliberately.
-//
-// three's default converts material colours into linear space and back on
-// output, which is right for a lit scene aiming at physical plausibility and
-// wrong for this one: the palette is four exact bytes, and the post pass below
-// writes them straight to the framebuffer. With conversion on, `PAL.lightest`
-// leaves the shader as 0x9bbc0f and reaches the screen as something else, and
-// the contrast the whole DMG look rests on becomes something to measure rather
-// than something to know.
-THREE.ColorManagement.enabled = false
 
 /**
  * Base luminance every block is lit from.
@@ -86,25 +72,15 @@ const BASE_LUMA = 0.58
  *   +X     0.461   0.58 * (0.42 + 1.20 * 0.461) = 0.564               2 light
  *   +Z     0.293   0.58 * (0.42 + 1.20 * 0.293) = 0.448               1 dark
  *
+ * The intensities go through `gbIntensity`, which carries the 1/PI factor
+ * three's Lambert BRDF applies — see the note on it in `shared/gb3d.ts`.
+ *
  * `qa/touch/tower-stacker.mjs` reads these back out of the framebuffer, so the
  * arithmetic is checked against the image rather than trusted.
  */
 const AMBIENT = 0.42
 const DIRECTIONAL = 1.2
 const LIGHT_DIR = new THREE.Vector3(0.55, 1, 0.35)
-
-/**
- * What the intensities above are multiplied by before they reach three.
- *
- * `BRDF_Lambert` is `RECIPROCAL_PI * diffuseColor`, and three applies it to
- * the ambient term as well as the direct one, so a light of intensity `i`
- * contributes `i / PI` to the image. Passing the table's numbers through
- * unscaled put *every* face of *every* block on tone 1 — one flat dark
- * silhouette against the sky, with the shading that separates the top of a
- * slab from its sides gone entirely. It reads as a bug in the palette pass
- * rather than in the lighting, which is what makes it worth naming here.
- */
-const LAMBERT_PI = Math.PI
 
 /** Camera direction from its target. Sees the +X, +Y and +Z faces. */
 const VIEW_DIR = new THREE.Vector3(1, 0.867, 1)
@@ -182,33 +158,8 @@ export interface TowerGame {
 export function createGame(parent: HTMLElement): TowerGame {
   // ---------------------------------------------------------------- renderer
 
-  // `preserveDrawingBuffer` is for `readPixels` below. Without it the drawing
-  // buffer is undefined once the frame is composited, so the palette and
-  // contrast checks would read back an empty image and pass on nothing.
-  const renderer = new THREE.WebGLRenderer({
-    antialias: false,
-    alpha: false,
-    preserveDrawingBuffer: true,
-  })
-  // No antialiasing and no device pixel ratio: the image is 160x144 and every
-  // pixel in it is meant to be visible as a pixel. `false` stops three writing
-  // its own CSS size, which would fight the shell's sizing below.
-  renderer.setPixelRatio(1)
-  renderer.setSize(GBC_WIDTH, GBC_HEIGHT, false)
-  renderer.outputColorSpace = THREE.LinearSRGBColorSpace
-  renderer.setClearColor(0x000000, 1)
-
-  const canvas = renderer.domElement
-  // The shell pins `#game` to 160x144 times an integer zoom and applies
-  // `image-rendering: pixelated`, so filling it exactly reproduces what
-  // Phaser's Scale.FIT does for the other games. `flexShrink` matters: `#game`
-  // is a flex container, and without it the canvas would be shrunk below the
-  // size the percentages just asked for.
-  canvas.style.width = '100%'
-  canvas.style.height = '100%'
-  canvas.style.display = 'block'
-  canvas.style.flexShrink = '0'
-  parent.appendChild(canvas)
+  const hud = createHud()
+  const gb = createGb3d({ parent, hudCanvas: hud.canvas, ramp: PAL })
 
   // ------------------------------------------------------------------- scene
 
@@ -218,7 +169,7 @@ export function createGame(parent: HTMLElement): TowerGame {
   // what colour a block is made, not just how it is post-processed.
   let mono = true
 
-  const aspect = GBC_WIDTH / GBC_HEIGHT
+  const aspect = GB_WIDTH / GB_HEIGHT
   const camera = new THREE.OrthographicCamera(
     (-FRUSTUM_HEIGHT * aspect) / 2,
     (FRUSTUM_HEIGHT * aspect) / 2,
@@ -229,10 +180,10 @@ export function createGame(parent: HTMLElement): TowerGame {
   )
   const viewOffset = VIEW_DIR.clone().normalize().multiplyScalar(24)
 
-  const light = new THREE.DirectionalLight(0xffffff, DIRECTIONAL * LAMBERT_PI)
+  const light = new THREE.DirectionalLight(0xffffff, gbIntensity(DIRECTIONAL))
   light.position.copy(LIGHT_DIR)
   scene.add(light)
-  scene.add(new THREE.AmbientLight(0xffffff, AMBIENT * LAMBERT_PI))
+  scene.add(new THREE.AmbientLight(0xffffff, gbIntensity(AMBIENT)))
 
   // One geometry for every block. A unit box scaled per mesh costs one
   // buffer instead of one per slab, which matters on a tower that can run to
@@ -297,81 +248,6 @@ export function createGame(parent: HTMLElement): TowerGame {
     mesh.add(new THREE.LineSegments(unitEdges, edgeMaterial))
     return mesh
   }
-
-  // ------------------------------------------------------------- post pass
-
-  const target = new THREE.WebGLRenderTarget(GBC_WIDTH, GBC_HEIGHT, {
-    minFilter: THREE.NearestFilter,
-    magFilter: THREE.NearestFilter,
-    // three.js's answer to Phaser's `pixelArt: true`. Nothing here is ever
-    // sampled at a non-integer scale, but a linear filter would still soften
-    // the composite on drivers that round differently.
-    depthBuffer: true,
-  })
-
-  const hud = createHud()
-  const hudTexture = new THREE.CanvasTexture(hud.canvas)
-  hudTexture.minFilter = THREE.NearestFilter
-  hudTexture.magFilter = THREE.NearestFilter
-
-  const tone = (n: number) => new THREE.Color(n)
-  const postMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-      tScene: { value: target.texture },
-      tHud: { value: hudTexture },
-      uMono: { value: 1 },
-      uT0: { value: tone(PAL.darkest) },
-      uT1: { value: tone(PAL.dark) },
-      uT2: { value: tone(PAL.light) },
-      uT3: { value: tone(PAL.lightest) },
-    },
-    vertexShader: `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = vec4(position.xy, 0.0, 1.0);
-      }
-    `,
-    // The tones are four separate uniforms rather than an array because
-    // indexing a uniform array with a computed index is not allowed in a
-    // GLSL ES 1.00 fragment shader, and that is the version three compiles a
-    // plain ShaderMaterial as.
-    fragmentShader: `
-      uniform sampler2D tScene;
-      uniform sampler2D tHud;
-      uniform float uMono;
-      uniform vec3 uT0;
-      uniform vec3 uT1;
-      uniform vec3 uT2;
-      uniform vec3 uT3;
-      varying vec2 vUv;
-
-      void main() {
-        vec3 src = texture2D(tScene, vUv).rgb;
-        vec3 quantised;
-        if (uMono > 0.5) {
-          // MONO: collapse to luminance and pick one of the four DMG tones.
-          float luma = dot(src, vec3(0.299, 0.587, 0.114));
-          float q = clamp(floor(luma * 4.0), 0.0, 3.0);
-          quantised = uT0;
-          quantised = mix(quantised, uT1, step(0.5, q));
-          quantised = mix(quantised, uT2, step(1.5, q));
-          quantised = mix(quantised, uT3, step(2.5, q));
-        } else {
-          // COLOR: four levels per channel, which is the GBC analogue — hue
-          // survives, but the shading is banded exactly as hard as MONO's.
-          quantised = min(floor(src * 4.0), 3.0) / 3.0;
-        }
-        // The HUD is composited after the quantise so its glyphs keep the
-        // exact colours hud.ts chose.
-        vec4 overlay = texture2D(tHud, vUv);
-        gl_FragColor = vec4(mix(quantised, overlay.rgb, overlay.a), 1.0);
-      }
-    `,
-  })
-  const postScene = new THREE.Scene()
-  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMaterial))
-  const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
 
   // -------------------------------------------------------------- run state
 
@@ -656,12 +532,8 @@ export function createGame(parent: HTMLElement): TowerGame {
       cameraY,
       t: elapsed,
     })
-    hudTexture.needsUpdate = true
-
-    renderer.setRenderTarget(target)
-    renderer.render(scene, camera)
-    renderer.setRenderTarget(null)
-    renderer.render(postScene, postCamera)
+    gb.needsHudUpdate()
+    gb.present(scene, camera)
 
     requestAnimationFrame(frame)
   }
@@ -681,15 +553,10 @@ export function createGame(parent: HTMLElement): TowerGame {
     mono: () => mono,
     setPalette(next) {
       mono = next
-      postMaterial.uniforms.uMono.value = next ? 1 : 0
+      gb.setPalette(next)
       retint()
     },
-    readPixels() {
-      const buf = new Uint8Array(GBC_WIDTH * GBC_HEIGHT * 4)
-      const gl = renderer.getContext()
-      gl.readPixels(0, 0, GBC_WIDTH, GBC_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, buf)
-      return buf
-    },
+    readPixels: gb.readPixels,
     press,
   }
 }
