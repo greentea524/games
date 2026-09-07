@@ -1,0 +1,68 @@
+/* Page layout for a standalone 3D game (#118).
+   The counterpart to shared/shell.css, which draws a GameBoy around its game.
+   This one gets out of the way: the game fills the viewport, and the only
+   chrome is whatever the game puts in its own overlay. */
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #0b0f14;
+  color: #e8ecf1;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  /* The canvas is the game's input surface, not something to scroll or pinch. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The stage's parent. Positioned so the overlay can be absolute inside it. */
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Sits above the canvas and ignores input, so the game's pointer handlers
+   still see the whole surface. Individual controls opt back in. */
+.stage3d-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stage3d-overlay button,
+.stage3d-overlay a,
+.stage3d-overlay [data-interactive] {
+  pointer-events: auto;
+}
+
+/* A way back to the hub, in the corner, on every 3D game. The GameBoy shell
+   has its own "< Games" link; this is the same affordance without the bezel. */
+.stage3d-back {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(11, 15, 20, 0.55);
+  border: 1px solid rgba(232, 236, 241, 0.18);
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  backdrop-filter: blur(6px);
+}
+
+.stage3d-back:hover,
+.stage3d-back:focus-visible {
+  color: #fff;
+  border-color: rgba(232, 236, 241, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage3d-back { backdrop-filter: none; }
+}

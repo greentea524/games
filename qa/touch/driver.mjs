@@ -135,9 +135,27 @@ export async function centreOf(page, selector) {
 }
 
 /**
- * The shell controls, with a helper for aiming at a d-pad arm.
+ * A point on the canvas, from normalised 0..1 coordinates.
  *
- * All five games share this markup, so one lookup serves every suite.
+ * The counterpart to `canvasSpace` in `grid.mjs` for games that are not
+ * 160 pixels wide. A standalone 3D game (#118) sizes its canvas to whatever
+ * the viewport gives it, so a suite cannot convert game-space to client-space
+ * the way the GameBoy games can — but it can still say "a third of the way
+ * across, near the bottom", which is what a gesture is actually described in.
+ */
+export async function canvasPoint(page, nx, ny, selector = 'canvas') {
+  const box = await page.locator(selector).boundingBox()
+  if (!box) throw new Error(`no element matching ${selector}`)
+  return { x: box.x + box.width * nx, y: box.y + box.height * ny, box }
+}
+
+/**
+ * The GameBoy shell's controls, with a helper for aiming at a d-pad arm.
+ *
+ * The five Phaser games and the two GameBoy-styled 3D ones share this markup,
+ * so one lookup serves those suites. Standalone 3D games (#118) have none of
+ * it — no pad, no A/B, no system buttons — and drive `canvasPoint` above
+ * against their own gestures instead.
  */
 export async function controls(page) {
   const pad = await centreOf(page, '.d-pad')
