@@ -96,6 +96,40 @@ that the three visible face orientations each cover a real area in a different
 tone, and that a scanline across the tower's waist is solid rather than
 punched through with the sky tone.
 
+**`tube-runner.mjs`** — the second three.js game (#111). Tower Stacker proved
+the shell reaches a non-Phaser game at all; what is new here is that Tube
+Runner's only verb is a **held** direction, which is the case `shared/dpad.ts`
+exists for and which nothing exercised across the renderer seam before:
+
+- holding an arm rotates the player, and lifting the thumb stops it
+- rolling a thumb from one arm to the other without lifting reverses the
+  rotation — the implicit-pointer-capture bug `setupDpad` was written to fix,
+  and fatal in a game where letting go is how you stop turning
+- steering onto the gap carries the run through rings, driven by real held
+  contacts rather than a burst of taps
+- the palette, the end screen's input lock, the save through `shared/storage`,
+  and the 340px branch — where the shrunk pad is checked to still steer
+
+The rules — the reachability bound that keeps a generated track fair — are in
+`tube-runner/track_test.ts` under `npm run qa:units`, not here.
+
+Its tone checks are the `qa:contrast` stand-in for this game. The one that
+matters asserts that **obstacle rings hold `lightest` and nothing else does**:
+the lighting rig separates surfaces by orientation, so a ring is the only thing
+facing the light, and losing that is the #62-shaped defect — the one thing you
+must react to, drawn in its background's tone.
+
+**What it does not check: the ribs.** The bands on the tube wall are what give
+the run its sense of speed, and the `light` tone was first written as their
+check on the reasoning that they are the only surface designed to land there.
+They are not the only thing that does — a ring fades through `light` on its way
+out of the fog, and several mid-distance rings are always on screen — so
+collapsing `RIB_LUMA` into `WALL_LUMA`, deleting the ribs as a distinct surface
+outright, leaves the whole suite green. The check was reworded to claim only
+what it measures. This is the same shape of gap `qa/contrast/README.md` records
+for the HUD relic pips, and it is written down for the same reason: an
+unguarded surface that nobody knows is unguarded is how #84 shipped.
+
 **`zoom.mjs`** — the double-tap zoom guard (`shared/noZoom.ts`), in all five
 games. The zoom itself cannot be reproduced here, because Chromium honours
 `user-scalable=no` and never zooms; it is iOS Safari, which ignores that meta,
@@ -152,6 +186,21 @@ the DOM.
   bottom-up, so a HUD line drawn across the top of the screen is in the
   *high* rows. Measuring the wrong end of the frame found a 160px-wide
   "tower" that was really the footer bar.
+- **A tap that follows other touches too closely does nothing.**
+  `shared/noZoom.ts` cancels a `touchend` within 300ms of the previous one, and
+  a cancelled `touchend` takes the synthesised `click` with it — so a tap on a
+  DOM button wired to `click`, sent straight after d-pad work, reaches the page
+  and has no effect. Lift every contact and let the window lapse first. The
+  palette toggle failed exactly this way and looked like a broken button.
+- **Wait on the thing you are claiming, not on a proxy for it.** Tube Runner's
+  ring-clearing helper first returned as soon as the player was lined up with
+  the gap — but a run opens with the gap already dead ahead, so it returned
+  instantly, ten times over, and reported nothing cleared. Waiting on the ring
+  count says what the check means.
+- **Do not assume one run survives the whole suite.** Proving that holding an
+  arm rotates the player also steers them off the gap, and the next ring
+  arrives regardless. Start a fresh run per phase rather than writing checks
+  that silently measure an end screen.
 - **Prove a check can fail.** Several of these passed for the wrong reason on
   first write. Where a defect is known — the #66 double-advance, or Tower
   Stacker's `LAMBERT_PI` — put it back temporarily and watch the check go red

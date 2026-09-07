@@ -11,6 +11,7 @@ import thumbPocketDungeon from './assets/images/pocket-dungeon.webp'
 import thumbWindup from './assets/images/windup.webp'
 import thumbLanternKeeper from './assets/images/lantern-keeper.webp'
 import thumbTowerStacker from './assets/images/tower-stacker.webp'
+import thumbTubeRunner from './assets/images/tube-runner.webp'
 import thumbInvasion from './assets/images/invasion.webp'
 import thumbPlatformer from './assets/images/platformer.webp'
 import thumbBig2 from './assets/images/big2.webp'
@@ -62,6 +63,14 @@ const WEB_GAMES = [
     href: `${import.meta.env.BASE_URL}tower-stacker/`,
     description:
       "A GameBoy-styled 3D block stacker. Drop each slab on the one below, watch the overhang get sliced away, and climb.",
+  },
+  {
+    title: "Tube Runner",
+    id: 'tube-runner',
+    image: thumbTubeRunner,
+    href: `${import.meta.env.BASE_URL}tube-runner/`,
+    description:
+      "A GameBoy-styled 3D endless runner. Rotate around the inside of a tube to line yourself up with the gap in each oncoming ring.",
   },
   {
     title: "Invasion",
