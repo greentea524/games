@@ -41,36 +41,14 @@ export function createHud(): Hud {
     panelFill: CSS_DARKEST,
     panelBorder: hex(PAL.dark),
   })
-  const { ctx, text, panel } = surface
+  const { text, panel } = surface
 
-  /**
-   * The player's marker: a chevron at the bottom of the frame, pointing up
-   * into the tube.
-   *
-   * Always in the same place, because the camera rolls with the player rather
-   * than the player moving across the screen — so what the run actually asks
-   * is "bring the gap down to here".
-   */
-  function marker(state: HudState, ink: string) {
-    const cx = GB_WIDTH / 2
-    const baseY = GB_HEIGHT - 16
-    // A clear pulses the marker one tone brighter for a few frames. Under
-    // reduced motion it simply stays at its normal tone: the marker is
-    // information, the pulse is decoration.
-    const lit = !state.reducedMotion && state.clearFlash > 0.35
-    ctx.fillStyle = CSS_DARKEST
-    // A dark plinth under the chevron, so it never has to compete with
-    // whatever tone the tube wall behind it happens to be.
-    ctx.fillRect(cx - 7, baseY - 1, 14, 10)
-    ctx.fillStyle = lit ? ink : hex(PAL.light)
-    // Drawn as rows rather than a path: a filled triangle at this size
-    // antialiases its own edges, and the whole point is hard pixels.
-    for (let row = 0; row < 6; row++) {
-      const halfWidth = 5 - row
-      if (halfWidth <= 0) break
-      ctx.fillRect(cx - halfWidth, baseY + row, halfWidth * 2, 1)
-    }
-  }
+  // The chevron that used to live here is gone. It existed because the camera
+  // sat near the tube's axis and the player had no body, so nothing on screen
+  // said where "you" were — the marker was standing in for a character. The
+  // runner is that character, drawn in the world at the radius the collision
+  // test actually uses, so a HUD stand-in would now be a second, less accurate
+  // answer to the same question.
 
   function prompt(on: boolean, ink: string) {
     panel(0, 116, GB_WIDTH, GB_HEIGHT - 116)
@@ -103,7 +81,6 @@ export function createHud(): Hud {
 
       text(String(state.rings), 4, 4, ink)
       text(`BEST ${state.best}`, GB_WIDTH - 4, 4, ink, 'right')
-      marker(state, ink)
     },
   }
 }

@@ -33,6 +33,10 @@
 //     round is the other way and the bound stops bounding anything.
 import {
   GAP_HALF,
+  PLAYER_FOOT_RADIUS,
+  PLAYER_INNER_RADIUS,
+  RING_INNER_RADIUS,
+  RING_OUTER_RADIUS,
   MIN_DELTA,
   PLAYER_HALF,
   REACTION_FRACTION,
@@ -216,6 +220,56 @@ const TAU = Math.PI * 2
   // Both directions get used, or the tube would only ever wind one way.
   const forward = gaps.slice(1).filter((g, i) => angleDelta(gaps[i], g) > 0).length
   check('gaps move both ways round the tube', forward > 100 && forward < 400, `${forward} of 499 forward`)
+}
+
+// --- the player is where the ring is --------------------------------------
+//
+// `clearsRing` compares angles and nothing else, which is a correct model of
+// hitting a ring only if the player occupies the radius the ring is solid at.
+// The first version failed exactly here and nothing noticed: the ring was an
+// annulus from 1.76 to 2.20 and the player was the camera at 0.35, sailing
+// through the open middle of every ring while crashes were decided from an
+// angle their body never tested. Every check in this file still passed,
+// because every check in this file was about angles.
+//
+// Proven to fail: setting PLAYER_RADIUS back to 0.35 fails both of these.
+
+{
+  check(
+    'the ring is solid across a real band',
+    RING_OUTER_RADIUS > RING_INNER_RADIUS,
+    `${RING_INNER_RADIUS.toFixed(2)}..${RING_OUTER_RADIUS.toFixed(2)}`,
+  )
+  check(
+    'the runner stands on the tube wall',
+    PLAYER_FOOT_RADIUS === RING_OUTER_RADIUS,
+    `feet at ${PLAYER_FOOT_RADIUS.toFixed(2)}, wall at ${RING_OUTER_RADIUS.toFixed(2)}`,
+  )
+  check(
+    'and their whole body is inside the band the ring is solid across',
+    PLAYER_INNER_RADIUS >= RING_INNER_RADIUS && PLAYER_FOOT_RADIUS <= RING_OUTER_RADIUS,
+    `runner spans ${PLAYER_INNER_RADIUS.toFixed(2)}..${PLAYER_FOOT_RADIUS.toFixed(2)}, ring is solid ${RING_INNER_RADIUS.toFixed(2)}..${RING_OUTER_RADIUS.toFixed(2)}`,
+  )
+  // Head clearance. Without it the ring's inner edge could sit between the
+  // runner's shoulders and their scalp — a hitbox that catches the body but
+  // lets the head through, which is worse than either extreme.
+  check(
+    'with clearance over their head, not just at their feet',
+    PLAYER_INNER_RADIUS - RING_INNER_RADIUS > 0.1,
+    `${(PLAYER_INNER_RADIUS - RING_INNER_RADIUS).toFixed(2)} units of headroom`,
+  )
+  // The gap has to be wide enough at the player's radius to be worth aiming
+  // for. An angular gap subtends an arc that shrinks as the radius shrinks, so
+  // a player pushed too far inward would face a gap narrower than they are.
+  // Measured at the head, where the arc is narrowest — clearing at the feet
+  // and clipping at the shoulders would be the same defect as above.
+  const gapArc = 2 * GAP_HALF * PLAYER_INNER_RADIUS
+  const playerArc = 2 * PLAYER_HALF * PLAYER_INNER_RADIUS
+  check(
+    'and the gap is wider than the player at that radius',
+    gapArc > playerArc,
+    `gap ${gapArc.toFixed(2)} units across, player ${playerArc.toFixed(2)}`,
+  )
 }
 
 // --- clearing a ring -------------------------------------------------------
