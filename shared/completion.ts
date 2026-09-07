@@ -136,6 +136,25 @@ function tubeRunnerStatus(): GameStatus {
 }
 
 /**
+ * Tilt Maze: a campaign, so progress is a position rather than a record.
+ *
+ * Unlike the two endless 3D games, this one has an end — so `completed` means
+ * something here and the badge can finally say so.
+ */
+const TILT_MAZE_LEVELS = 8
+function tiltMazeStatus(): GameStatus {
+  const d = readPayload('tilt_maze_save')
+  if (!d) return NONE
+  const completed = d.completed === true
+  const reached = typeof d.reached === 'number' ? d.reached : 0
+  if (!completed && reached <= 0) return NONE
+  return {
+    completed,
+    progress: completed ? 'Finished' : `Level ${reached + 1}/${TILT_MAZE_LEVELS}`,
+  }
+}
+
+/**
  * Status for each local game, keyed by the id used on the hub. Games hosted
  * elsewhere are absent — the hub cannot read another origin's storage, and
  * pretending otherwise would badge them permanently unplayed.
@@ -149,5 +168,6 @@ export function readStatuses(): Record<string, GameStatus> {
     'lantern-keeper': lanternKeeperStatus(),
     'tower-stacker': towerStackerStatus(),
     'tube-runner': tubeRunnerStatus(),
+    'tilt-maze': tiltMazeStatus(),
   }
 }

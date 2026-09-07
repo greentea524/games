@@ -27,6 +27,26 @@ import * as THREE from 'three'
  */
 const MAX_PIXEL_RATIO = 2
 
+/**
+ * What a light's intensity must be multiplied by before it reaches three.
+ *
+ * `BRDF_Lambert` is `RECIPROCAL_PI * diffuseColor`, and three applies it to
+ * the ambient term as well as the direct one, so a light of intensity `i`
+ * contributes `i / PI` to the image. A rig written from the brightness you
+ * actually want comes out at a third of it — a scene that looks like night
+ * when it was meant to look like a lit room.
+ *
+ * This has now cost two games. `shared/gb3d.ts` has the same helper under
+ * `gbIntensity` for the GameBoy pair, where it was found by measuring a
+ * framebuffer that had collapsed to one tone; Tilt Maze rediscovered it as a
+ * board too dark to see. It is duplicated rather than shared because the two
+ * stages are meant to be independent — but if a third game meets it, that is
+ * the moment to stop and pull it out.
+ */
+export function lambertIntensity(fraction: number): number {
+  return fraction * Math.PI
+}
+
 export interface Stage3DOptions {
   /** The element the canvas fills. Must be able to size itself. */
   parent: HTMLElement

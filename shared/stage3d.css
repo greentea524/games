@@ -26,6 +26,14 @@ html, body {
   overflow: hidden;
 }
 
+/* `hidden` has to win over a layout rule.
+   The attribute's default is `display: none`, but that is an ordinary
+   author-level default and any `display` in a stylesheet beats it — so a
+   panel styled `display: flex` and then hidden with `el.hidden = true` stays
+   on screen. Tilt Maze's win panel did exactly that, leaving its "Next level"
+   button floating over the board during play. */
+[hidden] { display: none !important; }
+
 /* Sits above the canvas and ignores input, so the game's pointer handlers
    still see the whole surface. Individual controls opt back in. */
 .stage3d-overlay {
