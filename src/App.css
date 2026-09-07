@@ -186,7 +186,12 @@
 /* Web Games Section Styles */
 .games-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  /* `auto-fill`, not `auto-fit`. `auto-fit` collapses the empty tracks, so a
+     section with two games stretched its cards to half the row while a section
+     with five kept them at a third — card width varying by how many games
+     happened to be in a section. `auto-fill` keeps the tracks, so every card
+     is the same width in every section. */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
   width: 100%;
   max-width: 860px;
@@ -333,4 +338,32 @@
   border-color: #9bbc0f;
   background: #24401c;
   color: #e0f8cf;
+}
+
+/* Game sections (#118's grouping).
+   The heading block has to line up with the grid under it, and the grid sets
+   its own max-width and gutter, so this repeats them rather than wrapping both
+   in a third container — one less box between the section and the cards. */
+.games-section-head {
+  /* Left, against the first card's edge. Centred, a heading floats over a row
+     that is packed from the left and stops reading as its label — most
+     visible in a section whose last row is short. */
+  text-align: left;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto 14px;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
+.games-section-blurb {
+  margin: 0;
+  font-size: 0.92rem;
+  opacity: 0.72;
+}
+
+/* Space between one section and the next, not above the first — the section
+   element already carries the padding that separates it from the hero. */
+.games-section + .games-section {
+  margin-top: 44px;
 }
