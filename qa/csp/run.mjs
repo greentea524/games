@@ -26,6 +26,7 @@ const PAGES = [
   'cart-crate/index.html',
   'tower-stacker/index.html',
   'tube-runner/index.html',
+  'tilt-maze/index.html',
 ]
 
 let ok = true

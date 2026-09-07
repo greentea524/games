@@ -32,6 +32,9 @@ export default defineConfig({
         'tube-runner': fileURLToPath(
           new URL('./tube-runner/index.html', import.meta.url),
         ),
+        'tilt-maze': fileURLToPath(
+          new URL('./tilt-maze/index.html', import.meta.url),
+        ),
       },
       output: {
         // Rollup names a shared chunk after one of the modules inside it. The
@@ -45,6 +48,7 @@ export default defineConfig({
         manualChunks(id: string) {
           if (id.includes('node_modules/phaser')) return 'phaser'
           if (id.includes('node_modules/three')) return 'three'
+          if (id.includes('node_modules/cannon-es')) return 'cannon'
         },
       },
     },

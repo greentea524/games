@@ -54,14 +54,29 @@ function gamesWithHooks() {
  * upscale. Top-aligned rather than centre-cropped, because these games put
  * their score line along the top and centring cuts it off.
  */
+/**
+ * The viewport a game is photographed at.
+ *
+ * Per-game like the pose, and for the same reason. The GameBoy pages want a
+ * tall window, because their pre-init script sizes the console from the
+ * available height. A standalone game fills whatever it is given, so a
+ * portrait window hands the treatment a portrait frame and most of the board
+ * is cropped away reaching the card's shape. A game may export `viewport` from
+ * its `thumbnail.mjs` to say so.
+ */
+const DEFAULT_VIEWPORT = { width: 520, height: 900 }
+
 async function capture(game, page, baseUrl, size) {
+  const hook = await import(`${ROOT}${game}/thumbnail.mjs`)
+  const { pose, viewport = DEFAULT_VIEWPORT } = hook
+  await page.setViewportSize(viewport)
+
   const url = new URL(`${game}/`, baseUrl)
   url.searchParams.set('qa', '1')
   await page.goto(url.toString(), { waitUntil: 'load' })
   await page.waitForSelector('#game canvas, canvas', { timeout: 20_000 })
   await page.waitForTimeout(1500)
 
-  const { pose } = await import(`${ROOT}${game}/thumbnail.mjs`)
   await pose(page)
 
   // ---------------------------------------------------------- the treatment
@@ -135,7 +150,7 @@ let browser
 let failed = 0
 try {
   browser = await chromium.launch(browserLaunchOptions())
-  const context = await browser.newContext({ viewport: { width: 520, height: 900 } })
+  const context = await browser.newContext({ viewport: DEFAULT_VIEWPORT })
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e.message)))

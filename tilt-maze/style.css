@@ -1,0 +1,78 @@
+/* Tilt Maze's own HUD. Real DOM over the canvas — see tilt-maze/hud.ts. */
+
+.tm-status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 999px;
+  background: rgba(11, 15, 20, 0.55);
+  border: 1px solid rgba(232, 236, 241, 0.18);
+  backdrop-filter: blur(6px);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-level { font-weight: 600; letter-spacing: 0.01em; }
+.tm-drops { color: #f2a4a4; font-size: 0.8rem; }
+.tm-drops:empty { display: none; }
+
+.tm-btn {
+  pointer-events: auto;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 236, 241, 0.25);
+  background: rgba(232, 236, 241, 0.08);
+  color: #e8ecf1;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.tm-btn:hover, .tm-btn:focus-visible { background: rgba(232, 236, 241, 0.18); }
+
+.tm-btn-primary {
+  padding: 10px 22px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: #35d6a4;
+  border-color: #35d6a4;
+  color: #06231a;
+}
+.tm-btn-primary:hover, .tm-btn-primary:focus-visible { background: #4ae9b7; }
+
+.tm-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: min(90vw, 460px);
+  text-align: center;
+  color: #9fb0c4;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.tm-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(8, 11, 16, 0.72);
+  backdrop-filter: blur(3px);
+  text-align: center;
+  padding: 20px;
+}
+
+.tm-panel-title { margin: 0; font-size: clamp(1.6rem, 6vw, 2.4rem); font-weight: 700; }
+.tm-panel-body { margin: 0 0 8px; color: #9fb0c4; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-status, .tm-panel { backdrop-filter: none; }
+}
