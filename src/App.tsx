@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { readStatuses } from '../shared/completion'
+import { readStatuses, type GameStatus } from '../shared/completion'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
@@ -16,82 +16,188 @@ import thumbInvasion from './assets/images/invasion.webp'
 import thumbPlatformer from './assets/images/platformer.webp'
 import thumbBig2 from './assets/images/big2.webp'
 
-const WEB_GAMES = [
+interface HubGame {
+  title: string
+  /**
+   * Set for games hosted here, and the key `shared/completion.ts` files their
+   * progress under. Games hosted elsewhere have no id, because the hub cannot
+   * read another origin's storage — which is why the third section says so
+   * rather than leaving their missing badges to be puzzled over.
+   */
+  id?: string
+  image: string
+  href: string
+  description: string
+}
+
+interface GameSection {
+  id: string
+  title: string
+  blurb: string
+  games: HubGame[]
+}
+
+/**
+ * The hub's games, grouped rather than listed flat.
+ *
+ * One grid was fine at five games. It is not fine at fourteen: three columns
+ * of undifferentiated cards is five rows with no structure, and the families
+ * sitting interleaved reads as inconsistency where separated they read as
+ * range.
+ *
+ * Grouped by what kind of game it is, not by where it is hosted. Hosting is
+ * the maintainer's concern; a player choosing something to play cares that a
+ * Game Boy puzzler and a 3D runner are different evenings. The split happens
+ * to line up anyway, since only the games hosted here can carry progress.
+ *
+ * The sections carry the category, which is why a card has no category badge.
+ * There is exactly one badge slot and progress owns it — a second pill saying
+ * "3D" next to one saying "Best 12" would be two different kinds of claim
+ * competing for the same corner.
+ *
+ * Adding a game means adding it to a section's `games`. Nothing in the
+ * rendering below needs to change, which is the point of the shape.
+ */
+const GAME_SECTIONS: GameSection[] = [
   {
-    title: "Static",
-    id: 'static',
-    image: thumbStatic,
-    href: `${import.meta.env.BASE_URL}static/`,
-    description: "A GBC-style top-down mystery/adventure game. Explore a small town where an old TV works like a portal.",
+    id: 'gameboy',
+    title: 'Game Boy',
+    blurb: 'GBC-styled games sharing one shell. Progress saves as you play.',
+    games: [
+      {
+        title: "Static",
+        id: 'static',
+        image: thumbStatic,
+        href: `${import.meta.env.BASE_URL}static/`,
+        description: "A GBC-style top-down mystery/adventure game. Explore a small town where an old TV works like a portal.",
+      },
+      {
+        title: "Cart & Crate",
+        id: 'cart-crate',
+        image: thumbCartCrate,
+        href: `${import.meta.env.BASE_URL}cart-crate/`,
+        description:
+          "A GBC-style Sokoban puzzle game. Help the courier animal push delivery carts and crates onto target tiles.",
+      },
+      {
+        title: "Pocket Dungeon",
+        id: 'pocket-dungeon',
+        image: thumbPocketDungeon,
+        href: `${import.meta.env.BASE_URL}pocket-dungeon/`,
+        description:
+          "A GBC-style turn-based roguelite dungeon crawler. Explore floors, fight monsters, and survive the depth.",
+      },
+      {
+        title: "Windup",
+        id: 'windup',
+        image: thumbWindup,
+        href: `${import.meta.env.BASE_URL}windup/`,
+        description:
+          "A GBC-style energy platformer. Guide the windup toy across platforms before its key runs out of power.",
+      },
+      {
+        title: "Lantern Keeper",
+        id: 'lantern-keeper',
+        image: thumbLanternKeeper,
+        href: `${import.meta.env.BASE_URL}lantern-keeper/`,
+        description:
+          "Light lanterns in a dark forest in this GBC-style puzzle-platformer. Double jump, dash, and wall-cling your way to the Crown.",
+      },
+    ],
   },
   {
-    title: "Cart & Crate",
-    id: 'cart-crate',
-    image: thumbCartCrate,
-    href: `${import.meta.env.BASE_URL}cart-crate/`,
-    description:
-      "A GBC-style Sokoban puzzle game. Help the courier animal push delivery carts and crates onto target tiles.",
+    id: 'three-d',
+    title: '3D',
+    blurb: 'Built with three.js.',
+    games: [
+      {
+        title: "Tower Stacker",
+        id: 'tower-stacker',
+        image: thumbTowerStacker,
+        href: `${import.meta.env.BASE_URL}tower-stacker/`,
+        description:
+          "A GameBoy-styled 3D block stacker. Drop each slab on the one below, watch the overhang get sliced away, and climb.",
+      },
+      {
+        title: "Tube Runner",
+        id: 'tube-runner',
+        image: thumbTubeRunner,
+        href: `${import.meta.env.BASE_URL}tube-runner/`,
+        description:
+          "A GameBoy-styled 3D endless runner. Rotate around the inside of a tube to line yourself up with the gap in each oncoming ring.",
+      },
+    ],
   },
   {
-    title: "Pocket Dungeon",
-    id: 'pocket-dungeon',
-    image: thumbPocketDungeon,
-    href: `${import.meta.env.BASE_URL}pocket-dungeon/`,
-    description:
-      "A GBC-style turn-based roguelite dungeon crawler. Explore floors, fight monsters, and survive the depth.",
+    id: 'more',
+    title: 'More Games',
+    blurb: 'Earlier browser games, hosted separately — progress is not tracked here.',
+    games: [
+      {
+        title: "Invasion",
+        image: thumbInvasion,
+        href: "https://greentea524.github.io/vite-project/space/",
+        description: "Defend against waves of alien invaders. Features a multiplayer mode!",
+      },
+      {
+        title: "Platformer",
+        image: thumbPlatformer,
+        href: "https://greentea524.github.io/vite-project/platformer/",
+        description:
+          "A 2D side-scrolling adventure featuring a multiplayer 'Race a friend' mode.",
+      },
+      {
+        title: "Big 2",
+        image: thumbBig2,
+        href: "https://greentea524.github.io/vite-project/big2/",
+        description: "Shed all 13 cards first in this classic climbing card game.",
+      },
+    ],
   },
-  {
-    title: "Windup",
-    id: 'windup',
-    image: thumbWindup,
-    href: `${import.meta.env.BASE_URL}windup/`,
-    description:
-      "A GBC-style energy platformer. Guide the windup toy across platforms before its key runs out of power.",
-  },
-  {
-    title: "Lantern Keeper",
-    id: 'lantern-keeper',
-    image: thumbLanternKeeper,
-    href: `${import.meta.env.BASE_URL}lantern-keeper/`,
-    description:
-      "Light lanterns in a dark forest in this GBC-style puzzle-platformer. Double jump, dash, and wall-cling your way to the Crown.",
-  },
-  {
-    title: "Tower Stacker",
-    id: 'tower-stacker',
-    image: thumbTowerStacker,
-    href: `${import.meta.env.BASE_URL}tower-stacker/`,
-    description:
-      "A GameBoy-styled 3D block stacker. Drop each slab on the one below, watch the overhang get sliced away, and climb.",
-  },
-  {
-    title: "Tube Runner",
-    id: 'tube-runner',
-    image: thumbTubeRunner,
-    href: `${import.meta.env.BASE_URL}tube-runner/`,
-    description:
-      "A GameBoy-styled 3D endless runner. Rotate around the inside of a tube to line yourself up with the gap in each oncoming ring.",
-  },
-  {
-    title: "Invasion",
-    image: thumbInvasion,
-    href: "https://greentea524.github.io/vite-project/space/",
-    description: "Defend against waves of alien invaders. Features a multiplayer mode!",
-  },
-  {
-    title: "Platformer",
-    image: thumbPlatformer,
-    href: "https://greentea524.github.io/vite-project/platformer/",
-    description:
-      "A 2D side-scrolling adventure featuring a multiplayer 'Race a friend' mode.",
-  },
-  {
-    title: "Big 2",
-    image: thumbBig2,
-    href: "https://greentea524.github.io/vite-project/big2/",
-    description: "Shed all 13 cards first in this classic climbing card game.",
-  },
-];
+]
+
+function GameCard({ game, status }: { game: HubGame; status?: GameStatus }) {
+  return (
+    <div className="game-card">
+      {game.image && (
+        <a
+          href={game.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="game-thumb-link"
+        >
+          <img
+            src={game.image}
+            alt={game.title}
+            className="game-card-thumb"
+            loading="lazy"
+            decoding="async"
+            width="640"
+            height="478"
+          />
+        </a>
+      )}
+      <a
+        className="game-link"
+        href={game.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`${game.title} (opens in a new tab)`}
+      >
+        <span className="game-link-title-row">
+          🎮 {game.title}
+        </span>
+        <span>↗</span>
+      </a>
+      {status?.progress && (
+        <span className={status.completed ? 'game-badge is-complete' : 'game-badge'}>
+          {status.completed ? `\u2714 ${status.progress}` : status.progress}
+        </span>
+      )}
+      <p className="game-link-description">{game.description}</p>
+    </div>
+  )
+}
 
 function App() {
   // Read once per mount. Saves only change while a game is open, and the games
@@ -115,58 +221,23 @@ function App() {
       <div className="ticks"></div>
 
       <section id="web-games" style={{ padding: '36px 0 48px' }}>
-        <div className="games-grid">
-          {WEB_GAMES.map((game) => (
-            <div className="game-card" key={game.title}>
-              {game.image && (
-                <a
-                  href={game.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="game-thumb-link"
-                >
-                  <img
-                    src={game.image}
-                    alt={game.title}
-                    className="game-card-thumb"
-                    loading="lazy"
-                    decoding="async"
-                    width="640"
-                    height="478"
-                  />
-                </a>
-              )}
-              <a
-                className="game-link"
-                href={game.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${game.title} (opens in a new tab)`}
-              >
-                <span className="game-link-title-row">
-                  🎮 {game.title}
-                </span>
-                <span>↗</span>
-              </a>
-              {(() => {
-                const status = game.id ? statuses[game.id] : undefined
-                if (!status?.progress) return null
-                return (
-                  <span
-                    className={
-                      status.completed ? 'game-badge is-complete' : 'game-badge'
-                    }
-                  >
-                    {status.completed ? `\u2714 ${status.progress}` : status.progress}
-                  </span>
-                )
-              })()}
-              <p className="game-link-description">
-                {game.description}
-              </p>
+        {GAME_SECTIONS.map((section) => (
+          <div className="games-section" key={section.id}>
+            <div className="games-section-head">
+              <h2>{section.title}</h2>
+              <p className="games-section-blurb">{section.blurb}</p>
             </div>
-          ))}
-        </div>
+            <div className="games-grid">
+              {section.games.map((game) => (
+                <GameCard
+                  key={game.title}
+                  game={game}
+                  status={game.id ? statuses[game.id] : undefined}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </section>
 
       <div className="ticks"></div>
