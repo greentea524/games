@@ -48,6 +48,46 @@ export const GAP_HALF = 0.61
  */
 export const PLAYER_HALF = 0.18
 
+/**
+ * The radial band an obstacle ring is solid across, as a fraction of
+ * `TUBE_RADIUS`, and the radius the player runs at.
+ *
+ * These live here, beside the collision test, because they are what makes that
+ * test *true* rather than merely self-consistent — and the first version got it
+ * wrong in a way nothing could see.
+ *
+ * `clearsRing` compares angles and nothing else. That is only a correct model
+ * of "did the player hit the ring" if the player actually occupies the radius
+ * the ring is solid at. Originally the ring was an annulus from 1.76 to 2.20
+ * and the player was the camera, at 0.35 — flying through the wide-open hole
+ * in the middle of every ring, while the game decided crashes from an angle
+ * they never physically tested. It played as a hitbox that fired at nothing,
+ * because that is what it was.
+ *
+ * `track_test.ts` asserts the player's whole radial extent lies inside the
+ * band, so the two can never drift apart again.
+ */
+export const RING_INNER_FACTOR = 0.7
+export const RING_OUTER_FACTOR = 1
+export const RING_INNER_RADIUS = TUBE_RADIUS * RING_INNER_FACTOR
+export const RING_OUTER_RADIUS = TUBE_RADIUS * RING_OUTER_FACTOR
+
+/**
+ * The runner stands on the inside surface of the tube, and reaches inward
+ * toward the axis.
+ *
+ * Stated as feet-on-the-wall plus a height rather than as a centre plus a
+ * half-thickness, because the second version got it wrong: a runner's "up" is
+ * toward the axis, so a body described as `radius +/- half` put its head
+ * *outside* the tube and its feet floating, and the number the check compared
+ * against described nothing that existed. Feet and height are what the mesh
+ * is actually built from, so they are what the check should be built from too.
+ */
+export const PLAYER_FOOT_RADIUS = TUBE_RADIUS
+export const PLAYER_HEIGHT = 0.5
+/** The innermost radius any part of the runner reaches — the top of the head. */
+export const PLAYER_INNER_RADIUS = PLAYER_FOOT_RADIUS - PLAYER_HEIGHT
+
 const SPEED_BASE = 7
 const SPEED_STEP = 0.22
 /**

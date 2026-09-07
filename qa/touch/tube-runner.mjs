@@ -53,6 +53,7 @@ const state = (page) =>
     gap: window.__game.nextGapAngle(),
     distance: window.__game.nextGapDistance(),
     speed: window.__game.speed(),
+    stride: window.__game.stridePhase(),
     mono: window.__game.mono(),
   }))
 
@@ -237,6 +238,22 @@ async function run() {
   )
   check('and the run has sped up', played.speed > 7, `${played.speed.toFixed(2)} u/s`)
 
+  // ------------------------------------------------------- the runner
+
+  // The player is a body in the world now, not just a camera position, and
+  // that is what makes the angular collision test true rather than merely
+  // self-consistent — see the radial checks in tube-runner/track_test.ts. What
+  // is checkable from here is the animation: that the run cycle is driven by
+  // the tube going past rather than by a clock.
+  const strideA = (await state(page)).stride
+  await page.waitForTimeout(300)
+  const strideB = (await state(page)).stride
+  check(
+    'the runner strides while the tube is moving',
+    strideB > strideA,
+    `phase ${strideA.toFixed(2)} -> ${strideB.toFixed(2)}`,
+  )
+
   // ------------------------------------------ the DMG tones, as rendered
   //
   // `qa:contrast` measures Phaser textures and has nothing to say about this
@@ -363,6 +380,22 @@ async function run() {
   await hand.tap(ACT, c.A.x, c.A.y, 60)
   await page.waitForTimeout(150)
   check('a bounced press does not skip the end screen', (await state(page)).screen === 'over')
+
+  // After the bounce, not before it. The first version measured the stride
+  // over 400ms here and spent the end screen's half-second input lock doing
+  // it, so the bounce that check exists to test arrived after the lock had
+  // already expired and the run had restarted underneath it.
+  //
+  // A cycle driven by time rather than by distance would keep the runner's
+  // legs going on the end screen, with the tube stopped around them.
+  const deadA = (await state(page)).stride
+  await page.waitForTimeout(400)
+  const deadB = (await state(page)).stride
+  check(
+    'and stops striding once the run is over',
+    deadB === deadA,
+    `phase held at ${deadA.toFixed(2)}`,
+  )
 
   await page.waitForTimeout(700)
   await hand.tap(ACT, c.A.x, c.A.y, 120)

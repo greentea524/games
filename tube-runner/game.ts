@@ -16,6 +16,10 @@
 import * as THREE from 'three'
 import {
   GAP_HALF,
+  PLAYER_FOOT_RADIUS,
+  PLAYER_HEIGHT,
+  RING_INNER_RADIUS,
+  RING_OUTER_RADIUS,
   RING_SPACING,
   ROTATE_SPEED,
   TUBE_RADIUS,
@@ -81,8 +85,44 @@ const RING_LUMA = 0.62
 const FOG_NEAR = 4
 const FOG_FAR = 30
 
-/** Camera distance from the tube's axis. */
-const CAM_RADIUS = 0.35
+/**
+ * Where the camera sits relative to the runner.
+ *
+ * It used to sit at 0.35 from the axis — near the middle of the tube, looking
+ * straight down it — because the player had no body and the camera *was* the
+ * player. That is what made the hitbox wrong: the ring is solid only between
+ * `RING_INNER_RADIUS` and `RING_OUTER_RADIUS`, so a camera at 0.35 passed
+ * through the open middle of every ring while the game decided crashes from an
+ * angle nothing had physically tested.
+ *
+ * Now the camera trails a runner who is genuinely inside that band. It sits
+ * inward of them (so they appear low in the frame, running on the floor) and
+ * behind them, which is also what makes a run cycle worth animating: from the
+ * middle of the tube there was nobody to watch.
+ */
+// Inward of the runner's head, so they read as standing on a floor below the
+// lens rather than hanging beside it, and far enough back that they occupy the
+// lower third instead of the middle of the frame.
+const CAM_RADIUS = (PLAYER_FOOT_RADIUS - PLAYER_HEIGHT) * 0.62
+const CAM_BACK = 4.4
+const CAM_LOOK_AHEAD = 13
+/** How far toward the axis the camera aims, so the runner sits below centre. */
+const CAM_LOOK_RADIUS = CAM_RADIUS * 0.35
+
+/**
+ * The height the runner is modelled at, before scaling.
+ *
+ * The parts below are laid out at a comfortable size to read and edit; the
+ * group is then scaled so its real height is exactly `PLAYER_HEIGHT`. That
+ * keeps the one number the collision check depends on in charge of the mesh,
+ * rather than the two being set independently and drifting — which is the
+ * mistake that produced the original hitbox.
+ */
+const RUNNER_MESH_HEIGHT = 0.8
+
+/** Leg swing amplitude, and how fast the cycle runs per unit of speed. */
+const STRIDE = 0.62
+const CADENCE = 1.15
 
 /**
  * How many rings exist. Never more, never fewer, never reallocated.
@@ -126,6 +166,13 @@ export interface TubeGame {
   nextGapDistance(): number | null
   /** Forward speed right now, in world units per second. */
   speed(): number
+  /**
+   * The run cycle's phase, in radians.
+   *
+   * Advances with distance travelled rather than with time, so it is also the
+   * check that the legs are driven by the run and not by a clock.
+   */
+  stridePhase(): number
   mono(): boolean
   setPalette(mono: boolean): void
   readPixels(): Uint8Array
@@ -238,18 +285,107 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
     ribs.push({ mesh, z: i * RIB_SPACING })
   }
 
+  // ---------------------------------------------------------------- runner
+
+  /**
+   * The player, as an actual body in the world.
+   *
+   * Built from boxes rather than loaded: at this size the whole figure is
+   * around twenty pixels tall, so a model would be wasted and a silhouette is
+   * all that survives. What has to read is the *cycle* — legs alternating —
+   * because that is the only thing that says "running" rather than "sliding".
+   *
+   * Every part carries a `darkest` outline for the reason CLAUDE.md gives:
+   * the runner's camera-facing side is lit head-on, exactly like an obstacle
+   * ring, so the two land on the same tone. The outline is what keeps the
+   * runner readable when a ring passes directly behind them.
+   */
+  const runner = new THREE.Group()
+  const runnerMaterial = new THREE.MeshLambertMaterial({
+    color: surfaceColour('ring'),
+    flatShading: true,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
+  })
+  const outlineMaterial = new THREE.LineBasicMaterial({ color: PAL.darkest })
+
+  function limb(w: number, h: number, d: number): THREE.Mesh {
+    const geometry = new THREE.BoxGeometry(w, h, d)
+    const mesh = new THREE.Mesh(geometry, runnerMaterial)
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), outlineMaterial))
+    return mesh
+  }
+
+  /**
+   * A limb that swings from a joint.
+   *
+   * The mesh hangs below an empty group placed at the hip or shoulder, so
+   * rotating the group swings the limb about its top end rather than about its
+   * middle — which is the difference between a leg and a spinning stick.
+   */
+  function joint(at: THREE.Vector3, w: number, h: number, d: number): THREE.Group {
+    const group = new THREE.Group()
+    group.position.copy(at)
+    const mesh = limb(w, h, d)
+    mesh.position.y = -h / 2
+    group.add(mesh)
+    return group
+  }
+
+  const torso = limb(0.3, 0.34, 0.2)
+  torso.position.y = 0.42
+  const head = limb(0.21, 0.19, 0.19)
+  head.position.y = 0.68
+  const legLeft = joint(new THREE.Vector3(-0.08, 0.26, 0), 0.11, 0.28, 0.11)
+  const legRight = joint(new THREE.Vector3(0.08, 0.26, 0), 0.11, 0.28, 0.11)
+  const armLeft = joint(new THREE.Vector3(-0.19, 0.55, 0), 0.09, 0.24, 0.09)
+  const armRight = joint(new THREE.Vector3(0.19, 0.55, 0), 0.09, 0.24, 0.09)
+  runner.add(torso, head, legLeft, legRight, armLeft, armRight)
+  runner.scale.setScalar(PLAYER_HEIGHT / RUNNER_MESH_HEIGHT)
+  scene.add(runner)
+
+  /** Advances the run cycle and places the runner on the tube wall. */
+  function poseRunner(phase: number, reduced: boolean) {
+    const swing = Math.sin(phase) * STRIDE
+    legLeft.rotation.x = swing
+    legRight.rotation.x = -swing
+    // Arms counter-swing. Without it the figure reads as hopping rather than
+    // running, which at twenty pixels is most of what sells the animation.
+    armLeft.rotation.x = -swing * 0.75
+    armRight.rotation.x = swing * 0.75
+
+    // The bob is the one part that is decoration: the cycle itself is
+    // locomotion the player reads as speed, but the vertical bounce carries no
+    // information, so shared/motion.ts takes it and leaves the rest.
+    const bob = reduced ? 0 : Math.abs(Math.cos(phase)) * 0.04
+
+    // Feet on the wall; the bob lifts them a little toward the axis, which is
+    // "up" for someone standing on the inside of a tube.
+    const radius = PLAYER_FOOT_RADIUS - bob
+    runner.position.set(Math.cos(playerAngle) * radius, Math.sin(playerAngle) * radius, playerZ)
+    // Stand the runner on the wall: local +Y points inward at the axis, local
+    // +Z stays forward down the tube. A rotation about Z of `angle + PI/2`
+    // maps +Y onto -radial, which is exactly that.
+    runner.rotation.z = playerAngle + Math.PI / 2
+    // Lean into the turn. Decorative, and the only thing here that tells the
+    // player the difference between holding a direction and having released it.
+    runner.rotation.y = reduced ? 0 : -steering * 0.25
+  }
+
   // ------------------------------------------------------------- ring pool
 
   // The gap is cut at angle 0 and the mesh is *rotated* to place it. That is
   // what lets one geometry serve every ring for the whole run: changing which
   // gap a recycled ring presents costs a `rotation.z`, not a rebuild.
-  // A hoop rather than a disc with a hole. At 0.72 the annulus was wide enough
-  // to hide the wall behind it, and the wall is what carries the sense of
-  // travel; 0.8 keeps the ring unmistakably an obstacle while leaving the
-  // ribs visible between one ring and the next.
+  // A hoop rather than a disc with a hole, but a much deeper one than it began
+  // as. The band has to be wide enough to actually contain the runner — that
+  // is what makes the angular collision test true — while still leaving the
+  // wall and its ribs visible between one ring and the next. Both radii live
+  // in track.ts beside the test that depends on them.
   const ringGeometry = new THREE.RingGeometry(
-    TUBE_RADIUS * 0.8,
-    TUBE_RADIUS,
+    RING_INNER_RADIUS,
+    RING_OUTER_RADIUS,
     28,
     1,
     GAP_HALF,
@@ -277,6 +413,8 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
   let overAt = 0
   let elapsed = 0
   let clearFlash = 0
+  /** Advances with distance travelled, so the stride matches the speed. */
+  let runPhase = 0
 
   const speed = () => speedAt(cleared)
 
@@ -369,6 +507,9 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
 
       const previousZ = playerZ
       playerZ += speed() * dt
+      // Driven by speed, not by wall-clock time, so the stride keeps pace with
+      // the run rather than looking like a treadmill as the tube accelerates.
+      runPhase += speed() * CADENCE * dt
 
       for (const r of rings) {
         // Crossing the plane of a ring is the only moment collision is tested
@@ -398,7 +539,10 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
         if (rib.z < playerZ - BEHIND) rib.z += RIB_POOL * RIB_SPACING
         rib.mesh.position.z = rib.z
       }
-      if (screen === 'title') playerZ += speedAt(0) * dt * 0.45
+      if (screen === 'title') {
+        playerZ += speedAt(0) * dt * 0.45
+        runPhase += speedAt(0) * CADENCE * dt * 0.45
+      }
     }
 
     tube.position.z = playerZ + tubeLength / 2 - BEHIND
@@ -406,11 +550,21 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
     // The camera rolls with the player rather than orbiting them: `up` points
     // inward, at the tube's axis, so the player's side of the tube is always
     // the bottom of the frame and the HUD marker can be a fixed chevron there.
+    const reduced = prefersReducedMotion()
+    poseRunner(runPhase, reduced)
+
     const radialX = Math.cos(playerAngle)
     const radialY = Math.sin(playerAngle)
-    camera.position.set(radialX * CAM_RADIUS, radialY * CAM_RADIUS, playerZ)
+    // Behind the runner and inward of them, so they sit low in the frame with
+    // the tube opening out ahead. `up` points at the axis, which is what makes
+    // the player's side of the tube read as the floor.
+    camera.position.set(radialX * CAM_RADIUS, radialY * CAM_RADIUS, playerZ - CAM_BACK)
     camera.up.set(-radialX, -radialY, 0)
-    lookAt.set(radialX * CAM_RADIUS, radialY * CAM_RADIUS, playerZ + 10)
+    lookAt.set(
+      radialX * CAM_LOOK_RADIUS,
+      radialY * CAM_LOOK_RADIUS,
+      playerZ + CAM_LOOK_AHEAD,
+    )
     camera.lookAt(lookAt)
 
     hud.draw({
@@ -419,7 +573,7 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
       best,
       isRecord,
       mono,
-      reducedMotion: prefersReducedMotion(),
+      reducedMotion: reduced,
       t: elapsed,
       clearFlash,
     })
@@ -452,6 +606,7 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
       return r ? r.z - playerZ : null
     },
     speed,
+    stridePhase: () => runPhase,
     mono: () => mono,
     setPalette(next) {
       mono = next
@@ -459,6 +614,7 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
       wallMaterial.color.copy(surfaceColour('wall'))
       ribMaterial.color.copy(surfaceColour('rib'))
       ringMaterial.color.copy(surfaceColour('ring'))
+      runnerMaterial.color.copy(surfaceColour('ring'))
     },
     readPixels: gb.readPixels,
     press,
