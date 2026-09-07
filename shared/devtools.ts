@@ -19,11 +19,16 @@
 // One rule, all builds: no `?qa=1`, no handle. Nothing here is a security
 // boundary — it is discoverable by anyone who reads this file — it just keeps
 // a debugging tool out of the way of ordinary play.
-import type Phaser from 'phaser'
-
+// The handle is typed `unknown` rather than `Phaser.Game` (#109). A three.js
+// game is a second renderer under the same shell and has no `Phaser.Game` to
+// publish, so a Phaser-shaped signature would have left it assigning
+// `window.__game` by hand — and the whole point of the `?qa=1` gate is that
+// there is exactly one path onto that property. Nothing in TypeScript reads
+// the handle back; the QA suites reach it from `page.evaluate`, which is
+// untyped, so a narrower type here bought nothing and cost the seam.
 declare global {
   interface Window {
-    __game?: Phaser.Game
+    __game?: unknown
   }
 }
 
@@ -43,9 +48,12 @@ export function qaRequested(): boolean {
  * Publishes `game` on `window.__game` when `?qa=1` is present, and does
  * nothing otherwise.
  *
- * Call it once, right after the game is constructed.
+ * Call it once, right after the game is constructed. `game` is whatever a
+ * suite needs a handle on — a `Phaser.Game` for the five Phaser games, the
+ * game object for a three.js one.
  */
-export function exposeForQA(game: Phaser.Game): void {
-  if (!qaRequested()) return
+export function exposeForQA<T>(game: T): T {
+  if (!qaRequested()) return game
   window.__game = game
+  return game
 }

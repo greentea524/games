@@ -7,7 +7,7 @@ on-screen controls that a keyboard run never exercises (#97).
 npm run qa:touch
 ```
 
-That starts a dev server, runs both suites, and shuts it down. To reuse a
+That starts a dev server, runs every suite, and shuts it down. To reuse a
 server you already have running, point `QA_URL` at the games *base* URL:
 
 ```
@@ -15,7 +15,7 @@ npm run dev                                   # terminal 1
 QA_URL=http://localhost:5173/games/ npm run qa:touch
 ```
 
-Both suites exit non-zero on failure and treat any page or console error as
+The suites exit non-zero on failure and treat any page or console error as
 one, plus any request that fails outright — whatever its origin — and any
 same-origin request that returns an error status.
 
@@ -69,6 +69,33 @@ alone:
   genuinely has, unlike Static
 - Pocket Dungeon's game-over panel dismissing on a canvas tap
 
+**`tower-stacker.mjs`** — the three.js game (#109), where what is under test
+is the *seam* rather than the rules. The overlap arithmetic lives in
+`tower-stacker/stack_test.ts` under `npm run qa:units`, because a CDP tap
+cannot hit a 0.04-unit perfect window and a check pretending otherwise would
+be flaky rather than strict. What only touch can prove is that the shell still
+works across a change of renderer:
+
+- A, the d-pad's down arm and START each drop a block — that is
+  `shared/dpad.ts` and `shared/buttons.ts` reaching a game with no Phaser in
+  it, through synthetic key events on `window`
+- the canvas is still a 160x144 backing store at an integer zoom, which is
+  what lets `canvasSpace` here match the helper in `grid.mjs`
+- the palette toggle still means something in 3D: MONO puts nothing but the
+  four DMG tones in the framebuffer, COLOR puts colours in it that MONO cannot
+  make, and both stay quantised to four levels per channel
+- the end screen's input lock absorbs a bounced press, and the best height
+  survives a reload through `shared/storage`
+- the 340px branch, where `shell.css` shrinks the d-pad — a different path
+  through the pre-init sizing script than the one 390px takes
+
+It also carries **the DMG contrast guard for this game**, because
+`npm run qa:contrast` cannot help here: that suite measures Phaser textures,
+and this game has none. The checks read the framebuffer instead and assert
+that the three visible face orientations each cover a real area in a different
+tone, and that a scanline across the tower's waist is solid rather than
+punched through with the sky tone.
+
 **`zoom.mjs`** — the double-tap zoom guard (`shared/noZoom.ts`), in all five
 games. The zoom itself cannot be reproduced here, because Chromium honours
 `user-scalable=no` and never zooms; it is iOS Safari, which ignores that meta,
@@ -105,9 +132,30 @@ the DOM.
   Dungeon's game over returns to the title, where A immediately confirms START
   RUN — so the assertion saw a dungeon and reported the panel had not
   dismissed.
-- **Prove a check can fail.** Two of these passed for the wrong reason on
-  first write. Where a defect is known — the #66 double-advance — put it back
-  temporarily and watch the check go red before trusting it.
+- **Bound a polling loop by the clock, not by iterations.** One poll of the
+  page is a round trip of roughly ten milliseconds, while a Tower Stacker
+  block takes over three seconds to cross its travel. A forty-iteration cap
+  looked generous and covered less than half a second, so the loop meant to
+  wait for a miss gave up long before one could happen — and every check
+  after it measured a run that was still going.
+- **A tolerance that is a constant will stop being one.** The same suite
+  tapped when the block was within a fixed 0.3 units of centre, which lands
+  every time at full width and misses outright once the tower narrows past
+  0.6. Scale it to whatever the thing being aimed at currently measures.
+- **Test a lock with the press it exists for, not by racing it.** Checking
+  Tower Stacker's end-screen lock by detecting the end and *then* tapping
+  cannot work: the detection is a round trip, and the half-second lock has
+  usually expired by the time it lands. Send the bounce — two taps back to
+  back at the moment of the miss — which is the thing the lock is there to
+  absorb anyway.
+- **Know which way up the framebuffer is.** `readPixels` hands back rows
+  bottom-up, so a HUD line drawn across the top of the screen is in the
+  *high* rows. Measuring the wrong end of the frame found a 160px-wide
+  "tower" that was really the footer bar.
+- **Prove a check can fail.** Several of these passed for the wrong reason on
+  first write. Where a defect is known — the #66 double-advance, or Tower
+  Stacker's `LAMBERT_PI` — put it back temporarily and watch the check go red
+  before trusting it.
 
 ## Requirements
 

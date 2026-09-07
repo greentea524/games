@@ -101,6 +101,25 @@ function lanternKeeperStatus(): GameStatus {
 }
 
 /**
+ * Tower Stacker: endless, so the best height is the whole record (#110).
+ *
+ * `completed` is never true here, and that is deliberate rather than an
+ * omission. The other five games have a finish to badge — a last level, a
+ * boss, an ending flag. This one has no end state to reach, so picking a
+ * height and calling it "complete" would badge the card with a claim the game
+ * never makes. The run count is what separates "never played" from a genuine
+ * best of zero, which is a real result: a first drop can miss.
+ */
+function towerStackerStatus(): GameStatus {
+  const d = readPayload('tower_stacker_save')
+  if (!d) return NONE
+  const best = typeof d.best === 'number' ? d.best : 0
+  const runs = typeof d.runs === 'number' ? d.runs : 0
+  if (runs === 0) return NONE
+  return { completed: false, progress: `Best ${best}` }
+}
+
+/**
  * Status for each local game, keyed by the id used on the hub. Games hosted
  * elsewhere are absent — the hub cannot read another origin's storage, and
  * pretending otherwise would badge them permanently unplayed.
@@ -112,5 +131,6 @@ export function readStatuses(): Record<string, GameStatus> {
     'pocket-dungeon': pocketDungeonStatus(),
     windup: windupStatus(),
     'lantern-keeper': lanternKeeperStatus(),
+    'tower-stacker': towerStackerStatus(),
   }
 }
