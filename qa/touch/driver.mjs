@@ -7,28 +7,11 @@
 // mechanism shared/dpad.ts is built on. CDP's Input.dispatchTouchEvent
 // produces genuine trusted touch, so capture, the dead zone and the edge slop
 // all behave the way they do under a thumb.
-import fs from 'node:fs'
 import { chromium } from 'playwright-core'
+import { browserLaunchOptions } from '../harness.mjs'
 
 /** A mid-size phone in portrait — the case the on-screen controls exist for. */
 export const PHONE = { width: 390, height: 844 }
-
-// playwright-core ships no browsers, which keeps `npm ci` cheap for a
-// dependency only the QA scripts use. Point QA_BROWSER at a Chromium binary,
-// or leave it and we fall back to an installed Chrome.
-const BROWSER_PATHS = [
-  process.env.QA_BROWSER,
-  '/opt/pw-browsers/chromium',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-  '/usr/bin/google-chrome',
-].filter(Boolean)
-
-function launchOptions() {
-  const found = BROWSER_PATHS.find((p) => fs.existsSync(p))
-  if (found) return { executablePath: found }
-  return { channel: 'chrome' } // last resort: a system Chrome install
-}
 
 /** Base URL of the games, without a trailing game segment. */
 export const BASE_URL = process.env.QA_URL ?? 'http://localhost:5178/games/'
@@ -40,7 +23,7 @@ export function gameUrl(name) {
 export async function launchTouch(url) {
   let browser
   try {
-    browser = await chromium.launch(launchOptions())
+    browser = await chromium.launch(browserLaunchOptions())
   } catch (e) {
     throw new Error(
       'could not start a browser for the touch run. Set QA_BROWSER to a ' +

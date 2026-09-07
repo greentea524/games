@@ -27,6 +27,10 @@
 // problem.
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+// Shared with `scripts/thumbnail.mjs`, which has to *produce* files that pass
+// these checks. One definition of the house size and one webp reader, so the
+// tool and the check cannot disagree about what correct means.
+import { APP, IMAGE_DIR, declaredSize, importedImages, webpSize } from '../qa/thumbnails.mjs'
 
 let ok = true
 const check = (name: string, pass: boolean, note?: string) => {
@@ -34,49 +38,15 @@ const check = (name: string, pass: boolean, note?: string) => {
   console.log(`  ${pass ? 'ok  ' : 'FAIL'} ${name}${note ? ' — ' + note : ''}`)
 }
 
-const IMAGE_DIR = 'src/assets/images'
-const APP = 'src/App.tsx'
-
-/**
- * Width and height of a WebP file, read from its header.
- *
- * All three container variants are handled because this repo has all three:
- * the painted art is simple lossy `VP8 `, and anything Chromium's
- * `toDataURL('image/webp')` produced is `VP8X` extended. A reader that only
- * understood one would silently skip the files it could not parse, which is a
- * check that passes by looking away.
- */
-function webpSize(buf: Buffer): { w: number; h: number; fmt: string } | null {
-  if (buf.length < 30) return null
-  if (buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WEBP') return null
-  const fourcc = buf.toString('ascii', 12, 16)
-  if (fourcc === 'VP8 ') {
-    return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff, fmt: 'lossy' }
-  }
-  if (fourcc === 'VP8L') {
-    const bits = buf.readUInt32LE(21)
-    return { w: (bits & 0x3fff) + 1, h: ((bits >> 14) & 0x3fff) + 1, fmt: 'lossless' }
-  }
-  if (fourcc === 'VP8X') {
-    return { w: buf.readUIntLE(24, 3) + 1, h: buf.readUIntLE(27, 3) + 1, fmt: 'extended' }
-  }
-  return null
-}
-
-const app = readFileSync(APP, 'utf8')
-
 // --- what the markup claims ------------------------------------------------
 
-const declared = app.match(
-  /className="game-card-thumb"[\s\S]{0,200}?width="(\d+)"[\s\S]{0,80}?height="(\d+)"/,
-)
+const declared = declaredSize()
 check('the card image declares an intrinsic size', declared !== null, APP)
 if (!declared) {
   console.log('\nFAILURES ABOVE')
   process.exit(1)
 }
-const WIDTH = Number(declared[1])
-const HEIGHT = Number(declared[2])
+const { width: WIDTH, height: HEIGHT } = declared
 check('and it is a sane one', WIDTH > 0 && HEIGHT > 0, `${WIDTH}x${HEIGHT}`)
 
 // --- what is on disk -------------------------------------------------------
@@ -115,7 +85,7 @@ for (const file of images.filter((f) => f.endsWith('.webp'))) {
 // file is a broken build, which at least fails loudly, but it is the same
 // question and free to ask here.
 
-const imported = [...app.matchAll(/from '\.\/assets\/images\/([^']+)'/g)].map((m) => m[1])
+const imported = importedImages()
 check('App.tsx imports thumbnails', imported.length > 0, `${imported.length} import(s)`)
 
 const orphans = images.filter((f) => !imported.includes(f))
