@@ -26,14 +26,22 @@ export default defineConfig({
         'windup': fileURLToPath(
           new URL('./windup/index.html', import.meta.url),
         ),
+        'tower-stacker': fileURLToPath(
+          new URL('./tower-stacker/index.html', import.meta.url),
+        ),
       },
       output: {
         // Rollup names a shared chunk after one of the modules inside it. The
         // 1.2 MB vendor chunk was called "phaser" only by luck; adding another
         // module shared by all five games renamed it to that module, which
         // makes a network waterfall very hard to read. Pin the name.
+        // three.js is the second such dependency (#109). It and Phaser are
+        // never loaded by the same page, so this is two alternative vendor
+        // chunks rather than two costs on one page — but they are both large
+        // enough that an unnamed shared chunk would be just as unreadable.
         manualChunks(id: string) {
           if (id.includes('node_modules/phaser')) return 'phaser'
+          if (id.includes('node_modules/three')) return 'three'
         },
       },
     },

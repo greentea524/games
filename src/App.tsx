@@ -10,6 +10,7 @@ import thumbCartCrate from './assets/images/cart-crate.webp'
 import thumbPocketDungeon from './assets/images/pocket-dungeon.webp'
 import thumbWindup from './assets/images/windup.webp'
 import thumbLanternKeeper from './assets/images/lantern-keeper.webp'
+import thumbTowerStacker from './assets/images/tower-stacker.webp'
 import thumbInvasion from './assets/images/invasion.webp'
 import thumbPlatformer from './assets/images/platformer.webp'
 import thumbBig2 from './assets/images/big2.webp'
@@ -53,6 +54,14 @@ const WEB_GAMES = [
     href: `${import.meta.env.BASE_URL}lantern-keeper/`,
     description:
       "Light lanterns in a dark forest in this GBC-style puzzle-platformer. Double jump, dash, and wall-cling your way to the Crown.",
+  },
+  {
+    title: "Tower Stacker",
+    id: 'tower-stacker',
+    image: thumbTowerStacker,
+    href: `${import.meta.env.BASE_URL}tower-stacker/`,
+    description:
+      "A GameBoy-styled 3D block stacker. Drop each slab on the one below, watch the overhang get sliced away, and climb.",
   },
   {
     title: "Invasion",

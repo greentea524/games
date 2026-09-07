@@ -24,6 +24,7 @@ const PAGES = [
   'lantern-keeper/index.html',
   'pocket-dungeon/index.html',
   'cart-crate/index.html',
+  'tower-stacker/index.html',
 ]
 
 let ok = true
