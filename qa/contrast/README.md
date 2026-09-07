@@ -117,16 +117,22 @@ bar; that also means **nothing here checks them**, which is how #84's pips
 shipped dark-on-black. A sprite drawn against something other than a floor or
 a sky needs that surface named in `surfaces`, not an exclusion.
 
-## Tower Stacker is not here either
+## The three.js games are not here
 
-It is a three.js game (#109) and has no textures at all — its DMG tones are
-produced by a post pass that quantises the rendered image, so there is nothing
-for this suite's `textures.get(key)` to sample. That does not mean it goes
-unchecked: `qa/touch/tower-stacker.mjs` reads the framebuffer directly and
-asserts that MONO puts nothing but the four DMG tones on screen, that the
-three visible face orientations each land in a *different* tone covering a
-real area, and that a scanline across the tower is solid rather than punched
-through with the sky tone.
+Tower Stacker (#110) and Tube Runner (#111) have no textures at all — their
+DMG tones are produced by a post pass that quantises the rendered image, so
+there is nothing for this suite's `textures.get(key)` to sample. That does not
+mean they go unchecked. Each has tone checks in its own touch suite, reading
+the framebuffer directly:
+
+- `qa/touch/tower-stacker.mjs` asserts that MONO puts nothing but the four DMG
+  tones on screen, that the three visible face orientations each land in a
+  *different* tone covering a real area, and that a scanline across the tower
+  is solid rather than punched through with the sky tone.
+- `qa/touch/tube-runner.mjs` asserts that obstacle rings hold `lightest` and
+  the wall does not, which is what stops the one thing that can end a run from
+  being drawn in its background's tone. It explicitly does **not** cover the
+  tube's ribs — see that suite's own note.
 
 The equivalent of this suite's job is done there because the failure mode is
 the same one — a feature the player cannot see against its background — even

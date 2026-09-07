@@ -120,6 +120,22 @@ function towerStackerStatus(): GameStatus {
 }
 
 /**
+ * Tube Runner: endless, so the rings cleared in the best run is the record.
+ *
+ * `completed` is never true, for the same reason as Tower Stacker's: there is
+ * no finish to badge, and inventing a threshold would claim an ending the game
+ * does not have.
+ */
+function tubeRunnerStatus(): GameStatus {
+  const d = readPayload('tube_runner_save')
+  if (!d) return NONE
+  const best = typeof d.best === 'number' ? d.best : 0
+  const runs = typeof d.runs === 'number' ? d.runs : 0
+  if (runs === 0) return NONE
+  return { completed: false, progress: `Best ${best}` }
+}
+
+/**
  * Status for each local game, keyed by the id used on the hub. Games hosted
  * elsewhere are absent — the hub cannot read another origin's storage, and
  * pretending otherwise would badge them permanently unplayed.
@@ -132,5 +148,6 @@ export function readStatuses(): Record<string, GameStatus> {
     windup: windupStatus(),
     'lantern-keeper': lanternKeeperStatus(),
     'tower-stacker': towerStackerStatus(),
+    'tube-runner': tubeRunnerStatus(),
   }
 }

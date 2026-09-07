@@ -29,6 +29,9 @@ export default defineConfig({
         'tower-stacker': fileURLToPath(
           new URL('./tower-stacker/index.html', import.meta.url),
         ),
+        'tube-runner': fileURLToPath(
+          new URL('./tube-runner/index.html', import.meta.url),
+        ),
       },
       output: {
         // Rollup names a shared chunk after one of the modules inside it. The

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 
 const PORT = process.env.QA_PORT ?? '5178'
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
-const SUITES = ['./static.mjs', './platformers.mjs', './grid.mjs', './zoom.mjs', './tower-stacker.mjs']
+const SUITES = ['./static.mjs', './platformers.mjs', './grid.mjs', './zoom.mjs', './tower-stacker.mjs', './tube-runner.mjs']
 
 async function waitForServer(url, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs

@@ -1,24 +1,13 @@
-// The HUD, drawn into a 160x144 2D canvas and composited over the quantised
-// 3D image (#110).
+// Tower Stacker's HUD: what it draws, on the surface shared/gbhud.ts provides.
 //
-// three.js has no text, and the two usual answers are both worse here. A DOM
-// overlay sits outside the pixelated upscale, so its text renders at the
-// display's resolution and reads as a web page laid over a Game Boy. A
-// world-space sprite goes through the palette post pass and comes back
-// quantised, which turns 8px glyphs to mush.
-//
-// Drawing the HUD at exactly the render size and compositing it *after* the
-// post pass gets both: the text is authored in the same 160x144 grid as
-// everything else, and its colours land in the framebuffer untouched.
-//
-// CLAUDE.md's warning applies directly — the contrast suite measures sprites
-// against a floor or a sky, and "art on the HUD bar answers to a surface
-// nothing measures yet". So nothing here is left to chance: every glyph is
-// drawn over a panel this file fills itself, in a tone this file picked, and
-// the shadow below keeps it legible even where a panel is skipped.
-import { CSS_DARKEST, CSS_LIGHTEST, FONT, GBC_HEIGHT, GBC_WIDTH, PAL } from './constants'
+// The mechanics of drawing 8px text into a 160x144 canvas and compositing it
+// over the quantised image live in `shared/gbhud.ts`, along with the reason
+// panels exist. What is left here is this game's own layout — the height and
+// best lines, the title card, the end screen, the star field.
+import { CSS_DARKEST, CSS_LIGHTEST, FONT, PAL } from './constants'
+import { GB_HEIGHT, GB_WIDTH } from '../shared/gb3d'
+import { createHudSurface } from '../shared/gbhud'
 
-/** Which screen the HUD is drawing. */
 export type Screen = 'title' | 'run' | 'over'
 
 export interface HudState {
@@ -55,7 +44,7 @@ const STARS = Array.from({ length: 34 }, (_, i) => {
   const a = Math.sin(i * 12.9898) * 43758.5453
   const b = Math.sin(i * 78.233) * 12345.6789
   return {
-    x: Math.floor((a - Math.floor(a)) * GBC_WIDTH),
+    x: Math.floor((a - Math.floor(a)) * GB_WIDTH),
     y: (b - Math.floor(b)) * 3,
     /** Nearer stars travel further, so the field has depth. */
     depth: 0.35 + ((a - Math.floor(a)) * 0.5),
@@ -68,33 +57,13 @@ export interface Hud {
 }
 
 export function createHud(): Hud {
-  const canvas = document.createElement('canvas')
-  canvas.width = GBC_WIDTH
-  canvas.height = GBC_HEIGHT
-  const ctx = canvas.getContext('2d')!
-  // The whole point is a hard pixel grid; smoothing would blur the 8px font.
-  ctx.imageSmoothingEnabled = false
-  ctx.textBaseline = 'top'
-
-  /** Text with a one-pixel dark shadow. The shadow is what makes it legible
-      over any tone the 3D layer happens to put behind it. */
-  function text(s: string, x: number, y: number, colour: string, align: CanvasTextAlign = 'left') {
-    ctx.textAlign = align
-    ctx.fillStyle = CSS_DARKEST
-    ctx.fillText(s, x + 1, y + 1)
-    ctx.fillStyle = colour
-    ctx.fillText(s, x, y)
-  }
-
-  /** A filled panel with a one-pixel border, for anything that must be read. */
-  function panel(x: number, y: number, w: number, h: number) {
-    ctx.fillStyle = CSS_DARKEST
-    ctx.fillRect(x, y, w, h)
-    ctx.strokeStyle = hex(PAL.dark)
-    ctx.lineWidth = 1
-    // Offset by half a pixel so a 1px stroke lands on the pixel, not between two.
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-  }
+  const surface = createHudSurface({
+    font: FONT,
+    shadow: CSS_DARKEST,
+    panelFill: CSS_DARKEST,
+    panelBorder: hex(PAL.dark),
+  })
+  const { ctx, text, panel } = surface
 
   function drawStars(state: HudState) {
     ctx.fillStyle = hex(PAL.dark)
@@ -103,8 +72,8 @@ export function createHud(): Hud {
       // frames where no block has landed yet. Parallax is tied to progress
       // rather than to time, so reduced motion has nothing to strip here —
       // a still field would misreport how far the run has come.
-      const y = ((s.y + state.cameraY * s.depth * 6) % (GBC_HEIGHT + 8)) - 4
-      ctx.fillRect(s.x, Math.floor(GBC_HEIGHT - y), 1, 1)
+      const y = ((s.y + state.cameraY * s.depth * 6) % (GB_HEIGHT + 8)) - 4
+      ctx.fillRect(s.x, Math.floor(GB_HEIGHT - y), 1, 1)
     }
   }
 
@@ -112,7 +81,7 @@ export function createHud(): Hud {
     // Height, top left. No panel — the sky behind the top of the frame is the
     // darkest tone, and the shadow covers the case where a block reaches it.
     text(String(state.height), 4, 4, ink)
-    text(`BEST ${state.best}`, GBC_WIDTH - 4, 4, ink, 'right')
+    text(`BEST ${state.best}`, GB_WIDTH - 4, 4, ink, 'right')
 
     if (state.streak >= 2) {
       text(`x${state.streak}`, 4, 14, hex(PAL.light))
@@ -123,7 +92,7 @@ export function createHud(): Hud {
       // a fade through the four tones is two frames of visible and then two
       // of nothing — a blink at least lands on the frames it is drawn.
       const on = state.reducedMotion ? state.perfectFlash > 0.25 : Math.floor(state.t * 16) % 2 === 0
-      if (on) text('PERFECT!', GBC_WIDTH / 2, 30, ink, 'center')
+      if (on) text('PERFECT!', GB_WIDTH / 2, 30, ink, 'center')
     }
   }
 
@@ -146,8 +115,8 @@ export function createHud(): Hud {
     // Full width rather than a box around the words. A panel just big enough
     // for the label floats in the middle of the tower and reads as a hole
     // punched in it; a bar across the bottom reads as the footer it is.
-    panel(0, 116, GBC_WIDTH, GBC_HEIGHT - 116)
-    if (on) text('PRESS A', GBC_WIDTH / 2, 122, ink, 'center')
+    panel(0, 116, GB_WIDTH, GB_HEIGHT - 116)
+    if (on) text('PRESS A', GB_WIDTH / 2, 122, ink, 'center')
   }
 
   function drawTitle(state: HudState, ink: string) {
@@ -156,10 +125,10 @@ export function createHud(): Hud {
     // tower behind it and the title screen showed a title card and a sliver
     // of block. The tower is the better half of this screen; the card gets
     // the strip above it.
-    panel(16, 8, GBC_WIDTH - 32, 46)
-    text('TOWER', GBC_WIDTH / 2, 16, ink, 'center')
-    text('STACKER', GBC_WIDTH / 2, 30, ink, 'center')
-    if (state.best > 0) text(`BEST ${state.best}`, GBC_WIDTH / 2, 42, hex(PAL.light), 'center')
+    panel(16, 8, GB_WIDTH - 32, 46)
+    text('TOWER', GB_WIDTH / 2, 16, ink, 'center')
+    text('STACKER', GB_WIDTH / 2, 30, ink, 'center')
+    if (state.best > 0) text(`BEST ${state.best}`, GB_WIDTH / 2, 42, hex(PAL.light), 'center')
 
     // A blinking prompt is decoration, and someone who asked for less motion
     // still has to be told which button starts the game — so it stops
@@ -168,20 +137,17 @@ export function createHud(): Hud {
   }
 
   function drawOver(state: HudState, ink: string) {
-    panel(14, 26, GBC_WIDTH - 28, 52)
-    text(state.isRecord ? 'NEW BEST!' : 'TOPPLED', GBC_WIDTH / 2, 34, ink, 'center')
-    text(`HEIGHT ${state.height}`, GBC_WIDTH / 2, 50, ink, 'center')
-    text(`BEST ${state.best}`, GBC_WIDTH / 2, 62, hex(PAL.light), 'center')
+    panel(14, 26, GB_WIDTH - 28, 52)
+    text(state.isRecord ? 'NEW BEST!' : 'TOPPLED', GB_WIDTH / 2, 34, ink, 'center')
+    text(`HEIGHT ${state.height}`, GB_WIDTH / 2, 50, ink, 'center')
+    text(`BEST ${state.best}`, GB_WIDTH / 2, 62, hex(PAL.light), 'center')
     prompt(state.reducedMotion || Math.floor(state.t * 2) % 2 === 0, ink)
   }
 
   return {
-    canvas,
+    canvas: surface.canvas,
     draw(state) {
-      ctx.clearRect(0, 0, GBC_WIDTH, GBC_HEIGHT)
-      // 8px is the font's native size — it is an 8x8 grid face, so any other
-      // size lands glyph edges between pixels and fringes them.
-      ctx.font = `8px ${FONT}`
+      surface.clear()
       // In COLOR the 3D layer keeps its hues, so a green HUD would read as a
       // third palette on the same screen. Near-white sits over both.
       const ink = state.mono ? CSS_LIGHTEST : '#f8f8f0'
