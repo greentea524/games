@@ -130,6 +130,20 @@ what it measures. This is the same shape of gap `qa/contrast/README.md` records
 for the HUD relic pips, and it is written down for the same reason: an
 unguarded surface that nobody knows is unguarded is how #84 shipped.
 
+**`minigolf.mjs`** — the third three.js game (#113), on the standalone stage
+(#118). The course itself is checked headless in `minigolf/course_test.ts` and
+`minigolf/rest_test.ts`; what is here is the slingshot drag, because that
+control is the part #113 had to be redesigned around. The original issue
+specified a charging meter on a d-pad — a reasonable design for a 160x144
+shell, and meaningless once the game got its own canvas — so the gesture is
+new code with nothing else covering it.
+
+The checks worth knowing about are the two that assert a stroke did *not*
+happen: a pull that ends back at the ball plays nothing, and a tap with a
+two-pixel wobble plays nothing. A mis-started drag that gets played costs a
+stroke the player never took, which is unrecoverable in a game scored by
+counting them.
+
 **`zoom.mjs`** — the double-tap zoom guard (`shared/noZoom.ts`), in all five
 games. The zoom itself cannot be reproduced here, because Chromium honours
 `user-scalable=no` and never zooms; it is iOS Safari, which ignores that meta,
@@ -205,6 +219,18 @@ the DOM.
   first write. Where a defect is known — the #66 double-advance, or Tower
   Stacker's `LAMBERT_PI` — put it back temporarily and watch the check go red
   before trusting it.
+- **An exploratory gesture is still a gesture.** The aim checks pull the
+  contact around to prove direction and power track the drag — and the release
+  at the end of that was a real stroke, which on the short hole banked in and
+  advanced to the next one. Every check after it was reading a different hole,
+  and the stroke-count assertion failed by comparing across two of them. Land
+  the contact back where it started, or reset the game, before checking
+  anything that counts.
+- **Do not run two browser suites against one dev server.** Two Chromium
+  instances holding WebGL contexts on the same page lost one of them mid-run,
+  and the symptom was `window.__game` going undefined in a suite that had been
+  passing for a fortnight — which reads exactly like the game failing to
+  initialise.
 
 ## Requirements
 

@@ -13,6 +13,7 @@ import thumbLanternKeeper from './assets/images/lantern-keeper.webp'
 import thumbTowerStacker from './assets/images/tower-stacker.webp'
 import thumbTubeRunner from './assets/images/tube-runner.webp'
 import thumbTiltMaze from './assets/images/tilt-maze.webp'
+import thumbMinigolf from './assets/images/minigolf.webp'
 import thumbInvasion from './assets/images/invasion.webp'
 import thumbPlatformer from './assets/images/platformer.webp'
 import thumbBig2 from './assets/images/big2.webp'
@@ -118,6 +119,14 @@ const GAME_SECTIONS: GameSection[] = [
         href: `${import.meta.env.BASE_URL}tower-stacker/`,
         description:
           "A GameBoy-styled 3D block stacker. Drop each slab on the one below, watch the overhang get sliced away, and climb.",
+      },
+      {
+        title: "Minigolf",
+        id: 'minigolf',
+        image: thumbMinigolf,
+        href: `${import.meta.env.BASE_URL}minigolf/`,
+        description:
+          "Three low-poly holes. Drag back from the ball to aim and set power, read the slope, and try to keep the card under par.",
       },
       {
         title: "Tilt Maze",

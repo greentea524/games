@@ -1,0 +1,85 @@
+/* Minigolf's HUD. Real DOM over the canvas — see minigolf/hud.ts. */
+
+.mg-status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(9, 20, 15, 0.6);
+  border: 1px solid rgba(232, 241, 236, 0.18);
+  backdrop-filter: blur(6px);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.mg-hole { font-weight: 600; }
+.mg-strokes { color: #9ec9b3; }
+
+.mg-hint, .mg-waiting {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: min(90vw, 460px);
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.mg-hint { color: #9ec9b3; }
+.mg-waiting { color: #d9c27a; bottom: 52px; }
+
+.mg-btn {
+  pointer-events: auto;
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 241, 236, 0.25);
+  background: rgba(232, 241, 236, 0.08);
+  color: #eaf3ee;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mg-btn-primary { background: #35d68a; border-color: #35d68a; color: #05261a; }
+.mg-btn-primary:hover, .mg-btn-primary:focus-visible { background: #4ce89c; }
+
+.mg-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  background: rgba(6, 14, 11, 0.74);
+  backdrop-filter: blur(3px);
+  text-align: center;
+}
+.mg-panel-title { margin: 0; font-size: clamp(1.6rem, 6vw, 2.4rem); font-weight: 700; }
+.mg-panel-body { margin: 0 0 6px; color: #9ec9b3; }
+
+.mg-card {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  width: min(88vw, 320px);
+  font-variant-numeric: tabular-nums;
+}
+.mg-card:empty { display: none; }
+.mg-card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(232, 241, 236, 0.12);
+}
+.mg-card-par { color: #7fa392; }
+.mg-card-score { font-weight: 700; min-width: 2ch; text-align: right; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-status, .mg-panel { backdrop-filter: none; }
+}

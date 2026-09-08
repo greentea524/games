@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { ROOT, startDevServer } from '../harness.mjs'
 
 const PORT = process.env.QA_PORT ?? '5178'
-const SUITES = ['./static.mjs', './platformers.mjs', './grid.mjs', './zoom.mjs', './tower-stacker.mjs', './tube-runner.mjs', './tilt-maze.mjs']
+const SUITES = ['./static.mjs', './platformers.mjs', './grid.mjs', './zoom.mjs', './tower-stacker.mjs', './tube-runner.mjs', './tilt-maze.mjs', './minigolf.mjs']
 
 function run(script, env) {
   return new Promise((resolve) => {
