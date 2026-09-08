@@ -144,6 +144,23 @@ two-pixel wobble plays nothing. A mis-started drag that gets played costs a
 stroke the player never took, which is unrecoverable in a game scored by
 counting them.
 
+**`anomaly-room.mjs`** — the third standalone game (#114). The rules it plays
+by — that nothing is ever changed while it is on screen, and that every change
+is visible from where the player stands — are in
+`anomaly-room/anomaly_test.ts` under `npm run qa:units`, against real frustum
+and raycast maths.
+
+What is here is the seam, and for this game the seam carries unusual weight: a
+drag and a tap arrive through exactly the same events, and the game tells them
+apart only by how far the pointer moved. So the suite drives both, and checks
+the two negatives as carefully as the positives — that six full drags around
+the room cost no guesses, and that tapping a wall is neither right nor wrong.
+
+Objects are located through the game's own `probe`, which resolves a screen
+point exactly the way `flag` does. A suite that worked out where things were
+with its own copy of the projection would be checking its own arithmetic, and
+could pass while tapping flagged something else entirely.
+
 **`zoom.mjs`** — the double-tap zoom guard (`shared/noZoom.ts`), in all five
 games. The zoom itself cannot be reproduced here, because Chromium honours
 `user-scalable=no` and never zooms; it is iOS Safari, which ignores that meta,
@@ -231,6 +248,13 @@ the DOM.
   and the symptom was `window.__game` going undefined in a suite that had been
   passing for a fortnight — which reads exactly like the game failing to
   initialise.
+- **A CDP tap is not a fast tap.** `hand.tap` holds for 120ms, but the round
+  trips around it put roughly half a second between `pointerdown` and
+  `pointerup`. A game that classified a press as a tap only if it was released
+  inside 350ms ignored every tap the suite sent, and the symptom — input
+  apparently doing nothing — looked nothing like a timing threshold. The
+  threshold was wrong for people too, which is the real lesson: a press that
+  never moves is a tap however long it is held.
 
 ## Requirements
 

@@ -171,6 +171,20 @@ function minigolfStatus(): GameStatus {
 }
 
 /**
+ * Rounds found in the best run, which is the only number worth showing: a run
+ * ends either cleared or out of guesses, so "runs played" says nothing about
+ * how well any of them went.
+ */
+function anomalyRoomStatus(): GameStatus {
+  const d = readPayload('anomaly_room_save')
+  if (!d) return NONE
+  const best = typeof d.best === 'number' ? d.best : 0
+  const cleared = typeof d.cleared === 'number' ? d.cleared : 0
+  if (best === 0) return NONE
+  return { completed: cleared > 0, progress: `Best ${best}` }
+}
+
+/**
  * Status for each local game, keyed by the id used on the hub. Games hosted
  * elsewhere are absent — the hub cannot read another origin's storage, and
  * pretending otherwise would badge them permanently unplayed.
@@ -186,5 +200,6 @@ export function readStatuses(): Record<string, GameStatus> {
     'tube-runner': tubeRunnerStatus(),
     'tilt-maze': tiltMazeStatus(),
     minigolf: minigolfStatus(),
+    'anomaly-room': anomalyRoomStatus(),
   }
 }

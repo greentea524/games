@@ -14,6 +14,7 @@ import thumbTowerStacker from './assets/images/tower-stacker.webp'
 import thumbTubeRunner from './assets/images/tube-runner.webp'
 import thumbTiltMaze from './assets/images/tilt-maze.webp'
 import thumbMinigolf from './assets/images/minigolf.webp'
+import thumbAnomalyRoom from './assets/images/anomaly-room.webp'
 import thumbInvasion from './assets/images/invasion.webp'
 import thumbPlatformer from './assets/images/platformer.webp'
 import thumbBig2 from './assets/images/big2.webp'
@@ -127,6 +128,14 @@ const GAME_SECTIONS: GameSection[] = [
         href: `${import.meta.env.BASE_URL}minigolf/`,
         description:
           "Three low-poly holes. Drag back from the ball to aim and set power, read the slope, and try to keep the card under par.",
+      },
+      {
+        title: "Anomaly Room",
+        id: 'anomaly-room',
+        image: thumbAnomalyRoom,
+        href: `${import.meta.env.BASE_URL}anomaly-room/`,
+        description:
+          "You are alone in a room. Each round something changes behind your back \u2014 a thing moves, grows, doubles or disappears. Look around, find it, tap it.",
       },
       {
         title: "Tilt Maze",

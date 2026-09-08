@@ -1,0 +1,88 @@
+/* The Anomaly Room's HUD. Real DOM over the canvas — see anomaly-room/hud.ts. */
+
+.ar-status {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(6, 9, 12, 0.62);
+  border: 1px solid rgba(210, 224, 236, 0.16);
+  backdrop-filter: blur(6px);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ar-round { font-weight: 600; }
+.ar-lives { color: #9fb4c6; }
+
+.ar-btn {
+  pointer-events: auto;
+  padding: 9px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(210, 224, 236, 0.24);
+  background: rgba(210, 224, 236, 0.08);
+  color: #e7eef5;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ar-sound, .ar-look {
+  position: absolute;
+  top: 12px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+}
+.ar-sound { right: 12px; }
+.ar-look { left: 12px; top: 56px; }
+.ar-btn-primary { background: #6fb2d8; border-color: #6fb2d8; color: #05161f; }
+.ar-btn-primary:hover, .ar-btn-primary:focus-visible { background: #8ac8ea; }
+
+/* A steadying mark, not a reticle — flagging goes through the tap point. */
+.ar-centre {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: rgba(231, 238, 245, 0.34);
+}
+
+.ar-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: min(90vw, 460px);
+  text-align: center;
+  font-size: 0.85rem;
+  color: #bcd0e0;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+}
+
+.ar-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  background: rgba(4, 7, 10, 0.72);
+  backdrop-filter: blur(3px);
+  text-align: center;
+}
+.ar-panel-title { margin: 0; font-size: clamp(1.6rem, 6vw, 2.4rem); font-weight: 700; }
+.ar-panel-body { margin: 0 0 6px; color: #9fb4c6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-status, .ar-panel { backdrop-filter: none; }
+}

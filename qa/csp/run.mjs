@@ -28,6 +28,7 @@ const PAGES = [
   'tube-runner/index.html',
   'tilt-maze/index.html',
   'minigolf/index.html',
+  'anomaly-room/index.html',
 ]
 
 let ok = true
