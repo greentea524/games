@@ -1,161 +1,118 @@
-// Tower Stacker's HUD: what it draws, on the surface shared/gbhud.ts provides.
+// Tower Stacker's HUD (#110, #119), as DOM over the canvas.
 //
-// The mechanics of drawing 8px text into a 160x144 canvas and compositing it
-// over the quantised image live in `shared/gbhud.ts`, along with the reason
-// panels exist. What is left here is this game's own layout — the height and
-// best lines, the title card, the end screen, the star field.
-import { CSS_DARKEST, CSS_LIGHTEST, FONT, PAL } from './constants'
-import { GB_HEIGHT, GB_WIDTH } from '../shared/gb3d'
-import { createHudSurface } from '../shared/gbhud'
+// It used to be 8px glyphs drawn into a 160x144 2D canvas and composited into
+// the same framebuffer as the game — `shared/gbhud.ts`, and a font the shell
+// had to preload by hand because canvas text does not trigger a webfont fetch
+// the way a DOM node does. On `shared/stage3d.ts` the overlay is real DOM, so
+// the text is real text: crisp at any resolution, sized responsively, and
+// reachable by a screen reader.
+//
+// One thing did not survive the move and should not: the star field. It used
+// to be painted here and scrolled against the camera height. It is now points
+// in the scene, where the camera rising through it *is* the parallax.
+import { prefersReducedMotion } from '../shared/motion'
+import type { TowerGame } from './game'
 
 export type Screen = 'title' | 'run' | 'over'
 
-export interface HudState {
-  screen: Screen
-  /** Blocks placed above the base. */
-  height: number
-  best: number
-  /** Consecutive perfect drops. */
-  streak: number
-  /** 1 just after a perfect drop, decaying to 0. */
-  perfectFlash: number
-  /** The run that just ended beat the stored best. */
-  isRecord: boolean
-  /** MONO rather than COLOR. */
-  mono: boolean
-  reducedMotion: boolean
-  /** Camera height in world units, for the star parallax. */
-  cameraY: number
-  /** Seconds since load, for blinking prompts. */
-  t: number
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className: string,
+  text?: string,
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag)
+  node.className = className
+  if (text !== undefined) node.textContent = text
+  return node
 }
 
-const hex = (n: number) => '#' + n.toString(16).padStart(6, '0')
-
-/**
- * The star field, fixed at module load.
- *
- * Deterministic rather than random per run: a field that reshuffles on every
- * retry reads as noise, and one that scrolls past a *known* pattern is what
- * makes the climb legible.
- */
-const STARS = Array.from({ length: 34 }, (_, i) => {
-  // A cheap hash, so the layout is stable across reloads without shipping a table.
-  const a = Math.sin(i * 12.9898) * 43758.5453
-  const b = Math.sin(i * 78.233) * 12345.6789
-  return {
-    x: Math.floor((a - Math.floor(a)) * GB_WIDTH),
-    y: (b - Math.floor(b)) * 3,
-    /** Nearer stars travel further, so the field has depth. */
-    depth: 0.35 + ((a - Math.floor(a)) * 0.5),
-  }
-})
-
-export interface Hud {
-  canvas: HTMLCanvasElement
-  draw(state: HudState): void
+export interface HudHooks {
+  muted(): boolean
+  setMuted(muted: boolean): void
 }
 
-export function createHud(): Hud {
-  const surface = createHudSurface({
-    font: FONT,
-    shadow: CSS_DARKEST,
-    panelFill: CSS_DARKEST,
-    panelBorder: hex(PAL.dark),
-  })
-  const { ctx, text, panel } = surface
+export function createHud(game: TowerGame, hooks: HudHooks): void {
+  const overlay = game.stage.overlay
 
-  function drawStars(state: HudState) {
-    ctx.fillStyle = hex(PAL.dark)
-    for (const s of STARS) {
-      // Scrolls down as the camera rises, so climbing is visible even on the
-      // frames where no block has landed yet. Parallax is tied to progress
-      // rather than to time, so reduced motion has nothing to strip here —
-      // a still field would misreport how far the run has come.
-      const y = ((s.y + state.cameraY * s.depth * 6) % (GB_HEIGHT + 8)) - 4
-      ctx.fillRect(s.x, Math.floor(GB_HEIGHT - y), 1, 1)
+  const back = el('a', 'stage3d-back', '← Games')
+  back.href = `${import.meta.env.BASE_URL}`
+  overlay.append(back)
+
+  const sound = el('button', 'ts-btn ts-sound')
+  sound.type = 'button'
+  sound.onclick = () => {
+    hooks.setMuted(!hooks.muted())
+    refresh()
+  }
+  overlay.append(sound)
+
+  const score = el('div', 'ts-score')
+  const heightLabel = el('span', 'ts-height')
+  const bestLabel = el('span', 'ts-best')
+  score.append(heightLabel, bestLabel)
+  overlay.append(score)
+
+  const streak = el('p', 'ts-streak')
+  overlay.append(streak)
+
+  const perfect = el('p', 'ts-perfect', 'PERFECT!')
+  overlay.append(perfect)
+
+  const panel = el('div', 'ts-panel')
+  const panelTitle = el('h1', 'ts-panel-title')
+  const panelBody = el('p', 'ts-panel-body')
+  const panelBtn = el('button', 'ts-btn ts-btn-primary')
+  panelBtn.type = 'button'
+  panelBtn.onclick = () => game.press()
+  panel.append(panelTitle, panelBody, panelBtn)
+  overlay.append(panel)
+
+  const hint = el('p', 'ts-hint', 'Tap anywhere to drop the block.')
+  overlay.append(hint)
+
+  function refresh() {
+    const screen = game.screen()
+    const reduced = prefersReducedMotion()
+    sound.textContent = hooks.muted() ? '♪ off' : '♪ on'
+    sound.setAttribute('aria-pressed', String(hooks.muted()))
+
+    // The height only means anything once a run has started: the title screen
+    // builds a decorative tower through the real drop rules, so `height()` is
+    // non-zero there and would read as a score nobody had earned.
+    score.hidden = screen !== 'run'
+    heightLabel.textContent = String(game.height())
+    bestLabel.textContent = `best ${game.best()}`
+
+    streak.hidden = screen !== 'run' || game.streak() < 2
+    streak.textContent = `×${game.streak()}`
+
+    // Blinks rather than fades. A fade is a value the eye has to track; a
+    // blink lands on the frames it is drawn. Under reduced motion it holds
+    // steady instead — it reports the one skillful thing in the game, so it
+    // gets quieter rather than disappearing.
+    const flash = game.perfectFlash()
+    perfect.hidden =
+      screen !== 'run' || flash <= 0 || !(reduced ? flash > 0.25 : Math.floor(game.clock() * 12) % 2 === 0)
+
+    hint.hidden = screen !== 'run' || game.height() > 0
+
+    panel.hidden = screen === 'run'
+    if (screen === 'title') {
+      panelTitle.textContent = 'Tower Stacker'
+      panelBody.textContent =
+        game.best() > 0 ? `Best ${game.best()}. Time the drop; a clean one is worth more.` : 'Time the drop. A clean one is worth more.'
+      panelBtn.textContent = 'Start'
+    } else if (screen === 'over') {
+      panelTitle.textContent = game.isRecord() ? 'New best' : 'Toppled'
+      panelBody.textContent = `Height ${game.height()} · best ${game.best()}`
+      panelBtn.textContent = 'Again'
     }
   }
 
-  function drawRun(state: HudState, ink: string) {
-    // Height, top left. No panel — the sky behind the top of the frame is the
-    // darkest tone, and the shadow covers the case where a block reaches it.
-    text(String(state.height), 4, 4, ink)
-    text(`BEST ${state.best}`, GB_WIDTH - 4, 4, ink, 'right')
-
-    if (state.streak >= 2) {
-      text(`x${state.streak}`, 4, 14, hex(PAL.light))
-    }
-
-    if (state.perfectFlash > 0) {
-      // The one loud signal in the game. It blinks rather than fades, because
-      // a fade through the four tones is two frames of visible and then two
-      // of nothing — a blink at least lands on the frames it is drawn.
-      const on = state.reducedMotion ? state.perfectFlash > 0.25 : Math.floor(state.t * 16) % 2 === 0
-      if (on) text('PERFECT!', GB_WIDTH / 2, 30, ink, 'center')
-    }
-  }
-
-  /**
-   * The "PRESS A" prompt, on a panel of its own.
-   *
-   * It shipped as bare text first and was unreadable on both screens: the
-   * prompt sits low, the tower behind it is tallest exactly there, and the
-   * glyphs are `lightest` over a block face that is also `lightest`. The 1px
-   * shadow every string here gets was not enough — it outlines the glyph but
-   * the inside of the letter still matches what is behind it.
-   *
-   * This is the same defect CLAUDE.md counts six times over, arriving on the
-   * one surface `npm run qa:contrast` does not look at. The fix is the panel:
-   * the prompt now has a surface this file drew, so what is behind it stops
-   * mattering. The panel does not blink with the text — a frame that stays put
-   * while the label pulses is steadier to read than one that flashes whole.
-   */
-  function prompt(on: boolean, ink: string) {
-    // Full width rather than a box around the words. A panel just big enough
-    // for the label floats in the middle of the tower and reads as a hole
-    // punched in it; a bar across the bottom reads as the footer it is.
-    panel(0, 116, GB_WIDTH, GB_HEIGHT - 116)
-    if (on) text('PRESS A', GB_WIDTH / 2, 122, ink, 'center')
-  }
-
-  function drawTitle(state: HudState, ink: string) {
-    // High on the screen, deliberately. A panel is opaque — it is filled in
-    // the same tone as the sky — so one centred here sat squarely over the
-    // tower behind it and the title screen showed a title card and a sliver
-    // of block. The tower is the better half of this screen; the card gets
-    // the strip above it.
-    panel(16, 8, GB_WIDTH - 32, 46)
-    text('TOWER', GB_WIDTH / 2, 16, ink, 'center')
-    text('STACKER', GB_WIDTH / 2, 30, ink, 'center')
-    if (state.best > 0) text(`BEST ${state.best}`, GB_WIDTH / 2, 42, hex(PAL.light), 'center')
-
-    // A blinking prompt is decoration, and someone who asked for less motion
-    // still has to be told which button starts the game — so it stops
-    // blinking rather than disappearing.
-    prompt(state.reducedMotion || Math.floor(state.t * 2) % 2 === 0, ink)
-  }
-
-  function drawOver(state: HudState, ink: string) {
-    panel(14, 26, GB_WIDTH - 28, 52)
-    text(state.isRecord ? 'NEW BEST!' : 'TOPPLED', GB_WIDTH / 2, 34, ink, 'center')
-    text(`HEIGHT ${state.height}`, GB_WIDTH / 2, 50, ink, 'center')
-    text(`BEST ${state.best}`, GB_WIDTH / 2, 62, hex(PAL.light), 'center')
-    prompt(state.reducedMotion || Math.floor(state.t * 2) % 2 === 0, ink)
-  }
-
-  return {
-    canvas: surface.canvas,
-    draw(state) {
-      surface.clear()
-      // In COLOR the 3D layer keeps its hues, so a green HUD would read as a
-      // third palette on the same screen. Near-white sits over both.
-      const ink = state.mono ? CSS_LIGHTEST : '#f8f8f0'
-
-      drawStars(state)
-      if (state.screen === 'title') drawTitle(state, ink)
-      else if (state.screen === 'over') drawOver(state, ink)
-      else drawRun(state, ink)
-    },
-  }
+  game.onChange(refresh)
+  // The perfect flash decays continuously and nothing announces it, so the
+  // one thing the change callback cannot cover is polled — cheaply, and only
+  // fast enough to catch the blink.
+  window.setInterval(refresh, 60)
+  refresh()
 }

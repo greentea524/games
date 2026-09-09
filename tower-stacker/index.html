@@ -2,120 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- Content-Security-Policy (#101). Hardening, not a fix: these pages have
-         no XSS sink, no eval, and saves are parsed through shared/storage, so
-         nothing here is currently exploitable. What it buys is that the one
-         third-party script on the page — the analytics tag (#102) — is the
-         *only* third party the browser will ever talk to, and that a future
-         XSS sink meets a policy that already exists.
+    <!-- Content-Security-Policy, as on every page here (#101, #108).
 
-         Written off a measurement of what the pages actually request, not a
-         guess. Notes on the non-obvious parts:
-
-         - #102 dropped analytics, so every external host is gone from this
-           policy: nothing on these pages loads from an origin the repo does
-           not control. script-src, connect-src and img-src are 'self' and
-           local schemes only.
-         - scripts are 'self' plus one sha256 hash (#108). The hash covers the
-           inline pre-init sizing script, which is the only inline script left
-           on these pages — the analytics bootstrap was the other, and #102
-           removed it. `npm run qa:csp` recomputes the hash from this file and
-           fails if it does not match, because a stale hash fails *silently*:
-           the browser simply declines to run the script, and the shell never
-           sizes itself.
-         - style-src keeps 'unsafe-inline'. That same script builds a <style>
-           element at runtime with a computed width and height, and a stylesheet
-           written after the policy is served cannot be hashed ahead of it.
-         - data: and blob: for img/media because no game here loads art as a
-           file: the five Phaser games generate every sprite through canvas at
-           runtime, and this one draws its HUD into a canvas and its world out
-           of three.js primitives.
-         - nothing extra is needed for WebGL. A three.js game is still just
-           script and a canvas as far as this policy is concerned; it fetches
-           no shaders and no models, because both are inlined in the bundle.
-         - frame-ancestors and report-uri are deliberately absent: a meta CSP
-           ignores both, and including them only logs a console warning. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-tocenARxLNCLCKQwarBZsx3C+qtxhI395CjnNaqefDg='; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+         Note what is *absent*: there is no `sha256-` hash in `script-src`.
+         This page used to carry one, covering the inline script that sized
+         `#game` to a whole multiple of 160x144 before first paint. #119 moved
+         the game onto `shared/stage3d.ts`, which sizes itself from its
+         container through a ResizeObserver, so the inline script is gone and
+         the hash with it. `npm run qa:csp` checks both directions — every
+         inline script hashed, and every hash covering a script — so leaving
+         the hash behind would have failed rather than sat here granting
+         permission to nothing. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
-    <title>Tower Stacker - GB 3D Block Stacker</title>
-    <!-- Self-hosted: the Google Fonts copy is a third-party request that
-         fails closed. When it does not arrive the browser falls back to its
-         default serif, which is unreadable at these sizes in a pixel game.
-         font-display: block waits for it rather than flashing serif first. -->
-    <style>
-      @font-face {
-        font-family: 'Press Start 2P';
-        font-style: normal;
-        font-weight: 400;
-        font-display: block;
-        src: url('/games/fonts/press-start-2p-latin.woff2') format('woff2');
-      }
-    </style>
-    <script>
-      (function() {
-        var gbcW = 160, gbcH = 144;
-        var isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-        var availH = window.innerHeight - (isDesktop ? 250 : 380);
-        var zoom = Math.max(1, Math.min(
-          Math.floor((window.innerWidth - 40) / gbcW),
-          Math.floor(availH / gbcH)
-        ));
-        var style = document.createElement('style');
-        style.id = 'pre-init-game-style';
-        style.innerHTML = '#game { width: ' + (gbcW * zoom) + 'px; height: ' + (gbcH * zoom) + 'px; }';
-        document.head.appendChild(style);
-      })();
-    </script>
+    <title>Tower Stacker - drop the block, build the tower</title>
   </head>
   <body>
-    <div class="gb-shell">
-      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 400px; margin-bottom: 15px; padding: 0 10px; box-sizing: border-box;">
-        <div style="flex: 1; display: flex; justify-content: flex-start;">
-          <a href="https://greentea524.github.io/games/" style="color: #777; text-decoration: none; font-family: sans-serif; font-weight: bold; font-size: 0.9rem;">&lt; Games</a>
-        </div>
-        <div style="flex: 1; display: flex; justify-content: center;">
-          <div class="gb-logo" style="font-family: 'Press Start 2P', monospace; font-size: 10px; color: #555; text-shadow: -1px -1px 0px #222, 1px 1px 0px #ffffff; letter-spacing: 1.5px; margin-bottom: 0; white-space: nowrap;">TOWER STACKER</div>
-        </div>
-        <div style="flex: 1; display: flex; justify-content: flex-end;">
-          <button id="palette-toggle" title="Toggle MONO / COLOR Palette" style="display: flex; align-items: center; gap: 5px; background: #182018; border: 1.5px solid #8bac0f; padding: 3px 6px; border-radius: 12px; cursor: pointer; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.4); transition: all 0.2s;">
-            <span id="palette-label" style="font-family: 'Press Start 2P', monospace; font-size: 6px; color: #9bbc0f; letter-spacing: 0.5px;">MONO</span>
-            <div id="palette-track" style="position: relative; width: 20px; height: 10px; background: #0f140f; border-radius: 5px; border: 1px solid #306230; flex-shrink: 0; box-shadow: inset 0 1px 2px rgba(0,0,0,0.8); transition: all 0.2s;">
-              <div id="palette-knob" style="position: absolute; top: 1px; left: 1px; width: 6px; height: 6px; background: #9bbc0f; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.6); transition: transform 0.2s ease-in-out, background 0.2s;"></div>
-            </div>
-          </button>
-        </div>
-      </div>
-      <!-- The canvas is appended here by main.ts. There is no DOM overlay:
-           this game's HUD is drawn into the 160x144 render target itself, so
-           that its text is quantised and upscaled with everything else rather
-           than sitting on top of the shell at the display's resolution. -->
-      <div id="game"></div>
-
-      <div class="gb-controls">
-        <div class="d-pad">
-          <div class="d-center"></div>
-          <div class="d-btn d-up" data-key="ArrowUp">▲</div>
-          <div class="d-btn d-down" data-key="ArrowDown">▼</div>
-          <div class="d-btn d-left" data-key="ArrowLeft">◀</div>
-          <div class="d-btn d-right" data-key="ArrowRight">▶</div>
-        </div>
-        <div class="action-btns">
-          <div class="a-btn" data-key="KeyX">B</div>
-          <div class="a-btn" data-key="KeyZ">A</div>
-        </div>
-      </div>
-      <div class="sys-btns">
-        <div class="s-btn-container">
-          <div class="s-btn" id="btn-select"></div>
-          <span>SELECT</span>
-        </div>
-        <div class="s-btn-container">
-          <div class="s-btn" id="btn-start" data-key="Enter"></div>
-          <span>START</span>
-        </div>
-      </div>
-    </div>
+    <!-- The stage's parent. The canvas and the game's HUD overlay are both
+         appended here by shared/stage3d.ts; there is no bezel and no markup
+         for controls, because this game's control is the canvas itself. -->
+    <div id="stage"></div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

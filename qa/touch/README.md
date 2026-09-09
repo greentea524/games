@@ -69,32 +69,37 @@ alone:
   genuinely has, unlike Static
 - Pocket Dungeon's game-over panel dismissing on a canvas tap
 
-**`tower-stacker.mjs`** — the three.js game (#109), where what is under test
-is the *seam* rather than the rules. The overlap arithmetic lives in
+**`tower-stacker.mjs`** — the first three.js game (#110), moved off the
+GameBoy shell onto the standalone stage by #119. That rework deleted most of
+what this suite used to check: there is no d-pad, no A button, no 160x144
+backing store, and no palette toggle, so the checks for them went with it. The
+overlap arithmetic and the frustum derivation are in
 `tower-stacker/stack_test.ts` under `npm run qa:units`, because a CDP tap
 cannot hit a 0.04-unit perfect window and a check pretending otherwise would
-be flaky rather than strict. What only touch can prove is that the shell still
-works across a change of renderer:
+be flaky rather than strict.
 
-- A, the d-pad's down arm and START each drop a block — that is
-  `shared/dpad.ts` and `shared/buttons.ts` reaching a game with no Phaser in
-  it, through synthetic key events on `window`
-- the canvas is still a 160x144 backing store at an integer zoom, which is
-  what lets `canvasSpace` here match the helper in `grid.mjs`
-- the palette toggle still means something in 3D: MONO puts nothing but the
-  four DMG tones in the framebuffer, COLOR puts colours in it that MONO cannot
-  make, and both stay quantised to four levels per channel
+What is left for touch:
+
+- the whole canvas is the button — a tap in a corner drops the block, and one
+  tap is exactly one drop
 - the end screen's input lock absorbs a bounced press, and the best height
   survives a reload through `shared/storage`
-- the 340px branch, where `shell.css` shrinks the d-pad — a different path
-  through the pre-init sizing script than the one 390px takes
+- the stage's own contract: the canvas fills the viewport and its buffer is
+  scaled by the device pixel ratio, capped at 2
 
-It also carries **the DMG contrast guard for this game**, because
+It also carries **the contrast guard for this game**, because
 `npm run qa:contrast` cannot help here: that suite measures Phaser textures,
-and this game has none. The checks read the framebuffer instead and assert
-that the three visible face orientations each cover a real area in a different
-tone, and that a scanline across the tower's waist is solid rather than
-punched through with the sky tone.
+and this game has none. The four-tone version of that guard asked whether the
+tower was shaded across three DMG tones and none of them was the sky's. The
+question survives the palette even though the tones do not, so it is now asked
+in luminance: the dimmest part of the tower sits clear of the sky, the median
+is where the lighting rig was designed to put it, the faces spread across a
+real range rather than one flat value, and a scanline across the tower's waist
+is solid rather than punched through.
+
+The median is the one that catches the 1/PI Lambert bug, and it catches it
+loudly — 0.77 with the factor, 0.46 without. The spread catches it too but by
+a narrower margin, which is why both are there.
 
 **`tube-runner.mjs`** — the second three.js game (#111). Tower Stacker proved
 the shell reaches a non-Phaser game at all; what is new here is that Tube

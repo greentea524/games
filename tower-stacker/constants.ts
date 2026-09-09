@@ -1,27 +1,23 @@
-// Tower Stacker's fixed numbers (#110).
+// Tower Stacker's fixed numbers (#110, #119).
 //
-// The render target is 160x144 like every other game here, and for the same
-// reason: the shell pins `#game` to `aspect-ratio: 160 / 144` and upscales
-// with `image-rendering: pixelated`. It is also what lets the touch suite
-// reuse `canvasSpace` from `qa/touch/grid.mjs`, which assumes a 160-wide
-// canvas when it maps game space to client points.
-export const GBC_WIDTH = 160
-export const GBC_HEIGHT = 144
-
-// The classic DMG ramp, shared with the other four games. In 3D these are the
-// four tones the post pass quantises to, rather than four colours sprites are
-// drawn in — same palette, different mechanism.
-export const PAL = {
-  lightest: 0x9bbc0f,
-  light: 0x8bac0f,
-  dark: 0x306230,
-  darkest: 0x0f380f,
-}
-
-export const CSS_LIGHTEST = '#9bbc0f'
-export const CSS_DARKEST = '#0f380f'
-export const FONT = '"Press Start 2P", monospace'
+// What used to be here was mostly GameBoy: a 160x144 render target, the DMG
+// four-tone ramp, and the pixel font the 8px HUD drew in. #119 moved the game
+// onto `shared/stage3d.ts` — a full-resolution responsive canvas in full
+// colour — so none of that survives. The save key does, because it names data
+// already on players' machines and renaming it would silently reset every
+// stored best.
 
 /** Storage key and envelope version for the single saved best height. */
 export const SAVE_KEY = 'tower_stacker_save'
 export const SAVE_VERSION = 1
+
+/**
+ * The sky, and the outline every block carries.
+ *
+ * Dark, but not black. The blocks' dimmest visible face has to sit clearly
+ * above the background — see the lighting table in `game.ts` — and a pure
+ * black sky makes that easy to satisfy and easy to stop checking. A sky with
+ * a little luminance in it keeps the claim honest.
+ */
+export const SKY = 0x0e1420
+export const OUTLINE = 0x080b12
