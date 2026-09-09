@@ -1,17 +1,15 @@
-// Tower Stacker's renderer and loop: three.js under the GameBoy shell (#109, #110).
+// Tower Stacker's renderer and loop (#110, #119).
 //
-// The shell was built around Phaser, and everything it provides — the d-pad,
-// the palette toggle, the save, the hub card, the touch suite — has to keep
-// working across the seam to a second renderer. The two things that make that
-// possible — a 160x144 render target that CSS upscales, and a post pass that
-// quantises to four tones so MONO/COLOR still means something — landed here
-// first and now live in `shared/gb3d.ts`, where Tube Runner (#111) uses them
-// too. What is left in this file is Tower Stacker's own camera, lighting and
-// loop.
+// Built first inside the GameBoy shell — a 160x144 target upscaled by CSS, a
+// post pass quantising to four DMG tones, a d-pad — because #109 assumed that
+// was where a 3D game belonged. #118 settled that it is not: these are extra
+// games in the hub, not more GBC games. So this now runs on
+// `shared/stage3d.ts`, at the display's own resolution and in full colour.
 //
-// The rest of the shell needs no adapter at all: `shared/dpad.ts` and
-// `shared/buttons.ts` dispatch synthetic key events on `window`, so this reads
-// them with plain listeners and never touches Phaser.
+// What the rework deliberately did *not* touch is `stack.ts` and its test.
+// None of the overlap, slice, perfect-drop or speed arithmetic ever knew about
+// the palette, and a rework that also rewrote the rules would have made any
+// regression impossible to attribute.
 import * as THREE from 'three'
 import {
   BASE_BLOCK,
@@ -23,78 +21,65 @@ import {
   type Axis,
   type Block,
 } from './stack'
-import { PAL } from './constants'
-import { GB_HEIGHT, GB_WIDTH, createGb3d, gbIntensity } from '../shared/gb3d'
-import { createHud, type Screen } from './hud'
+import { OUTLINE, SKY } from './constants'
+import { HALF_HEIGHT, HALF_WIDTH, VIEW_DIR, frustumFor } from './framing'
+import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
+import { type Screen } from './hud'
 import { loadTowerSave, recordRun } from './save'
 import { playBlip, playLand, playMiss, playPerfect } from './audio'
 import { prefersReducedMotion } from '../shared/motion'
 
 
 /**
- * Base luminance every block is lit from.
+ * Base luminance every block is lit from, before the light touches it.
  *
- * In MONO this is the block's colour outright — a neutral grey — and that is
- * the point. The first attempt kept each block's hue in both modes and relied
- * on normalising it to this luminance, which is correct right up until the
- * lighting multiplies it: a saturated hue puts most of its luminance in one
- * channel, that channel saturates at 1.0 on the brightest face, and the *lost*
- * luminance drops the face a whole tone. Measured, a red block's top face came
- * back at 0.74 luma instead of 0.83 and landed on `light` instead of
- * `lightest`, so the tower rendered with no highlight at all.
+ * Every slab is normalised to this whatever its hue, which is what lets one
+ * arithmetic table below describe the whole game rather than one colour of it.
  *
- * Re-tinting on the toggle instead is also what the Phaser games here do —
- * Cart & Crate's `reloadPalette()` regenerates its textures rather than
- * trying to make one texture serve both palettes.
+ * It is also low enough that nothing clips. A saturated hue puts most of its
+ * luminance in one channel; if that channel reaches 1.0 on the brightest face,
+ * the luminance it would have carried past 1.0 is simply lost and the face
+ * comes back *darker* than the table says. Measured during #110, a red block's
+ * top face came back at 0.74 instead of 0.83. At this base the brightest face
+ * peaks at 0.83 and no channel saturates.
  */
 const BASE_LUMA = 0.58
 
 /**
- * Ambient and directional intensity, chosen together with `BASE_LUMA` so that
- * the three visible face orientations land in three *different* tones and none
- * of them lands in tone 0.
+ * Ambient and directional intensity, chosen together with `BASE_LUMA` so the
+ * three visible face orientations land at three clearly separated
+ * brightnesses, none of them near the sky's.
  *
  * This is the repo's most repeated defect handled structurally rather than by
  * inspection. CLAUDE.md counts six sprites that shipped invisible because they
- * were drawn in their background's tone; here the background is tone 0 by
- * construction (the scene clears to black) and the dimmest face any block can
- * present measures 0.448 luma — tone 1, with the tone-0 boundary at 0.25 a
- * long way below it. There is no lighting angle that can put a block face on
- * the sky's tone.
+ * were drawn in their background's tone. Here the equivalent would be a block
+ * face rendered at the sky's value, which would punch a hole in the tower
+ * rather than make a sprite vanish — so the rig is arranged to make that
+ * impossible rather than to make it unlikely.
  *
- * Worked through for MONO's neutral grey, with the light at `LIGHT_DIR` and
- * the camera at `VIEW_DIR` so the visible faces are +Y, +X and +Z. The grey
- * peaks at 0.827 on the brightest face, so nothing clips and the arithmetic
- * below is what the framebuffer actually contains:
+ * Worked through with the light at `LIGHT_DIR` and the camera at `VIEW_DIR`,
+ * so the visible faces are +Y, +X and +Z:
  *
- *   face   n.l     luma = BASE_LUMA * (AMBIENT + DIRECTIONAL * n.l)   tone
- *   +Y     0.838   0.58 * (0.42 + 1.20 * 0.838) = 0.827               3 lightest
- *   +X     0.461   0.58 * (0.42 + 1.20 * 0.461) = 0.564               2 light
- *   +Z     0.293   0.58 * (0.42 + 1.20 * 0.293) = 0.448               1 dark
+ *   face   n.l     BASE_LUMA * (AMBIENT + DIRECTIONAL * n.l)
+ *   +Y     0.838   0.58 * (0.42 + 1.20 * 0.838) = 0.827
+ *   +X     0.461   0.58 * (0.42 + 1.20 * 0.461) = 0.564
+ *   +Z     0.293   0.58 * (0.42 + 1.20 * 0.293) = 0.448
  *
- * The intensities go through `gbIntensity`, which carries the 1/PI factor
- * three's Lambert BRDF applies — see the note on it in `shared/gb3d.ts`.
+ * Against `SKY` at 0.076, the dimmest face any block can present is six times
+ * the background's luminance, and no lighting angle can close that.
  *
- * `qa/touch/tower-stacker.mjs` reads these back out of the framebuffer, so the
- * arithmetic is checked against the image rather than trusted.
+ * The intensities go through `lambertIntensity`, which carries the 1/PI factor
+ * three's Lambert BRDF applies — see the note on it in `shared/stage3d.ts`.
+ *
+ * These are the values *before* the renderer's colour management encodes the
+ * frame for display, which lifts them: what actually reaches the framebuffer
+ * is nearer 0.90, 0.78 and 0.69. `qa/touch/tower-stacker.mjs` measures the
+ * frame rather than trusting this table, which is the only reason the
+ * difference is safe to leave written down here.
  */
 const AMBIENT = 0.42
 const DIRECTIONAL = 1.2
 const LIGHT_DIR = new THREE.Vector3(0.55, 1, 0.35)
-
-/** Camera direction from its target. Sees the +X, +Y and +Z faces. */
-const VIEW_DIR = new THREE.Vector3(1, 0.867, 1)
-
-/**
- * How much of the world the camera shows, in world units of height.
- *
- * Sized off the slide rather than off the tower: the moving block reaches
- * 1.15 either side of centre plus its own half-width, which projects to about
- * 1.52 units of screen width, and the frustum is 2.0 half-widths across. A
- * block that slid off the edge of the screen would be a game asking for a
- * decision the player cannot see.
- */
-const FRUSTUM_HEIGHT = 3.6
 
 /** Seconds the end-of-run screen ignores input, matching shared/runSummary. */
 const OVER_LOCK = 0.5
@@ -146,44 +131,98 @@ export interface TowerGame {
   perfects(): number
   /** Drops the run has resolved, misses included. */
   drops(): number
-  /** MONO rather than COLOR. */
-  mono(): boolean
-  setPalette(mono: boolean): void
-  /** Reads the framebuffer back, for the palette and contrast checks. */
-  readPixels(): Uint8Array
-  /** Start, or retry from the end screen. Same thing the A button does. */
+  /** The run that just ended beat the stored best. */
+  isRecord(): boolean
+  /** 1 just after a perfect drop, decaying to 0. Drives the HUD's flash. */
+  perfectFlash(): number
+  /** Seconds since load, for the HUD's blinking prompts. */
+  clock(): number
+  /** Start, or retry from the end screen. */
   press(): void
+  stage: Stage3D
+  onChange(fn: () => void): void
 }
 
 export function createGame(parent: HTMLElement): TowerGame {
+  // ------------------------------------------------------------------ camera
+  //
+  // Before the stage, and deliberately: the stage measures its container and
+  // calls `onResize` while it is still being constructed, so anything that
+  // callback touches has to exist already. Declared after it, `camera` is in
+  // its temporal dead zone at that moment and the game throws on load.
+
+  // Orthographic, as it always was: the tower is read by comparing the edges
+  // of two slabs, and perspective makes the upper one narrower than the lower
+  // whether or not it overhangs.
+  const camera = new THREE.OrthographicCamera(-HALF_WIDTH, HALF_WIDTH, HALF_HEIGHT, -HALF_HEIGHT, 0.1, 120)
+  const viewOffset = new THREE.Vector3(VIEW_DIR.x, VIEW_DIR.y, VIEW_DIR.z).normalize().multiplyScalar(24)
+
+  /** Fits the frustum to the canvas. The arithmetic is in `framing.ts`. */
+  function fitFrustum(width: number, height: number) {
+    const { halfWidth, halfHeight } = frustumFor(width, height)
+    camera.left = -halfWidth
+    camera.right = halfWidth
+    camera.top = halfHeight
+    camera.bottom = -halfHeight
+    camera.updateProjectionMatrix()
+  }
+
   // ---------------------------------------------------------------- renderer
 
-  const hud = createHud()
-  const gb = createGb3d({ parent, hudCanvas: hud.canvas, ramp: PAL })
+  const stage = createStage3D({ parent, background: SKY, onResize: fitFrustum })
+  const size = stage.size()
+  fitFrustum(size.width, size.height)
 
   // ------------------------------------------------------------------- scene
 
   const scene = new THREE.Scene()
+  scene.background = new THREE.Color(SKY)
 
-  // Declared up here because `blockColour` below reads it: the palette decides
-  // what colour a block is made, not just how it is post-processed.
-  let mono = true
-
-  const aspect = GB_WIDTH / GB_HEIGHT
-  const camera = new THREE.OrthographicCamera(
-    (-FRUSTUM_HEIGHT * aspect) / 2,
-    (FRUSTUM_HEIGHT * aspect) / 2,
-    FRUSTUM_HEIGHT / 2,
-    -FRUSTUM_HEIGHT / 2,
-    0.1,
-    120,
-  )
-  const viewOffset = VIEW_DIR.clone().normalize().multiplyScalar(24)
-
-  const light = new THREE.DirectionalLight(0xffffff, gbIntensity(DIRECTIONAL))
+  const light = new THREE.DirectionalLight(0xffffff, lambertIntensity(DIRECTIONAL))
   light.position.copy(LIGHT_DIR)
   scene.add(light)
-  scene.add(new THREE.AmbientLight(0xffffff, gbIntensity(AMBIENT)))
+  scene.add(new THREE.AmbientLight(0xffffff, lambertIntensity(AMBIENT)))
+
+  /**
+   * The star field, as points in the world rather than pixels in the HUD.
+   *
+   * In the GameBoy build this was drawn into the 2D HUD surface and scrolled
+   * by hand against the camera height, which meant the field had to be told
+   * how far the run had come. In the scene it simply is where it is, and the
+   * camera rising through it is the parallax — one fewer thing that can drift
+   * out of step with the tower.
+   *
+   * Deterministic rather than random, for the reason it always was: a field
+   * that reshuffles on every retry reads as noise, and climbing past a field
+   * you recognise is what makes the height legible.
+   */
+  const STAR_COUNT = 320
+  const STAR_SPREAD = 26
+  const STAR_TOP = 180
+  const starPositions = new Float32Array(STAR_COUNT * 3)
+  for (let i = 0; i < STAR_COUNT; i++) {
+    // A cheap hash of the index, so the layout is stable across reloads
+    // without shipping a table of coordinates.
+    const a = Math.sin(i * 12.9898) * 43758.5453
+    const b = Math.sin(i * 78.233) * 12345.6789
+    const c = Math.sin(i * 39.4251) * 24634.6345
+    const frac = (n: number) => n - Math.floor(n)
+    starPositions[i * 3] = (frac(a) - 0.5) * STAR_SPREAD * 2
+    starPositions[i * 3 + 1] = frac(b) * STAR_TOP - 8
+    // Pushed behind the tower. The far plane is 120 from the camera and the
+    // camera sits 24 back, so anything much deeper than this is clipped away.
+    starPositions[i * 3 + 2] = (frac(c) - 0.5) * STAR_SPREAD * 2 - 20
+  }
+  const starGeometry = new THREE.BufferGeometry()
+  starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
+  const stars = new THREE.Points(
+    starGeometry,
+    // `sizeAttenuation` off: under an orthographic camera there is no
+    // perspective for it to work with, and leaving it on renders every star at
+    // a size derived from a division that means nothing here.
+    new THREE.PointsMaterial({ color: 0x4a5f80, size: 2, sizeAttenuation: false }),
+  )
+  scene.add(stars)
 
   // One geometry for every block. A unit box scaled per mesh costs one
   // buffer instead of one per slab, which matters on a tower that can run to
@@ -193,36 +232,34 @@ export function createGame(parent: HTMLElement): TowerGame {
   // The outline CLAUDE.md prescribes: "when a light feature lands on the light
   // floor, outline it — do not retone it". Two slabs of the same size stacked
   // flush present the same face at the same angle, so without an edge they
-  // merge into one column and the tower stops reading as a stack. One pixel of
-  // `darkest` at each boundary is what separates them; on the silhouette it
-  // costs a pixel to the sky, which is the trade that note describes.
-  const edgeMaterial = new THREE.LineBasicMaterial({ color: PAL.darkest })
+  // merge into one column and the tower stops reading as a stack. A dark line
+  // at each boundary is what separates them; on the silhouette it costs a
+  // pixel to the sky, which is the trade that note describes.
+  //
+  // #119 flagged this as worth carrying forward, and it was right to: it was
+  // reasoned about as a DMG palette problem and it never was one. It is a
+  // shading problem, and two flush slabs of the same size present the same
+  // face at the same angle in full colour exactly as they did in four tones.
+  const edgeMaterial = new THREE.LineBasicMaterial({ color: OUTLINE })
 
   /**
-   * The colour to build the slab at `level` in, for the palette now selected.
+   * The colour to build the slab at `level` in: a hue that walks with height,
+   * normalised to a fixed luminance.
    *
-   * MONO gets a neutral grey — every slab identical, so the three visible face
-   * orientations land in the three tones the table above works out, on every
-   * block of every tower. COLOR gets a walking hue, so the climb reads as a
-   * gradient; there the per-channel quantise keeps the hue and a clipped
-   * channel just means a bright face, which is what it should mean.
+   * The normalisation is what the lighting table depends on. Every slab is the
+   * same brightness whatever its hue, so the three visible face orientations
+   * land at the same three luminances on every block of every tower — which is
+   * what lets a single arithmetic table describe the whole game rather than
+   * one colour of it.
+   *
+   * There used to be a greyscale alternative here for the GameBoy shell's MONO
+   * switch. It is gone with the shell; the clipping hazard that shaped it is
+   * not — see `BASE_LUMA`.
    */
   function blockColour(level: number): THREE.Color {
-    if (mono) return new THREE.Color(BASE_LUMA, BASE_LUMA, BASE_LUMA)
     const c = new THREE.Color().setHSL((level * 0.062) % 1, 0.52, 0.6)
     const luma = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
     return c.multiplyScalar(BASE_LUMA / Math.max(luma, 1e-4))
-  }
-
-  /** Repaints every slab for the current palette. The toggle's other half. */
-  function retint() {
-    const paint = (mesh: THREE.Mesh) => {
-      const mat = mesh.material as THREE.MeshLambertMaterial
-      mat.color.copy(blockColour(mesh.userData.level as number))
-    }
-    for (const m of meshes) paint(m)
-    for (const c of chips) paint(c.mesh)
-    if (movingMesh) paint(movingMesh)
   }
 
   function makeBlockMesh(block: Block, level: number, y: number): THREE.Mesh {
@@ -241,7 +278,6 @@ export function createGame(parent: HTMLElement): TowerGame {
       polygonOffsetUnits: 1,
     })
     const mesh = new THREE.Mesh(unitBox, material)
-    // `retint` needs this to recompute the hue when the palette changes.
     mesh.userData.level = level
     mesh.scale.set(block.w, 1, block.d)
     mesh.position.set(block.x, y, block.z)
@@ -271,6 +307,17 @@ export function createGame(parent: HTMLElement): TowerGame {
   let flashMesh: THREE.MeshLambertMaterial | null = null
   let flashAmount = 0
   let elapsed = 0
+
+  const listeners: (() => void)[] = []
+  /**
+   * Told on the moments that change what the HUD says, not every frame.
+   *
+   * The one thing it cannot cover is the perfect-drop flash, which decays
+   * continuously — the HUD polls `perfectFlash()` for that. Driving the whole
+   * HUD from the loop instead would rebuild its DOM sixty times a second to
+   * change a number that moves a few times a minute.
+   */
+  const notify = () => listeners.forEach((fn) => fn())
 
   const height = () => stack.length - 1
   const currentAxis = (): Axis => axisFor(height())
@@ -353,12 +400,14 @@ export function createGame(parent: HTMLElement): TowerGame {
     }
     cameraY = blockY(stack.length - 1)
     screen = 'title'
+    notify()
   }
 
   function startRun() {
     reset()
     screen = 'run'
     spawnMoving()
+    notify()
   }
 
   function endRun() {
@@ -368,6 +417,7 @@ export function createGame(parent: HTMLElement): TowerGame {
     best = result.best
     isRecord = result.isRecord
     playMiss()
+    notify()
   }
 
   /** The A button, and the only verb the game has. */
@@ -441,9 +491,9 @@ export function createGame(parent: HTMLElement): TowerGame {
       streak++
       perfects++
       perfectFlash = 1
-      // Signalled loudly, in three places at once: the slab flashes to the
-      // lightest tone, the shake is doubled, and the HUD says so. #110 calls
-      // this the only skill expression in the game.
+      // Signalled loudly, in three places at once: the slab flashes bright,
+      // the shake is doubled, and the HUD says so. #110 calls this the only
+      // skill expression in the game.
       flashMesh = movingMesh.material as THREE.MeshLambertMaterial
       flashAmount = 1
       playPerfect(streak)
@@ -457,6 +507,7 @@ export function createGame(parent: HTMLElement): TowerGame {
     movingMesh = null
     levelTime = 0
     spawnMoving()
+    notify()
   }
 
   // ---------------------------------------------------------------- the loop
@@ -496,8 +547,7 @@ export function createGame(parent: HTMLElement): TowerGame {
       }
     }
 
-    // The perfect flash, decayed on the material's emissive so it reads
-    // through the palette quantise as a jump to the lightest tone.
+    // The perfect flash, decayed on the material's emissive.
     if (flashMesh) {
       flashAmount = Math.max(0, flashAmount - dt * 3.5)
       flashMesh.emissive.setScalar(flashAmount * 0.5)
@@ -520,20 +570,12 @@ export function createGame(parent: HTMLElement): TowerGame {
     camera.position.copy(lookTarget).add(viewOffset)
     camera.lookAt(lookTarget)
 
-    hud.draw({
-      screen,
-      height: height(),
-      best,
-      streak,
-      perfectFlash,
-      isRecord,
-      mono,
-      reducedMotion: prefersReducedMotion(),
-      cameraY,
-      t: elapsed,
-    })
-    gb.needsHudUpdate()
-    gb.present(scene, camera)
+    // The star field parallaxes because it is *in* the scene rather than
+    // painted behind it: the camera rises through it, so the sense of climbing
+    // costs nothing to keep in step with the tower. In the GameBoy build this
+    // was scrolled by hand in HUD space against `cameraY`, which had to be
+    // told how far the run had come.
+    stage.render(scene, camera)
 
     requestAnimationFrame(frame)
   }
@@ -550,13 +592,13 @@ export function createGame(parent: HTMLElement): TowerGame {
     streak: () => streak,
     perfects: () => perfects,
     drops: () => drops,
-    mono: () => mono,
-    setPalette(next) {
-      mono = next
-      gb.setPalette(next)
-      retint()
-    },
-    readPixels: gb.readPixels,
+    isRecord: () => isRecord,
+    perfectFlash: () => perfectFlash,
+    clock: () => elapsed,
     press,
+    stage,
+    onChange(fn) {
+      listeners.push(fn)
+    },
   }
 }

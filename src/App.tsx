@@ -120,7 +120,7 @@ const GAME_SECTIONS: GameSection[] = [
         image: thumbTowerStacker,
         href: `${import.meta.env.BASE_URL}tower-stacker/`,
         description:
-          "A GameBoy-styled 3D block stacker. Drop each slab on the one below, watch the overhang get sliced away, and climb.",
+          "Drop each slab on the one below, watch the overhang get sliced away, and climb. A clean drop keeps the slab whole.",
       },
       {
         title: "Minigolf",

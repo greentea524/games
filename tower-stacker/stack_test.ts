@@ -23,6 +23,7 @@
 //     when re-running this by hand: at 0.25 the checks at the top of the file
 //     drop through the perfect branch, `r.chip` is null, and the run dies on
 //     a TypeError before it reaches the checks the change is aimed at.
+import { HALF_HEIGHT, HALF_WIDTH, frustumFor, neededHalfWidth } from './framing'
 import {
   BASE_BLOCK,
   PERFECT_EPS,
@@ -239,6 +240,63 @@ const moverAt = (top: Block, axis: Axis, offset: number): Block =>
   check(
     'the axis alternates every level',
     [0, 1, 2, 3, 4, 5].every((n) => axisFor(n) !== axisFor(n + 1)),
+  )
+}
+
+// --- the camera shows the whole slide (#119) -------------------------------
+//
+// Not stacking arithmetic, but it lives or dies by the same numbers. On the
+// GameBoy shell the frustum was one hand-picked size for one aspect ratio; on
+// a canvas that is whatever shape the window is, the width the slide needs has
+// to be derived, and `framing.ts` derives it. This is what makes that
+// derivation load-bearing rather than decorative.
+
+{
+  const needed = neededHalfWidth()
+  check(
+    'the camera is wide enough for the block at the end of its travel',
+    HALF_WIDTH >= needed,
+    `shows ${HALF_WIDTH.toFixed(3)}, needs ${needed.toFixed(3)}`,
+  )
+  check(
+    'with margin, so the decision is not made against the bezel',
+    HALF_WIDTH / needed >= 1.03 && HALF_WIDTH / needed <= 1.25,
+    `${(HALF_WIDTH / needed).toFixed(3)}x`,
+  )
+}
+
+{
+  // Every shape of screen the games are actually played on, and one absurd
+  // one. The frustum must never be narrower than the slide, whatever the
+  // aspect — which is exactly what holding the height alone got wrong.
+  const shapes: [number, number][] = [
+    [390, 844],
+    [414, 896],
+    [768, 1024],
+    [900, 640],
+    [1440, 900],
+    [2560, 1080],
+    [300, 1200],
+  ]
+  const narrow = shapes.filter(([w, h]) => frustumFor(w, h).halfWidth < neededHalfWidth())
+  check(
+    'and stays wide enough at every shape of screen',
+    narrow.length === 0,
+    narrow.length ? `${narrow[0][0]}x${narrow[0][1]} is too narrow` : `${shapes.length} shapes`,
+  )
+  const short = shapes.filter(([w, h]) => frustumFor(w, h).halfHeight < HALF_HEIGHT - 1e-9)
+  check('and never shorter than the tower needs', short.length === 0)
+}
+
+{
+  // The rule that used to be in force, put back: hold the height and let the
+  // width follow the aspect. It is the obvious thing to do, it is what the
+  // shared stage's `track` does, and on a phone it crops the slide.
+  const holdHeight = (w: number, h: number) => HALF_HEIGHT * (w / h)
+  check(
+    'holding the height alone is caught',
+    holdHeight(390, 844) < neededHalfWidth(),
+    `a 390x844 phone would show ${holdHeight(390, 844).toFixed(2)} against ${neededHalfWidth().toFixed(2)} needed`,
   )
 }
 

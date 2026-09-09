@@ -1,9 +1,16 @@
-// How Tower Stacker wants to be photographed (#124).
+// How Tower Stacker wants to be photographed (#124, #119).
+//
+// Unchanged by the move off the GameBoy shell, which is the point: it drives
+// the game through `press`, `moving` and `stack`, none of which knew anything
+// about the palette or the 160x144 target. Only the viewport below is new —
+// the canvas is whatever shape it is given now, rather than a fixed box.
 //
 // Its title screen is a card and a decorative tower, which says nothing about
 // the verb. What the thumbnail should show is a tower part-built with visible
 // ledges and the next slab still sliding — so the drop is legible as the thing
 // you do. Driven through `window.__game`, which `?qa=1` publishes.
+export const viewport = { width: 900, height: 690 }
+
 export async function pose(page) {
   await page.evaluate(async () => {
     const g = window.__game
