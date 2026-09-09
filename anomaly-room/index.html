@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Content-Security-Policy, as on every page here (#101, #108).
+
+         No `sha256-` hash in `script-src`, and that absence is deliberate:
+         the GameBoy pages carry one because they run an inline script to size
+         `#game` before first paint, and a standalone 3D game has no inline
+         script at all — `shared/stage3d.ts` sizes itself from its container
+         through a ResizeObserver. `npm run qa:csp` checks both directions, so
+         a hash copied over from those pages would fail rather than sit here
+         granting permission to nothing.
+
+         `media-src` covers no files: this game's drone and stingers are
+         synthesised by `anomaly-room/audio.ts` through the Web Audio API,
+         which needs no source permission at all. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <title>Anomaly Room - spot what changed</title>
+  </head>
+  <body>
+    <!-- The stage's parent. The canvas and the game's HUD overlay are both
+         appended here by shared/stage3d.ts; there is no bezel and no markup
+         for controls, because this game's control is the canvas itself. -->
+    <div id="stage"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

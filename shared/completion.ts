@@ -155,6 +155,50 @@ function tiltMazeStatus(): GameStatus {
 }
 
 /**
+ * Minigolf: a round has a total, and lower is better.
+ *
+ * The only game here whose score improves by going *down*, which is why the
+ * badge says "Best 9" rather than a level or a height — a number with no
+ * direction would read as progress rather than as a round.
+ */
+function minigolfStatus(): GameStatus {
+  const d = readPayload('minigolf_save')
+  if (!d) return NONE
+  const best = typeof d.best === 'number' ? d.best : 0
+  const rounds = typeof d.rounds === 'number' ? d.rounds : 0
+  if (rounds === 0 || best === 0) return NONE
+  return { completed: true, progress: `Best ${best}` }
+}
+
+/**
+ * Rounds found in the best run, which is the only number worth showing: a run
+ * ends either cleared or out of guesses, so "runs played" says nothing about
+ * how well any of them went.
+ */
+function anomalyRoomStatus(): GameStatus {
+  const d = readPayload('anomaly_room_save')
+  if (!d) return NONE
+  const best = typeof d.best === 'number' ? d.best : 0
+  const cleared = typeof d.cleared === 'number' ? d.cleared : 0
+  if (best === 0) return NONE
+  return { completed: cleared > 0, progress: `Best ${best}` }
+}
+
+/**
+ * Fewest digs a find has been named in. Lower is better, like Minigolf's
+ * round, so an unset best is 0 rather than a large number that would read as
+ * a good score.
+ */
+function voxelDiggerStatus(): GameStatus {
+  const d = readPayload('voxel_digger_save')
+  if (!d) return NONE
+  const best = typeof d.best === 'number' ? d.best : 0
+  const finds = typeof d.finds === 'number' ? d.finds : 0
+  if (finds === 0 || best === 0) return NONE
+  return { completed: true, progress: `Best ${best}` }
+}
+
+/**
  * Status for each local game, keyed by the id used on the hub. Games hosted
  * elsewhere are absent — the hub cannot read another origin's storage, and
  * pretending otherwise would badge them permanently unplayed.
@@ -169,5 +213,8 @@ export function readStatuses(): Record<string, GameStatus> {
     'tower-stacker': towerStackerStatus(),
     'tube-runner': tubeRunnerStatus(),
     'tilt-maze': tiltMazeStatus(),
+    minigolf: minigolfStatus(),
+    'anomaly-room': anomalyRoomStatus(),
+    'voxel-digger': voxelDiggerStatus(),
   }
 }

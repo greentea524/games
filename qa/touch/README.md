@@ -130,6 +130,37 @@ what it measures. This is the same shape of gap `qa/contrast/README.md` records
 for the HUD relic pips, and it is written down for the same reason: an
 unguarded surface that nobody knows is unguarded is how #84 shipped.
 
+**`minigolf.mjs`** — the third three.js game (#113), on the standalone stage
+(#118). The course itself is checked headless in `minigolf/course_test.ts` and
+`minigolf/rest_test.ts`; what is here is the slingshot drag, because that
+control is the part #113 had to be redesigned around. The original issue
+specified a charging meter on a d-pad — a reasonable design for a 160x144
+shell, and meaningless once the game got its own canvas — so the gesture is
+new code with nothing else covering it.
+
+The checks worth knowing about are the two that assert a stroke did *not*
+happen: a pull that ends back at the ball plays nothing, and a tap with a
+two-pixel wobble plays nothing. A mis-started drag that gets played costs a
+stroke the player never took, which is unrecoverable in a game scored by
+counting them.
+
+**`anomaly-room.mjs`** — the third standalone game (#114). The rules it plays
+by — that nothing is ever changed while it is on screen, and that every change
+is visible from where the player stands — are in
+`anomaly-room/anomaly_test.ts` under `npm run qa:units`, against real frustum
+and raycast maths.
+
+What is here is the seam, and for this game the seam carries unusual weight: a
+drag and a tap arrive through exactly the same events, and the game tells them
+apart only by how far the pointer moved. So the suite drives both, and checks
+the two negatives as carefully as the positives — that six full drags around
+the room cost no guesses, and that tapping a wall is neither right nor wrong.
+
+Objects are located through the game's own `probe`, which resolves a screen
+point exactly the way `flag` does. A suite that worked out where things were
+with its own copy of the projection would be checking its own arithmetic, and
+could pass while tapping flagged something else entirely.
+
 **`zoom.mjs`** — the double-tap zoom guard (`shared/noZoom.ts`), in all five
 games. The zoom itself cannot be reproduced here, because Chromium honours
 `user-scalable=no` and never zooms; it is iOS Safari, which ignores that meta,
@@ -205,6 +236,25 @@ the DOM.
   first write. Where a defect is known — the #66 double-advance, or Tower
   Stacker's `LAMBERT_PI` — put it back temporarily and watch the check go red
   before trusting it.
+- **An exploratory gesture is still a gesture.** The aim checks pull the
+  contact around to prove direction and power track the drag — and the release
+  at the end of that was a real stroke, which on the short hole banked in and
+  advanced to the next one. Every check after it was reading a different hole,
+  and the stroke-count assertion failed by comparing across two of them. Land
+  the contact back where it started, or reset the game, before checking
+  anything that counts.
+- **Do not run two browser suites against one dev server.** Two Chromium
+  instances holding WebGL contexts on the same page lost one of them mid-run,
+  and the symptom was `window.__game` going undefined in a suite that had been
+  passing for a fortnight — which reads exactly like the game failing to
+  initialise.
+- **A CDP tap is not a fast tap.** `hand.tap` holds for 120ms, but the round
+  trips around it put roughly half a second between `pointerdown` and
+  `pointerup`. A game that classified a press as a tap only if it was released
+  inside 350ms ignored every tap the suite sent, and the symptom — input
+  apparently doing nothing — looked nothing like a timing threshold. The
+  threshold was wrong for people too, which is the real lesson: a press that
+  never moves is a tap however long it is held.
 
 ## Requirements
 

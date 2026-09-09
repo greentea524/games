@@ -1,0 +1,91 @@
+/* Voxel Digger's HUD. Real DOM over the canvas — see voxel-digger/hud.ts. */
+
+.vd-status {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(10, 14, 20, 0.62);
+  border: 1px solid rgba(214, 226, 240, 0.16);
+  backdrop-filter: blur(6px);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vd-digs { font-weight: 600; }
+.vd-exposed { color: #9db2c8; }
+
+.vd-btn {
+  pointer-events: auto;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 226, 240, 0.24);
+  background: rgba(214, 226, 240, 0.08);
+  color: #e8eff6;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.vd-btn:disabled { opacity: 0.4; cursor: default; }
+.vd-undo {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+}
+.vd-btn-primary { background: #e0a13c; border-color: #e0a13c; color: #201603; }
+.vd-btn-primary:hover, .vd-btn-primary:focus-visible { background: #f2c46a; }
+
+.vd-guesses {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+.vd-guess-label { margin: 0; font-size: 0.8rem; color: #9db2c8; }
+.vd-guess-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.vd-guess { padding: 9px 16px; font-size: 0.86rem; }
+
+.vd-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: min(90vw, 460px);
+  text-align: center;
+  font-size: 0.82rem;
+  color: #9db2c8;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+}
+
+.vd-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  background: rgba(6, 9, 14, 0.74);
+  backdrop-filter: blur(3px);
+  text-align: center;
+}
+.vd-panel-title { margin: 0; font-size: clamp(1.5rem, 5.5vw, 2.2rem); font-weight: 700; }
+.vd-panel-body { margin: 0 0 6px; color: #9db2c8; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vd-status, .vd-panel { backdrop-filter: none; }
+}
