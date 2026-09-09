@@ -35,6 +35,9 @@ export default defineConfig({
         'tilt-maze': fileURLToPath(
           new URL('./tilt-maze/index.html', import.meta.url),
         ),
+        'voxel-digger': fileURLToPath(
+          new URL('./voxel-digger/index.html', import.meta.url),
+        ),
         'anomaly-room': fileURLToPath(
           new URL('./anomaly-room/index.html', import.meta.url),
         ),

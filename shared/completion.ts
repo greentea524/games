@@ -185,6 +185,20 @@ function anomalyRoomStatus(): GameStatus {
 }
 
 /**
+ * Fewest digs a find has been named in. Lower is better, like Minigolf's
+ * round, so an unset best is 0 rather than a large number that would read as
+ * a good score.
+ */
+function voxelDiggerStatus(): GameStatus {
+  const d = readPayload('voxel_digger_save')
+  if (!d) return NONE
+  const best = typeof d.best === 'number' ? d.best : 0
+  const finds = typeof d.finds === 'number' ? d.finds : 0
+  if (finds === 0 || best === 0) return NONE
+  return { completed: true, progress: `Best ${best}` }
+}
+
+/**
  * Status for each local game, keyed by the id used on the hub. Games hosted
  * elsewhere are absent — the hub cannot read another origin's storage, and
  * pretending otherwise would badge them permanently unplayed.
@@ -201,5 +215,6 @@ export function readStatuses(): Record<string, GameStatus> {
     'tilt-maze': tiltMazeStatus(),
     minigolf: minigolfStatus(),
     'anomaly-room': anomalyRoomStatus(),
+    'voxel-digger': voxelDiggerStatus(),
   }
 }

@@ -29,6 +29,7 @@ const PAGES = [
   'tilt-maze/index.html',
   'minigolf/index.html',
   'anomaly-room/index.html',
+  'voxel-digger/index.html',
 ]
 
 let ok = true
