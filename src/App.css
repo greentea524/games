@@ -217,12 +217,33 @@
   transform: translateY(-2px);
 }
 
+/* The house frame (#123).
+ *
+ * Fourteen cards carry three kinds of picture — painted art for five GameBoy
+ * games, captures of the running game for six, and hand-taken screenshots for
+ * the three hosted elsewhere. The rule about where each comes from is in
+ * `qa/thumbnails.mjs`; this is the other half of the answer, and the half that
+ * costs nothing per card: whatever the picture is, it is presented the same
+ * way.
+ *
+ * A mat rather than a bleed. The pictures have wildly different grounds — a
+ * near-black 3D room next to a bright painted village — and edge-to-edge they
+ * read as a patchwork. A few pixels of consistent ground around every one
+ * gives the grid a single rhythm, and a new card inherits it without anyone
+ * deciding anything.
+ *
+ * The scaling that matters happens at capture time, not here: a pixel game is
+ * integer-scaled to the house size by `scripts/thumbnail.mjs`. By the time the
+ * hub sees it, it is a 640x478 photograph like any other, and asking for
+ * `image-rendering: pixelated` at the card's ~300px display width would be
+ * asking a downscale to keep hard pixels, which only makes it crunch. */
 .game-thumb-link {
   display: block;
   overflow: hidden;
   border-radius: 12px;
   aspect-ratio: 4 / 3;
-  background: rgba(0, 0, 0, 0.2);
+  padding: 6px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.28));
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -231,7 +252,7 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 12px;
+  border-radius: 7px;
   transition: transform 0.3s ease;
 }
 
