@@ -1,8 +1,17 @@
-// Tube Runner's renderer and loop (#111).
+// Tube Runner's renderer and loop (#111, #120).
 //
-// The pipeline — a 160x144 target, the four-tone post pass, the HUD composite
-// — is `shared/gb3d.ts`. What is here is the tube, the ring pool, the fog, and
-// the loop that moves the player down it.
+// Built first inside the GameBoy shell — a 160x144 target, a four-tone post
+// pass, a composited 8px HUD — because #109 assumed that was where a 3D game
+// belonged. #118 settled that it is not, and #120 moved this onto
+// `shared/stage3d.ts`: the display's own resolution, full colour, and the fog
+// doing the depth work with nothing quantised on top of it.
+//
+// `track.ts` and its test are untouched. The reachability bound is the heart
+// of the game and never knew about the palette, and a rework that also
+// rewrote the rules would have made any regression impossible to attribute.
+//
+// What is here is the tube, the ring pool, the fog, and the loop that moves
+// the player down it.
 //
 // Two things #111 asks for shape almost every decision below:
 //
@@ -30,9 +39,9 @@ import {
   seededRandom,
   speedAt,
 } from './track'
-import { PAL } from './constants'
-import { GB_HEIGHT, GB_WIDTH, createGb3d, gbIntensity } from '../shared/gb3d'
-import { createHud, type Screen } from './hud'
+import { OUTLINE } from './constants'
+import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
+import type { Screen } from './hud'
 import { loadTubeSave, recordRun } from './save'
 import { playBlip, playClear, playCrash, ensureCtx } from './audio'
 import { prefersReducedMotion } from '../shared/motion'
@@ -52,19 +61,25 @@ import { prefersReducedMotion } from '../shared/motion'
  * With `AMBIENT = 0.55` and `DIRECTIONAL = 0.85`, and each surface's base
  * luminance chosen against that:
  *
- *   surface   base   luma = base * (AMBIENT + DIRECTIONAL * n.l)   tone
- *   ring      0.62   0.62 * 1.40 = 0.868                           3 lightest
- *   rib       1.00   1.00 * 0.55 = 0.550                           2 light
- *   wall      0.60   0.60 * 0.55 = 0.330                           1 dark
- *   sky       —      the scene clears to black                     0 darkest
+ *   surface   base   luma = base * (AMBIENT + DIRECTIONAL * n.l)
+ *   ring      0.62   0.62 * 1.40 = 0.868
+ *   rib       1.00   1.00 * 0.55 = 0.550
+ *   wall      0.60   0.60 * 0.55 = 0.330
+ *   sky       —      the scene clears to black
  *
- * Nothing clips — the brightest value in the table is 0.868 — so this is what
- * the framebuffer contains, not an approximation of it, and
- * `qa/touch/tube-runner.mjs` reads it back to check.
+ * Nothing clips — the brightest value in the table is 0.868 — so the ordering
+ * is real and not an artefact of rounding.
  *
- * Fog then walks each of those *down* the ramp with distance, which is how a
- * ring resolves: it emerges from the sky's tone, becomes `dark`, then `light`,
- * and is only unambiguously an obstacle once it is `lightest`.
+ * #120 removed the four-tone quantiser this was originally written against,
+ * and was explicit that the *principle* had to survive it: the thing that can
+ * end a run must be separable from its background by more than hue alone. It
+ * does survive, because none of the reasoning above was about the palette —
+ * it is about which way each surface faces. A ring is nearly three times the
+ * wall's luminance, before any colour is chosen.
+ *
+ * Fog then walks each of those down with distance, which is how a ring
+ * resolves: it emerges from the sky, brightens through the wall's value, and
+ * is only unambiguously an obstacle once it is near the top of the range.
  */
 const AMBIENT = 0.55
 const DIRECTIONAL = 0.85
@@ -173,10 +188,15 @@ export interface TubeGame {
    * check that the legs are driven by the run and not by a clock.
    */
   stridePhase(): number
-  mono(): boolean
-  setPalette(mono: boolean): void
-  readPixels(): Uint8Array
-  /** Start or retry. What the A button does. */
+  /** The run that just ended beat the stored best. */
+  isRecord(): boolean
+  /** 1 just after a ring is cleared, decaying. */
+  clearFlash(): number
+  /** Seconds since load, for blinking prompts. */
+  clock(): number
+  stage: Stage3D
+  onChange(fn: () => void): void
+  /** Start or retry. */
   press(): void
   /** Hold a direction: -1, 1, or 0 for neither. */
   steer(direction: -1 | 0 | 1): void
@@ -191,40 +211,43 @@ interface Ring {
 }
 
 export function createGame(parent: HTMLElement): TubeGame {
-  const hud = createHud()
-  const gb = createGb3d({ parent, hudCanvas: hud.canvas, ramp: PAL })
+  const stage = createStage3D({ parent, background: 0x000000 })
 
   const scene = new THREE.Scene()
   // Fog colour matched to the clear colour exactly. Any mismatch shows up as a
-  // rectangle of slightly-wrong tone where the tube ends and the sky begins,
-  // and at four tones that is a hard edge rather than a soft one.
+  // rectangle of slightly-wrong colour where the tube ends and the sky begins.
+  // At four tones that was a hard edge; in full colour it is a soft one, which
+  // is worse — a soft wrong edge reads as something in the distance.
+  scene.background = new THREE.Color(0x000000)
   scene.fog = new THREE.Fog(0x000000, FOG_NEAR, FOG_FAR)
 
   // 62 degrees, not the 72 this started at. A wider lens makes the nearest ring
 // subtend most of the frame, and with five rings inside the fog that stacked
 // into concentric bright bands with almost no wall left between them — the
 // gaps were there but the picture was too busy to read one at a glance.
-const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FAR + 8)
+const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
+  stage.track(camera)
 
   // Straight down the tube. See the tone table above.
-  const light = new THREE.DirectionalLight(0xffffff, gbIntensity(DIRECTIONAL))
+  const light = new THREE.DirectionalLight(0xffffff, lambertIntensity(DIRECTIONAL))
   light.position.set(0, 0, -1)
   light.target.position.set(0, 0, 0)
   scene.add(light)
   scene.add(light.target)
-  scene.add(new THREE.AmbientLight(0xffffff, gbIntensity(AMBIENT)))
+  scene.add(new THREE.AmbientLight(0xffffff, lambertIntensity(AMBIENT)))
 
-  let mono = true
-
-  const grey = (luma: number) => new THREE.Color(luma, luma, luma)
   /**
-   * Surface colours. MONO gets neutral greys so the tone table above holds
-   * exactly; COLOR gets hues at the same luminance, so the toggle changes the
-   * palette and not the readability.
+   * Surface colours: a hue per surface, normalised to the luminance the table
+   * above assigns it.
+   *
+   * The normalisation is the whole point and is what #120 asked to preserve.
+   * Hue is the decoration; the luminance ordering is the information, and it
+   * has to survive whatever hues are chosen. Picking colours that merely
+   * *looked* different would put a game-ending obstacle and the wall behind it
+   * at the same brightness for anyone who cannot separate them by hue.
    */
   function surfaceColour(kind: 'wall' | 'rib' | 'ring'): THREE.Color {
     const luma = kind === 'wall' ? WALL_LUMA : kind === 'rib' ? RIB_LUMA : RING_LUMA
-    if (mono) return grey(luma)
     const hue = kind === 'wall' ? 0.58 : kind === 'rib' ? 0.52 : 0.09
     const c = new THREE.Color().setHSL(hue, 0.45, 0.55)
     const l = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
@@ -308,7 +331,7 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
   })
-  const outlineMaterial = new THREE.LineBasicMaterial({ color: PAL.darkest })
+  const outlineMaterial = new THREE.LineBasicMaterial({ color: OUTLINE })
 
   function limb(w: number, h: number, d: number): THREE.Mesh {
     const geometry = new THREE.BoxGeometry(w, h, d)
@@ -416,6 +439,16 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
   /** Advances with distance travelled, so the stride matches the speed. */
   let runPhase = 0
 
+  const listeners: (() => void)[] = []
+  /**
+   * Told when the score, the screen or the record changes — not every frame.
+   *
+   * The clear flash decays continuously and is polled by the HUD instead.
+   * Rebuilding the HUD's DOM sixty times a second to move a counter that
+   * changes a few times a run would be the wrong trade.
+   */
+  const notify = () => listeners.forEach((fn) => fn())
+
   const speed = () => speedAt(cleared)
 
   /** Places ring `r` at the far end of the pool with the next generated gap. */
@@ -460,11 +493,13 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
   function showTitle() {
     reset()
     screen = 'title'
+    notify()
   }
 
   function startRun() {
     reset()
     screen = 'run'
+    notify()
   }
 
   function endRun() {
@@ -474,6 +509,10 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
     best = result.best
     isRecord = result.isRecord
     playCrash()
+    // After the record is resolved, not before: the HUD reads `best` and
+    // `isRecord` when it is told, and telling it first shows the previous
+    // run's numbers on the screen announcing this one.
+    notify()
   }
 
   function press() {
@@ -521,6 +560,7 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
             break
           }
           cleared++
+          notify()
           clearFlash = 1
           playClear(cleared)
         }
@@ -567,18 +607,7 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
     )
     camera.lookAt(lookAt)
 
-    hud.draw({
-      screen,
-      rings: cleared,
-      best,
-      isRecord,
-      mono,
-      reducedMotion: reduced,
-      t: elapsed,
-      clearFlash,
-    })
-    gb.needsHudUpdate()
-    gb.present(scene, camera)
+    stage.render(scene, camera)
 
     requestAnimationFrame(frame)
   }
@@ -607,16 +636,13 @@ const camera = new THREE.PerspectiveCamera(62, GB_WIDTH / GB_HEIGHT, 0.1, FOG_FA
     },
     speed,
     stridePhase: () => runPhase,
-    mono: () => mono,
-    setPalette(next) {
-      mono = next
-      gb.setPalette(next)
-      wallMaterial.color.copy(surfaceColour('wall'))
-      ribMaterial.color.copy(surfaceColour('rib'))
-      ringMaterial.color.copy(surfaceColour('ring'))
-      runnerMaterial.color.copy(surfaceColour('ring'))
+    isRecord: () => isRecord,
+    clearFlash: () => clearFlash,
+    clock: () => elapsed,
+    stage,
+    onChange(fn) {
+      listeners.push(fn)
     },
-    readPixels: gb.readPixels,
     press,
     steer(direction) {
       if (direction !== 0) ensureCtx()

@@ -1,14 +1,16 @@
 // The stage a standalone 3D game runs on (#118).
 //
-// `shared/gb3d.ts` puts a game inside the GameBoy shell: a fixed 160x144
-// target, a four-tone palette pass, an 8px HUD composited into the same grid.
-// That was the right answer for Tower Stacker and Tube Runner and the wrong
-// answer for everything after them — these are meant to be additional games in
-// the hub, not more GBC games, and the hub already hosts both kinds.
+// There used to be a second one, `shared/gb3d.ts`, which put a 3D game inside
+// the GameBoy shell: a fixed 160x144 target, a four-tone palette pass, an 8px
+// HUD composited into the same grid. It was written for Tower Stacker and
+// Tube Runner on the assumption that a 3D game belonged in the bezel, and this
+// module exists because that assumption was wrong — these are additional games
+// in the hub, not more GBC games. #119 and #120 moved both of those games
+// here and the other stage was deleted.
 //
-// So this is the other stage. Full resolution, full colour, no palette, no
-// bezel: a canvas that fills its container and keeps up with it, and an
-// overlay element the game puts its own HUD in.
+// Full resolution, full colour, no palette, no bezel: a canvas that fills its
+// container and keeps up with it, and an overlay element the game puts its own
+// HUD in.
 //
 // What is deliberately *not* here: the camera, the lighting, the HUD's
 // contents, and the controls. Those differ per game — a minigolf camera and a
@@ -36,12 +38,12 @@ const MAX_PIXEL_RATIO = 2
  * actually want comes out at a third of it — a scene that looks like night
  * when it was meant to look like a lit room.
  *
- * This has now cost two games. `shared/gb3d.ts` has the same helper under
- * `gbIntensity` for the GameBoy pair, where it was found by measuring a
- * framebuffer that had collapsed to one tone; Tilt Maze rediscovered it as a
- * board too dark to see. It is duplicated rather than shared because the two
- * stages are meant to be independent — but if a third game meets it, that is
- * the moment to stop and pull it out.
+ * This has now cost four games. Tower Stacker found it first, by measuring a
+ * framebuffer that had collapsed to a single tone; Tube Runner inherited the
+ * fix; Tilt Maze rediscovered it as a board too dark to see; Minigolf met it
+ * again. Every one of them looked like a lighting choice rather than a bug,
+ * which is why the helper exists at all — a rig written from the brightness
+ * you want is right, and this is what makes it so.
  */
 export function lambertIntensity(fraction: number): number {
   return fraction * Math.PI
@@ -62,8 +64,8 @@ export interface Stage3D {
    * A DOM layer above the canvas, for the game's HUD.
    *
    * DOM rather than a drawn overlay, which is the freedom this stage buys over
-   * `shared/gb3d.ts`: with no pixelated upscale to stay in step with, text can
-   * be real text — crisp at any resolution, selectable, and reachable by a
+   * the one it replaced: with no pixelated upscale to stay in step with, text
+   * can be real text — crisp at any resolution, selectable, and reachable by a
    * screen reader. It is `pointer-events: none` by default so it cannot eat
    * the canvas's input; put `pointer-events: auto` on the individual controls
    * that need it.

@@ -101,39 +101,55 @@ The median is the one that catches the 1/PI Lambert bug, and it catches it
 loudly — 0.77 with the factor, 0.46 without. The spread catches it too but by
 a narrower margin, which is why both are there.
 
-**`tube-runner.mjs`** — the second three.js game (#111). Tower Stacker proved
-the shell reaches a non-Phaser game at all; what is new here is that Tube
-Runner's only verb is a **held** direction, which is the case `shared/dpad.ts`
-exists for and which nothing exercised across the renderer seam before:
+**`tube-runner.mjs`** — the second three.js game (#111), moved onto the
+standalone stage by #120. The d-pad is gone; the control is hold zones on the
+left and right halves of the canvas, and the checks that drove
+`shared/dpad.ts` drive those instead. The claims are the same, and they are
+what makes a *held* control different from a button:
 
-- holding an arm rotates the player, and lifting the thumb stops it
-- rolling a thumb from one arm to the other without lifting reverses the
-  rotation — the implicit-pointer-capture bug `setupDpad` was written to fix,
-  and fatal in a game where letting go is how you stop turning
-- steering onto the gap carries the run through rings, driven by real held
-  contacts rather than a burst of taps
-- the palette, the end screen's input lock, the save through `shared/storage`,
-  and the 340px branch — where the shrunk pad is checked to still steer
+- holding a side turns the player, and letting go stops dead
+- rolling a thumb across the middle without lifting reverses the turn — the
+  case the d-pad module existed for, and fatal in a game where letting go is
+  how you stop
+- a second thumb on the other side takes over rather than cancelling to zero,
+  which would strand a player at the moment they are changing their mind
+- the end screen's input lock, and the save through `shared/storage`
+
+One check is new, and it guards #120's own note that rotation must stay a
+direct angular velocity: the fairness bound in `track.ts` is derived from
+`ROTATE_SPEED` being a rate the player actually achieves, so easing into it
+would make every generated track harder than the bound promises. The suite
+measures the rate at the start of a hold and again later, and requires both to
+match `ROTATE_SPEED`.
+
+**Measure that rate against the game's clock, not the wall's.** The loop
+integrates in simulated seconds and clamps a long frame, so under a headless
+renderer that drops frames the angle advances less than wall time says it
+should — through no fault of the control. Against `performance.now()` it read
+as a rate falling from 3.2 to 2.6, which is indistinguishable from the easing
+the check exists to rule out. Against `clock()` it is 3.60 every sample.
 
 The rules — the reachability bound that keeps a generated track fair — are in
 `tube-runner/track_test.ts` under `npm run qa:units`, not here.
 
-Its tone checks are the `qa:contrast` stand-in for this game. The one that
-matters asserts that **obstacle rings hold `lightest` and nothing else does**:
-the lighting rig separates surfaces by orientation, so a ring is the only thing
-facing the light, and losing that is the #62-shaped defect — the one thing you
-must react to, drawn in its background's tone.
+Its tone checks are the `qa:contrast` stand-in for this game. In four tones
+the claim was "obstacle rings hold `lightest` and nothing else does". In full
+colour it is the same claim in luminance: the brightest surface on screen
+reaches the value the lighting table gives a ring, and the wall sits far below
+it. The lighting rig separates surfaces by orientation — a ring is the only
+thing facing the light — so losing that is the #62-shaped defect, the one
+thing you must react to drawn at its background's value. Removing
+`DIRECTIONAL` takes the brightest thing from 0.92 to 0.76, because the ribs
+become the brightest surface instead.
 
 **What it does not check: the ribs.** The bands on the tube wall are what give
-the run its sense of speed, and the `light` tone was first written as their
-check on the reasoning that they are the only surface designed to land there.
-They are not the only thing that does — a ring fades through `light` on its way
-out of the fog, and several mid-distance rings are always on screen — so
-collapsing `RIB_LUMA` into `WALL_LUMA`, deleting the ribs as a distinct surface
-outright, leaves the whole suite green. The check was reworded to claim only
-what it measures. This is the same shape of gap `qa/contrast/README.md` records
-for the HUD relic pips, and it is written down for the same reason: an
-unguarded surface that nobody knows is unguarded is how #84 shipped.
+the run its sense of speed, and no check guards them. Collapsing `RIB_LUMA`
+into `WALL_LUMA` — deleting them as a distinct surface outright — leaves the
+whole suite green, because the rings still reach the top of the range and the
+wall still sits at the bottom. That was true of the four-tone version for the
+same reason. It is the same shape of gap `qa/contrast/README.md` records for
+the HUD relic pips, and it is written down for the same reason: an unguarded
+surface that nobody knows is unguarded is how #84 shipped.
 
 **`minigolf.mjs`** — the third three.js game (#113), on the standalone stage
 (#118). The course itself is checked headless in `minigolf/course_test.ts` and
