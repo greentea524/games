@@ -50,6 +50,25 @@ treat any page or console error as a failure. Point `QA_URL` at a running
 server to skip the spawn — `static/qa/` takes a game URL, `qa/touch/` takes the
 games *base* URL.
 
+**Hub thumbnails have one rule, and it is written down (#123).** A card's
+picture is a capture of the running game, produced by `npm run thumbnail` at
+the size `src/App.tsx` declares. There are exactly two sets of exceptions and
+both are *closed lists* in `qa/thumbnails.mjs`: five GameBoy games carry
+commissioned painted art, and three games are hosted elsewhere with nothing
+here to photograph. A new game is a capture — `src/thumbnails_test.ts` fails if
+one is neither on a list nor has a `thumbnail.mjs` exporting `pose(page)`.
+
+The rule exists because there never was one, so each card was decided on its
+own and the answers drifted into three styles. Keep the lists closed; adding to
+them is the drift.
+
+The tool photographs the page, not the canvas. Reading a canvas back with
+`drawImage` only works if the renderer asked for `preserveDrawingBuffer`, and
+Phaser does not — every GameBoy game captured as a rectangle of solid black,
+written to disk and reported as a success. A screenshot composites what the
+player sees whatever the renderer did, and the tool now refuses a capture with
+no variation in it.
+
 **DMG art is the repo's most repeated defect.** Six sprites have shipped
 invisible — #52, #58, #83, #62, #85, #84 — always the same way: the DMG ramp
 has four tones, three games draw their background in `PAL.lightest`, and a

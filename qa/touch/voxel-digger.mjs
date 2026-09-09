@@ -223,20 +223,38 @@ async function run() {
 
   // -------------------------------------------------------------- the save
 
-  await page.evaluate(async () => {
+  // Cleared first, because the guess above may have been right — and a correct
+  // guess records the round's own dig count, which is lower than the number
+  // written here. `recordFind` keeps the *smaller* best, so the check passed
+  // only on the runs where the blind guess happened to be wrong. Asserting
+  // against a known-empty save makes the result the same every time.
+  const saved = await page.evaluate(async () => {
+    localStorage.removeItem('voxel_digger_save')
     const { recordFind } = await import('/games/voxel-digger/save.ts')
     recordFind(11)
+    try {
+      const raw = JSON.parse(localStorage.getItem('voxel_digger_save'))
+      return { v: raw?.v, best: raw?.d?.best, finds: raw?.d?.finds }
+    } catch {
+      return null
+    }
   })
   check(
     'a find is stored through shared/storage, envelope and all',
-    await page.evaluate(() => {
-      try {
-        const raw = JSON.parse(localStorage.getItem('voxel_digger_save'))
-        return raw && raw.v === 1 && raw.d?.best === 11 && raw.d?.finds >= 1
-      } catch {
-        return false
-      }
+    saved?.v === 1 && saved.best === 11 && saved.finds >= 1,
+    saved ? `v${saved.v} best ${saved.best} finds ${saved.finds}` : 'unreadable',
+  )
+  check(
+    'and a better round replaces it while a worse one does not',
+    await page.evaluate(async () => {
+      const { recordFind } = await import('/games/voxel-digger/save.ts')
+      recordFind(20)
+      const worse = JSON.parse(localStorage.getItem('voxel_digger_save')).d.best
+      recordFind(4)
+      const better = JSON.parse(localStorage.getItem('voxel_digger_save')).d.best
+      return worse === 11 && better === 4
     }),
+    'fewer digs is a better round',
   )
 
   check(

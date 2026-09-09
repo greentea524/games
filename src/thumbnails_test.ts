@@ -1,4 +1,5 @@
-// The hub's thumbnails are the size the hub says they are (#122).
+// The hub's thumbnails are the size the hub says they are (#122), and come
+// from where the house rule says they come from (#123).
 //
 //   npx tsx src/thumbnails_test.ts
 //
@@ -25,12 +26,21 @@
 // must follow, change a file and the markup must. A constant duplicated here
 // would be a third thing to keep in sync, which is the shape of the original
 // problem.
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 // Shared with `scripts/thumbnail.mjs`, which has to *produce* files that pass
 // these checks. One definition of the house size and one webp reader, so the
 // tool and the check cannot disagree about what correct means.
-import { APP, IMAGE_DIR, declaredSize, importedImages, webpSize } from '../qa/thumbnails.mjs'
+import {
+  APP,
+  EXTERNAL,
+  IMAGE_DIR,
+  PAINTED,
+  declaredSize,
+  importedImages,
+  webpSize,
+} from '../qa/thumbnails.mjs'
+import { ROOT } from '../qa/harness.mjs'
 
 let ok = true
 const check = (name: string, pass: boolean, note?: string) => {
@@ -101,6 +111,65 @@ check(
   missing.length === 0,
   missing.length ? missing.join(' ') : `${imported.length} resolved`,
 )
+
+// --- where a card's picture comes from (#123) ------------------------------
+//
+// The rule is in `qa/thumbnails.mjs`: a card is a capture of the running game,
+// with two closed sets of exceptions. #123 exists because there was never a
+// stated rule and each new card was decided on its own, so the value here is
+// not that any one card is wrong — it is that a fifteenth game cannot quietly
+// become a fourth kind of picture. That is what these check.
+
+const cards = imported.map((f) => f.replace(/\.webp$/, ''))
+
+{
+  const overlap = PAINTED.filter((g) => EXTERNAL.includes(g))
+  check(
+    'the two exception sets do not overlap',
+    overlap.length === 0,
+    overlap.length ? overlap.join(' ') : `${PAINTED.length} painted, ${EXTERNAL.length} external`,
+  )
+  const unknown = [...PAINTED, ...EXTERNAL].filter((g) => !cards.includes(g))
+  check(
+    'every listed exception is still a card on the hub',
+    unknown.length === 0,
+    unknown.length ? `${unknown.join(' ')} — remove it from the list` : 'no stale entries',
+  )
+}
+
+{
+  // The load-bearing one. Anything not on a list has to be regenerable, and
+  // regenerable means the game's directory carries the pose hook the tool
+  // needs. A new game added in a hurry either gets a hook or fails here.
+  const capturable = cards.filter((g) => !PAINTED.includes(g) && !EXTERNAL.includes(g))
+  const hookless = capturable.filter((g) => !existsSync(join(ROOT, g, 'thumbnail.mjs')))
+  check(
+    'every card that is not an exception can be recaptured',
+    hookless.length === 0,
+    hookless.length
+      ? `${hookless.join(' ')} — add a thumbnail.mjs exporting pose(page), or say why it is an exception`
+      : `${capturable.length} capturable`,
+  )
+}
+
+{
+  // And the exceptions are exceptions because there is nothing to photograph
+  // or because someone painted them — not because a hook was never written.
+  // A painted game that grew a hook would be silently recaptured by
+  // `npm run thumbnail` with no arguments, overwriting the art.
+  const armed = PAINTED.filter((g) => existsSync(join(ROOT, g, 'thumbnail.mjs')))
+  check(
+    'no painted card has a pose hook that would overwrite it',
+    armed.length === 0,
+    armed.length ? `${armed.join(' ')} — running the tool would replace the art` : `${PAINTED.length} safe`,
+  )
+  const local = EXTERNAL.filter((g) => existsSync(join(ROOT, g, 'index.html')))
+  check(
+    'no external card is actually a game in this repo',
+    local.length === 0,
+    local.length ? `${local.join(' ')} — it can be captured, so it is not an exception` : 'all elsewhere',
+  )
+}
 
 console.log(ok ? '\nALL THUMBNAIL CHECKS PASS' : '\nFAILURES ABOVE')
 process.exit(ok ? 0 : 1)
