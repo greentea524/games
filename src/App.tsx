@@ -160,7 +160,7 @@ const GAME_SECTIONS: GameSection[] = [
         image: thumbTubeRunner,
         href: `${import.meta.env.BASE_URL}tube-runner/`,
         description:
-          "A GameBoy-styled 3D endless runner. Rotate around the inside of a tube to line yourself up with the gap in each oncoming ring.",
+          "An endless runner down the inside of a tube. Hold left or right to turn, and line yourself up with the gap in each oncoming ring.",
       },
     ],
   },

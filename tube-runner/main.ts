@@ -1,124 +1,154 @@
-// Tube Runner's shell wiring (#111).
+// Tube Runner's controls (#111, #120).
 //
-// The same shared modules as Tower Stacker, used the same way — which is the
-// claim #109 made and this file is the second piece of evidence for. The only
-// difference worth noting is that this game reads the d-pad as a *held*
-// direction rather than as a press: rotating is its one verb, and
-// `shared/dpad.ts` emits a matching `keyup` when a thumb slides off an arm or
-// lifts, so a held direction is exactly as reliable here as it is under
-// Phaser.
+// The shell wiring this file used to do is gone: no d-pad, no A button, no
+// bezel, no palette toggle. #120 offers two replacements for the d-pad —
+// hold zones on the left and right halves of the canvas, or a drag whose
+// horizontal component sets the direction — and this is the hold zones.
+//
+// **That choice is not a preference.** #120's second note says rotation must
+// stay a direct angular velocity rather than an eased one, because the
+// fairness bound in `track.ts` is derived from `ROTATE_SPEED` being a rate the
+// player actually achieves; anything slower makes every generated track
+// harder than the bound promises. A drag invites easing — mapping travel to
+// rate, ramping in, adding inertia — and each of those quietly breaks the
+// bound while feeling like an improvement. A hold zone has nothing to ease:
+// the finger is down or it is not, and the rate is the constant the generator
+// was told about.
+//
+// It also keeps exactly the property the d-pad had and this suite used to
+// check: sliding a thumb from one side to the other reverses the turn without
+// ever passing through "not turning", because both contacts are tracked and
+// the newest side wins.
 import { createGame } from './game'
-import { setupDpad } from '../shared/dpad'
-import { setupButtons } from '../shared/buttons'
+import { createHud } from './hud'
 import { exposeForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
 import { ensureCtx, isMuted, playBlip, setMuted } from './audio'
-import { FONT } from './constants'
-import '../shared/shell.css'
+import '../shared/stage3d.css'
+import './style.css'
 
-const parent = document.getElementById('game')
-if (!parent) throw new Error('#game is missing from the shell')
+const parent = document.getElementById('stage')
+if (!parent) throw new Error('#stage is missing from the page')
 
 const game = createGame(parent)
 exposeForQA(game)
+preventZoomGestures()
+createHud(game, {
+  muted: isMuted,
+  setMuted(next) {
+    setMuted(next)
+    if (!next) playBlip()
+  },
+})
 
-// Canvas text does not trigger a webfont load the way a DOM node does, so
-// without this the HUD would render in the browser's default monospace for
-// ever. Nothing waits on it: the loop redraws every frame.
-void document.fonts?.load(`8px ${FONT}`)
+const canvas = game.stage.renderer.domElement
 
-const dispatch = (type: 'keydown' | 'keyup', code: string) => {
-  window.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true, cancelable: true }))
+/** Which side of the canvas a point is on. */
+const sideOf = (clientX: number): -1 | 1 => {
+  const rect = canvas.getBoundingClientRect()
+  return clientX - rect.left < rect.width / 2 ? -1 : 1
 }
 
-setupButtons({ dispatch, onPress: () => void ensureCtx() })
-setupDpad({ dispatch, onPress: () => void ensureCtx() })
-preventZoomGestures()
+/**
+ * Every contact currently down, and which way it is asking to turn.
+ *
+ * A map rather than a single value so that a thumb sliding across the middle
+ * of the screen reverses cleanly: the pointer is still down, `pointermove`
+ * updates its side, and the turn flips without a gap. With one value it would
+ * take a lift and a re-press to change direction, which in a game about lining
+ * up with a gap is the difference between a correction and a crash.
+ */
+const contacts = new Map<number, -1 | 1>()
+
+function applySteering() {
+  // The most recent contact wins. Two thumbs down on opposite sides is a
+  // player changing their mind, not a request to stop — cancelling to zero
+  // there would strand them mid-turn.
+  const sides = [...contacts.values()]
+  game.steer(sides.length === 0 ? 0 : sides[sides.length - 1])
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  ensureCtx()
+  // Off the run screens, a press is the button. There is no separate A any
+  // more, so the same tap that turns during a run starts the next one.
+  if (game.screen() !== 'run') {
+    game.press()
+    e.preventDefault()
+    return
+  }
+  contacts.set(e.pointerId, sideOf(e.clientX))
+  applySteering()
+  try {
+    canvas.setPointerCapture(e.pointerId)
+  } catch {
+    // Safari has thrown here for pointers that ended in the same frame.
+  }
+  e.preventDefault()
+})
+
+canvas.addEventListener('pointermove', (e) => {
+  if (!contacts.has(e.pointerId)) return
+  const side = sideOf(e.clientX)
+  if (contacts.get(e.pointerId) === side) return
+  contacts.set(e.pointerId, side)
+  applySteering()
+})
+
+const release = (e: PointerEvent) => {
+  if (!contacts.delete(e.pointerId)) return
+  applySteering()
+}
+canvas.addEventListener('pointerup', release)
+canvas.addEventListener('pointercancel', release)
+// A pointer whose capture is lost never sends `pointerup` to this element, and
+// a direction latched on with nothing to release it turns the player for ever.
+canvas.addEventListener('lostpointercapture', release)
+window.addEventListener('blur', () => {
+  contacts.clear()
+  applySteering()
+})
+
+// ------------------------------------------------------------- keyboard
 
 const LEFT = new Set(['ArrowLeft', 'KeyA'])
 const RIGHT = new Set(['ArrowRight', 'KeyD'])
 const CONFIRM = new Set(['KeyZ', 'KeyX', 'Space', 'Enter', 'NumpadEnter'])
 
-// Which directions are down, so releasing one while the other is still held
-// resumes that one rather than stopping. A player rolling a thumb across the
-// pad produces exactly that overlap.
-const held = new Set<string>()
+const keys = new Set<string>()
 
-function applySteering() {
-  const left = [...LEFT].some((k) => held.has(k))
-  const right = [...RIGHT].some((k) => held.has(k))
-  // Both at once cancels rather than picking a winner: `shared/dpad.ts` never
-  // emits two arms at once, but a keyboard can, and drifting under two held
-  // keys would be a surprise either way.
+function applyKeys() {
+  const left = [...LEFT].some((k) => keys.has(k))
+  const right = [...RIGHT].some((k) => keys.has(k))
+  // Both at once cancels rather than picking a winner. A keyboard can hold two
+  // arrows where a thumb cannot be on two sides at once, and drifting under
+  // both would be a surprise either way.
   game.steer(left === right ? 0 : left ? -1 : 1)
 }
 
 window.addEventListener('keydown', (e) => {
   if (CONFIRM.has(e.code)) {
     e.preventDefault()
-    if (held.has(e.code)) return
-    held.add(e.code)
+    if (keys.has(e.code)) return
+    keys.add(e.code)
     ensureCtx()
     game.press()
     return
   }
   if (!LEFT.has(e.code) && !RIGHT.has(e.code)) return
   e.preventDefault()
-  held.add(e.code)
-  applySteering()
+  if (keys.has(e.code)) return
+  keys.add(e.code)
+  ensureCtx()
+  applyKeys()
 })
 
 window.addEventListener('keyup', (e) => {
-  if (!held.delete(e.code)) return
-  if (LEFT.has(e.code) || RIGHT.has(e.code)) applySteering()
+  if (!keys.delete(e.code)) return
+  if (LEFT.has(e.code) || RIGHT.has(e.code)) applyKeys()
 })
 
-// A key held when the tab loses focus never sends its keyup, which would leave
-// the player rotating for ever.
 window.addEventListener('blur', () => {
-  held.clear()
-  applySteering()
+  keys.clear()
+  applyKeys()
 })
-
-// SELECT mutes, wired by hand because it invokes a function rather than
-// standing for a key — the split `shared/buttons.ts` describes.
-const btnSelect = document.getElementById('btn-select')
-if (btnSelect) {
-  const toggleMute = (e: Event) => {
-    e.preventDefault()
-    setMuted(!isMuted())
-    btnSelect.classList.toggle('latched', isMuted())
-    if (!isMuted()) playBlip()
-  }
-  btnSelect.addEventListener('click', toggleMute)
-  btnSelect.addEventListener('touchstart', toggleMute, { passive: false })
-}
-
-const paletteBtn = document.getElementById('palette-toggle')
-if (paletteBtn) {
-  const labelEl = document.getElementById('palette-label')
-  const trackEl = document.getElementById('palette-track')
-  const knobEl = document.getElementById('palette-knob')
-
-  const paint = () => {
-    const isColour = !game.mono()
-    if (labelEl) {
-      labelEl.textContent = isColour ? 'COLOR' : 'MONO'
-      labelEl.style.color = isColour ? '#ffcc00' : '#9bbc0f'
-    }
-    if (trackEl) {
-      trackEl.style.background = isColour ? '#1c2838' : '#0f140f'
-      trackEl.style.borderColor = isColour ? '#385888' : '#306230'
-    }
-    if (knobEl) {
-      knobEl.style.transform = isColour ? 'translateX(12px)' : 'translateX(0px)'
-      knobEl.style.background = isColour ? '#ff4444' : '#9bbc0f'
-    }
-  }
-
-  paletteBtn.addEventListener('click', () => {
-    game.setPalette(!game.mono())
-    paint()
-  })
-  paint()
-}

@@ -1,86 +1,102 @@
-// Tube Runner's HUD: the score lines, the screens, and the player's marker.
+// Tube Runner's HUD (#111, #120), as DOM over the canvas.
 //
-// The marker is the part that matters. The camera sits near the tube's axis
-// so most of the ring ahead is visible at once, which means the player's own
-// angular position is not implied by the view the way it would be in a first
-// person one — without a reference, "line the gap up with yourself" has no
-// second half. Drawing it here rather than in the world puts it on the one
-// surface whose colours survive the palette pass untouched, and pins it to the
-// bottom of the frame where it cannot be lost against a fogged tube wall.
-import { CSS_DARKEST, CSS_LIGHTEST, FONT, PAL } from './constants'
-import { GB_HEIGHT, GB_WIDTH } from '../shared/gb3d'
-import { createHudSurface } from '../shared/gbhud'
+// It used to be 8px glyphs drawn into a 160x144 2D canvas and composited into
+// the same framebuffer as the game. On `shared/stage3d.ts` the overlay is real
+// DOM, so the text is real text.
+//
+// #120 asks what happens to the player marker. The answer is that it went
+// before this rework did, and for a better reason than the palette: the marker
+// existed because the camera sat on the tube's axis and the player had no
+// body, so nothing on screen said where "you" were. #126 gave the player a
+// body at the radius the collision test actually uses, and the camera now
+// trails it. The runner *is* the marker, and a HUD stand-in would be a second,
+// less accurate answer to the same question.
+import { prefersReducedMotion } from '../shared/motion'
+import type { TubeGame } from './game'
 
 export type Screen = 'title' | 'run' | 'over'
 
-export interface HudState {
-  screen: Screen
-  /** Rings cleared this run. */
-  rings: number
-  best: number
-  isRecord: boolean
-  mono: boolean
-  reducedMotion: boolean
-  /** Seconds since load, for the blinking prompt. */
-  t: number
-  /** 1 just after a ring is cleared, decaying — the marker pulses on it. */
-  clearFlash: number
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className: string,
+  text?: string,
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag)
+  node.className = className
+  if (text !== undefined) node.textContent = text
+  return node
 }
 
-const hex = (n: number) => '#' + n.toString(16).padStart(6, '0')
-
-export interface Hud {
-  canvas: HTMLCanvasElement
-  draw(state: HudState): void
+export interface HudHooks {
+  muted(): boolean
+  setMuted(muted: boolean): void
 }
 
-export function createHud(): Hud {
-  const surface = createHudSurface({
-    font: FONT,
-    shadow: CSS_DARKEST,
-    panelFill: CSS_DARKEST,
-    panelBorder: hex(PAL.dark),
-  })
-  const { text, panel } = surface
+export function createHud(game: TubeGame, hooks: HudHooks): void {
+  const overlay = game.stage.overlay
 
-  // The chevron that used to live here is gone. It existed because the camera
-  // sat near the tube's axis and the player had no body, so nothing on screen
-  // said where "you" were — the marker was standing in for a character. The
-  // runner is that character, drawn in the world at the radius the collision
-  // test actually uses, so a HUD stand-in would now be a second, less accurate
-  // answer to the same question.
+  const back = el('a', 'stage3d-back', '← Games')
+  back.href = `${import.meta.env.BASE_URL}`
+  overlay.append(back)
 
-  function prompt(on: boolean, ink: string) {
-    panel(0, 116, GB_WIDTH, GB_HEIGHT - 116)
-    if (on) text('PRESS A', GB_WIDTH / 2, 122, ink, 'center')
+  const sound = el('button', 'tr-btn tr-sound')
+  sound.type = 'button'
+  sound.onclick = () => {
+    hooks.setMuted(!hooks.muted())
+    refresh()
+  }
+  overlay.append(sound)
+
+  const score = el('div', 'tr-score')
+  const ringLabel = el('span', 'tr-rings')
+  const bestLabel = el('span', 'tr-best')
+  score.append(ringLabel, bestLabel)
+  overlay.append(score)
+
+  const panel = el('div', 'tr-panel')
+  const panelTitle = el('h1', 'tr-panel-title')
+  const panelBody = el('p', 'tr-panel-body')
+  const panelBtn = el('button', 'tr-btn tr-btn-primary')
+  panelBtn.type = 'button'
+  panelBtn.onclick = () => game.press()
+  panel.append(panelTitle, panelBody, panelBtn)
+  overlay.append(panel)
+
+  const hint = el('p', 'tr-hint', 'Hold the left or right side of the screen to turn.')
+  overlay.append(hint)
+
+  function refresh() {
+    const screen = game.screen()
+    sound.textContent = hooks.muted() ? '♪ off' : '♪ on'
+    sound.setAttribute('aria-pressed', String(hooks.muted()))
+
+    score.hidden = screen !== 'run'
+    ringLabel.textContent = String(game.rings())
+    bestLabel.textContent = `best ${game.best()}`
+    // Pulses as a ring is cleared, which is the only feedback that a ring
+    // counted — the ring itself is behind the player by then.
+    score.classList.toggle(
+      'tr-pulse',
+      screen === 'run' && game.clearFlash() > 0.4 && !prefersReducedMotion(),
+    )
+
+    hint.hidden = screen !== 'run' || game.rings() > 0
+
+    panel.hidden = screen === 'run'
+    if (screen === 'title') {
+      panelTitle.textContent = 'Tube Runner'
+      panelBody.textContent =
+        game.best() > 0 ? `Best ${game.best()} rings. Turn to line yourself up with the gap.` : 'Turn to line yourself up with the gap.'
+      panelBtn.textContent = 'Run'
+    } else if (screen === 'over') {
+      panelTitle.textContent = game.isRecord() ? 'New best' : 'Crashed'
+      panelBody.textContent = `${game.rings()} rings · best ${game.best()}`
+      panelBtn.textContent = 'Again'
+    }
   }
 
-  return {
-    canvas: surface.canvas,
-    draw(state) {
-      surface.clear()
-      const ink = state.mono ? CSS_LIGHTEST : '#f8f8f0'
-
-      if (state.screen === 'title') {
-        panel(14, 8, GB_WIDTH - 28, 46)
-        text('TUBE', GB_WIDTH / 2, 16, ink, 'center')
-        text('RUNNER', GB_WIDTH / 2, 30, ink, 'center')
-        if (state.best > 0) text(`BEST ${state.best}`, GB_WIDTH / 2, 42, hex(PAL.light), 'center')
-        prompt(state.reducedMotion || Math.floor(state.t * 2) % 2 === 0, ink)
-        return
-      }
-
-      if (state.screen === 'over') {
-        panel(14, 26, GB_WIDTH - 28, 52)
-        text(state.isRecord ? 'NEW BEST!' : 'CRASHED', GB_WIDTH / 2, 34, ink, 'center')
-        text(`RINGS ${state.rings}`, GB_WIDTH / 2, 50, ink, 'center')
-        text(`BEST ${state.best}`, GB_WIDTH / 2, 62, hex(PAL.light), 'center')
-        prompt(state.reducedMotion || Math.floor(state.t * 2) % 2 === 0, ink)
-        return
-      }
-
-      text(String(state.rings), 4, 4, ink)
-      text(`BEST ${state.best}`, GB_WIDTH - 4, 4, ink, 'right')
-    },
-  }
+  game.onChange(refresh)
+  // The clear flash decays continuously and nothing announces it.
+  window.setInterval(refresh, 60)
+  refresh()
 }

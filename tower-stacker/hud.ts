@@ -1,9 +1,10 @@
 // Tower Stacker's HUD (#110, #119), as DOM over the canvas.
 //
 // It used to be 8px glyphs drawn into a 160x144 2D canvas and composited into
-// the same framebuffer as the game — `shared/gbhud.ts`, and a font the shell
-// had to preload by hand because canvas text does not trigger a webfont fetch
-// the way a DOM node does. On `shared/stage3d.ts` the overlay is real DOM, so
+// the same framebuffer as the game, through a shared surface that has since
+// been deleted along with the shell it served — and a font that had to be
+// preloaded by hand, because canvas text does not trigger a webfont fetch the
+// way a DOM node does. On `shared/stage3d.ts` the overlay is real DOM, so
 // the text is real text: crisp at any resolution, sized responsively, and
 // reachable by a screen reader.
 //
