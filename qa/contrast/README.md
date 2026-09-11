@@ -131,8 +131,10 @@ the framebuffer directly:
   is solid rather than punched through with the sky tone.
 - `qa/touch/tube-runner.mjs` asserts that obstacle rings hold `lightest` and
   the wall does not, which is what stops the one thing that can end a run from
-  being drawn in its background's tone. It explicitly does **not** cover the
-  tube's ribs — see that suite's own note.
+  being drawn in its background's tone. The tube's ribs are covered too, but
+  not by a tone check — a surface in the middle of the range is invisible to a
+  frame-wide percentile, so #130 checks instead that the ribs *arrive at the
+  rate the run's speed implies*. See that suite's own note.
 
 The equivalent of this suite's job is done there because the failure mode is
 the same one — a feature the player cannot see against its background — even

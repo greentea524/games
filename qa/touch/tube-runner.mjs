@@ -28,12 +28,11 @@
 // screen reaches the value the lighting table gives a ring, and the wall sits
 // far below it.
 //
-// One thing here still does **not** discriminate, and it is worth naming
-// rather than leaving to be found. The ribs are not guarded. Collapsing
-// `RIB_LUMA` into `WALL_LUMA` — deleting them as a distinct surface — leaves
-// every check below green, because the rings still reach the top of the range
-// and the wall still sits at the bottom. That was true of the four-tone
-// version for the same reason and is recorded in `qa/touch/README.md`.
+// The ribs are guarded separately, by `ribPattern` below (#130). A frame-wide
+// tone check cannot see them: collapsing `RIB_LUMA` into `WALL_LUMA` left
+// every other check here green, because the rings still reached the top of the
+// range and the wall still sat at the bottom — the ribs simply stopped
+// existing in between, and nothing was asking about the middle.
 import { launchTouch, canvasPoint, gameUrl, checker, PAD, ACT } from './driver.mjs'
 
 const { check, finish } = checker()
@@ -147,6 +146,153 @@ const survive = (page, ms) =>
     }
     g.steer(0)
   }, ms)
+
+/**
+ * The rib pattern on the near wall, measured down one column of a live run.
+ *
+ * This is #130. The frame-wide tone checks below cannot see the ribs at all —
+ * they ask what the brightest and middling values are, and the ribs are
+ * neither — so the bands that carry the entire sense of speed were unguarded
+ * from #111 until here.
+ *
+ * Two claims, and the second is the one worth having:
+ *
+ *   1. the ribs are on screen at a tone of their own, between the wall's and
+ *      the ring's;
+ *   2. they *arrive at the rate the run's own speed implies*. The ribs are
+ *      `RIB_SPACING` apart in world units, so a player travelling at `speed`
+ *      meets `speed / RIB_SPACING` of them a second, and that is what makes
+ *      the pattern a truthful speedometer rather than a flicker.
+ *
+ * Measured by tracking the nearest rib. Looking forward along the tube the
+ * ribs bunch towards the vanishing point, so only the near ones are separable;
+ * the column is therefore cropped to the bottom `NEAR` of the frame, where the
+ * whole sawtooth lives — the nearest rib sweeps down to the bottom edge, off
+ * it, and the next one appears at the top of the crop. Sampling a *position*
+ * rather than counting brightness pulses is what makes this robust at the ~20
+ * frames a second a headless renderer manages: a pulse is one frame wide and
+ * can fall between two of them, but the position is there in every frame.
+ *
+ * The band is in framebuffer values, not in the lighting table's, and the gap
+ * between the two is worth stating because it looks like an error. Colour
+ * management is on, so the buffer is sRGB-encoded: the table's linear 0.33
+ * wall reads 0.61, its 0.55 rib reads 0.77, its 0.868 ring reads 0.94. The
+ * numbers below were measured, and they agree with the transfer function to
+ * within the antialiasing.
+ *
+ * Both edges of the band are load-bearing. The lower one is the defect this
+ * exists for — a rib drawn at the wall's value. The upper one is the other
+ * direction, and a real one: `game.ts` records that ribs bright enough to
+ * compete with the rings cost the rings the salience they need as the only
+ * thing that can end a run.
+ *
+ * Four defects were reintroduced to watch these go red, per CLAUDE.md:
+ *
+ *   - `RIB_LUMA = WALL_LUMA` — 16 to 19 frames of 81 keep a value in the band,
+ *     and those are rings fogged through it rather than ribs;
+ *   - `RIB_LUMA = 1.6`, bright enough to compete with the rings — 38 of 81;
+ *   - `rib.mesh.position.z` never assigned — 10 of 81;
+ *   - the ribs moved with the camera instead of the world. This one **passes**
+ *     the tone check at 75 of 81 and fails the rate check at 1 arrival against
+ *     9.8, which is the whole reason there are two checks here and not one: a
+ *     pattern can be three distinct tones on screen and still tell the player
+ *     the run is standing still.
+ *
+ * A fifth candidate is *not* a defect and was checked rather than assumed:
+ * changing the rib's hue to the wall's leaves both checks green, and should.
+ * `surfaceColour` normalises every surface to the luminance the table assigns
+ * it, so a rib that shares the wall's hue still sits a third brighter than it
+ * and still reads as a band. That normalisation is the property #120 asked to
+ * preserve, and measuring luminance here rather than colour is what keeps this
+ * check aligned with it.
+ */
+const RIB_LO = 0.72
+const RIB_HI = 0.82
+/** Fraction of the frame, from the bottom, the sawtooth is measured in. */
+const NEAR = 0.4
+/**
+ * A rib counts as arrived below this fraction of the crop, and re-arms above.
+ *
+ * `ARRIVE` is generous on purpose. Perspective makes the nearest rib accelerate
+ * as it leaves — the last frames of a sweep move it a fifth of the crop each —
+ * so a tight line at the very bottom edge is one a rib can step over between
+ * two frames. At 0.08 that lost an arrival or two in ten; at 0.2 every sweep
+ * lands inside it, and the hysteresis at `REARM` is what stops one sweep being
+ * counted twice.
+ */
+const ARRIVE = 0.2
+const REARM = 0.45
+
+const ribPattern = (page, seconds) =>
+  page.evaluate(
+    async ({ seconds, lo, hi, near, arrive, rearm }) => {
+      const g = window.__game
+      const { RIB_SPACING } = await import('/games/tube-runner/game.ts')
+      let frames = 0
+      let withRib = 0
+      let arrivals = 0
+      let armed = true
+      // Distance is integrated from the game's own clock and speed rather than
+      // wall time, for the reason the rate check below gives: the loop clamps a
+      // long frame, so wall time over-counts how far the run actually went.
+      let travelled = 0
+      let lastT = g.clock()
+      let lastSpeed = g.speed()
+      const t0 = lastT
+      while (g.clock() - t0 < seconds && g.screen() === 'run') {
+        // Steer toward the gap, or the run ends inside the measurement.
+        const gap = g.nextGapAngle()
+        if (gap !== null) {
+          let d = gap - g.angle()
+          while (d > Math.PI) d -= Math.PI * 2
+          while (d < -Math.PI) d += Math.PI * 2
+          g.steer(Math.abs(d) < 0.05 ? 0 : d > 0 ? 1 : -1)
+        }
+        await new Promise((r) => requestAnimationFrame(r))
+
+        const now = g.clock()
+        const speed = g.speed()
+        travelled += ((speed + lastSpeed) / 2) * (now - lastT)
+        lastT = now
+        lastSpeed = speed
+
+        const { data, width, height } = g.stage.readPixels()
+        // `readPixels` is raw GL, so row 0 is the bottom of the frame.
+        const rows = Math.floor(height * near)
+        const x = Math.floor(width * 0.12)
+        let nearest = null
+        for (let y = 0; y < rows; y++) {
+          const i = (y * width + x) * 4
+          const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255
+          if (l >= lo && l <= hi) {
+            nearest = y
+            break
+          }
+        }
+        frames++
+        if (nearest !== null) withRib++
+        // Hysteresis, so a ring fogged into the band for one frame cannot be
+        // counted as a rib arriving. Measured: two such frames in 141.
+        if (armed && nearest !== null && nearest < rows * arrive) {
+          arrivals++
+          armed = false
+        } else if (nearest === null || nearest > rows * rearm) {
+          armed = true
+        }
+      }
+      g.steer(0)
+      return {
+        frames,
+        withRib,
+        arrivals,
+        travelled,
+        expected: travelled / RIB_SPACING,
+        ribSpacing: RIB_SPACING,
+        screen: g.screen(),
+      }
+    },
+    { seconds, lo: RIB_LO, hi: RIB_HI, near: NEAR, arrive: ARRIVE, rearm: REARM },
+  )
 
 async function run() {
   console.log('\n### tube-runner ###\n')
@@ -353,6 +499,39 @@ async function run() {
     'the tube fogs out to black in the distance',
     tone.dark > 0.005,
     `${(tone.dark * 100).toFixed(2)}% of the frame`,
+  )
+
+  // --------------------------------------------------- the ribs, as a speedometer
+  //
+  // #130. Retried like the tone checks above, and for the same reason: the
+  // measurement needs a run that stays alive for its whole window.
+  let rib = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await freshRun(page)
+    rib = await ribPattern(page, 4)
+    if (rib.screen === 'run' && rib.frames >= 20) break
+  }
+  check(
+    'the rib measurement ran on a live run, with frames to work from',
+    rib?.screen === 'run' && rib.frames >= 20,
+    `${rib?.frames} frames over ${rib?.travelled.toFixed(1)} units, screen=${rib?.screen}`,
+  )
+  check(
+    'the near wall carries a rib at a tone of its own, in every frame',
+    rib && rib.frames > 0 && rib.withRib / rib.frames >= 0.9,
+    `${rib?.withRib}/${rib?.frames} frames — collapsing RIB_LUMA into WALL_LUMA gives about 18,`
+      + ' which is rings fogged through the band rather than ribs',
+  )
+  // The claim the ribs exist for. `travelled` is the distance the run covered
+  // by its own reckoning, so `travelled / RIB_SPACING` is how many ribs it went
+  // past — and each one has to have swept down the near wall and off the
+  // bottom of the frame. A pattern that scrolls at a fixed rate, or one pinned
+  // to the camera, fails this while passing the check above.
+  check(
+    'and the ribs arrive at the rate the run\'s own speed implies',
+    rib && rib.expected > 3 && Math.abs(rib.arrivals - rib.expected) / rib.expected < 0.25,
+    `${rib?.arrivals} arrivals against ${rib?.expected.toFixed(1)} expected ` +
+      `(${rib?.travelled.toFixed(1)} units at ${rib?.ribSpacing} apart)`,
   )
 
   // ------------------------------------------------- crashing and retrying
