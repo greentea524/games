@@ -26,9 +26,20 @@ export const GAMES = [
       // PAL.lightest — the brightest tone the DMG ramp has, which is why so
       // many sprites here have shipped invisible.
       floor: { texture: 'tiles_dmg_v2', frame: 0 },
+      // The bottom status bar, where the relic pips live (#131).
+      //
+      // Not a texture — it is a rectangle `UIScene` draws at 80% opacity over
+      // the dungeon, so its tone is a composite and has to be derived. Both
+      // halves are read from the running game: the fill and the alpha off the
+      // live rectangle, the thing behind it off the floor surface above. The
+      // point is what identifies the rectangle, so moving the bar without
+      // moving this fails loudly rather than silently measuring the wrong
+      // thing.
+      hud: { overlay: { scene: 'ui', at: [80, 136] }, over: 'floor' },
     },
-    // Everything the player is meant to pick out against the room floor.
-    onFloor: [
+    on: {
+      // Everything the player is meant to pick out against the room floor.
+      floor: [
       'hero_dmg_down', 'hero_dmg_up', 'hero_dmg_left', 'hero_dmg_right',
       'rat_dmg', 'bat_dmg', 'archer_dmg', 'spider_dmg', 'slime_dmg',
       'skeleton_dmg', 'boss_dmg', 'boss_brute_dmg', 'boss_choir_dmg',
@@ -40,14 +51,14 @@ export const GAMES = [
       'chest_golden_closed_dmg', 'chest_golden_open_dmg',
       'chest_locked_closed_dmg', 'chest_locked_open_dmg',
       'relic_dmg', 'portal_dmg',
-    ],
+      ],
+      // #84's pips. They were excluded for four issues on the grounds that
+      // they answer to the status bar rather than the floor, which was true
+      // and was the wrong conclusion: the bar is a surface, so it gets named.
+      hud: ['relicpip_held_dmg', 'relicpip_empty_dmg'],
+    },
     exclude: {
       tiles_dmg_v2: 'the tileset is the surface, not something drawn on it',
-      // The relic pips (#84) are 6px HUD glyphs drawn on the black status bar,
-      // not on the dungeon floor. Scoring them against the floor would demand
-      // they contrast with a surface they are never drawn against.
-      relicpip_held_dmg: 'a HUD pip on the status bar, not on the floor',
-      relicpip_empty_dmg: 'a HUD pip on the status bar, not on the floor',
     },
   },
   {
@@ -57,12 +68,14 @@ export const GAMES = [
     surfaces: {
       floor: { texture: 'floor_dmg' },
     },
-    onFloor: [
-      'player_dmg_down', 'player_dmg_up', 'player_dmg_left', 'player_dmg_right',
-      'crate_dmg', 'target_dmg', 'target_lit_dmg',
-      'hole_dmg',
-      'wall_dmg', 'shelf_dmg', 'pegboard_dmg', 'barrel_dmg',
-    ],
+    on: {
+      floor: [
+        'player_dmg_down', 'player_dmg_up', 'player_dmg_left', 'player_dmg_right',
+        'crate_dmg', 'target_dmg', 'target_lit_dmg',
+        'hole_dmg',
+        'wall_dmg', 'shelf_dmg', 'pegboard_dmg', 'barrel_dmg',
+      ],
+    },
     // Ice and cracked ground are floor with a mark on it — that is what they
     // are meant to be, so they answer to the variant rule instead.
     floorVariants: ['ice_dmg', 'cracked_dmg'],
@@ -80,7 +93,8 @@ export const GAMES = [
       // drawn in PAL.lightest, which is what most of the game is walked on.
       floor: { texture: 'tiles_dmg', rect: [0, 0, 16, 16] },
     },
-    onFloor: [
+    on: {
+      floor: [
       'kid_dmg_down_0', 'kid_dmg_down_1', 'kid_dmg_up_0', 'kid_dmg_up_1',
       'kid_dmg_left_0', 'kid_dmg_left_1', 'kid_dmg_right_0', 'kid_dmg_right_1',
       'npc_dmg_mom_down', 'npc_dmg_ren_down', 'npc_dmg_gus_down', 'npc_dmg_baker_down',
@@ -92,7 +106,8 @@ export const GAMES = [
       'fountain_full_dmg', 'fountain_drained_dmg', 'hatch_dmg',
       'prop_bed_dmg', 'prop_bookshelf_dmg', 'prop_plant_dmg',
       'prop_bush_dmg', 'prop_fence_dmg', 'prop_flower_dmg',
-    ],
+      ],
+    },
     floorVariants: ['prop_rug_dmg'],
     exclude: {
       tiles_dmg: 'the tileset is the surface',
@@ -126,10 +141,18 @@ export const GAMES = [
       // so the brick is the tone the separation check has to measure against.
       platform: { texture: 'tiles_dmg', frame: 1 },
     },
-    onSky: [
-      'windup_dmg_left', 'windup_dmg_right',
-      'station_dmg', 'station_empty_dmg', 'energy_dmg', 'goal_dmg', 'puff_dmg',
-    ],
+    on: {
+      sky: [
+        'windup_dmg_left', 'windup_dmg_right',
+        'station_dmg', 'station_empty_dmg', 'energy_dmg', 'goal_dmg', 'puff_dmg',
+        // The HUD portrait (#56). It was excluded as "drawn on the HUD panel
+        // rather than in the world", and there is no HUD panel — `UIScene`
+        // holds a portrait, a graphics energy bar and two labels, and nothing
+        // behind any of them. The portrait sits on the camera background like
+        // every other sprite in this list (#131).
+        'windup_dmg_head',
+      ],
+    },
     // #52's defect, and it is the opposite relation. The backdrop must NOT be
     // confusable with the platform tile: it shipped drawn in the brick tone,
     // so background scenery read as something you could stand on. Here a high
@@ -139,7 +162,6 @@ export const GAMES = [
     ],
     exclude: {
       tiles_dmg: 'the tileset is the surface',
-      windup_dmg_head: 'the portrait, drawn on the HUD panel rather than in the world',
     },
   },
 ]

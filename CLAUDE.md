@@ -80,8 +80,9 @@ and read `qa/contrast/README.md` before adding art.
 Two of the six got past a *green* run of that suite, which is worth knowing
 before trusting it. Legibility is a whole-sprite score, so a dark body carries
 a sprite whose horns or lid band are painted in the floor tone; #107 added a
-silhouette rule for that. And the suite only checks sprites drawn on a floor
-or a sky — art on the HUD bar answers to a surface nothing measures yet.
+silhouette rule for that. #131 closed the other gap: a sprite is listed against
+a *named* surface, so the HUD bar is measured like anything else — an exclusion
+whose reason is a place rather than a duplicate is the next one of these.
 
 **When a light feature lands on the light floor, outline it — do not retone
 it.** There are four tones and the dark two are usually already in use, so a

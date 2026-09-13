@@ -173,10 +173,10 @@ the lighting table's. Colour management is on, so the buffer is sRGB-encoded
 and the table's linear 0.33 wall reads 0.61, its 0.55 rib reads 0.77, its 0.868
 ring reads 0.94.
 
-That leaves the HUD relic pips as the last surface in the repo that nothing
-measures — `qa/contrast/README.md` records it, and #131 is open on it. An
-unguarded surface nobody knows is unguarded is how #84 shipped, which is why
-both were written down rather than left to be found.
+The HUD relic pips were the other surface nothing measured, and #131 closed
+that one too — `qa/contrast/README.md` has it. An unguarded surface nobody
+knows is unguarded is how #84 shipped, which is why both were written down
+rather than left to be found.
 
 **`minigolf.mjs`** — the third three.js game (#113), on the standalone stage
 (#118). The course itself is checked headless in `minigolf/course_test.ts` and
