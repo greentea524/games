@@ -87,11 +87,73 @@ for (const entry of GAMES) {
     // by BootScene regardless
   }
 
+  // The scene the manifest names has to actually be running before anything is
+  // measured. This used to be a field nobody read: every check here samples
+  // textures, which `BootScene` builds up front, so the suite passed just as
+  // happily against a title screen — and the comment above claiming that
+  // reaching gameplay "proves the keys the manifest names are the ones
+  // actually in use" was not enforced by anything. #131 needs it enforced for
+  // real, because an overlay surface can only be read off a live scene.
+  const reached = await page
+    .waitForFunction(
+      (key) => window.__game?.scene?.getScene(key)?.scene?.isActive(),
+      entry.scene,
+      { timeout: 8000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check(
+    `the ${entry.scene} scene is running`,
+    reached,
+    reached
+      ? 'reached'
+      : `still on ${await page.evaluate(() => window.__game.scene.scenes.filter((x) => x.scene.isActive()).map((x) => x.scene.key).join(', '))}`,
+  )
+
   await page.evaluate(PAGE_HELPERS)
 
   // --- resolve the surfaces -------------------------------------------------
+  //
+  // In declaration order, so an `overlay` can composite itself over a surface
+  // named earlier in the same entry.
   const tones = {}
   for (const [name, surface] of Object.entries(entry.surfaces)) {
+    if (surface.overlay) {
+      const under = tones[surface.over]
+      if (!under) {
+        check(`surface ${name} composites over a surface declared before it`, false,
+          `'${surface.over}' is not resolved — declare it above ${name}`)
+        continue
+      }
+      const fill = await page.evaluate(
+        ({ scene, at }) => {
+          const sc = window.__game.scene.getScene(scene)
+          if (!sc) return null
+          // Topmost first: the display list is painted in order, so the last
+          // rectangle covering the point is the one a sprite is drawn on.
+          const hit = sc.children.list
+            .filter((o) => o.type === 'Rectangle')
+            .filter((o) => {
+              const x = o.x - o.width * o.originX
+              const y = o.y - o.height * o.originY
+              return at[0] >= x && at[0] < x + o.width && at[1] >= y && at[1] < y + o.height
+            })
+            .pop()
+          return hit ? { fill: hit.fillColor, alpha: hit.fillAlpha } : null
+        },
+        { scene: surface.overlay.scene, at: surface.overlay.at },
+      )
+      if (!fill) {
+        check(`surface ${name} finds its overlay`, false,
+          `nothing in scene '${surface.overlay.scene}' covers ${JSON.stringify(surface.overlay.at)}`)
+        continue
+      }
+      // Source-over, which is what Phaser does with a translucent fill.
+      tones[name] = [16, 8, 0].map((shift, i) =>
+        Math.round(((fill.fill >> shift) & 255) * fill.alpha + under[i] * (1 - fill.alpha)),
+      )
+      continue
+    }
     tones[name] = await page.evaluate(
       ({ surface }) => {
         if (surface.cameraBackground) {
@@ -118,13 +180,47 @@ for (const entry of GAMES) {
     )
 
   // --- legibility: a sprite must not be its own background ------------------
-  const legible = [
-    ...(entry.onFloor ?? []).map((k) => [k, 'floor']),
-    ...(entry.onSky ?? []).map((k) => [k, 'sky']),
-  ]
+  // One vocabulary, not two. `onFloor` and `onSky` were the only two words the
+  // manifest had, which is why a sprite drawn on anything else could only be
+  // written down as an exclusion — and an exclusion is not checked. Naming the
+  // surface is the whole of #131's fix.
+  const legible = Object.entries(entry.on).flatMap(([surface, keys]) =>
+    keys.map((k) => [k, surface]),
+  )
+  const undeclared = Object.keys(entry.on).filter((name) => !(name in entry.surfaces))
+  check(
+    'every surface sprites are listed against is declared',
+    undeclared.length === 0,
+    undeclared.length ? `no such surface: ${undeclared.join(', ')}` : `${Object.keys(entry.on).length} in use`,
+  )
+  // And the other way. A surface nothing is drawn against is either a mistake
+  // or dead weight, and either way it is not being checked by its presence.
+  const unused = Object.keys(entry.surfaces).filter(
+    (name) =>
+      !(name in entry.on) &&
+      !(entry.floorVariants && name === 'floor') &&
+      !(entry.backdropVsPlatform && name === 'platform'),
+  )
+  check(
+    'every declared surface has something drawn against it',
+    unused.length === 0,
+    unused.length ? `nothing is listed on: ${unused.join(', ')}` : 'all in use',
+  )
   const failures = []
   const missing = []
-  for (const [key, surfaceName] of legible) {
+  // A surface that failed to resolve above has already been reported, but the
+  // sprites listed against it must not then be scored against `undefined` —
+  // which throws inside the page and turns a clean failure into a stack trace.
+  const unresolved = legible.filter(([, name]) => !tones[name])
+  check(
+    'every sprite has a surface to be scored against',
+    unresolved.length === 0,
+    unresolved.length
+      ? `unresolved surfaces: ${[...new Set(unresolved.map(([, n]) => n))].join(', ')}`
+      : `${legible.length} scored`,
+  )
+  const scorable = legible.filter(([, name]) => tones[name])
+  for (const [key, surfaceName] of scorable) {
     const r = await scoreAgainst(key, tones[surfaceName])
     if (r === null) {
       missing.push(key)
@@ -133,7 +229,7 @@ for (const entry of GAMES) {
     if (r.strong < MIN_STRONG_PIXELS) failures.push(`${key} ${r.strong}px`)
   }
   check(
-    `every sprite is legible against its surface (${legible.length} checked)`,
+    `every sprite is legible against its surface (${scorable.length} checked)`,
     failures.length === 0,
     failures.length
       ? `under ${MIN_STRONG_PIXELS} strongly-contrasting pixels: ${failures.join(', ')}`
@@ -147,7 +243,7 @@ for (const entry of GAMES) {
   // floods in from the texture edge through everything indistinguishable from
   // the surface and counts what it swallows.
   const dissolved = []
-  for (const [key, surfaceName] of legible) {
+  for (const [key, surfaceName] of scorable) {
     const n = await page.evaluate(
       ({ key, tone, threshold }) => {
         if (!window.__game.textures.exists(key)) return null
@@ -158,7 +254,7 @@ for (const entry of GAMES) {
     if (n !== null && n > MAX_DISSOLVED_PIXELS) dissolved.push(`${key} ${n}px`)
   }
   check(
-    `no sprite has lost part of its silhouette (${legible.length} checked)`,
+    `no sprite has lost part of its silhouette (${scorable.length} checked)`,
     dissolved.length === 0,
     dissolved.length
       ? `over ${MAX_DISSOLVED_PIXELS}px eaten into the surface: ${dissolved.join(', ')}`
@@ -167,7 +263,7 @@ for (const entry of GAMES) {
   check(
     'every key the manifest names actually exists',
     missing.length === 0,
-    missing.length ? `not built: ${missing.join(', ')}` : `${legible.length} keys resolved`,
+    missing.length ? `not built: ${missing.join(', ')}` : `${scorable.length} keys resolved`,
   )
 
   // --- floor variants: floor-toned by design, but must carry a mark ---------

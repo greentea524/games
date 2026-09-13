@@ -29,10 +29,11 @@ its own colour.
 
 ## What it measures
 
-Nothing here hardcodes a colour. Surfaces are sampled from the generated
-textures at run time, so a palette change cannot silently invalidate the
-suite. Sprites are compared against the surface they are actually drawn on,
-named per game in `manifest.mjs`.
+Nothing here hardcodes a colour. Surfaces are sampled from the running game —
+from the generated textures, from a scene's camera background, or from a live
+overlay object — so a palette change cannot silently invalidate the suite.
+Sprites are compared against the surface they are actually drawn on, named per
+game in `manifest.mjs` and listed under it in `on`.
 
 Four rules:
 
@@ -111,11 +112,65 @@ The suite fails on any DMG texture that is in neither — without that, a sprite
 added later is silently never checked and the suite passes because it is
 testing less than it used to.
 
-`exclude` is for sprites that are not drawn on the surface at all, not for
-sprites that fail. The relic pips are excluded because they live on the HUD
-bar; that also means **nothing here checks them**, which is how #84's pips
-shipped dark-on-black. A sprite drawn against something other than a floor or
-a sky needs that surface named in `surfaces`, not an exclusion.
+`exclude` is for sprites that are not drawn on a measured surface at all, not
+for sprites that fail, and **not for a sprite whose surface has no name yet**
+— that is what `surfaces` is for. Naming a new one is the cheap half of the
+job; the expensive half is being honest about which surface it really is.
+
+For four issues the relic pips sat in `exclude` reading "a HUD pip on the
+status bar, not on the floor", which was true and was the wrong conclusion:
+the bar is a surface, so #131 named it. The tell for the next one is an
+exclusion whose stated reason is a *place* rather than a *duplicate*.
+
+## The HUD bar, and the surface that never existed (#131)
+
+Two exclusions were audited out in #131, and they failed in opposite
+directions.
+
+**Pocket Dungeon's relic pips are drawn on the bottom status bar**, which is
+not a texture: `UIScene` draws a black rectangle at 80% opacity over the
+dungeon, so the pips' background is a composite. The manifest declares it as
+an `overlay` — a scene, a point in game space, and the surface underneath —
+and the runner reads the fill and the alpha off the live rectangle and blends
+them over the floor tone. Both halves come from the running game, so this
+hardcodes no more than the rest of the suite does. Measured: `rgb(31,38,3)`.
+
+The point is load-bearing and deliberately so. Shrink the bar and nothing
+covers `[80, 136]` any more; the surface fails to resolve, the sprites listed
+against it fail for want of one, and the suite says so — rather than quietly
+measuring the wrong rectangle.
+
+**Windup's HUD portrait was excluded as "drawn on the HUD panel rather than in
+the world", and there is no HUD panel.** `UIScene` holds a portrait, a
+graphics energy bar and two text labels, and nothing behind any of them — the
+portrait sits on the camera background like every other sprite in that game's
+list. The exclusion named a surface that does not exist, and the sprite went
+unchecked for it. It is now in `on.sky` and scores 26 strong pixels.
+
+### The tightest margin in the suite
+
+The *empty* pip is worth knowing about. It is `PAL.dark` on that composite,
+its whole art is a 12-pixel outline, and all 12 pixels clear
+`MIN_STRONG_PIXELS` — by a tone distance of 122 against a threshold of 120.
+Nothing else in the suite passes this narrowly, and #84's own note in
+`BootScene` says this tone "vanished into the bar" by eye, which the measure
+disagrees with only just. If the bar's alpha or the pip's tone moves at all,
+this is the first thing that will go red, and that will be a real finding
+rather than a flaky one.
+
+The held pip, which is the one carrying the information, scores 24 of 24.
+
+## Reaching the game first
+
+`manifest.mjs` has always declared a `scene` per game, and until #131 nothing
+read it. Every rule here samples textures, and `BootScene` builds those up
+front, so the suite passed just as happily against a title screen — the
+comment claiming that walking in "proves the keys the manifest names are the
+ones actually in use" was enforced by nothing.
+
+It is checked now, because an overlay surface can only be read off a live
+scene. Setting a game's `advance` to 0 reports `still on title` and takes the
+overlay surface down with it.
 
 ## The three.js games are not here
 
