@@ -142,14 +142,41 @@ thing you must react to drawn at its background's value. Removing
 `DIRECTIONAL` takes the brightest thing from 0.92 to 0.76, because the ribs
 become the brightest surface instead.
 
-**What it does not check: the ribs.** The bands on the tube wall are what give
-the run its sense of speed, and no check guards them. Collapsing `RIB_LUMA`
-into `WALL_LUMA` — deleting them as a distinct surface outright — leaves the
-whole suite green, because the rings still reach the top of the range and the
-wall still sits at the bottom. That was true of the four-tone version for the
-same reason. It is the same shape of gap `qa/contrast/README.md` records for
-the HUD relic pips, and it is written down for the same reason: an unguarded
-surface that nobody knows is unguarded is how #84 shipped.
+**The ribs are checked separately, and not by tone alone (#130).** The bands on
+the tube wall are what give the run its sense of speed, and for a long time
+nothing guarded them: collapsing `RIB_LUMA` into `WALL_LUMA` — deleting them as
+a distinct surface outright — left the whole suite green, because the rings
+still reached the top of the range and the wall still sat at the bottom. A
+frame-wide percentile cannot see a surface in the middle.
+
+What replaced that note is `ribPattern`, and the claim it makes is not "the
+ribs are visible" but **"the ribs arrive at the rate the run's own speed
+implies"** — `speed / RIB_SPACING` a second, measured by tracking the nearest
+rib down a column of the near wall and counting the ones that sweep off the
+bottom of the frame. That is what makes the pattern a truthful speedometer
+rather than a flicker, and it is the half a tone check could never have
+covered: ribs pinned to the camera are still three distinct tones on screen and
+still say the run is standing still.
+
+Four defects were reintroduced to watch it go red — the ribs collapsed into the
+wall (16 to 19 frames of 81 keep a value in the band, and those are rings
+fogged through it, not ribs), the ribs drawn bright enough to compete with the
+rings (38 of 81), the ribs never repositioned (10 of 81), and the ribs moving
+with the camera. The last one passes the tone half and fails the rate half, 1
+arrival against 9.8, which is the case that says why there are two checks and
+not one. A fifth candidate, the rib's *hue* set to the wall's, was tried and
+correctly stays green: `surfaceColour` normalises every surface to its table
+luminance, so a rib sharing the wall's hue is still a third brighter than it.
+
+One thing to know before changing the band: it is in *framebuffer* values, not
+the lighting table's. Colour management is on, so the buffer is sRGB-encoded
+and the table's linear 0.33 wall reads 0.61, its 0.55 rib reads 0.77, its 0.868
+ring reads 0.94.
+
+That leaves the HUD relic pips as the last surface in the repo that nothing
+measures — `qa/contrast/README.md` records it, and #131 is open on it. An
+unguarded surface nobody knows is unguarded is how #84 shipped, which is why
+both were written down rather than left to be found.
 
 **`minigolf.mjs`** — the third three.js game (#113), on the standalone stage
 (#118). The course itself is checked headless in `minigolf/course_test.ts` and

@@ -149,7 +149,11 @@ const RING_POOL = 7
 
 /** Ribs, for the sense of travel. Same recycling rule as the rings. */
 const RIB_POOL = 14
-const RIB_SPACING = 3
+/**
+ * Exported so `qa/touch/tube-runner.mjs` can check the ribs arrive at the rate
+ * the run's own speed implies, rather than against a copy of this number.
+ */
+export const RIB_SPACING = 3
 
 /** How far behind the player a ring or rib may fall before it is recycled. */
 const BEHIND = 4
