@@ -31,8 +31,13 @@ export const IMAGE_DIR = 'src/assets/images'
  * than a screenshot. It is better-looking than a capture of a 160x144 tilemap
  * and it is kept for that reason, with the cost understood: it is *not* what
  * the game looks like. Static's piece shows a village, a HUD and a score line
- * the game does not have. Nothing regenerates these, so nothing keeps them
- * honest, which is exactly why no sixth game may join them.
+ * the game does not have, which is exactly why no sixth game may join them.
+ *
+ * Nothing regenerates these, so #132 records an approval instead:
+ * `npm run qa:painted` hashes each card and a digest of the textures its game
+ * builds, and goes red when the game moves on without anyone looking at the
+ * picture again. It does not judge the illustration — nothing can — it only
+ * makes the staleness visible. See `qa/painted/README.md`.
  *
  * `EXTERNAL` — three games are hosted elsewhere and have no directory in this
  * repo, so there is nothing here to photograph. Their cards are screenshots

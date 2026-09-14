@@ -37,6 +37,7 @@ npm run lint       # oxlint; a handful of pre-existing warnings are expected
 npm run qa:static  # Static: reachability + a full scripted playthrough
 npm run qa:touch   # all five games under real multi-touch, on a phone viewport
 npm run qa:contrast# DMG sprites must not be drawn in their background's tone
+npm run qa:painted # the five painted hub cards still match their games (#132)
 npm run qa:units   # pure-logic checks (floor modifiers, storage migration)
 npm run qa:csp     # the CSP's script hashes still match the scripts (#108)
 ```
@@ -61,6 +62,14 @@ one is neither on a list nor has a `thumbnail.mjs` exporting `pose(page)`.
 The rule exists because there never was one, so each card was decided on its
 own and the answers drifted into three styles. Keep the lists closed; adding to
 them is the drift.
+
+The painted five are the ones nothing regenerates, so `npm run qa:painted`
+records an approval instead: a hash of each card plus a digest of the textures
+its game builds, red when the game moves on and nobody has looked at the
+picture since. Comparing the painting to the game directly was tried first and
+measured — four of the five paintings resemble some *other* game more than
+their own — so do not reach for it again; `qa/painted/README.md` has the
+matrix.
 
 The tool photographs the page, not the canvas. Reading a canvas back with
 `drawImage` only works if the renderer asked for `preserveDrawingBuffer`, and

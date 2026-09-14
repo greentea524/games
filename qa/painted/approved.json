@@ -1,0 +1,39 @@
+{
+  "static": {
+    "note": "A painted village with a HUD and a score line the game does not have. The drift is known, recorded in qa/thumbnails.mjs, and accepted \u2014 this baseline exists so the NEXT drift is not.",
+    "art": "12687b5955b3a48e6053e6e68dafa137ac405064f5f60636b0ba2b4ff488f930",
+    "textures": "f507231b785a33c881ec3a386011bbfd296b6237446d55dcdcea83dc16bf1b34",
+    "keys": 101,
+    "nondeterministic": [
+      "entity"
+    ]
+  },
+  "windup": {
+    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
+    "art": "f792231667471f974d05b6656d67d6a1b413573f8e36280d9f7543943659b941",
+    "textures": "f15797ad49818730bb862cd5cc1a09f09eec0eb6062e70a5a01ae7d1aa7ce0d2",
+    "keys": 28,
+    "nondeterministic": []
+  },
+  "lantern-keeper": {
+    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
+    "art": "9b92ea28dcc6406278824a6074115d0c983232a537902446ade6313d366018e9",
+    "textures": "3af891575aac788aaa802d0f73ba97e3296f39fe729183481832d284aa134ff1",
+    "keys": 25,
+    "nondeterministic": []
+  },
+  "pocket-dungeon": {
+    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye. Note that its DMG art is unreachable (#134), so half of what is hashed here is art no player sees.",
+    "art": "24c156be67a95d315b274771eaa331dac018621fa57516ce4be994f04a3eee0c",
+    "textures": "d636c3d69c0b41a650b23c203b698e2f87ac24920890bccbf88d806e1d261423",
+    "keys": 68,
+    "nondeterministic": []
+  },
+  "cart-crate": {
+    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
+    "art": "d1ad5e0233bc6b14706d70928fd41270cc800ad6ef9292a7a23f64938daa0c3a",
+    "textures": "a374f1bff1b20ae67f1bc92795ee4130e2746cfe92a43277bb1c252891235770",
+    "keys": 74,
+    "nondeterministic": []
+  }
+}
