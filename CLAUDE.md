@@ -105,6 +105,16 @@ Phaser polls `Key.isDown` once a frame so zero-length presses fall between
 frames, and CDP's `touchEnd` carries the contacts being *released* rather than
 those remaining.
 
+**three's Lambert BRDF carries a 1/PI factor, and it has cost four games.**
+three applies it to the ambient term as well as the direct one, so a rig
+written from the brightness you actually want renders at a third of it —
+Tower Stacker, Tube Runner, Tilt Maze and Minigolf each met it separately and
+each time it looked like a lighting choice rather than a bug. `lambertIntensity`
+in `shared/stage3d.ts` is the fix and it was opt-in, which is why it kept
+happening; #133 made it enforced, so every light built by a file on that stage
+must take its intensity from the helper or `npm run qa:units` fails. The factor
+is right for the diffuse response of every lit material three ships.
+
 **The CSP hashes an inline script, and a stale hash fails silently.** Editing
 the pre-init sizing script in any `index.html` changes its hash; the browser
 then declines to run it, nothing throws, and every functional check goes on

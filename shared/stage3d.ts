@@ -44,6 +44,22 @@ const MAX_PIXEL_RATIO = 2
  * again. Every one of them looked like a lighting choice rather than a bug,
  * which is why the helper exists at all — a rig written from the brightness
  * you want is right, and this is what makes it so.
+ *
+ * **Calling it is not optional, and `shared/lighting_test.ts` is what makes
+ * that true (#133).** The helper being correct never stopped anyone reaching
+ * past it: `new THREE.AmbientLight(0xffffff, 0.55)` compiles, runs, and looks
+ * plausibly-but-wrongly dark, which is how a fix that had existed since the
+ * first game went on costing three more. Under `npm run qa:units`, every light
+ * built by a file on this stage must take its intensity from here.
+ *
+ * The factor is right for every lit material three ships, and that is read off
+ * the shipped GLSL rather than assumed: `BRDF_Lambert` is applied to both
+ * `directDiffuse` and `indirectDiffuse` in the lambert, phong, physical and
+ * toon chunks alike. So it corrects the whole of a Lambert or Phong material's
+ * response and the diffuse half of a Standard or Physical one — a specular
+ * lobe is not scaled by it and sits on top, which is a reason to re-tune a rig
+ * that adds specularity rather than to skip the factor. `MeshBasicMaterial`
+ * ignores lights and has nothing to correct.
  */
 export function lambertIntensity(fraction: number): number {
   return fraction * Math.PI
