@@ -236,6 +236,15 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Re-textures the board for the palette the player just chose.
+   *
+   * The chain below is a list of sprite kinds, which means a kind added later
+   * and not added here keeps its old palette silently. That is how the decor
+   * came to be missed: nothing on screen looked broken, because the floor and
+   * the crates *did* switch. `qa:contrast` now asserts that no GBC-keyed art
+   * remains on screen in DMG mode (#134), which is what catches the next one.
+   */
   reloadPalette() {
     const mode = GameState.paletteMode
     const tKey = this.getTextureKey.bind(this)
@@ -248,6 +257,14 @@ export class BoardScene extends Phaser.Scene {
         else if (key.startsWith('ice_')) child.setTexture(tKey('ice'))
         else if (key.startsWith('cracked_')) child.setTexture(tKey('cracked'))
         else if (key.startsWith('hole_')) child.setTexture(tKey('hole'))
+        // The decor, which this list missed until #134's reachability check
+        // caught it: 34 `*_gbc_w1` sprites stayed on screen in DMG mode, so
+        // the DMG shelf, pegboard and barrel art `qa:contrast` scores could
+        // not be seen. Every entry in this chain is a sprite kind somebody
+        // had to remember — see the note on `reloadPalette` above.
+        else if (key.startsWith('shelf_')) child.setTexture(tKey('shelf'))
+        else if (key.startsWith('pegboard_')) child.setTexture(tKey('pegboard'))
+        else if (key.startsWith('barrel_')) child.setTexture(tKey('barrel'))
       } else if (child instanceof Phaser.GameObjects.Sprite) {
         const key = child.texture.key
         if (key.startsWith('crate_')) {

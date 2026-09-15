@@ -23,7 +23,7 @@
     "nondeterministic": []
   },
   "pocket-dungeon": {
-    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye. Note that its DMG art is unreachable (#134), so half of what is hashed here is art no player sees.",
+    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye. Its DMG art was unreachable when this was recorded; #134 wired the palette toggle, so the hashed art is now art a player can actually see.",
     "art": "24c156be67a95d315b274771eaa331dac018621fa57516ce4be994f04a3eee0c",
     "textures": "d636c3d69c0b41a650b23c203b698e2f87ac24920890bccbf88d806e1d261423",
     "keys": 68,

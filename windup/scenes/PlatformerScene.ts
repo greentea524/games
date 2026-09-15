@@ -402,6 +402,25 @@ export class PlatformerScene extends Phaser.Scene {
     
     this.pickups.getChildren().forEach((p: any) => p.setTexture(`energy_${mode}`))
     this.goals.getChildren().forEach((g: any) => g.setTexture(`goal_${mode}`))
+
+    // The backdrop and the steam puffs, which the list above missed until
+    // #134's reachability check caught it: 25 `*_gbc` objects stayed on screen
+    // in DMG mode — more than the 14 that had switched — so the five `bg_*_dmg`
+    // sprites this game's contrast rule exists for, #52's own defect, guarded
+    // art the player could not see in that mode.
+    //
+    // Swapped by rewriting the suffix rather than by naming each sprite. The
+    // backdrop is five kinds today and the list above is what happens when a
+    // sixth arrives: every entry there is a kind somebody had to remember.
+    const repalette = (o: { texture?: { key?: string }; setTexture?: (k: string) => unknown }) => {
+      const key = o.texture?.key
+      if (typeof key !== 'string' || !o.setTexture) return
+      const base = key.replace(/_(dmg|gbc)$/, '')
+      if (base !== key) o.setTexture(`${base}_${mode}`)
+    }
+    for (const container of [this.backdropFar, this.backdropNear]) {
+      container?.list.forEach((child) => repalette(child as never))
+    }
   }
 
   update(time: number, delta: number) {

@@ -332,6 +332,68 @@ for (const entry of GAMES) {
     unlisted.length ? `add or exclude: ${unlisted.join(', ')}` : `${covered.size} keys accounted for`,
   )
 
+  // --- the DMG art has to be reachable at all (#134) ------------------------
+  //
+  // Everything above reads textures out of the texture manager, and those exist
+  // whether or not anything ever draws them. Pocket Dungeon shipped that way:
+  // `GameState.setPaletteMode` and `DungeonScene.reloadPalette()` both existed
+  // with no callers, because its shell had no palette control, so `paletteMode`
+  // was `'gbc'` from load to unload and all 32 of its sprites scored here were
+  // art no player could reach. Nothing noticed for four issues.
+  //
+  // So: find the control the manifest names, use it, and require the running
+  // game to actually be drawing `_dmg` textures afterwards. Deliberately the
+  // last thing in the entry, so it cannot perturb a measurement above it.
+  const toggle = await page.$(entry.paletteToggle)
+  check(
+    `the shell has a palette control at ${entry.paletteToggle}`,
+    Boolean(toggle),
+    toggle ? 'present' : 'no element matches — the DMG art cannot be reached',
+  )
+  if (toggle) {
+    const drawing = () =>
+      page.evaluate(() => {
+        let dmg = 0
+        let gbc = 0
+        const gbcSeen = []
+        const walk = (list) => {
+          for (const o of list) {
+            const key = o.texture?.key
+            if (typeof key === 'string') {
+              if (/_dmg(_|$)/.test(key)) dmg++
+              else if (/_gbc(_|$)/.test(key)) { gbc++; gbcSeen.push(key) }
+            }
+            if (o.list) walk(o.list)
+          }
+        }
+        for (const s of window.__game.scene.scenes) {
+          if (s.scene.isActive()) walk(s.children.list)
+        }
+        return { dmg, gbc, gbcKeys: [...new Set(gbcSeen)].sort() }
+      })
+
+    // The mode is binary, so two presses reach it from either starting state.
+    let drawn = await drawing()
+    for (let i = 0; i < 2 && drawn.dmg === 0; i++) {
+      await toggle.click()
+      await page.waitForTimeout(500)
+      drawn = await drawing()
+    }
+    // `dmg > 0` is not the bar, and finding that out is what made this check
+    // worth having. Pocket Dungeon passed it with the scene reload deleted,
+    // on three relic pips alone — `UIScene` re-textures those from
+    // `paletteMode` every frame, so a game whose HUD follows the mode and
+    // whose world does not would read as fine. The bar is that *nothing* on
+    // screen is still GBC art, which is what the mode means.
+    check(
+      'and using it leaves no GBC art on screen',
+      drawn.dmg > 0 && drawn.gbc === 0,
+      drawn.gbc === 0
+        ? `${drawn.dmg} DMG sprite(s), no GBC`
+        : `${drawn.dmg} DMG but ${drawn.gbc} GBC still drawn — ${drawn.gbcKeys.join(' ')} — reloadPalette is missing a sprite kind`,
+    )
+  }
+
   if (!finish(t.log)) allOk = false
   await t.browser.close()
 }

@@ -172,6 +172,48 @@ It is checked now, because an overlay surface can only be read off a live
 scene. Setting a game's `advance` to 0 reports `still on title` and takes the
 overlay surface down with it.
 
+## Can the DMG art be reached at all? (#134)
+
+Every rule above reads textures out of the texture manager, and those exist
+whether or not anything ever draws them. **Pocket Dungeon shipped a complete
+DMG art set it could not display.** `GameState.setPaletteMode` and
+`DungeonScene.reloadPalette()` both existed with no callers anywhere, because
+its shell had no palette control — so `paletteMode` was `'gbc'` from load to
+unload, and all 32 of its sprites scored here were art no player could reach.
+Four issues passed over it.
+
+So the manifest names each game's `paletteToggle`, and the suite uses it and
+then requires the running game to be drawing DMG art. The control is real, in
+the DOM, and clicked — not simulated.
+
+### `dmg > 0` is not the bar, and finding that out was the point
+
+The first version asked only that *some* DMG sprite be on screen. Reverting
+Pocket Dungeon's scene reload — leaving the toggle wired but nothing
+redrawing — **passed it**, on three relic pips: `UIScene` re-textures those
+from `paletteMode` every frame. A game whose HUD follows the mode and whose
+world does not would have read as fine.
+
+The bar is that **nothing on screen is still GBC art**, which is what the mode
+means. At that bar the same revert reports 3 DMG against 1041 GBC.
+
+### It immediately found two more of the same defect
+
+Both `reloadPalette` implementations are a list of sprite kinds, so a kind
+added later and not added there keeps its old palette in silence — and nothing
+looks broken, because the floor and the player *do* switch.
+
+- **Cart & Crate** left 34 `*_gbc_w1` decor sprites on screen in DMG mode:
+  `shelf_`, `pegboard_` and `barrel_` were missing from the chain, so the DMG
+  shelf, pegboard and barrel art this suite scores could not be seen.
+- **Windup** left 25 `*_gbc` objects — *more than the 14 that had switched* —
+  the five `bg_*` backdrop sprites and the steam puffs. Those five backdrop
+  sprites are what `backdropVsPlatform` exists for. #52's guard was protecting
+  art the player never saw in that mode.
+
+Both are fixed. Windup's swap rewrites the key's suffix rather than naming each
+sprite, because the list is what produced the bug.
+
 ## The three.js games are not here
 
 Tower Stacker (#110) and Tube Runner (#111) have no textures at all — their
