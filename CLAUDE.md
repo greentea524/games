@@ -93,6 +93,18 @@ silhouette rule for that. #131 closed the other gap: a sprite is listed against
 a *named* surface, so the HUD bar is measured like anything else — an exclusion
 whose reason is a place rather than a duplicate is the next one of these.
 
+**A palette that nothing can switch to is art nobody sees (#134).** Pocket
+Dungeon shipped a full DMG set it could never display: `setPaletteMode` and
+`reloadPalette()` both existed with no callers, because its shell had no
+palette control. Every `_dmg` check in the repo reads the texture manager, and
+textures exist whether or not anything draws them, so four issues passed over
+it. `qa:contrast` now uses each game's real toggle and requires **no GBC art
+left on screen** afterwards — `dmg > 0` was the first bar and three relic pips
+satisfied it with the whole dungeon still in colour. That check immediately
+found two more: both `reloadPalette` implementations are a list of sprite kinds,
+and Cart & Crate's decor and Windup's whole backdrop were missing from theirs.
+Prefer rewriting the key's palette suffix over naming each sprite.
+
 **When a light feature lands on the light floor, outline it — do not retone
 it.** There are four tones and the dark two are usually already in use, so a
 face or a bone drawn dark enough to survive the grass stops reading as a face

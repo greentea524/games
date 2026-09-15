@@ -15,6 +15,8 @@ export class TitleScene extends Phaser.Scene {
   private arrowLeft!: Phaser.GameObjects.Text
   private arrowRight!: Phaser.GameObjects.Text
   private menuItems: Phaser.GameObjects.Text[] = []
+  private heroPreview!: Phaser.GameObjects.Sprite
+  private ratPreview!: Phaser.GameObjects.Sprite
 
   constructor() {
     super('title')
@@ -40,8 +42,15 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5, 0)
 
     // Sprite preview: hero flanked by a dungeon threat, in the title's side margins
-    const heroPreview = this.add.sprite(20, 16, `hero_${GameState.paletteMode}_down`).setScale(1.4)
-    const ratPreview = this.add.sprite(140, 16, `rat_${GameState.paletteMode}`).setScale(1.2)
+    // Held as fields so `reloadPalette` can retexture them. Restarting the
+    // scene instead would also work and would throw away the class the player
+    // had scrolled to, because `create` resets `classIndex` to 0.
+    const heroPreview = (this.heroPreview = this.add
+      .sprite(20, 16, `hero_${GameState.paletteMode}_down`)
+      .setScale(1.4))
+    const ratPreview = (this.ratPreview = this.add
+      .sprite(140, 16, `rat_${GameState.paletteMode}`)
+      .setScale(1.2))
     this.tweens.add({
       targets: heroPreview,
       y: '+=2',
@@ -188,6 +197,18 @@ export class TitleScene extends Phaser.Scene {
         this.menuItems[i].setColor('#86b06a')
       }
     }
+  }
+
+  /**
+   * Re-textures the two previews for the palette the player just chose (#134).
+   *
+   * The title screen is the one place this game shows sprites outside the
+   * dungeon, so without it a toggle pressed here does nothing visible and
+   * reads as a dead control.
+   */
+  reloadPalette() {
+    this.heroPreview?.setTexture(`hero_${GameState.paletteMode}_down`)
+    this.ratPreview?.setTexture(`rat_${GameState.paletteMode}`)
   }
 
   private updateClassDisplay() {

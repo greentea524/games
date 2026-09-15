@@ -18,6 +18,8 @@
 export const GAMES = [
   {
     game: 'pocket-dungeon',
+    // The shell control that puts the game in DMG mode (#134).
+    paletteToggle: '#palette-toggle',
     // Tap A three times: title -> class select -> dungeon.
     advance: 3,
     scene: 'dungeon',
@@ -63,6 +65,8 @@ export const GAMES = [
   },
   {
     game: 'cart-crate',
+    // The shell control that puts the game in DMG mode (#134).
+    paletteToggle: '#palette-toggle',
     advance: 2,
     scene: 'board',
     surfaces: {
@@ -85,6 +89,8 @@ export const GAMES = [
   },
   {
     game: 'static',
+    // The shell control that puts the game in DMG mode (#134).
+    paletteToggle: '#palette-toggle',
     advance: 3,
     scene: 'world',
     surfaces: {
@@ -130,6 +136,8 @@ export const GAMES = [
   },
   {
     game: 'windup',
+    // The shell control that puts the game in DMG mode (#134).
+    paletteToggle: '#btn-palette',
     advance: 2,
     scene: 'platformer',
     surfaces: {

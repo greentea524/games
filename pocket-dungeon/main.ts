@@ -6,6 +6,7 @@ import { ShopScene } from './scenes/ShopScene'
 import { DungeonScene } from './scenes/DungeonScene'
 import { UIScene } from './scenes/UIScene'
 import { GameOverScene } from './scenes/GameOverScene'
+import { GameState } from './state'
 import { ensureCtx } from './audio'
 import { setupDpad } from '../shared/dpad'
 import { setupButtons } from '../shared/buttons'
@@ -95,3 +96,55 @@ setupDpad({
   dispatch: (type, code) => dispatchKey(code, type),
   onPress: ensureCtx,
 })
+
+// The palette toggle (#134).
+//
+// This game shipped with a DMG art set it could never display. `GameState`
+// had `setPaletteMode`, `DungeonScene` had `reloadPalette()`, `BootScene` built
+// every `_dmg` texture — and nothing called any of it, because the shell had no
+// control. `paletteMode` was `'gbc'` from load to unload, so all 79 DMG
+// textures were dead weight and the 32 of them `npm run qa:contrast` scores
+// were art no player could reach.
+//
+// Only the button was missing. The switch matches Static's and Cart & Crate's
+// rather than Windup's plain label, which makes it three of four on one style
+// instead of two and two, and it shows the current mode where a label cannot.
+const paletteBtn = document.getElementById('palette-toggle')
+if (paletteBtn) {
+  const labelEl = document.getElementById('palette-label')
+  const trackEl = document.getElementById('palette-track')
+  const knobEl = document.getElementById('palette-knob')
+
+  const updatePaletteBtn = () => {
+    const isGbc = GameState.paletteMode === 'gbc'
+    if (labelEl) {
+      labelEl.textContent = isGbc ? 'COLOR' : 'MONO'
+      labelEl.style.color = isGbc ? '#ffcc00' : '#9bbc0f'
+    }
+    if (trackEl) {
+      trackEl.style.background = isGbc ? '#1c2838' : '#0f140f'
+      trackEl.style.borderColor = isGbc ? '#385888' : '#306230'
+    }
+    if (knobEl) {
+      knobEl.style.transform = isGbc ? 'translateX(12px)' : 'translateX(0px)'
+      knobEl.style.background = isGbc ? '#ff4444' : '#9bbc0f'
+    }
+  }
+
+  paletteBtn.addEventListener('click', () => {
+    GameState.setPaletteMode(GameState.paletteMode === 'dmg' ? 'gbc' : 'dmg')
+    updatePaletteBtn()
+
+    // Both scenes that draw sprites, not just the dungeon. The sibling games
+    // each have one scene to reload; this one has a title screen with hero and
+    // enemy previews on it, and a toggle pressed there would otherwise look
+    // dead. `UIScene` needs nothing — it re-textures the relic pips from
+    // `paletteMode` every frame already.
+    const dungeon = game.scene.getScene('dungeon') as DungeonScene | null
+    if (dungeon?.scene.isActive()) dungeon.reloadPalette()
+    const title = game.scene.getScene('title') as TitleScene | null
+    if (title?.scene.isActive()) title.reloadPalette()
+  })
+
+  updatePaletteBtn()
+}
