@@ -356,13 +356,39 @@ for (const entry of GAMES) {
         let dmg = 0
         let gbc = 0
         const gbcSeen = []
+        const count = (key) => {
+          if (typeof key !== 'string') return
+          if (/_dmg(_|$)/.test(key)) dmg++
+          else if (/_gbc(_|$)/.test(key)) {
+            gbc++
+            gbcSeen.push(key)
+          }
+        }
         const walk = (list) => {
           for (const o of list) {
-            const key = o.texture?.key
-            if (typeof key === 'string') {
-              if (/_dmg(_|$)/.test(key)) dmg++
-              else if (/_gbc(_|$)/.test(key)) { gbc++; gbcSeen.push(key) }
-            }
+            count(o.texture?.key)
+            // A tilemap layer has no `texture` — its art is in `tileset[]`,
+            // one `Tileset` per image (#137). Static's entire ground is one
+            // such layer, so reading only `texture.key` reported that game as
+            // "6 DMG sprites" for a whole overworld and never looked at the
+            // floor. Counted once per tileset rather than once per tile: the
+            // bar below is "no GBC art on screen", and one is enough to fail.
+            //
+            // Tilemaps are the only such case, and that was enumerated rather
+            // than assumed — the assumption is what failed the first time.
+            // Every display object on the four games' active scenes in DMG
+            // mode, by class, and whether this walk can see its art:
+            //
+            //   Image, Sprite, ArcadeImage, ArcadeSprite   texture.key
+            //   ParticleEmitter                            texture.key
+            //   TilemapLayer                               tileset[].image.key
+            //   Container                                  none; walked into
+            //   Rectangle, Zone, Graphics                  carry no texture
+            //
+            // `Graphics` draws in palette *colours* rather than from a texture
+            // — Windup's energy bar, Pocket Dungeon's status bars — so there is
+            // no key to read and it is outside what this asks.
+            if (Array.isArray(o.tileset)) for (const t of o.tileset) count(t.image?.key)
             if (o.list) walk(o.list)
           }
         }
@@ -390,7 +416,7 @@ for (const entry of GAMES) {
       drawn.dmg > 0 && drawn.gbc === 0,
       drawn.gbc === 0
         ? `${drawn.dmg} DMG sprite(s), no GBC`
-        : `${drawn.dmg} DMG but ${drawn.gbc} GBC still drawn — ${drawn.gbcKeys.join(' ')} — reloadPalette is missing a sprite kind`,
+        : `${drawn.dmg} DMG but ${drawn.gbc} GBC still drawn — ${drawn.gbcKeys.join(' ')} — reloadPalette is missing a sprite kind or a tileset`,
     )
   }
 

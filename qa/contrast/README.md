@@ -214,6 +214,34 @@ looks broken, because the floor and the player *do* switch.
 Both are fixed. Windup's swap rewrites the key's suffix rather than naming each
 sprite, because the list is what produced the bug.
 
+### And it could not see a tilemap (#137)
+
+The walk read `o.texture?.key`, and a `Phaser.Tilemaps.TilemapLayer` has no
+`texture` — its art is in `tileset[]`, one `Tileset` per image. Static's whole
+ground is one such layer, so the check reported that game as **6 DMG sprites**
+for an entire overworld and never looked at the floor.
+
+Demonstrated both ways, which is the clearest statement of the gap. Pin
+Static's tileset to `tiles_gbc` so the sprites switch and the ground does not:
+
+| walk | result |
+| --- | --- |
+| before #137 | `ok — 6 DMG sprite(s), no GBC` |
+| after | `FAIL — 6 DMG but 1 GBC still drawn — tiles_gbc` |
+
+Static was never actually broken — its `reloadPalette` is a `scene.restart()`,
+so the map is rebuilt wholesale — but the check could not tell that from a game
+with no map at all.
+
+Tilemaps are the only such case, and that was **enumerated rather than
+assumed**, the assumption being what failed the first time. Across the four
+games' active scenes in DMG mode the display lists hold `Image`, `Sprite`,
+`ArcadeImage`, `ArcadeSprite`, `ParticleEmitter` (all with a `texture.key`),
+one `TilemapLayer`, plus `Container` (walked into), `Rectangle`, `Zone` and
+`Graphics` — the last three carrying no texture at all. `Graphics` draws in
+palette *colours* rather than from a texture, so there is no key to read and it
+is outside what this check asks.
+
 ## The three.js games are not here
 
 Tower Stacker (#110) and Tube Runner (#111) have no textures at all — their

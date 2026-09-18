@@ -105,6 +105,11 @@ found two more: both `reloadPalette` implementations are a list of sprite kinds,
 and Cart & Crate's decor and Windup's whole backdrop were missing from theirs.
 Prefer rewriting the key's palette suffix over naming each sprite.
 
+That walk read `texture.key`, which a tilemap layer does not have — so Static's
+whole ground went unexamined and the check called a six-sprite overworld clean
+(#137). It reads `tileset[].image.key` too now. Enumerate what is actually on a
+display list before trusting a walk over it; assuming was the error both times.
+
 **When a light feature lands on the light floor, outline it — do not retone
 it.** There are four tones and the dark two are usually already in use, so a
 face or a bone drawn dark enough to survive the grass stops reading as a face
