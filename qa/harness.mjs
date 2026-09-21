@@ -97,3 +97,89 @@ export async function startDevServer({ port = '5178', reuse = process.env.QA_URL
   }
   return { url, spawned: true, stop, logText }
 }
+
+/**
+ * Serves a directory over HTTP the way GitHub Pages does, for #135.
+ *
+ * The one property that matters is the one Vite's own servers do not have:
+ * **an unmatched path gets a 404.** Both `vite` and `vite preview` fall back to
+ * serving `index.html`, so a missing asset, a wrong `base` or a filename whose
+ * case is only right on this filesystem all answer 200 against them and 404 on
+ * Pages. `qa/touch/README.md` has said so since it was written, and until this
+ * existed nothing in the repo ever served anything else — so the only defect
+ * class the repo had written down as invisible was invisible on every run.
+ *
+ * `mount` matters as much. The built pages reference `/games/assets/...`
+ * absolutely, because `vite.config.ts` sets `base: '/games/'`, so a server that
+ * hands `dist/` out at the root serves pages whose every asset 404s. Mounting
+ * at `/games/` is what Pages does with this repo.
+ */
+export async function startStaticServer({ dir, port = '5181', mount = '/games/' } = {}) {
+  const { createServer } = await import('node:http')
+  const { join, normalize, extname } = await import('node:path')
+
+  const TYPES = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.mjs': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.svg': 'image/svg+xml',
+    '.webp': 'image/webp',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+    '.mp3': 'audio/mpeg',
+    '.ogg': 'audio/ogg',
+    '.wav': 'audio/wav',
+    '.ico': 'image/x-icon',
+    '.wasm': 'application/wasm',
+    '.map': 'application/json; charset=utf-8',
+  }
+
+  const server = createServer((req, res) => {
+    const send = (code, body = '', type = 'text/plain; charset=utf-8') => {
+      res.writeHead(code, { 'content-type': type })
+      res.end(body)
+    }
+    let path
+    try {
+      path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname)
+    } catch {
+      return send(400, 'bad request')
+    }
+    if (!path.startsWith(mount)) return send(404, 'not found')
+    let rel = path.slice(mount.length)
+    if (rel.endsWith('/') || rel === '') rel += 'index.html'
+    // `normalize` collapses `..`, and the prefix test is what stops a request
+    // escaping the served directory.
+    const full = normalize(join(dir, rel))
+    if (!full.startsWith(normalize(dir))) return send(403, 'forbidden')
+    let body
+    try {
+      body = fs.readFileSync(full)
+    } catch {
+      // No index.html fallback. This is the whole point of the file.
+      return send(404, 'not found')
+    }
+    send(200, body, TYPES[extname(full).toLowerCase()] ?? 'application/octet-stream')
+  })
+
+  await new Promise((resolve, reject) => {
+    server.on('error', reject)
+    server.listen(Number(port), '127.0.0.1', resolve)
+  })
+  const url = `http://localhost:${port}${mount}`
+  return {
+    url,
+    spawned: true,
+    stop() {
+      server.close()
+    },
+    logText: () => '',
+  }
+}
