@@ -8,7 +8,11 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# Anchored, so it means the Vite build output at the repo root and not any
+# directory that happens to be called dist. Unanchored, it also swallowed
+# `qa/dist/` — the suite that checks the build output (#135) — which git then
+# refused to track, silently, because an ignored path is not an error.
+/dist
 dist-ssr
 *.local
 

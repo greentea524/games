@@ -40,6 +40,7 @@ npm run qa:contrast# DMG sprites must not be drawn in their background's tone
 npm run qa:painted # the five painted hub cards still match their games (#132)
 npm run qa:units   # pure-logic checks (floor modifiers, storage migration)
 npm run qa:csp     # the CSP's script hashes still match the scripts (#108)
+npm run qa:dist    # the site as it ships: every page loaded from dist/ (#135)
 ```
 
 `*_test.ts` files run under `tsx` and use `process.exit`, so they are excluded
@@ -131,6 +132,15 @@ in `shared/stage3d.ts` is the fix and it was opt-in, which is why it kept
 happening; #133 made it enforced, so every light built by a file on that stage
 must take its intensity from the helper or `npm run qa:units` fails. The factor
 is right for the diffuse response of every lit material three ships.
+
+**Every other suite runs against `npm run dev`, which cannot 404 (#135).** Vite
+and `vite preview` both fall back to serving index.html for an unmatched path,
+so a missing asset, a wrong `base` or a filename whose case is only right on
+this filesystem all answer 200 in dev and 404 on Pages — the one defect class
+that reaches production, since `main` deploys straight there. `npm run qa:dist`
+builds, serves `dist/` from a server that returns real 404s, and loads all
+twelve pages. Measured: a literal `/games/src/...` asset path fails against
+`dist/` and is completely green in dev, where the path itself answers 200.
 
 **The CSP hashes an inline script, and a stale hash fails silently.** Editing
 the pre-init sizing script in any `index.html` changes its hash; the browser

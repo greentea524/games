@@ -27,7 +27,13 @@ a host the repo does not control and the exemption went with it.
 Note that a missing asset only shows up against a **built** site. Both the
 Vite dev server and `vite preview` fall back to serving index.html for an
 unmatched path, so everything answers 200 there; GitHub Pages returns a real
-404. Point `QA_URL` at a static server over `dist/` to exercise that path.
+404.
+
+That is `npm run qa:dist`'s job now (#135) — it builds, serves `dist/` from a
+server that returns real 404s, and loads every page. For four issues this
+paragraph ended "point `QA_URL` at a static server over `dist/` to exercise
+that path" and nothing ever did, which made this the only defect class the repo
+had written down as invisible *and* left invisible. See `qa/dist/README.md`.
 
 ## What they check
 
