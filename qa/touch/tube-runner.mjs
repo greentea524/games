@@ -33,7 +33,7 @@
 // every other check here green, because the rings still reached the top of the
 // range and the wall still sat at the bottom — the ribs simply stopped
 // existing in between, and nothing was asking about the middle.
-import { launchTouch, canvasPoint, gameUrl, checker, PAD, ACT } from './driver.mjs'
+import { launchTouch, canvasPoint, gameUrl, checker, PAD, ACT, checkSound } from './driver.mjs'
 
 const { check, finish } = checker()
 
@@ -588,12 +588,19 @@ async function run() {
 
   // ------------------------------------------------------------- the sound
 
-  const label = () => page.evaluate(() => document.querySelector('.tr-sound')?.textContent)
-  const on = await label()
-  await page.evaluate(() => document.querySelector('.tr-sound').click())
-  check('the sound can be turned off', (await label()) !== on, `${on} -> ${await label()}`)
-  await page.evaluate(() => document.querySelector('.tr-sound').click())
-  check('and back on', (await label()) === on, on)
+  // Listened to rather than read off the label (#136). A tap starts or retries a
+  // run, and both play a blip.
+  await checkSound({
+    page,
+    check,
+    selector: '.tr-sound',
+    play: async () => {
+      for (let i = 0; i < 4; i++) {
+        await hand.tap(PAD, right.x, right.y)
+        await page.waitForTimeout(500)
+      }
+    },
+  })
 
   check(
     'there is a way back to the hub',

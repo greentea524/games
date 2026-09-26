@@ -16,7 +16,7 @@
 // The stacking arithmetic, and the frustum that has to be wide enough for the
 // slide on any shape of screen, are in `tower-stacker/stack_test.ts` under
 // `npm run qa:units`.
-import { launchTouch, canvasPoint, gameUrl, checker, PAD } from './driver.mjs'
+import { launchTouch, canvasPoint, gameUrl, checker, PAD, checkSound } from './driver.mjs'
 
 const { check, finish } = checker()
 
@@ -376,12 +376,20 @@ async function run() {
 
   // ------------------------------------------------------------- the sound
 
-  const label = () => page.evaluate(() => document.querySelector('.ts-sound')?.textContent)
-  const on = await label()
-  await page.evaluate(() => document.querySelector('.ts-sound').click())
-  check('the sound can be turned off', (await label()) !== on, `${on} -> ${await label()}`)
-  await page.evaluate(() => document.querySelector('.ts-sound').click())
-  check('and back on', (await label()) === on, on)
+  // Listened to rather than read off the label (#136). A tap drops a block, and
+  // landing one is this game's noise.
+  await checkSound({
+    page,
+    check,
+    selector: '.ts-sound',
+    play: async () => {
+      const spot = await canvasPoint(page, 0.5, 0.5, '#stage canvas')
+      for (let i = 0; i < 4; i++) {
+        await hand.tap(PAD, spot.x, spot.y)
+        await page.waitForTimeout(500)
+      }
+    },
+  })
 
   check(
     'there is a way back to the hub',

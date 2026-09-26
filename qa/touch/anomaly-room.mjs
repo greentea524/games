@@ -12,7 +12,7 @@
 // case that actually breaks — a slightly shaky tap that turns the room instead
 // of flagging, or a short drag that flags something on the way past and spends
 // a guess the player never meant to.
-import { launchTouch, canvasPoint, gameUrl, checker, PAD } from './driver.mjs'
+import { launchTouch, canvasPoint, gameUrl, checker, PAD, checkSound } from './driver.mjs'
 
 const { check, finish } = checker()
 
@@ -250,18 +250,26 @@ async function run() {
 
   // ---------------------------------------------------------- the sound
 
-  const soundLabel = () => page.evaluate(() => document.querySelector('.ar-sound')?.textContent)
   check(
     'mouse look is not offered on a touch device',
     await page.evaluate(() => document.querySelector('.ar-look')?.hidden === true),
     'nothing to lock on a phone',
   )
-  const onLabel = await soundLabel()
-  await page.evaluate(() => document.querySelector('.ar-sound').click())
-  const offLabel = await soundLabel()
-  check('the sound can be turned off', onLabel !== offLabel, `${onLabel} -> ${offLabel}`)
-  await page.evaluate(() => document.querySelector('.ar-sound').click())
-  check('and back on', (await soundLabel()) === onLabel, onLabel)
+  // Listened to rather than read off the label (#136). This game is the reason
+  // `MUTE_SETTLE_MS` exists: its master gain fades with `setTargetAtTime`, so
+  // measuring the instant the button is clicked catches the ramp.
+  await checkSound({
+    page,
+    check,
+    selector: '.ar-sound',
+    play: async () => {
+      const spot = await canvasPoint(page, 0.5, 0.5, '#stage canvas')
+      for (let i = 0; i < 4; i++) {
+        await hand.tap(PAD, spot.x, spot.y)
+        await page.waitForTimeout(500)
+      }
+    },
+  })
 
   // ------------------------------------------------------------- the save
 
