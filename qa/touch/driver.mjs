@@ -116,7 +116,11 @@ const AUDIO_PROBE = `
 
 `
 
-export async function launchTouch(url) {
+/**
+ * @param url the game to open
+ * @param options.reducedMotion 'reduce' to emulate the media preference (#138)
+ */
+export async function launchTouch(url, options = {}) {
   let browser
   try {
     browser = await chromium.launch(browserLaunchOptions())
@@ -131,6 +135,10 @@ export async function launchTouch(url) {
     hasTouch: true,
     isMobile: true,
     deviceScaleFactor: 3,
+    // Emulated at the context, so `matchMedia` answers before any game script
+    // runs — `shared/motion.ts` is read during `create()` in two of the four
+    // games, and a preference applied after load would arrive too late.
+    ...(options.reducedMotion ? { reducedMotion: options.reducedMotion } : {}),
   })
   // Installed before any page script, so the games' own `new AudioContext()`
   // already sees the patched `destination`. See `AUDIO_PROBE`.

@@ -137,6 +137,22 @@ export interface TowerGame {
   perfectFlash(): number
   /** Seconds since load, for the HUD's blinking prompts. */
   clock(): number
+  /**
+   * Camera shake left to play out, in world units.
+   *
+   * Exposed for #138, because it is the only one of this game's three
+   * reduced-motion effects a check can reach: the chips' spin lives on
+   * throwaway meshes and the HUD's flash hold needs a *perfect* drop, which a
+   * CDP tap cannot reliably land on a 0.04-unit window — the reason
+   * `stack_test.ts` exists at all.
+   *
+   * Measuring the frame instead was tried and does not work: the mean
+   * frame-to-frame difference after a landing is 0.62 to 1.16 normally and
+   * 0.65 to 0.99 under the preference, which overlap completely, because the
+   * sliding block and the rising tower move far more of the screen than the
+   * shake does.
+   */
+  shake(): number
   /** Start, or retry from the end screen. */
   press(): void
   stage: Stage3D
@@ -595,6 +611,7 @@ export function createGame(parent: HTMLElement): TowerGame {
     isRecord: () => isRecord,
     perfectFlash: () => perfectFlash,
     clock: () => elapsed,
+    shake: () => shake,
     press,
     stage,
     onChange(fn) {
