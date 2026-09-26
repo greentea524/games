@@ -20,6 +20,102 @@ export function gameUrl(name) {
   return new URL(`${name}/`, BASE_URL.endsWith('/') ? BASE_URL : `${BASE_URL}/`).toString()
 }
 
+const AUDIO_PROBE = `
+/**
+ * Listens to what the games actually put out, for #136.
+ *
+ * Three touch suites check the sound control by asserting the *label* changed,
+ * and nothing anywhere asserted a sound. \`playBlip\` wired to nothing, a context
+ * left suspended, a master gain stuck at 0, or a toggle that flips the label and
+ * not the gain — every one of those passed. The last is the sharp case, because
+ * a label changing is exactly what a broken toggle also does.
+ *
+ * So this measures the signal rather than the intent. Installed before any page
+ * script runs, it replaces the \`destination\` getter every game reaches for with
+ * an \`AnalyserNode\` that forwards to the real output, and keeps the peak RMS
+ * seen since the last reset.
+ *
+ * An analyser rather than a count of \`createOscillator\` calls, deliberately:
+ * counting calls measures what the game meant to do, and a master gain at 0 —
+ * which is what a half-wired mute looks like — leaves the count untouched and
+ * the room silent. The samples are the only thing that knows the difference.
+ *
+ * It is a pass-through, so nothing about what a player would hear changes; and
+ * it exists only under this driver, never in a shipped page.
+ *
+ * Peak-held rather than sampled on demand: the shortest sound in the repo is a
+ * 55 ms ring clear, so a single read after the fact would usually land in
+ * silence and report a game that had just made a noise as mute.
+ */
+;(() => {
+  try {
+    const proto = window.BaseAudioContext?.prototype ?? window.AudioContext?.prototype
+    if (!proto) return
+    const real = Object.getOwnPropertyDescriptor(proto, 'destination')
+    if (!real?.get) return
+
+    const state = { analysers: [], peak: 0, contexts: 0 }
+    window.__audio = {
+      /** Peak RMS across every context since the last reset. */
+      peak: () => state.peak,
+      /** How many contexts the page built — 0 means nothing even tried. */
+      contexts: () => state.contexts,
+      reset() {
+        state.peak = 0
+      },
+    }
+
+    Object.defineProperty(proto, 'destination', {
+      configurable: true,
+      get() {
+        const output = real.get.call(this)
+        // \`createAnalyser\` can reach for \`destination\` itself; without this the
+        // getter recurses until the stack gives out.
+        if (this.__probing) return output
+        if (!this.__probe) {
+          this.__probing = true
+          try {
+            const analyser = this.createAnalyser()
+            analyser.fftSize = 2048
+            analyser.connect(output)
+            this.__probe = analyser
+            state.analysers.push(analyser)
+            state.contexts++
+          } catch {
+            this.__probe = null
+          } finally {
+            this.__probing = false
+          }
+        }
+        return this.__probe ?? output
+      },
+    })
+
+    const buf = new Float32Array(2048)
+    const tick = () => {
+      for (const a of state.analysers) {
+        try {
+          a.getFloatTimeDomainData(buf)
+        } catch {
+          continue
+        }
+        let sum = 0
+        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i]
+        const rms = Math.sqrt(sum / buf.length)
+        if (rms > state.peak) state.peak = rms
+      }
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  } catch {
+    // A driver that breaks the page it is measuring is worse than one that
+    // measures nothing, and \`window.__audio\` being absent is a loud failure in
+    // the checks that use it.
+  }
+})()
+
+`
+
 export async function launchTouch(url) {
   let browser
   try {
@@ -36,6 +132,9 @@ export async function launchTouch(url) {
     isMobile: true,
     deviceScaleFactor: 3,
   })
+  // Installed before any page script, so the games' own `new AudioContext()`
+  // already sees the patched `destination`. See `AUDIO_PROBE`.
+  await context.addInitScript(AUDIO_PROBE)
   const page = await context.newPage()
   const log = []
   page.on('pageerror', (e) => log.push({ kind: 'pageerror', text: e.message }))
@@ -195,4 +294,103 @@ export function checker() {
       return results.every(Boolean)
     },
   }
+}
+
+/** Peak RMS the page has put out since `resetAudio`, and how many contexts exist. */
+export async function audioPeak(page) {
+  return page.evaluate(() => {
+    if (!window.__audio) return { missing: true }
+    return { peak: window.__audio.peak(), contexts: window.__audio.contexts() }
+  })
+}
+
+/** Zeroes the peak hold, so the next reading covers only what follows it. */
+export async function resetAudio(page) {
+  await page.evaluate(() => window.__audio?.reset())
+}
+
+/**
+ * The peak RMS above which the page is making a sound rather than not.
+ *
+ * Calibrated, not chosen. Peak RMS through `AUDIO_PROBE` while each game is
+ * playing normally, against the same measurement with its sound turned off:
+ *
+ *   game            playing   muted
+ *   anomaly-room     0.0162     0
+ *   tube-runner      0.0286     0
+ *   tower-stacker    0.0866     0
+ *
+ * 0.004 sits a factor of four below the quietest game that is audible and well
+ * clear of the silence, which is exact in all three.
+ */
+export const AUDIBLE = 0.004
+
+/**
+ * How long to wait after the mute control before measuring silence.
+ *
+ * Not padding. Anomaly Room fades its master gain with
+ * `setTargetAtTime(0, now, 0.05)`, which approaches zero exponentially and
+ * never arrives, and its drone is continuous — so a check that zeroes the peak
+ * hold the instant the button is clicked measures the *ramp* and reports a leak.
+ * It read 2.9e-3 that way, most of the way to `AUDIBLE`, which would have
+ * looked like a flaky threshold rather than a mismeasurement. At 300 ms — six
+ * time constants — every game reads exactly 0.
+ */
+export const MUTE_SETTLE_MS = 300
+
+/**
+ * Checks a game's sound control by listening to it (#136).
+ *
+ * The three suites with a sound button each asserted that its *label* changed,
+ * and nothing asserted a sound. That passes for a `playBlip` wired to nothing,
+ * a context left suspended, a master gain stuck at 0, and — the sharp case — a
+ * toggle that flips the label and not the gain, because a label changing is
+ * exactly what a broken toggle also does.
+ *
+ * `play` is the game's own way of making a noise, supplied by the caller: the
+ * driver has no idea which gesture is loud in which game, and guessing is how a
+ * check ends up asserting silence against a game nobody asked to make a sound.
+ *
+ * Shared rather than copied into three suites because `MUTE_SETTLE_MS` is a
+ * trap worth solving once.
+ */
+export async function checkSound({ page, check, selector, play }) {
+  const text = () => page.evaluate((s) => document.querySelector(s)?.textContent, selector)
+  const click = () => page.evaluate((s) => document.querySelector(s).click(), selector)
+  const measure = async () => {
+    await resetAudio(page)
+    await play()
+    return audioPeak(page)
+  }
+
+  const on = await text()
+  const loud = await measure()
+  check(
+    'the game makes a sound at all',
+    !loud.missing && loud.peak >= AUDIBLE,
+    loud.missing
+      ? 'window.__audio is absent — the probe did not install'
+      : `peak ${loud.peak.toFixed(4)} over ${loud.contexts} context(s), floor ${AUDIBLE}`,
+  )
+
+  await click()
+  const off = await text()
+  check('the control reports it off', off !== on, `${on} -> ${off}`)
+  await page.waitForTimeout(MUTE_SETTLE_MS)
+  const quiet = await measure()
+  check(
+    'and nothing comes out of it',
+    quiet.peak < AUDIBLE,
+    `peak ${quiet.peak.toExponential(2)} against floor ${AUDIBLE}`,
+  )
+
+  await click()
+  check('the control reports it back on', (await text()) === on, on)
+  await page.waitForTimeout(MUTE_SETTLE_MS)
+  const again = await measure()
+  check(
+    'and the sound comes back',
+    again.peak >= AUDIBLE,
+    `peak ${again.peak.toFixed(4)} — a mute that cannot be undone passes the label checks too`,
+  )
 }

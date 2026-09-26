@@ -142,6 +142,17 @@ builds, serves `dist/` from a server that returns real 404s, and loads all
 twelve pages. Measured: a literal `/games/src/...` asset path fails against
 `dist/` and is completely green in dev, where the path itself answers 200.
 
+**Sound was checked as a label for three games and as sound for none (#136).**
+The suites asserted the button's text changed, which is also what a toggle that
+flips the label and not the gain does. `driver.mjs` now installs an
+`AnalyserNode` in front of `destination` before any page script and holds the
+peak RMS, and `checkSound` mutes, replays and unmutes. Two traps are written
+down there: measure the instant the button is clicked and you catch Anomaly
+Room's mute *ramp* rather than its silence, and a brand-new `AudioContext` is
+`running` in this headless browser, so a suspended-context defect cannot be
+staged under the driver at all. The Phaser five's mute lives in an in-game menu
+and is still unchecked.
+
 **The CSP hashes an inline script, and a stale hash fails silently.** Editing
 the pre-init sizing script in any `index.html` changes its hash; the browser
 then declines to run it, nothing throws, and every functional check goes on

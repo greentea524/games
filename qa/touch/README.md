@@ -35,6 +35,57 @@ paragraph ended "point `QA_URL` at a static server over `dist/` to exercise
 that path" and nothing ever did, which made this the only defect class the repo
 had written down as invisible *and* left invisible. See `qa/dist/README.md`.
 
+## Sound is listened to, not read off a label (#136)
+
+Three suites — `tower-stacker`, `tube-runner`, `anomaly-room` — used to check
+the sound control by asserting the button's *text* changed. That passes for a
+`playBlip` wired to nothing, a master gain stuck at 0, and, most sharply, a
+toggle that flips the label and not the gain: a label changing is exactly what a
+broken toggle also does.
+
+`AUDIO_PROBE` in `driver.mjs` is installed before any page script and replaces
+the `destination` getter every game reaches for with an `AnalyserNode` that
+forwards to the real output, holding the peak RMS since the last reset. An
+analyser rather than a tally of `createOscillator` calls, because a count
+measures what the game *meant* to do and a gain at 0 leaves it untouched. Peak
+*held*, because the shortest sound in the repo is a 55 ms ring clear and a read
+after the fact would land in silence.
+
+`checkSound` drives it: make a noise, mute, make the same noise, unmute, make it
+again. Four checks where there were two. Measured peaks, playing against muted:
+
+| game | playing | muted |
+| --- | --- | --- |
+| anomaly-room | 0.0182 | 1.5e-6 |
+| tube-runner | 0.0524 | 0 |
+| tower-stacker | 0.0866 | 0 |
+
+`AUDIBLE = 0.004` sits a factor of four below the quietest game.
+
+**`MUTE_SETTLE_MS` is the trap, and it is solved once here rather than three
+times.** Anomaly Room fades its master with `setTargetAtTime(0, now, 0.05)`,
+which approaches zero and never arrives, over a continuous drone — so zeroing
+the peak hold the instant the button is clicked measures the *ramp*. It read
+2.9e-3 that way, most of the way to the floor, which would have looked like a
+flaky threshold rather than a mismeasurement. At 300 ms every game reads zero.
+
+Three controls, each watched go red: the `if (muted) return` guard removed so
+the label flips and the sound does not stop (`4.8e-2` against a 0.004 floor);
+the oscillators never connected to the output (0 contexts, so the probe was
+never even reached); and a `setMuted` that ignores `false`, which fails *"the
+sound comes back"* — the check that a mute can be undone.
+
+**A fourth mode cannot be staged here, and that is worth knowing rather than
+assuming.** A context left suspended should be silent, but a brand-new
+`AudioContext` in this headless browser reports `running` with no gesture at all
+(`hasBeenActive` also reads true, so the cause is not cleanly attributable). So
+`ensureCtx`'s `resume()` is untested by construction — not by oversight.
+
+The Phaser five are not covered. Their mute is a menu item inside the game
+(`Sound: ON/OFF` in Static's pause menu) rather than a button in the shell, so
+reaching it means driving each game's own menu — a larger job than #136's, and
+a separate one.
+
 ## What they check
 
 **`static.mjs`** — the d-pad turning rather than walking, A opening and
