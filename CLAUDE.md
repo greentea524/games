@@ -41,6 +41,7 @@ npm run qa:painted # the five painted hub cards still match their games (#132)
 npm run qa:units   # pure-logic checks (floor modifiers, storage migration)
 npm run qa:csp     # the CSP's script hashes still match the scripts (#108)
 npm run qa:dist    # the site as it ships: every page loaded from dist/ (#135)
+npm run qa:motion  # prefers-reduced-motion is honoured, paired runs (#138)
 ```
 
 `*_test.ts` files run under `tsx` and use `process.exit`, so they are excluded
@@ -152,6 +153,19 @@ Room's mute *ramp* rather than its silence, and a brand-new `AudioContext` is
 `running` in this headless browser, so a suspended-context defect cannot be
 staged under the driver at all. The Phaser five's mute lives in an in-game menu
 and is still unchecked.
+
+**Reduced motion is honoured in four games, and the check is a *pair* (#138).**
+`shared/motion.ts` is read at six sites and nothing measured any of them until
+`qa:motion`, which loads each game twice — once plain, once with the preference
+emulated — and asserts the motion is there by default and gone under it, plus a
+denominator saying the run was equally busy both ways. "Nothing moved" alone is
+satisfied by a game that never moved. Emulate on the context, not after load:
+two of the four read the preference during `create()`.
+
+The other four stage3d games never call it and that is correct — none has
+decorative motion. Anomaly Room looks like the exception and is the clearest
+case: its renderer contains no time-varying transform at all, because the room
+is still by design.
 
 **The CSP hashes an inline script, and a stale hash fails silently.** Editing
 the pre-init sizing script in any `index.html` changes its hash; the browser
