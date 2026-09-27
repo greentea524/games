@@ -6,7 +6,16 @@
 // opaque every frame, with a white circle erased at each light. Erasing is
 // what makes the cut-out show the world underneath rather than a lighter
 // shade of overlay.
+//
+// The two pieces of arithmetic live in `shared/darkness.ts` and are checked by
+// `shared/darkness_test.ts` (#139). They are there rather than here because
+// Phaser touches `window` when it is imported, so anything importing this file
+// cannot run under `tsx` — the same reason `tower-stacker/framing.ts` exists
+// apart from its game. What is left in this file is Phaser plumbing, and it
+// answers to the eye: an overlay that paints an opaque rectangle over the game
+// is the most visible defect a person can have.
 import Phaser from 'phaser'
+import { brushRadius, reachesScreen } from './darkness'
 
 export interface Light {
   /** Centre, in world coordinates — conversion to screen space is handled here. */
@@ -39,7 +48,7 @@ const BRUSH_PREFIX = '__light_brush_'
  * rounding, a smoothly shrinking radius would mint a texture per frame.
  */
 function brushTexture(scene: Phaser.Scene, radius: number): string {
-  const r = Math.max(1, Math.round(radius))
+  const r = brushRadius(radius)
   const key = `${BRUSH_PREFIX}${r}`
   if (!scene.textures.exists(key)) {
     const g = scene.make.graphics({}, false)
@@ -95,20 +104,11 @@ export class Darkness {
     for (const light of lights) {
       if (light.radius <= 0) continue
 
-      const r = Math.max(1, Math.round(light.radius))
+      const r = brushRadius(light.radius)
       const sx = light.x - cam.scrollX
       const sy = light.y - cam.scrollY
 
-      // Skip lights whose circle cannot reach the screen. Cheap here, and it
-      // matters for a game that lights every torch on a floor at once.
-      if (
-        sx + r < 0 ||
-        sy + r < 0 ||
-        sx - r > this.rt.width ||
-        sy - r > this.rt.height
-      ) {
-        continue
-      }
+      if (!reachesScreen(sx, sy, r, this.rt.width, this.rt.height)) continue
 
       this.brush.setTexture(brushTexture(this.scene, r))
       // setTexture does not always resize an Image that has had an explicit

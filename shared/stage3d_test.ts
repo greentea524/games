@@ -1,6 +1,14 @@
 // Every light on the standalone 3D stage goes through `lambertIntensity` (#133).
 //
-//   npx tsx shared/lighting_test.ts
+//   npx tsx shared/stage3d_test.ts
+//
+// Named for `shared/stage3d.ts`, whose contract this enforces. It was
+// `lighting_test.ts` until #139, which was wrong twice over: this file has
+// nothing to do with `shared/lighting.ts` — a darkness overlay for the Phaser
+// games — and the name implied that module was covered when it had no check at
+// all. `X_test.ts` beside `X.ts` means it tests `X` everywhere else here
+// (`storage.ts`, `relics.ts`), so the name has to mean that or say something
+// else.
 //
 // ## The defect this exists for
 //
@@ -154,6 +162,67 @@ export function findLights(src: string): Light[] {
 /** The intensity argument is three's second, and may be absent (it defaults to 1). */
 export const intensityOf = (light: Light): string | null => light.args[1] ?? null
 
+/**
+ * Blanks comments, keeping every offset and newline.
+ *
+ * #139 found this the hard way, and the way it found it is the point. Renaming
+ * this file put the string `shared/stage3d_test.ts` into `shared/stage3d.ts`'s
+ * own docstring, which made that file match the scan below — and its docstring
+ * *illustrates the defect* with `new THREE.AmbientLight(0xffffff, 0.55)` in
+ * prose. The check reported the documentation of the bug as the bug.
+ *
+ * A scanner that reads comments as code is wrong beyond that one file: any game
+ * documenting why the helper exists would trip it, and the fix would look like
+ * deleting the explanation.
+ *
+ * Replaced with spaces rather than removed so the reported line numbers still
+ * point at the real line. Strings are respected, because `'https://x'` and
+ * `"/* "` both appear in ordinary code and neither starts a comment.
+ */
+export function stripComments(src: string): string {
+  let out = ''
+  let i = 0
+  const blank = (text: string) => text.replace(/[^\n]/g, ' ')
+  while (i < src.length) {
+    const two = src.slice(i, i + 2)
+    if (two === '//') {
+      const end = src.indexOf('\n', i)
+      const stop = end === -1 ? src.length : end
+      out += blank(src.slice(i, stop))
+      i = stop
+    } else if (two === '/*') {
+      const end = src.indexOf('*/', i + 2)
+      const stop = end === -1 ? src.length : end + 2
+      out += blank(src.slice(i, stop))
+      i = stop
+    } else if (src[i] === "'" || src[i] === '"' || src[i] === '`') {
+      const quote = src[i]
+      let j = i + 1
+      while (j < src.length && src[j] !== quote) {
+        if (src[j] === '\\') j++
+        j++
+      }
+      out += src.slice(i, Math.min(j + 1, src.length))
+      i = j + 1
+    } else {
+      out += src[i]
+      i++
+    }
+  }
+  return out
+}
+
+/**
+ * Whether a file is *on* the stage, meaning it imports it.
+ *
+ * `includes('shared/stage3d')` was the first version and it matches a mention,
+ * not an import — so the moment this file's own name appeared in `stage3d.ts`'s
+ * docstring, `stage3d.ts` counted as one of its own consumers.
+ */
+export function importsStage3d(src: string): boolean {
+  return /from\s+['"][^'"]*shared\/stage3d['"]/.test(src)
+}
+
 // --- the scanner has to prove it works, every run --------------------------
 //
 // A source check that silently matches nothing reports "all clear" forever,
@@ -195,10 +264,59 @@ export const intensityOf = (light: Light): string | null => light.args[1] ?? nul
   )
 }
 
+{
+  // The two helpers #139 added, against the exact shapes that fooled the first
+  // version. Fixtures rather than the repository, for the reason the parser's
+  // fixture exists: a scanner has to be shown working before it is trusted.
+  const PROSE = [
+    '/**',
+    " * past it: `new THREE.AmbientLight(0xffffff, 0.55)` compiles and looks dark.",
+    ' */',
+    "const url = 'https://example.com/a//b'",
+    'scene.add(new THREE.AmbientLight(0xffffff, lambertIntensity(0.55))) // real',
+    "const notAComment = '/* still a string */'",
+  ].join('\n')
+  const stripped = stripComments(PROSE)
+  check(
+    'comments are blanked and code is not',
+    !stripped.includes('compiles and looks dark') && stripped.includes('lambertIntensity(0.55)'),
+    'the prose example is gone, the real light remains',
+  )
+  check(
+    'and a URL inside a string survives its double slash',
+    stripped.includes('https://example.com/a//b'),
+    "'//' in a string does not start a comment",
+  )
+  check(
+    'and offsets are preserved, so reported line numbers stay true',
+    stripped.length === PROSE.length &&
+      stripped.split('\n').length === PROSE.split('\n').length,
+    `${stripped.length} chars over ${stripped.split('\n').length} lines, unchanged`,
+  )
+  check(
+    'stripping is what stops the prose example being read as a light',
+    findLights(PROSE).length === 2 && findLights(stripped).length === 1,
+    `${findLights(PROSE).length} found raw, ${findLights(stripped).length} after stripping`,
+  )
+
+  check(
+    'a file is on the stage when it imports it',
+    importsStage3d("import { createStage3D } from '../shared/stage3d'") &&
+      importsStage3d('import type { Stage3D } from "../shared/stage3d"'),
+    'both quote styles',
+  )
+  check(
+    'and merely naming it is not enough',
+    !importsStage3d(' * `shared/stage3d_test.ts` is what makes that true.') &&
+      !importsStage3d('// see shared/stage3d for the helper'),
+    'the mention that made stage3d.ts a consumer of itself',
+  )
+}
+
 // --- the repository --------------------------------------------------------
 
 const files = sources(ROOT)
-const onStage = files.filter((f) => readFileSync(f, 'utf8').includes('shared/stage3d'))
+const onStage = files.filter((f) => importsStage3d(readFileSync(f, 'utf8')))
 check(
   'there are files on the standalone 3D stage to check',
   onStage.length > 0,
@@ -207,7 +325,9 @@ check(
 
 const lit: { file: string; light: Light }[] = []
 for (const file of onStage) {
-  for (const light of findLights(readFileSync(file, 'utf8'))) lit.push({ file, light })
+  for (const light of findLights(stripComments(readFileSync(file, 'utf8')))) {
+    lit.push({ file, light })
+  }
 }
 check(
   'and they build lights',
@@ -239,7 +359,7 @@ check(
 // that it stays that way rather than becoming the next way in.
 const assigned: string[] = []
 for (const file of onStage) {
-  const src = readFileSync(file, 'utf8')
+  const src = stripComments(readFileSync(file, 'utf8'))
   src.split('\n').forEach((line, i) => {
     if (/\.intensity\s*=(?!=)/.test(line) && !line.includes('lambertIntensity(')) {
       assigned.push(`${relative(ROOT, file)}:${i + 1} ${line.trim()}`)
@@ -252,5 +372,5 @@ check(
   assigned.length ? assigned.join('; ') : 'no post-construction assignment',
 )
 
-console.log(ok ? '\nALL LIGHTING CHECKS PASS' : '\nFAILURES ABOVE')
+console.log(ok ? '\nALL STAGE3D LIGHTING CHECKS PASS' : '\nFAILURES ABOVE')
 process.exit(ok ? 0 : 1)

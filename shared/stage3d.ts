@@ -45,9 +45,11 @@ const MAX_PIXEL_RATIO = 2
  * which is why the helper exists at all — a rig written from the brightness
  * you want is right, and this is what makes it so.
  *
- * **Calling it is not optional, and `shared/lighting_test.ts` is what makes
+ * **Calling it is not optional, and `shared/stage3d_test.ts` is what makes
  * that true (#133).** The helper being correct never stopped anyone reaching
  * past it: `new THREE.AmbientLight(0xffffff, 0.55)` compiles, runs, and looks
+ * — that example survives here only because the check strips comments before
+ * scanning, which it learned to do in #139 after reporting this very line —
  * plausibly-but-wrongly dark, which is how a fix that had existed since the
  * first game went on costing three more. Under `npm run qa:units`, every light
  * built by a file on this stage must take its intensity from here.

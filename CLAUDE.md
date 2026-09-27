@@ -131,8 +131,10 @@ Tower Stacker, Tube Runner, Tilt Maze and Minigolf each met it separately and
 each time it looked like a lighting choice rather than a bug. `lambertIntensity`
 in `shared/stage3d.ts` is the fix and it was opt-in, which is why it kept
 happening; #133 made it enforced, so every light built by a file on that stage
-must take its intensity from the helper or `npm run qa:units` fails. The factor
-is right for the diffuse response of every lit material three ships.
+must take its intensity from the helper or `npm run qa:units` fails (the check
+is `shared/stage3d_test.ts` — it was called `lighting_test.ts` until #139, which
+falsely implied the unrelated `shared/lighting.ts` was covered). The factor is
+right for the diffuse response of every lit material three ships.
 
 **Every other suite runs against `npm run dev`, which cannot 404 (#135).** Vite
 and `vite preview` both fall back to serving index.html for an unmatched path,
@@ -166,6 +168,27 @@ The other four stage3d games never call it and that is correct — none has
 decorative motion. Anomaly Room looks like the exception and is the clearest
 case: its renderer contains no time-varying transform at all, because the room
 is still by design.
+
+**A source-scanning check must not read comments, and must not confuse a
+mention with an import (#139).** `shared/stage3d_test.ts` scans for lights that
+skip `lambertIntensity`. Renaming it put its own name into `shared/stage3d.ts`'s
+docstring, which made that file match a filter written as
+`includes('shared/stage3d')` — and the docstring *illustrates the defect* with
+`new THREE.AmbientLight(0xffffff, 0.55)` in prose. The check reported the
+documentation of the bug as the bug, and the tempting fix was to delete the
+explanation. It strips comments and matches a real `from '...'` import now; the
+file count went from a misleading 18 to the 6 that actually import it.
+
+**A test file named for a module is a claim that the module is covered (#139).**
+`shared/lighting_test.ts` checked three.js light *intensities* while
+`shared/lighting.ts` is a Phaser darkness overlay with no check at all — so the
+name asserted coverage that did not exist. The three.js one is
+`shared/stage3d_test.ts` now, and the overlay's two pieces of pure arithmetic
+moved to `shared/darkness.ts` where `darkness_test.ts` can reach them: Phaser
+touches `window` on import, so nothing importing it runs under `tsx` (the reason
+`tower-stacker/framing.ts` exists apart from its game). Both checked pieces fail
+*invisibly* — a dropped radius in the screen cull leaves a room dark where a
+torch should light it, and dropped rounding mints a brush texture every frame.
 
 **The CSP hashes an inline script, and a stale hash fails silently.** Editing
 the pre-init sizing script in any `index.html` changes its hash; the browser
