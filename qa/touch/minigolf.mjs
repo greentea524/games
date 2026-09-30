@@ -209,16 +209,22 @@ async function run() {
     sawItRolling ? 'canPutt stayed false for the whole roll' : 'never saw the ball moving',
   )
 
-  // ---------------------------------------------- the climb on the third hole
+  // ------------------------------------------------------ the climb on Rise
   //
   // The reason this hole exists, and the one that was unplayable in review: a
   // ramp to a raised green. Getting the ball onto the upper level is the whole
   // hole, and no amount of aiming does it if the geometry is wrong.
+  //
+  // Found by name: #141 put holes in front of it, and this used to be goTo(2).
 
-  await page.evaluate(() => window.__game.goTo(2))
+  const riseAt = await page.evaluate(async () => {
+    const { HOLES } = await import('/games/minigolf/holes.ts')
+    return HOLES.findIndex((h) => h.name === 'Rise')
+  })
+  await page.evaluate((i) => window.__game.goTo(i), riseAt)
   await page.waitForTimeout(600)
   const atTee = await state(page)
-  check('the third hole is the climb', atTee.name === 'Rise', atTee.name)
+  check('Rise is on the course, and it is the climb', riseAt >= 0 && atTee.name === 'Rise', atTee.name)
   check('and the ball starts on the lower green', atTee.ball.y < 0.3, `y ${atTee.ball.y.toFixed(2)}`)
 
   let climbed = null
@@ -239,10 +245,14 @@ async function run() {
 
   // --------------------------------------------------------- the scorecard
 
-  await page.evaluate(() => {
-    window.__game.restartCourse()
-    for (let i = 0; i < 3; i++) window.__game.nextHole()
+  const holes = await page.evaluate(async () => {
+    const { HOLES } = await import('/games/minigolf/holes.ts')
+    return HOLES.length
   })
+  await page.evaluate((n) => {
+    window.__game.restartCourse()
+    for (let i = 0; i < n; i++) window.__game.nextHole()
+  }, holes)
   await page.waitForTimeout(400)
   const finished = await state(page)
   check(
@@ -252,7 +262,8 @@ async function run() {
   )
   check(
     'and the scorecard has a row per hole',
-    (await page.evaluate(() => document.querySelectorAll('.mg-card-row').length)) === 3,
+    (await page.evaluate(() => document.querySelectorAll('.mg-card-row').length)) === holes,
+    `${holes} holes`,
   )
 
   // -------------------------------------------------------------- the save
@@ -271,6 +282,35 @@ async function run() {
         return false
       }
     }),
+  )
+
+  // A best from the three-hole course (#141). Par there was 8, so a stored 5
+  // is a score no nine-hole round can touch; kept, it would stand for ever,
+  // in the game and on the hub's badge. The save is written exactly as the
+  // old game wrote it — no course key — and read back through both readers.
+  const stale = await page.evaluate(async () => {
+    localStorage.setItem('minigolf_save', JSON.stringify({ v: 1, d: { best: 5, rounds: 4 } }))
+    const { loadGolfSave, recordRound } = await import('/games/minigolf/save.ts')
+    const { readStatuses } = await import('/games/shared/completion.ts')
+    const before = { save: loadGolfSave(), hub: readStatuses().minigolf.progress }
+    recordRound(29)
+    const after = { save: loadGolfSave(), hub: readStatuses().minigolf.progress }
+    return { before, after }
+  })
+  check(
+    'a best from the old three-hole course is not a best on this one',
+    stale.before.save.best === 0 && stale.before.hub === null,
+    `game best ${stale.before.save.best}, hub badge ${JSON.stringify(stale.before.hub)}`,
+  )
+  check(
+    'but the rounds played on it still count',
+    stale.before.save.rounds === 4,
+    `${stale.before.save.rounds} rounds`,
+  )
+  check(
+    'and the next round on this course is the best',
+    stale.after.save.best === 29 && stale.after.hub === 'Best 29',
+    `game best ${stale.after.save.best}, hub badge ${JSON.stringify(stale.after.hub)}`,
   )
 
   // ------------------------------------------------------- back to the hub

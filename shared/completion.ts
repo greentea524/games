@@ -6,6 +6,7 @@
 //
 // Kept out of App.tsx because the interesting part is not the rendering, it is
 // deciding what "progress" means per game, and that is worth testing.
+import { COURSE_KEY } from '../minigolf/holes'
 import { loadSave } from './storage'
 
 export interface GameStatus {
@@ -164,7 +165,10 @@ function tiltMazeStatus(): GameStatus {
 function minigolfStatus(): GameStatus {
   const d = readPayload('minigolf_save')
   if (!d) return NONE
-  const best = typeof d.best === 'number' ? d.best : 0
+  // A best set on another course is not shown: #141 grew the course from par
+  // 8 to par 26, and a badge reading "Best 8" would be a score nobody can now
+  // beat. Imported rather than copied, so it cannot drift from the game's.
+  const best = typeof d.best === 'number' && d.course === COURSE_KEY ? d.best : 0
   const rounds = typeof d.rounds === 'number' ? d.rounds : 0
   if (rounds === 0 || best === 0) return NONE
   return { completed: true, progress: `Best ${best}` }

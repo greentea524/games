@@ -1,10 +1,12 @@
-// Minigolf's three holes, as data (#113).
+// Minigolf's nine holes, as data (#113, #141).
 //
 // Everything is a box. A green is a flat box the ball rolls on, a ramp is the
 // same box tilted, a wall is a taller one it bounces off. That is the whole
 // vocabulary, and it is deliberate: #113's scope guard says this issue sprawls
 // through level authoring rather than through code, so the authoring stays
-// cheap enough that three holes is a morning and not a fortnight.
+// cheap enough that a hole is a morning and not a fortnight. #141 grew the
+// course from three holes to nine without adding a primitive — the one helper
+// it added, `mirrorZ`, reuses `ramp` rather than replacing it.
 //
 // No heightmaps, no curves, no meshes loaded from files.
 //
@@ -36,8 +38,11 @@ export interface Box {
 export interface Hole {
   name: string
   par: number
-  /** Where the ball is teed, on the surface. */
-  tee: { x: number; z: number }
+  /**
+   * Where the ball is teed, on the surface. `y` is the height of the green it
+   * sits on, for a hole that starts on a raised one (#141); it defaults to 0.
+   */
+  tee: { x: number; z: number; y?: number }
   /** Centre of the cup. The ball drops when it is over this and slow. */
   cup: { x: number; y: number; z: number }
   boxes: Box[]
@@ -193,6 +198,33 @@ function rampRails(
   return out
 }
 
+/**
+ * Reflects a piece of a hole through z = 0.
+ *
+ * `ramp` climbs toward -z and nothing else, and every hole before #141 needed
+ * no other direction. A hole that *descends* from the tee, or climbs back
+ * toward the camera, needs the opposite, and a second ramp builder would be a
+ * second place for the crest-meets-the-plateau arithmetic to go wrong. So a
+ * piece is authored climbing the usual way and mirrored: z is negated, and so
+ * is the tilt, because reflecting in z reverses a rotation about x.
+ */
+function mirrorZ(box: Box): Box {
+  return { ...box, z: -box.z, tiltX: box.tiltX === undefined ? undefined : -box.tiltX }
+}
+
+/**
+ * `Drop`: the tee is on a raised green and the course falls away from it.
+ * Gentler than `Rise`'s ramp, because going down the danger is too much speed
+ * rather than too little.
+ */
+export const DROP_HEIGHT = 0.8
+const DROP_SLOPE = 0.2
+const DROP_RUN = rampRun(DROP_HEIGHT, DROP_SLOPE)
+
+/** `Shelf` and `Summit`: a lower step than `Rise`, reached by a narrower ramp. */
+export const SHELF_HEIGHT = 0.6
+const SHELF_RUN = rampRun(SHELF_HEIGHT, MAX_SLOPE)
+
 /** Where `Rise`'s ramp crests, and so where its raised green has to begin. */
 const RISE_CREST_Z = -rampRun(RISE_HEIGHT, MAX_SLOPE)
 
@@ -211,6 +243,26 @@ export const HOLES: Hole[] = [
       wall(2.2, 0, 0.4, 12),
       wall(0, -6.2, 4.8, 0.4),
       wall(0, 6.2, 4.8, 0.4),
+    ],
+  },
+  {
+    name: 'Gate',
+    par: 2,
+    // The Opener again with one wall across it and a gap a little off the
+    // centre line. Straight back no longer works; the second thing a player
+    // learns is that aim is a decision and not a default.
+    tee: { x: 0, z: 4.5 },
+    cup: { x: 0, y: 0, z: -4.5 },
+    boxes: [
+      green(0, 0, 4, 12),
+      wall(-2.2, 0, 0.4, 12),
+      wall(2.2, 0, 0.4, 12),
+      wall(0, -6.2, 4.8, 0.4),
+      wall(0, 6.2, 4.8, 0.4),
+      // The gate: a gap from x = 0.1 to 1.1, a metre wide against a ball a
+      // third of that. The straight line from tee to cup crosses at x = 0.
+      wall(-0.95, 0, 2.1, 0.4),
+      wall(1.55, 0, 0.9, 0.4),
     ],
   },
   {
@@ -241,6 +293,25 @@ export const HOLES: Hole[] = [
       // north side, meeting at the corner.
       wall(-1.8, 3.1, 0.4, 9.8),
       wall(2, -1.8, 8.4, 0.4),
+    ],
+  },
+  {
+    name: 'Bank',
+    par: 3,
+    // A baffle across most of the fairway with the cup tucked behind its
+    // closed end. The way through is the gap on the far side, and the way to
+    // the cup from there is off a wall — the Elbow's lesson, without the
+    // corner to hide it.
+    tee: { x: -1.5, z: 4.5 },
+    cup: { x: -1.5, y: 0, z: -4 },
+    boxes: [
+      green(0, 0, 6, 12),
+      wall(-3.2, 0, 0.4, 12),
+      wall(3.2, 0, 0.4, 12),
+      wall(0, -6.2, 6.8, 0.4),
+      wall(0, 6.2, 6.8, 0.4),
+      // x from -3 to 1.5, leaving 1.5 open against the east wall.
+      wall(-0.75, 0, 4.5, 0.4),
     ],
   },
   {
@@ -277,4 +348,152 @@ export const HOLES: Hole[] = [
       wall(0, RISE_CREST_Z - 4.2, 4.8, 0.4, RISE_HEIGHT),
     ],
   },
+  {
+    name: 'Drop',
+    par: 3,
+    // `Rise` run backwards: the tee is on the raised green and the course
+    // falls away toward the cup. Authored climbing, the usual way, and then
+    // mirrored — see `mirrorZ` — so the ramp's crest still lands on the
+    // plateau's edge by construction rather than by eye.
+    //
+    // The skill inverts too. Climbing, the question was whether the ball
+    // would get up; descending, it is whether it will stop.
+    tee: { x: 0, z: DROP_RUN + 3, y: DROP_HEIGHT },
+    // In the back corner, by measurement. Anywhere mid-green the ramp funnels
+    // the ball in: 21 to 28 of 648 tee shots holed out, three to four times
+    // the Opener's rate. Against the back wall the ball arrives fast and
+    // carries, and it falls to 5 — the Opener's neighbourhood.
+    cup: { x: -1.3, y: 0, z: -4.3 },
+    boxes: [
+      // Climbing frame: lower green z 0..5, ramp from z 0 to -DROP_RUN, the
+      // raised green beyond it. Mirrored, the raised green is nearest the
+      // camera and the lower one is the far end of the hole.
+      green(0, 2.5, 4, 5),
+      ramp(0, 4, 0, 0, DROP_HEIGHT, DROP_SLOPE),
+      green(0, -DROP_RUN - 2, 4, 4, DROP_HEIGHT),
+      ...[-2.2, 2.2].flatMap((x) => [
+        wall(x, 2.5, 0.4, 5.4),
+        ...rampRails(x, 0.4, 0, 0, DROP_HEIGHT, DROP_SLOPE),
+        wall(x, -DROP_RUN - 2.25, 0.4, 4.6, DROP_HEIGHT),
+      ]),
+      wall(0, 5.2, 4.8, 0.4),
+      wall(0, -DROP_RUN - 4.2, 4.8, 0.4, DROP_HEIGHT),
+    ].map(mirrorZ),
+  },
+  {
+    name: 'Split',
+    par: 3,
+    // Two lanes, one choice. A divider runs up the middle from just in front
+    // of the tee. The west lane is the direct line and has a narrow gate in
+    // it; the east lane is open and long, and costs a stroke to come back
+    // across from. Neither is wrong, which is the point.
+    tee: { x: 0, z: 5.5 },
+    cup: { x: -1.5, y: 0, z: -4.5 },
+    boxes: [
+      green(0, 0, 6, 12),
+      wall(-3.2, 0, 0.4, 12),
+      wall(3.2, 0, 0.4, 12),
+      wall(0, -6.2, 6.8, 0.4),
+      wall(0, 6.2, 6.8, 0.4),
+      // The divider, z from -2 to 5.
+      wall(0, 1.5, 0.4, 7),
+      // The west lane's gate: open from x = -1.7 to -0.8.
+      wall(-2.35, 1.5, 1.3, 0.4),
+      wall(-0.5, 1.5, 0.6, 0.4),
+    ],
+  },
+  {
+    name: 'Shelf',
+    par: 3,
+    // The cup is on a shelf across the back, reached by a narrow ramp at one
+    // side. The shelf has no rail along its front edge: a putt across it that
+    // is too firm rolls off and drops back to the lower green. That edge is
+    // the hole.
+    // Teed in line with the ramp. Teed centrally, the solver — which aims
+    // perfectly — needed four strokes on a par 3: one just to line up.
+    tee: { x: -2, z: 4 },
+    cup: { x: 1.5, y: SHELF_HEIGHT, z: -SHELF_RUN - 1.5 },
+    boxes: [
+      // Lower green in two slabs that meet rather than overlap — two coplanar
+      // faces flicker, which is why the Elbow is one slab. The first spans the
+      // width from the tee to the ramp's foot; the second fills the floor
+      // beside the ramp, under the shelf's front edge.
+      green(0, 2.5, 6, 5),
+      green(1, -SHELF_RUN / 2, 4, SHELF_RUN),
+      ramp(-2, 2, 0, 0, SHELF_HEIGHT, MAX_SLOPE),
+      green(0, -SHELF_RUN - 1.5, 6, 3, SHELF_HEIGHT),
+      // A plinth under the shelf, filling it down to the floor. The shelf is
+      // a slab like every green, 0.4 thick and raised 0.6, so without this its
+      // front edge showed a black strip — the view straight under it — and it
+      // read as a plank floating over the course rather than a step up.
+      green(0, -SHELF_RUN - 1.5, 6, 3, SHELF_HEIGHT - GREEN_H),
+      // The ramp is a lane: railed on both sides, so a ball on it cannot slip
+      // off sideways onto the floor beside it.
+      ...rampRails(-3.2, 0.4, 0, 0, SHELF_HEIGHT, MAX_SLOPE),
+      ...rampRails(-0.8, 0.4, 0, 0, SHELF_HEIGHT, MAX_SLOPE),
+      // Lower walls. The east one stops a hair short of the shelf, or it would
+      // edge the shelf too, half a metre below its surface.
+      wall(-3.2, 2.5, 0.4, 5.4),
+      wall(3.2, (5.2 - SHELF_RUN + 0.1) / 2, 0.4, 5.1 + SHELF_RUN),
+      wall(0, 5.2, 6.8, 0.4),
+      // The shelf's own walls, standing on the floor and clearing the shelf
+      // by a wall's height. Based on the shelf instead, they floated over
+      // nothing, and the east one left a see-through notch at its corner.
+      wall(-3.2, -SHELF_RUN - 1.5, 0.4, 3.4, 0, SHELF_HEIGHT + WALL_H),
+      wall(3.2, -SHELF_RUN - 1.5, 0.4, 3.4, 0, SHELF_HEIGHT + WALL_H),
+      wall(0, -SHELF_RUN - 3.2, 6.8, 0.4, 0, SHELF_HEIGHT + WALL_H),
+    ],
+  },
+  {
+    name: 'Summit',
+    par: 4,
+    // The closer, and the course's two ideas at once. A U: up the west leg,
+    // across the top — a corner to bank or to play round, as on the Elbow —
+    // and back down the east leg, which climbs toward the camera to a raised
+    // green with the cup on it.
+    //
+    // The east leg is authored climbing away from the camera, foot at z = 2,
+    // and mirrored, so its foot lands at z = -2 on the cross leg's edge.
+    tee: { x: -3, z: 5 },
+    cup: { x: 3, y: SHELF_HEIGHT, z: SHELF_RUN + 1 },
+    boxes: [
+      // West leg, x -5..-1, z -2..6; the cross leg, x -5..5, z -6..-2.
+      green(-3, 2, 4, 8),
+      green(0, -4, 10, 4),
+      wall(-5.2, 0, 0.4, 12.4),
+      wall(0, -6.2, 10.8, 0.4),
+      wall(-3, 6.2, 4.8, 0.4),
+      wall(-0.8, 2.1, 0.4, 8.2),
+      // Between the legs there is no floor. This closes the cross leg's edge
+      // there, or a ball rolling south across it would drop into the gap.
+      wall(0, -1.8, 2, 0.4),
+      wall(5.2, -4.1, 0.4, 4.2),
+      // East leg, x 1..5, authored in the climbing frame and mirrored.
+      ...[
+        ramp(3, 4, 2, 0, SHELF_HEIGHT, MAX_SLOPE),
+        green(3, 2 - SHELF_RUN - 2, 4, 4, SHELF_HEIGHT),
+        ...[0.8, 5.2].flatMap((x) => [
+          ...rampRails(x, 0.4, 2, 0, SHELF_HEIGHT, MAX_SLOPE),
+          wall(x, 2 - SHELF_RUN - 2.25, 0.4, 4.6, SHELF_HEIGHT),
+        ]),
+        wall(3, 2 - SHELF_RUN - 4.2, 4.8, 0.4, SHELF_HEIGHT),
+      ].map(mirrorZ),
+    ],
+  },
 ]
+
+/**
+ * Which course a score was set on (#141).
+ *
+ * A round's total only means something against the holes it was played over.
+ * The save used to keep a bare number, so when the course grew from three
+ * holes (par 8) to nine, a best of 8 from the old course would have beaten
+ * every round anyone could play on the new one — for ever, on the game's own
+ * screen and on the hub's badge. Both now compare this against the key the
+ * best was stored with, and ignore a best from another course.
+ *
+ * Names and pars, so reordering, renaming, adding or re-parring a hole all
+ * start a fresh best. Re-authoring a hole's geometry without touching either
+ * does not, which is deliberate: that is a fix, not a new course.
+ */
+export const COURSE_KEY = HOLES.map((h) => `${h.name}/${h.par}`).join(' ')

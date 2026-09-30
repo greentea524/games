@@ -17,7 +17,7 @@
 //
 // What no other check could see is the only thing that matters about a hole:
 // whether a player can finish it. So this one plays them.
-import { COURSE, CUP_RADIUS, createSim, type Sim } from './physics'
+import { BALL_RADIUS, COURSE, CUP_RADIUS, createSim, type Sim } from './physics'
 import { HOLES, MAX_SLOPE, RISE_HEIGHT, rampRun, type Box, type Hole } from './holes'
 
 let ok = true
@@ -27,18 +27,163 @@ const check = (name: string, pass: boolean, note?: string) => {
 }
 
 /**
- * How far from the cup the ball came to rest, with a penalty for being on the
- * wrong level.
+ * How far a ball still has to travel to reach the cup — along the course, not
+ * through it (#141).
  *
- * On `Rise` the cup sits directly above the lower green, so plan distance
- * alone rates a ball at the foot of the ramp as nearly holed. The penalty is
- * what makes climbing count as progress.
+ * This was straight-line distance plus a penalty per unit of height, which is
+ * right for a course whose route only ever closes on the cup, and #113's three
+ * holes all did. #141's did not, and the greedy solver parked in the obvious
+ * trap: on `Shelf` it sat on the floor directly under the cup, 0.6 below it
+ * and — by that measure — nearer than anywhere on the ramp that leads up; on
+ * `Summit`, a U, it pressed against the wall between the legs, the nearest
+ * point in plan to a cup on the other side. Six strokes of standing still.
+ *
+ * So the measure is a walking distance: a grid over the course's surfaces,
+ * where walls block and a change of level only connects along a ramp, filled
+ * outward from the cup. It changes only which stroke looks like progress. The
+ * physics still decides every outcome, and a hole the ball cannot finish still
+ * fails — see `routeCost` for why unreachable is a fallback and not a verdict.
  */
-function costToCup(sim: Sim, hole: Hole): number {
-  const dx = sim.ball.position.x - hole.cup.x
-  const dz = sim.ball.position.z - hole.cup.z
-  const dy = sim.ball.position.y - hole.cup.y
-  return Math.hypot(dx, dz) + 2 * Math.abs(dy)
+const CELL = 0.2
+/** Largest rise between neighbouring cells that still counts as one surface. */
+const STEP = 0.08
+
+/** The top of whatever green is under (x, z), or null for none. */
+function surfaceAt(hole: Hole, x: number, z: number): number | null {
+  let top: number | null = null
+  for (const b of hole.boxes) {
+    if (b.surface !== 'green' || Math.abs(x - b.x) > b.w / 2) continue
+    let y: number
+    if (b.tiltX) {
+      // The top face's centre sits half a slab out along the tilted normal;
+      // from there the surface runs along the tilted local z axis.
+      const c = Math.cos(b.tiltX)
+      const s = Math.sin(b.tiltX)
+      const tz = b.z + (b.h / 2) * s
+      const ty = b.y + (b.h / 2) * c
+      const u = (z - tz) / c
+      if (Math.abs(u) > b.d / 2) continue
+      y = ty - u * s
+    } else {
+      if (Math.abs(z - b.z) > b.d / 2) continue
+      y = b.y + b.h / 2
+    }
+    if (top === null || y > top) top = y
+  }
+  return top
+}
+
+/** Is there a wall at (x, z) standing above a surface at `y`? */
+function walled(hole: Hole, x: number, z: number, y: number): boolean {
+  // Slightly under the ball's radius: a ball resting against a wall must still
+  // land in a cell the field can see.
+  const r = 0.1
+  return hole.boxes.some(
+    (b) =>
+      b.surface === 'wall' &&
+      Math.abs(x - b.x) <= b.w / 2 + r &&
+      Math.abs(z - b.z) <= b.d / 2 + r &&
+      b.y + b.h / 2 > y + 0.05 &&
+      b.y - b.h / 2 < y + 0.3,
+  )
+}
+
+interface RouteField {
+  /** Walking distance from (x, y, z) to the cup; Infinity if unconnected. */
+  from(x: number, y: number, z: number): number
+}
+
+function routeField(hole: Hole): RouteField {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+  for (const b of hole.boxes) {
+    minX = Math.min(minX, b.x - b.w / 2)
+    maxX = Math.max(maxX, b.x + b.w / 2)
+    minZ = Math.min(minZ, b.z - b.d / 2)
+    maxZ = Math.max(maxZ, b.z + b.d / 2)
+  }
+  const nx = Math.ceil((maxX - minX) / CELL) + 1
+  const nz = Math.ceil((maxZ - minZ) / CELL) + 1
+  const height = new Array<number | null>(nx * nz)
+  for (let i = 0; i < nx; i++) {
+    for (let k = 0; k < nz; k++) {
+      const x = minX + i * CELL
+      const z = minZ + k * CELL
+      const y = surfaceAt(hole, x, z)
+      height[i * nz + k] = y !== null && !walled(hole, x, z, y) ? y : null
+    }
+  }
+  const cellOf = (x: number, z: number) => [
+    Math.round((x - minX) / CELL),
+    Math.round((z - minZ) / CELL),
+  ]
+
+  // Dijkstra outward from the cup. A few thousand cells; the plain scan for
+  // the nearest unsettled cell is fast enough and easy to read.
+  const dist = new Array<number>(nx * nz).fill(Infinity)
+  const done = new Array<boolean>(nx * nz).fill(false)
+  const [ci, ck] = cellOf(hole.cup.x, hole.cup.z)
+  dist[ci * nz + ck] = 0
+  for (;;) {
+    let at = -1
+    for (let n = 0; n < dist.length; n++) {
+      if (!done[n] && dist[n] < Infinity && (at < 0 || dist[n] < dist[at])) at = n
+    }
+    if (at < 0) break
+    done[at] = true
+    const i = Math.floor(at / nz)
+    const k = at % nz
+    for (let di = -1; di <= 1; di++) {
+      for (let dk = -1; dk <= 1; dk++) {
+        const a = i + di
+        const c = k + dk
+        if ((!di && !dk) || a < 0 || c < 0 || a >= nx || c >= nz) continue
+        const n = a * nz + c
+        const h0 = height[at]
+        const h1 = height[n]
+        if (h0 === null || h1 === null || Math.abs(h1 - h0) > STEP * Math.hypot(di, dk)) continue
+        const d = dist[at] + CELL * Math.hypot(di, dk)
+        if (d < dist[n]) dist[n] = d
+      }
+    }
+  }
+
+  return {
+    from(x, y, z) {
+      // The nearest cell on the ball's own level, within a couple of cells: a
+      // ball against a wall sits on the edge of the walled-off band.
+      const [i, k] = cellOf(x, z)
+      const floor = y - BALL_RADIUS
+      let best = Infinity
+      for (let di = -2; di <= 2; di++) {
+        for (let dk = -2; dk <= 2; dk++) {
+          const a = i + di
+          const c = k + dk
+          if (a < 0 || c < 0 || a >= nx || c >= nz) continue
+          const h = height[a * nz + c]
+          if (h === null || Math.abs(h - floor) > 0.2) continue
+          best = Math.min(best, dist[a * nz + c] + CELL * Math.hypot(di, dk))
+        }
+      }
+      return best
+    },
+  }
+}
+
+/**
+ * The solver's measure of a resting ball: its walking distance to the cup.
+ *
+ * Where the field has no route — which is exactly the case for a broken hole —
+ * this falls back to the old straight-line measure, offset so any connected
+ * position beats any unconnected one. The field is a guide and not a judge: if
+ * an unconnected field ended the solve, a hole could be failed by a grid
+ * artefact, and both controls below would be caught by the map instead of by
+ * the ball actually failing to get there. They are not; the ball plays on.
+ */
+function routeCost(sim: Sim, hole: Hole, field: RouteField): number {
+  const p = sim.ball.position
+  const walk = field.from(p.x, p.y, p.z)
+  if (walk < Infinity) return walk
+  return 1000 + Math.hypot(p.x - hole.cup.x, p.z - hole.cup.z) + 2 * Math.abs(p.y - hole.cup.y)
 }
 
 interface Stroke {
@@ -100,6 +245,7 @@ function copyBall(from: Sim, to: Sim) {
 function solve(hole: Hole, budget: number): Stroke[] | null {
   const sim = createSim(hole)
   const probe = createSim(hole)
+  const field = routeField(hole)
   const strokes: Stroke[] = []
 
   for (let n = 0; n < budget; n++) {
@@ -110,7 +256,7 @@ function solve(hole: Hole, budget: number): Stroke[] | null {
       copyBall(sim, probe)
       const outcome = playStroke(probe, stroke)
       if (outcome === 'off') continue
-      const cost = outcome === 'holed' ? -1 : costToCup(probe, hole)
+      const cost = outcome === 'holed' ? -1 : routeCost(probe, hole, field)
       if (cost < bestCost) {
         bestCost = cost
         best = stroke
@@ -227,6 +373,49 @@ check('the scorecard covers every hole', COURSE.length === HOLES.length, `${COUR
   )
 }
 
+{
+  // One per hole #141 added, as #141 asked: wall off the route and the solver
+  // has to say so. A new hole the solver finishes has only been shown to be
+  // finishable; this shows the solver would have noticed if it were not.
+  const hole = (name: string) => HOLES.find((h) => h.name === name)!
+  const sealed = (name: string, ...walls: Box[]): Hole => ({
+    ...hole(name),
+    name: `${name} (sealed)`,
+    boxes: [...hole(name).boxes, ...walls],
+  })
+  const across = (x: number, z: number, w: number, d: number, y = 0): Box => ({
+    x, y: y + 0.25, z, w, h: 0.5, d, surface: 'wall',
+  })
+  const cases: [Hole, string][] = [
+    [sealed('Gate', across(0.6, 0, 1, 0.4)), 'the gate closed'],
+    [sealed('Bank', across(2.25, 0, 1.5, 0.4)), 'the gap past the baffle closed'],
+    [sealed('Drop', across(0, -2, 4, 0.4)), 'a wall across the lower green'],
+    [sealed('Split', across(-1.25, 1.5, 0.9, 0.4), across(1.6, 1.5, 3.2, 0.4)), 'both lanes closed'],
+    [sealed('Shelf', across(-2, 0.3, 2, 0.4)), 'the foot of the ramp closed'],
+    [sealed('Summit', across(0, -4, 0.4, 4)), 'the cross leg cut'],
+  ]
+  for (const [h, how] of cases) {
+    check(`${h.name} is caught`, solve(h, h.par + 3) === null, how)
+  }
+
+  // And the one hole whose design is a claim about routes: `Split` says
+  // neither lane is wrong. Close either one and it must still be holed by the
+  // other — otherwise "two lanes" is one lane and a wall.
+  for (const [lane, wall] of [
+    ['east', across(-1.25, 1.5, 0.9, 0.4)],
+    ['west', across(1.6, 1.5, 3.2, 0.4)],
+  ] as const) {
+    const other = lane === 'east' ? 'west gate' : 'east lane'
+    const h = sealed('Split', wall)
+    const strokes = solve(h, h.par + 3)
+    check(
+      `Split with its ${other} closed is still holed`,
+      strokes !== null,
+      strokes ? `${strokes.length} strokes by the ${lane} lane` : `the ${lane} lane is not a route`,
+    )
+  }
+}
+
 // --- every rail is taller than the green it edges --------------------------
 //
 // The solver cannot catch this one. A green with no edge does not block any
@@ -276,10 +465,13 @@ for (const hole of HOLES) {
   // Every rail flattened to the default height and dropped to the lower green,
   // which is how `Rise` shipped: correct alongside the tee, and no edge at all
   // once the course climbs away from it.
+  // By name, not index: #141 put holes in front of it, and `HOLES[2]` quietly
+  // became the Elbow — a flat hole, so the control would have tested nothing.
+  const rise = HOLES.find((h) => h.name === 'Rise')!
   const lowRails: Hole = {
-    ...HOLES[2],
+    ...rise,
     name: 'Rise (short rails)',
-    boxes: HOLES[2].boxes.map((b) => (b.surface === 'wall' ? { ...b, y: 0.25, h: 0.5 } : b)),
+    boxes: rise.boxes.map((b) => (b.surface === 'wall' ? { ...b, y: 0.25, h: 0.5 } : b)),
   }
   check(
     'a rail that stops below its green is caught',

@@ -128,7 +128,7 @@ const GAME_SECTIONS: GameSection[] = [
         image: thumbMinigolf,
         href: `${import.meta.env.BASE_URL}minigolf/`,
         description:
-          "Three low-poly holes. Drag back from the ball to aim and set power, read the slope, and try to keep the card under par.",
+          "Nine low-poly holes. Drag back from the ball to aim and set power, read the slope, and try to keep the card under par.",
       },
       {
         title: "Voxel Digger",
