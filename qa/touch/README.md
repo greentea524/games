@@ -280,6 +280,35 @@ open: `shared/runSummary.ts` picks "Tap to continue" over "Z: continue" off
 `A` rather than `Z`. Static's is the only one drawn into the game rather than
 the DOM.
 
+**`hints.mjs`** — the six standalone 3D games' on-screen hints name their keys
+(#140). Every one has a full keyboard scheme, and until #140 five of the six
+hints said only "tap", "drag" or "hold the side of the screen", so a desktop
+player could not find the keys. Per game, on a fresh load, it reads the hint
+where a player reads it (after Start for the two with a title panel) and
+asserts two things:
+
+- **it names a key**, from a small vocabulary in the file — without this the
+  hint regresses to "tap" and passes;
+- **every key it names is one the game acts on**, pressed through the real
+  keyboard. A hint naming a dead key is worse than one naming none.
+
+"Acts on" is read as `defaultPrevented` on the keydown, seen by a listener
+registered after the game's. Every handler in the six calls `preventDefault()`
+on the keys it uses, and nothing in `shared/` listens to the keyboard, so no
+global handler can make an unhandled key pass. It is a proxy, and says the key
+reached a handler that claimed it; what the key then does is each game's own
+suite's business.
+
+The hints are unconditional, unlike `shared/runSummary.ts`'s prompt. #140
+weighed `(pointer: coarse)` and chose one line for every device: "keys" costs a
+phone player nothing, and "tap" alone costs a desktop player the controls.
+
+Three controls, all red where planted and green elsewhere: Tower Stacker's hint
+put back to "Tap anywhere to drop the block." (*no key the vocabulary
+recognises*); Voxel Digger's hint made to say "press Space", which it ignores
+(*not consumed: Space*); and `ArrowLeft` dropped from Tube Runner's handler
+with its hint untouched (*not consumed: ArrowLeft*).
+
 ## Notes for anyone extending this
 
 - **Use CDP, not Playwright's touch helpers.** `page.touchscreen.tap` is one

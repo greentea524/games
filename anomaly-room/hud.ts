@@ -91,7 +91,7 @@ export function createHud(game: AnomalyGame, audio: RoomAudio, hooks: HudHooks):
     // Only while the room is unchanged. Saying "something has changed" before
     // anything has would be a lie the player could act on.
     hint.hidden = phase !== 'looking' || !game.armed()
-    hint.textContent = 'Something is different. Tap it.'
+    hint.textContent = 'Something is different. Tap it — or look with the arrow keys and press Space when it is in the centre.'
 
     panel.hidden = phase === 'looking'
     const anomaly = game.anomaly()

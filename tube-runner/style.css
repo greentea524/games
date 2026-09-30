@@ -48,10 +48,19 @@
   bottom: 26px;
   transform: translateX(-50%);
   margin: 0;
+  /* Starting at left: 50% leaves half the screen, so without this the box
+     shrinks to fit that half and max-width never applies (#140). */
+  width: max-content;
   max-width: 80vw;
   text-align: center;
   font-size: 0.85rem;
-  color: #8fa6c0;
+  /* The tube behind this is pale blue at the start of a run, and the hint used
+     to be pale blue-grey on it — unreadable, shadow or not. A backing like the
+     score pill's holds whatever the tube is doing (#140). */
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: rgba(12, 18, 28, 0.55);
+  color: #dbe6f2;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
 }
 

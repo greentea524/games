@@ -56,7 +56,7 @@ export function createHud(game: VoxelGame): void {
   const hint = el(
     'p',
     'vd-hint',
-    'Drag to turn the block. Tap a cube to dig it out.',
+    'Drag — or use the arrow keys — to turn the block. Tap a cube to dig it out.',
   )
   overlay.append(hint)
 

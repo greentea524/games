@@ -190,6 +190,16 @@ touches `window` on import, so nothing importing it runs under `tsx` (the reason
 *invisibly* — a dropped radius in the screen cull leaves a room dark where a
 torch should light it, and dropped rounding mints a brush texture every frame.
 
+**A standalone 3D game's hint names its keys, and a check holds it to them
+(#140).** All six have full keyboard schemes; five hints said only "tap" or
+"drag". `qa/touch/hints.mjs` reads each hint on screen, requires it to name a
+key, and presses every key it names to confirm the game consumes it — a hint
+naming a dead key is worse than none. The hints are unconditional by decision,
+not by omission. Screenshot a hint you lengthen, at phone *and* desktop width:
+these boxes sit at `left: 50%`, so they shrink to half the screen unless
+`width: max-content` lets their `max-width` apply, and Minigolf's lands on its
+pale front rail on a wide screen.
+
 **The CSP hashes an inline script, and a stale hash fails silently.** Editing
 the pre-init sizing script in any `index.html` changes its hash; the browser
 then declines to run it, nothing throws, and every functional check goes on

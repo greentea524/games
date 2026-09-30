@@ -68,7 +68,7 @@ export function createHud(game: TowerGame, hooks: HudHooks): void {
   panel.append(panelTitle, panelBody, panelBtn)
   overlay.append(panel)
 
-  const hint = el('p', 'ts-hint', 'Tap anywhere to drop the block.')
+  const hint = el('p', 'ts-hint', 'Tap anywhere — or press Space — to drop the block.')
   overlay.append(hint)
 
   function refresh() {

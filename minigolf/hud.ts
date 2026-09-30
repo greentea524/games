@@ -40,7 +40,7 @@ export function createHud(game: MinigolfGame): void {
   const hint = el(
     'p',
     'mg-hint',
-    'Drag back from the ball to aim and set power, like a slingshot. Release to putt.',
+    'Drag back from the ball like a slingshot and let go to putt — or aim with the arrow keys and hold Space for power.',
   )
   overlay.append(hint)
 
