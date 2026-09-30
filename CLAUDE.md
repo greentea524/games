@@ -200,6 +200,25 @@ these boxes sit at `left: 50%`, so they shrink to half the screen unless
 `width: max-content` lets their `max-width` apply, and Minigolf's lands on its
 pale front rail on a wide screen.
 
+**Minigolf's solver measures how far the ball still has to *walk* (#141).**
+`course_test.ts` plays every hole greedily, and it used to score a resting ball
+by straight-line distance to the cup. That only works for a route that closes
+on the cup the whole way; #141's Shelf and Summit parked the solver under the
+cup's shelf and against the wall between a U's legs for six strokes each. It
+scores by a walking-distance field now: walls block, and a change of level
+connects only along a ramp. The field only guides — where it finds no route
+the solver falls back to the old measure and plays on, so a sealed hole still
+fails through the physics and not through the map. Every hole #141 added has a
+sealed copy in that file that must fail. `mirrorZ` in `holes.ts` is how a ramp
+climbs toward the camera; do not write a second ramp builder.
+
+**A score is only a best on the course it was set on (#141).** Minigolf's save
+keeps the round total, and growing the course from par 8 to par 26 would have
+left an old best of 8 unbeatable on the game's screen and the hub's badge.
+Both readers compare `COURSE_KEY` (names and pars) and ignore a best from
+another course. Any game whose levels are counted into one score has this
+shape.
+
 **The CSP hashes an inline script, and a stale hash fails silently.** Editing
 the pre-init sizing script in any `index.html` changes its hash; the browser
 then declines to run it, nothing throws, and every functional check goes on

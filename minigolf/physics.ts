@@ -184,7 +184,7 @@ export function createSim(hole: Hole, options: SimOptions = {}): Sim {
       still = 0
     },
     tee() {
-      ball.position.set(hole.tee.x, BALL_RADIUS + 0.02, hole.tee.z)
+      ball.position.set(hole.tee.x, (hole.tee.y ?? 0) + BALL_RADIUS + 0.02, hole.tee.z)
       ball.velocity.setZero()
       ball.angularVelocity.setZero()
       ball.force.setZero()
