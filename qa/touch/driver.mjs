@@ -362,9 +362,13 @@ export const MUTE_SETTLE_MS = 300
  * Shared rather than copied into three suites because `MUTE_SETTLE_MS` is a
  * trap worth solving once.
  */
-export async function checkSound({ page, check, selector, play }) {
-  const text = () => page.evaluate((s) => document.querySelector(s)?.textContent, selector)
-  const click = () => page.evaluate((s) => document.querySelector(s).click(), selector)
+export async function checkSound({ page, check, selector, play, toggle, label }) {
+  // A selector covers the three standalone games, whose control is a button
+  // whose text is its state. `toggle` and `label` cover the rest (#142): a
+  // control that is a key or a menu item, and a state read off the game.
+  const text =
+    label ?? (() => page.evaluate((s) => document.querySelector(s)?.textContent, selector))
+  const click = toggle ?? (() => page.evaluate((s) => document.querySelector(s).click(), selector))
   const measure = async () => {
     await resetAudio(page)
     await play()

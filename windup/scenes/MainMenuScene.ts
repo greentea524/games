@@ -129,9 +129,11 @@ export class MainMenuScene extends Phaser.Scene {
       this.updateCursor()
     } else if (e.code === 'KeyZ' || e.code === 'Enter' || e.code === 'Space') {
       this.selectOption()
-    } else if (e.code === 'KeyM') {
-      setMuted(!isMuted())
     }
+    // No KeyM here. `mKey` in `create()` already toggles the mute, on every
+    // view; a second toggle in this handler cancelled it on the menu view,
+    // so M did nothing there — found by #142's sound check, the first thing
+    // ever to listen to it.
   }
 
   private updateCursor() {

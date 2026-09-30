@@ -7,10 +7,10 @@ import { DungeonScene } from './scenes/DungeonScene'
 import { UIScene } from './scenes/UIScene'
 import { GameOverScene } from './scenes/GameOverScene'
 import { GameState } from './state'
-import { ensureCtx } from './audio'
+import { ensureCtx, isMuted, sfx } from './audio'
 import { setupDpad } from '../shared/dpad'
 import { setupButtons } from '../shared/buttons'
-import { exposeForQA } from '../shared/devtools'
+import { exposeForQA, exposeSoundForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
 import '../shared/shell.css'
 
@@ -37,6 +37,7 @@ const config: Phaser.Types.Core.GameConfig = {
 
 export const game = new Phaser.Game(config)
 exposeForQA(game)
+exposeSoundForQA({ muted: isMuted, effect: () => sfx.menuMove() })
 
 const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
   const keyMap: Record<string, string> = {

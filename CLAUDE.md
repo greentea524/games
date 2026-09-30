@@ -153,8 +153,19 @@ peak RMS, and `checkSound` mutes, replays and unmutes. Two traps are written
 down there: measure the instant the button is clicked and you catch Anomaly
 Room's mute *ramp* rather than its silence, and a brand-new `AudioContext` is
 `running` in this headless browser, so a suspended-context defect cannot be
-staged under the driver at all. The Phaser five's mute lives in an in-game menu
-and is still unchecked.
+staged under the driver at all. The Phaser five are checked too since #142, by
+`qa/touch/sound.mjs` — and only Static's mute is reachable by touch; the other
+four have the M key and nothing else, which is its own issue.
+
+**Listening found two games whose sound was broken in ways no other check
+could see (#142).** Windup's M toggled twice per press and did nothing on its
+title menu. Cart & Crate's effects have never made a sound: its ZzFX port
+builds a one-sample NaN buffer, and under that sits a missing envelope, a
+phase-scaled amplitude and a route past the mute — repairing it is its own
+issue. Two traps from that work: a page-side `import()` of a game's module can
+return a *second copy* of it under Vite (`?t=`), so a game hands the check its
+own `effect` via `exposeSoundForQA`; and a short listen can land in a tune's
+rest, so the window is a whole musical cycle.
 
 **Reduced motion is honoured in four games, and the check is a *pair* (#138).**
 `shared/motion.ts` is read at six sites and nothing measured any of them until
