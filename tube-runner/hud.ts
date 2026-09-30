@@ -62,7 +62,7 @@ export function createHud(game: TubeGame, hooks: HudHooks): void {
   panel.append(panelTitle, panelBody, panelBtn)
   overlay.append(panel)
 
-  const hint = el('p', 'tr-hint', 'Hold the left or right side of the screen to turn.')
+  const hint = el('p', 'tr-hint', 'Hold the left or right side of the screen — or the arrow keys — to turn.')
   overlay.append(hint)
 
   function refresh() {

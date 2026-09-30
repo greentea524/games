@@ -63,6 +63,9 @@
   bottom: 96px;
   transform: translateX(-50%);
   margin: 0;
+  /* Starting at left: 50% leaves half the screen, so without this the box
+     shrinks to fit that half and max-width never applies (#140). */
+  width: max-content;
   max-width: min(90vw, 460px);
   text-align: center;
   font-size: 0.82rem;

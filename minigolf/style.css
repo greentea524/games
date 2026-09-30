@@ -24,12 +24,23 @@
   bottom: 24px;
   transform: translateX(-50%);
   margin: 0;
+  /* Starting at left: 50% leaves half the screen, so without this the box
+     shrinks to fit that half and max-width never applies (#140). */
+  width: max-content;
   max-width: min(90vw, 460px);
   text-align: center;
   font-size: 0.85rem;
   line-height: 1.5;
 }
-.mg-hint { color: #9ec9b3; }
+/* The course is framed to fill the viewport, so on a wide screen the hint sits
+   over the pale front rail, where pale text vanishes. A shadow was tried and was
+   not enough; the backing is Tube Runner's (#140). */
+.mg-hint {
+  color: #9ec9b3;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: rgba(8, 20, 15, 0.6);
+}
 .mg-waiting { color: #d9c27a; bottom: 52px; }
 
 .mg-btn {
