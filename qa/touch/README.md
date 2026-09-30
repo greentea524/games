@@ -81,10 +81,45 @@ assuming.** A context left suspended should be silent, but a brand-new
 (`hasBeenActive` also reads true, so the cause is not cleanly attributable). So
 `ensureCtx`'s `resume()` is untested by construction — not by oversight.
 
-The Phaser five are not covered. Their mute is a menu item inside the game
-(`Sound: ON/OFF` in Static's pause menu) rather than a button in the shell, so
-reaching it means driving each game's own menu — a larger job than #136's, and
-a separate one.
+### The Phaser five (#142)
+
+`sound.mjs` covers them, through the same `checkSound`, which now takes a
+`toggle` and a `label` as well as a selector. What it found about the games
+matters more than the check:
+
+- **Only Static has a mute a finger can reach** — `Sound: ON/OFF` in its pause
+  overlay, tapped as a button. The other four mute on the M key and nothing
+  else, with no menu item and no mention of M on screen; on a phone they
+  cannot be muted at all. The check drives M, the only control they have, and
+  the gap is left to its own issue — adding controls is design, not testing.
+- **Windup's M did nothing on its title menu.** `addKey('M')` and a `KeyM`
+  branch in `handleInput` both toggled, so each press muted and unmuted in the
+  same frame. Fixed: the branch is gone. The first run of this check was red
+  on exactly that, which is its control.
+- **Cart & Crate's sound effects have never played.** Its ZzFX port has four
+  faults — the buffer is one NaN sample, and fixed one at a time the effects
+  go full-scale, then unbounded — and they also bypass the master gain. Left
+  for its own issue: repairing the synth is choosing what seven sounds sound
+  like. What the check hears for Cart & Crate is its music. `sound.mjs` has the
+  measurements.
+
+State comes from `window.__sound` (`exposeSoundForQA`, under `?qa=1`), because
+four of the five show their mute state nowhere. It also carries an `effect`
+each game hands over from its own `main.ts`, fired alongside a cursor move so a
+mute is tested against more than one sound path. It is handed over rather than
+reached with `import()` for a reason worth knowing: Vite tags a module edited
+during a server's life with `?t=`, so a bare import from the page gets a
+**second copy** of `audio.ts` — its own context, gain and `muted` — and
+measures nothing about the game. That cost a run that looked green.
+
+The listen is 1.5 s, not 500 ms. Cart & Crate's tune rests for about half a
+second in every one and a half, and a short listen landing in the rest let a
+mute that never touched the gain read 3.2e-3 and pass.
+
+Controls, all five at once: every master bus left unconnected turns "the game
+makes a sound at all" red in all five; `setMuted` left to flip the flag but not
+the gain turns "and nothing comes out of it" red in all five — Cart & Crate only
+once the listen was long enough.
 
 ## What they check
 

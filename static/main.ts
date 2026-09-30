@@ -8,7 +8,7 @@ import { sfx, isMuted, setMuted, music } from './audio'
 import { GameState } from './state'
 import { setupDpad } from '../shared/dpad'
 import { setupButtons } from '../shared/buttons'
-import { exposeForQA } from '../shared/devtools'
+import { exposeForQA, exposeSoundForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
 import '../shared/shell.css'
 
@@ -61,6 +61,7 @@ function createGame() {
     }
   })
   exposeForQA(game)
+  exposeSoundForQA({ muted: isMuted, effect: () => sfx.menuMove() })
   ;(window as any).__music = music
 }
 

@@ -4,10 +4,10 @@ import { MapScene } from './scenes/MapScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PlayScene } from './scenes/PlayScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
-import { ensureCtx } from './audio'
+import { ensureCtx, isMuted, sfx } from './audio'
 import { setupDpad } from '../shared/dpad'
 import { setupButtons } from '../shared/buttons'
-import { exposeForQA } from '../shared/devtools'
+import { exposeForQA, exposeSoundForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
 import '../shared/shell.css'
 
@@ -57,6 +57,7 @@ function createGame() {
     }
   })
   exposeForQA(game)
+  exposeSoundForQA({ muted: isMuted, effect: () => sfx.jump() })
 }
 
 // Load the pixel font before booting so canvas text renders with it from

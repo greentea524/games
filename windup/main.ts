@@ -8,7 +8,8 @@ import { UIScene } from './scenes/UIScene'
 import { PauseScene } from './scenes/PauseScene'
 import { setupDpad } from '../shared/dpad'
 import { setupButtons } from '../shared/buttons'
-import { exposeForQA } from '../shared/devtools'
+import { exposeForQA, exposeSoundForQA } from '../shared/devtools'
+import { isMuted, sfx } from './audio'
 import { preventZoomGestures } from '../shared/noZoom'
 import '../shared/shell.css'
 
@@ -42,6 +43,7 @@ const config: Phaser.Types.Core.GameConfig = {
 
 export const game = new Phaser.Game(config)
 exposeForQA(game)
+exposeSoundForQA({ muted: isMuted, effect: () => sfx.pickup() })
 
 const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
   const keyMap: Record<string, string> = {

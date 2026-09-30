@@ -29,6 +29,7 @@
 declare global {
   interface Window {
     __game?: unknown
+    __sound?: SoundHandle
   }
 }
 
@@ -56,4 +57,40 @@ export function exposeForQA<T>(game: T): T {
   if (!qaRequested()) return game
   window.__game = game
   return game
+}
+
+/** What `exposeSoundForQA` publishes. */
+export interface SoundHandle {
+  /** The game's own mute state. */
+  muted(): boolean
+  /** Plays one of the game's sound effects, through its own audio module. */
+  effect(): void
+}
+
+/**
+ * Publishes a game's mute state, and a way to make it play an effect, when
+ * `?qa=1` is present (#142).
+ *
+ * The Phaser five publish a `Phaser.Game` as `window.__game`, which knows
+ * nothing about sound — every one of them synthesises through its own
+ * `audio.ts` and keeps `muted` in a module variable. Four of the five show that
+ * state nowhere on screen either, so without this the sound check could only
+ * tell "the mute changed" by the silence, and could not tell a toggle that
+ * fired twice from one that never fired.
+ *
+ * A read-only getter, the same trade #138 made for Tower Stacker's `shake()`:
+ * it states what the control did, and the analyser still has to agree that
+ * the sound actually stopped.
+ *
+ * `effect` is here rather than reached by `import()` from the page, which was
+ * tried first and measured the wrong thing. Vite tags a module edited during a
+ * dev server's life with `?t=`, so the game imports `audio.ts?t=...` and a
+ * bare `import('/games/x/audio.ts')` gets a second, fresh copy — its own
+ * context, its own master gain, its own `muted`. Whatever that copy plays, or
+ * fails to, says nothing about the game. Handed over by the game itself, it is
+ * the instance the player hears.
+ */
+export function exposeSoundForQA(sound: SoundHandle): void {
+  if (!qaRequested()) return
+  window.__sound = sound
 }

@@ -8,7 +8,7 @@ import { BoardScene } from './scenes/BoardScene'
 import { UIScene } from './scenes/UIScene'
 import { setupDpad } from '../shared/dpad'
 import { setupButtons } from '../shared/buttons'
-import { exposeForQA } from '../shared/devtools'
+import { exposeForQA, exposeSoundForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -34,6 +34,7 @@ const config: Phaser.Types.Core.GameConfig = {
 
 export const game = new Phaser.Game(config)
 exposeForQA(game)
+exposeSoundForQA({ muted: isMuted, effect: () => playMove() })
 
 const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
   const keyMap: Record<string, string> = {
@@ -156,7 +157,7 @@ if (paletteBtn) {
   updatePaletteBtn()
 }
 
-import { ensureCtx } from './audio'
+import { ensureCtx, isMuted, playMove } from './audio'
 import '../shared/shell.css'
 const initAudio = () => {
   ensureCtx()
