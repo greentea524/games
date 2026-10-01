@@ -96,12 +96,27 @@ matters more than the check:
   branch in `handleInput` both toggled, so each press muted and unmuted in the
   same frame. Fixed: the branch is gone. The first run of this check was red
   on exactly that, which is its control.
-- **Cart & Crate's sound effects have never played.** Its ZzFX port has four
-  faults — the buffer is one NaN sample, and fixed one at a time the effects
-  go full-scale, then unbounded — and they also bypass the master gain. Left
-  for its own issue: repairing the synth is choosing what seven sounds sound
-  like. What the check hears for Cart & Crate is its music. `sound.mjs` has the
-  measurements.
+- **Cart & Crate's sound effects had never played.** Its ZzFX port had four
+  faults — the buffer was one NaN sample, and fixed one at a time the effects
+  went full-scale, then unbounded — and they also bypassed the master gain.
+  #144 replaced the port with the same small synth the other four use, routed
+  through the master gain, at their loudness.
+
+### An effect, heard alone (#144)
+
+Every check above stayed green on Cart & Crate's silent effects, because each
+listen included its music. So each game's run ends by stopping its music
+(`window.__sound.silence`), confirming the room is silent, and firing the
+effect alone. The first version measured "on the title, before any input"
+instead, and passed `main`'s silent ZzFX at 0.0179: the first effect call
+resumes the context and releases the menu music queued at load. Stopping the
+music is the only way to know what is being heard.
+
+Controls: `main`'s ZzFX `audio.ts` put back turns "its effect is audible on its
+own" red at 0.0000 with every other check green — exactly the old blind spot;
+and the new synth wired to `destination` instead of `master` turns "and
+nothing comes out of it" red at 1.37e-2, the leak #142 could only reason
+about.
 
 State comes from `window.__sound` (`exposeSoundForQA`, under `?qa=1`), because
 four of the five show their mute state nowhere. It also carries an `effect`

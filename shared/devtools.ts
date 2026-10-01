@@ -65,6 +65,12 @@ export interface SoundHandle {
   muted(): boolean
   /** Plays one of the game's sound effects, through its own audio module. */
   effect(): void
+  /**
+   * Stops the game's music, so an effect can be heard on its own (#144). A
+   * listen that includes music cannot tell a silent effect from a working one,
+   * which is how Cart & Crate's effects went unheard for the life of the game.
+   */
+  silence(): void
 }
 
 /**

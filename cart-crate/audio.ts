@@ -1,133 +1,38 @@
 import { migrateKey } from '../shared/storage'
 
-let zzfxV = 0.3
-export let zzfxX: AudioContext
+// Cart & Crate's sound (#144).
+//
+// The effects used to be a hand-copied ZzFX, and they never made a sound: the
+// samples reached the player as a one-sample buffer holding NaN. Under that
+// were three more faults — a bare sine where volume times envelope belonged,
+// an amplitude scaled by the oscillator's running phase, and a route straight
+// to `destination` that the mute could not reach. #142's sound check was the
+// first thing to listen, and #144 has the measurements.
+//
+// Rather than repair the port, the effects now use the same small synth the
+// other four GameBoy games use: one oscillator, an exponential decay, through
+// the master gain. Each is translated from its ZzFX parameter list — pitch,
+// attack + sustain + release, wave shape, slide, and ZzFX's +-pitch
+// randomness — so the sounds are the ones the lists describe, at a loudness
+// that sits with the rest of the collection.
 
-export const zzfxInit = () => {
-  if (!zzfxX) {
-    zzfxX = new (window.AudioContext || (window as any).webkitAudioContext)()
-  }
-  if (zzfxX.state === 'suspended') {
-    zzfxX.resume()
-  }
-}
-
-export const zzfx = (...zzfxParams: any[]) => {
-  if (!zzfxX) return
-  return zzfxP(zzfxG(...zzfxParams))
-}
-
-const zzfxP = (...t: any[]) => {
-  let e = zzfxX.createBufferSource(),
-    f = zzfxX.createBuffer(t.length, t[0].length, zzfxX.sampleRate)
-  t.map((d, i) => f.getChannelData(i).set(d))
-  e.buffer = f
-  e.connect(zzfxX.destination)
-  e.start()
-  return e
-}
-
-const zzfxG = (
-  q = 1,
-  k = 0.05,
-  c = 220,
-  e = 0,
-  t = 0,
-  m = 0.1,
-  r = 0,
-  F = 1,
-  v = 0,
-  z = 0,
-  w = 0,
-  A = 0,
-  // Positional slot in zzfx's signature. Unused, but it cannot be removed
-  // without shifting every argument after it.
-  _l = 0,
-  B = 0,
-  x = 0,
-  A2 = 0,
-  d = 0,
-  u = 1,
-  c2 = 0,
-  b = 0
-) => {
-  let y = 2 * Math.PI,
-    H = (v *= (500 * y) / zzfxX.sampleRate ** 2),
-    I = (0 < x ? 1 : -1) * (y / 4),
-    J = (c *= (1 + 2 * k * Math.random() - k) * (y / zzfxX.sampleRate)),
-    Z = [],
-    g = 0,
-    E = 0,
-    a = 0,
-    n = 1,
-    J2 = 0,
-    K = 0,
-    f = 0,
-    p = 0,
-    h
-
-  e = 99 + zzfxX.sampleRate * e
-  m = zzfxX.sampleRate * m
-  r = zzfxX.sampleRate * r
-  t = zzfxX.sampleRate * t
-  d = zzfxX.sampleRate * d
-
-  for (h = e + m + r + t + d; a < h; Z[a++] = f)
-    ++K > 100 * c2 &&
-      ((K = 0),
-      (f =
-        g *
-        q *
-        zzfxV *
-        (a < e
-          ? a / e
-          : a < e + m
-          ? 1 - ((a - e) / m) * (1 - F)
-          : a < e + m + r
-          ? F
-          : a < h - d
-          ? ((h - a - d) / t) * F
-          : 0)),
-      (f = f ? (x ? f / 2 + (x > 0 ? -0.5 : 0) * Math.sin(I) : Math.sin(g)) : 0),
-      (f = b ? f / 2 + b * p : f)),
-      (p = f),
-      (g += J += H += v += w *= y / zzfxX.sampleRate ** 3),
-      (E += 1 + A * Math.sin((a * B * y) / zzfxX.sampleRate)),
-      (n += 1 - u),
-      (J2 += (z * y) / zzfxX.sampleRate),
-      (g += z ? Math.sin(J2) * n : 0),
-      (I += (A2 * y) / zzfxX.sampleRate)
-
-  return [Z]
-}
-
-// Predefined sounds
-export const playMove = () => zzfx(1.2,0.05,400,0,0,0.02,0,1,0,0,0,0,0,0,0,0,0,1,0,0)
-export const playPush = () => zzfx(1.5,0.05,120,0,0.02,0.1,0,1,0,0,0,0,0,0,0,0,0,1,0,0)
-export const playDock = () => zzfx(1,0.05,800,0.05,0.05,0.1,0,1,0,0,0,0,0,0,0,0,0,1,0,0)
-export const playFall = () => zzfx(1,0.2,400,0,0.2,0.3,1,1,-5,0,0,0,0,0,0,0,0,1,0,0)
-export const playWin = () => {
-  zzfx(1,0.1,600,0.05,0.05,0.1,0,1,0,0,0,0,0,0,0,0,0,1,0,0)
-  setTimeout(() => zzfx(1,0.1,800,0.05,0.05,0.2,0,1,0,0,0,0,0,0,0,0,0,1,0,0), 150)
-  setTimeout(() => zzfx(1,0.1,1200,0.1,0.1,0.3,0,1,0,0,0,0,0,0,0,0,0,1,0,0), 300)
-}
-export const playMenuSelect = () => zzfx(0.5,0.05,600,0,0,0.02,0,1,0,0,0,0,0,0,0,0,0,1,0,0)
-export const playMenuConfirm = () => zzfx(1,0.05,900,0,0.05,0.05,0,1,0,0,0,0,0,0,0,0,0,1,0,0)
-
+let ctx: AudioContext | null = null
 let master: GainNode | null = null
 // Renamed from 'cartcrate_muted' (#104); carry the old setting across.
 migrateKey('cartcrate_muted', 'cart_crate_muted')
 let muted = localStorage.getItem('cart_crate_muted') === '1'
 
 export function ensureCtx(): AudioContext | null {
-  zzfxInit()
-  if (!zzfxX) return null
-  if (!master) {
-    master = zzfxX.createGain()
+  if (!ctx) {
+    const AC = window.AudioContext || (window as any).webkitAudioContext
+    if (!AC) return null
+    ctx = new AC()
+    master = ctx.createGain()
     master.gain.value = muted ? 0 : 1
-    master.connect(zzfxX.destination)
+    master.connect(ctx.destination)
   }
-  return zzfxX
+  if (ctx.state === 'suspended') ctx.resume()
+  return ctx
 }
 
 export function isMuted(): boolean { return muted }
@@ -136,6 +41,76 @@ export function setMuted(m: boolean) {
   localStorage.setItem('cart_crate_muted', m ? '1' : '0')
   if (master) master.gain.value = m ? 0 : 1
 }
+
+/**
+ * One effect: an oscillator from `fStart` to `fEnd` over `dur` seconds,
+ * decaying from `vol`, through the master gain so the mute reaches it.
+ *
+ * `jitter` is ZzFX's randomness: the pitch moves by up to that fraction each
+ * time, so a sound played on every step of a level does not drone.
+ */
+function tone(
+  type: OscillatorType,
+  fStart: number,
+  fEnd: number,
+  dur: number,
+  vol: number,
+  { delay = 0, jitter = 0.05 } = {},
+) {
+  const c = ensureCtx()
+  if (!c || !master) return
+  const shift = 1 + (Math.random() * 2 - 1) * jitter
+  const osc = c.createOscillator()
+  const g = c.createGain()
+  osc.type = type
+  osc.connect(g)
+  g.connect(master)
+  const t0 = c.currentTime + delay
+  osc.frequency.setValueAtTime(fStart * shift, t0)
+  if (fStart !== fEnd) osc.frequency.exponentialRampToValueAtTime(Math.max(1, fEnd * shift), t0 + dur)
+  g.gain.setValueAtTime(vol, t0)
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur)
+  osc.start(t0)
+  osc.stop(t0 + dur + 0.02)
+}
+
+/**
+ * Loudness of a ZzFX volume of 1. Each effect keeps its list's own volume as a
+ * multiple of this, so their balance against each other is the one authored.
+ *
+ * Measured through the QA analyser, peak RMS: at 0.04 the set ran 0.005 (the
+ * menu tick, authored at half volume) to 0.023 (the win), with a move at
+ * 0.011. The other four games' effects measure 0.013 to 0.036 and this game's
+ * music 0.015, so 0.05 puts a move — the sound of every step — at about 0.014,
+ * inside that range and under the music.
+ */
+const VOL = 0.05
+
+// Each line keeps the ZzFX list it replaces, as (volume, randomness, pitch,
+// attack, sustain, release, shape, ...). Durations are attack + sustain +
+// release, floored at 40 ms: ZzFX's 20 ms blips are a click on a phone
+// speaker, if they are anything.
+
+// (1.2, .05, 400, 0, 0, .02) — a short sine blip.
+export const playMove = () => tone('sine', 400, 400, 0.04, 1.2 * VOL)
+// (1.5, .05, 120, 0, .02, .1) — a low thud. Triangle, not ZzFX's sine: a 120 Hz
+// sine is close to inaudible on a phone speaker, and the push is the sound a
+// sokoban is about. The triangle's harmonics carry the same pitch.
+export const playPush = () => tone('triangle', 120, 120, 0.12, 1.5 * VOL)
+// (1, .05, 800, .05, .05, .1) — a bright chime as a crate lands on a target.
+export const playDock = () => tone('sine', 800, 800, 0.2, VOL)
+// (1, .2, 400, 0, .2, .3, triangle, 1, slide -5) — a falling triangle.
+export const playFall = () => tone('triangle', 400, 100, 0.5, VOL, { jitter: 0.2 })
+// Three rising chimes, 150 ms apart, each a little longer than the last.
+export const playWin = () => {
+  tone('sine', 600, 600, 0.2, VOL, { jitter: 0.1 })
+  tone('sine', 800, 800, 0.3, VOL, { delay: 0.15, jitter: 0.1 })
+  tone('sine', 1200, 1200, 0.5, VOL, { delay: 0.3, jitter: 0.1 })
+}
+// (.5, .05, 600, 0, 0, .02) — a quiet tick.
+export const playMenuSelect = () => tone('sine', 600, 600, 0.04, 0.5 * VOL)
+// (1, .05, 900, 0, .05, .05) — a brighter confirm.
+export const playMenuConfirm = () => tone('sine', 900, 900, 0.1, VOL)
 
 let musicBus: GainNode | null = null
 let musicTimer: number | null = null

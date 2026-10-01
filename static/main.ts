@@ -61,7 +61,7 @@ function createGame() {
     }
   })
   exposeForQA(game)
-  exposeSoundForQA({ muted: isMuted, effect: () => sfx.menuMove() })
+  exposeSoundForQA({ muted: isMuted, effect: () => sfx.menuMove(), silence: () => music.stop() })
   ;(window as any).__music = music
 }
 
