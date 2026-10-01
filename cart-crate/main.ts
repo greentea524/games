@@ -34,7 +34,7 @@ const config: Phaser.Types.Core.GameConfig = {
 
 export const game = new Phaser.Game(config)
 exposeForQA(game)
-exposeSoundForQA({ muted: isMuted, effect: () => playMove() })
+exposeSoundForQA({ muted: isMuted, effect: () => playMove(), silence: () => music.stop() })
 
 const dispatchKey = (code: string, type: 'keydown' | 'keyup') => {
   const keyMap: Record<string, string> = {
@@ -157,7 +157,7 @@ if (paletteBtn) {
   updatePaletteBtn()
 }
 
-import { ensureCtx, isMuted, playMove } from './audio'
+import { ensureCtx, isMuted, music, playMove } from './audio'
 import '../shared/shell.css'
 const initAudio = () => {
   ensureCtx()

@@ -37,31 +37,36 @@
 // is mostly music, and a mute that stopped the music and not the effects would
 // have passed.
 //
-// ## Cart & Crate's effects have never made a sound
+// ## The effect is also heard alone
 //
-// Written down because this check reads green for it and the reason matters.
-// Its effects are ZzFX, and the port in `cart-crate/audio.ts` has four faults,
-// measured while writing this: `zzfx` passes `zzfxG`'s `[Z]` to `zzfxP`
-// unspread, so every buffer is one sample long and that sample is NaN — every
-// move, push, dock and win has always been silence. Spread it, and the next
-// line replaces volume-times-envelope with a bare `Math.sin`, so each effect is
-// a full-scale sine (a move at 0.49 RMS, the win clipping at 1.23). Fix that,
-// and the amplitude line multiplies by the oscillator's running phase, which
-// grows without bound. And the effects connect to `destination` directly,
-// bypassing the master gain the mute turns down.
+// Cart & Crate's effects never made a sound until #144 — its ZzFX port built a
+// one-sample NaN buffer — and every check here read green for it, because a
+// listen that includes music cannot tell a silent effect from a working one.
+// So at the end of each game's run, its music is stopped through
+// `window.__sound.silence`, the room is confirmed silent, and the effect is
+// fired alone and must be heard.
 //
-// Repairing that synth is choosing what seven sounds sound like, which is not
-// a test's job, so it is left for its own issue. What this check hears for Cart
-// & Crate today is its music, which the mute does stop. It still fires the
-// game's real `playMove`, so the day the synth is repaired this check hears
-// the effects too. Repaired with the bypass left in, they would sound through
-// the mute — past the gain it turns down, straight into the analyser — and
-// "nothing comes out of it" should go red. That is reasoned, not run: with
-// the synth as it is there was no working effect to leak.
+// The first version of this measured on the title "before any input", where
+// four of the five are silent, and it was wrong in the way it was meant to
+// catch: the first effect call resumes the context, and the menu music queued
+// at load starts with it. Against `main`'s silent ZzFX it read 0.0179 — the
+// music's first note — and passed. Stopping the music is the only way to know
+// what is being heard.
 //
 // The effect is handed over by the game rather than reached with `import()`:
 // see `exposeSoundForQA` for the module-copy trap that cost a run.
-import { launchTouch, gameUrl, checker, checkSound, controls, centreOf, ACT } from './driver.mjs'
+import {
+  launchTouch,
+  gameUrl,
+  checker,
+  checkSound,
+  controls,
+  centreOf,
+  ACT,
+  AUDIBLE,
+  audioPeak,
+  resetAudio,
+} from './driver.mjs'
 
 const { check, finish } = checker()
 let ok = true
@@ -95,6 +100,34 @@ const pressM = (page) => async () => {
   await page.waitForTimeout(80)
 }
 
+/**
+ * The game's effect, heard by itself (#144): the music stopped, the notes it
+ * had already scheduled let finish, the room confirmed silent, then the effect.
+ */
+async function effectAlone(page, named) {
+  await page.evaluate(() => window.__sound.silence())
+  // A track schedules a quarter-second ahead and its longest note is about
+  // 0.6 s, so this outlasts anything it had queued.
+  await page.waitForTimeout(1500)
+  await resetAudio(page)
+  await page.waitForTimeout(600)
+  const background = await audioPeak(page)
+  named(
+    'its music can be stopped, for the next check',
+    background.peak < AUDIBLE,
+    `peak ${background.peak.toFixed(4)} with the music stopped, floor ${AUDIBLE}`,
+  )
+  await resetAudio(page)
+  await page.evaluate(() => window.__sound.effect())
+  await page.waitForTimeout(600)
+  const alone = await audioPeak(page)
+  named(
+    'its effect is audible on its own',
+    alone.peak >= AUDIBLE,
+    `peak ${alone.peak.toFixed(4)}, nothing else playing, floor ${AUDIBLE}`,
+  )
+}
+
 async function run(name, drive) {
   console.log(`\n### sound: ${name} ###\n`)
   const t = await launchTouch(gameUrl(name))
@@ -103,6 +136,7 @@ async function run(name, drive) {
     await t.page.waitForTimeout(1500)
     const named = (label, pass, note) => check(`${name}: ${label}`, pass, note)
     await drive(t, named)
+    await effectAlone(t.page, named)
   } finally {
     await t.browser.close()
   }
@@ -149,7 +183,7 @@ await run('static', async ({ page, hand }, named) => {
 // The other four: M on the title menu, the only mute any of them has.
 for (const name of ['windup', 'lantern-keeper', 'pocket-dungeon', 'cart-crate']) {
   await run(name, async ({ page }, named) => {
-    named('publishes its mute state and an effect for this check', await page.evaluate(() => typeof window.__sound?.muted === 'function' && typeof window.__sound?.effect === 'function'))
+    named('publishes its mute state, an effect and a way to stop its music', await page.evaluate(() => ['muted', 'effect', 'silence'].every((k) => typeof window.__sound?.[k] === 'function')))
     await checkSound({ page, check: named, play: play(page), label: mutedState(page), toggle: pressM(page) })
   })
 }

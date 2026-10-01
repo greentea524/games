@@ -159,10 +159,14 @@ four have the M key and nothing else, which is its own issue.
 
 **Listening found two games whose sound was broken in ways no other check
 could see (#142).** Windup's M toggled twice per press and did nothing on its
-title menu. Cart & Crate's effects have never made a sound: its ZzFX port
-builds a one-sample NaN buffer, and under that sits a missing envelope, a
-phase-scaled amplitude and a route past the mute — repairing it is its own
-issue. Two traps from that work: a page-side `import()` of a game's module can
+title menu. Cart & Crate's effects had never made a sound: its ZzFX port built
+a one-sample NaN buffer, and under that sat a missing envelope, a
+phase-scaled amplitude and a route past the mute. #144 replaced it with the
+synth the other four use, and the suite now hears each game's effect *alone*,
+music stopped through `exposeSoundForQA`'s `silence` — every listen that
+included music had passed the silent effects. Three traps from that work: a
+first effect call can release music queued at load, so "before any input" is
+not silence; a page-side `import()` of a game's module can
 return a *second copy* of it under Vite (`?t=`), so a game hands the check its
 own `effect` via `exposeSoundForQA`; and a short listen can land in a tune's
 rest, so the window is a whole musical cycle.
