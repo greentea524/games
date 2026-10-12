@@ -4,6 +4,10 @@ import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem } from '../save'
 import type { BoardScene } from './BoardScene'
+import { isMuted, setMuted } from '../audio'
+
+/** The pause panel's sound row, numbered with the rest; its state is live (#143). */
+const soundLabel = () => `6. SOUND: ${isMuted() ? 'OFF' : 'ON'}`
 
 export class UIScene extends Phaser.Scene {
   private levelTitleText!: Phaser.GameObjects.Text
@@ -109,57 +113,72 @@ export class UIScene extends Phaser.Scene {
   private createPauseMenu() {
     const bgGfx = this.add.graphics()
     bgGfx.fillStyle(PAL.darkest, 0.96)
-    bgGfx.fillRoundedRect(-65, -45, 130, 90, 6)
+    // Taller by one row for SOUND (#143), and every row moved up six to keep
+    // the stack centred. Wider too: at 130 px, with rows starting 50 px left of
+    // centre, "> 1. RESUME GAME" (16 characters, 128 px at 8 px) ran through
+    // the border and off the 160 px screen. Rows now start at -66, inside a
+    // 150 px panel, and the longest ends at +62.
+    bgGfx.fillRoundedRect(-75, -51, 150, 102, 6)
     bgGfx.lineStyle(1.5, PAL.lightest, 1)
-    bgGfx.strokeRoundedRect(-65, -45, 130, 90, 6)
+    bgGfx.strokeRoundedRect(-75, -51, 150, 102, 6)
 
-    const titleText = this.add.text(0, -32, 'PAUSED', {
+    const titleText = this.add.text(0, -38, 'PAUSED', {
       fontFamily: FONT,
       fontSize: '16px',
       color: '#9bbc0f',
       resolution: 2,
     }).setOrigin(0.5)
 
-    const btnResume = this.add.text(-50, -14, '1. RESUME GAME', {
+    const btnResume = this.add.text(-66, -20, '1. RESUME GAME', {
       fontFamily: FONT,
       fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '1. RESUME GAME')
 
-    const btnHelp = this.add.text(-50, -2, '2. HOW TO PLAY', {
+    const btnHelp = this.add.text(-66, -8, '2. HOW TO PLAY', {
       fontFamily: FONT,
       fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '2. HOW TO PLAY')
 
-    const btnSkip = this.add.text(-50, 10, '3. SKIP STAGE', {
+    const btnSkip = this.add.text(-66, 4, '3. SKIP STAGE', {
       fontFamily: FONT,
       fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '3. SKIP STAGE')
 
-    const btnRestart = this.add.text(-50, 22, '4. RESTART LVL', {
+    const btnRestart = this.add.text(-66, 16, '4. RESTART LVL', {
       fontFamily: FONT,
       fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '4. RESTART LVL')
 
-    const btnQuit = this.add.text(-50, 34, '5. QUIT TO MAP', {
+    const btnQuit = this.add.text(-66, 28, '5. QUIT TO MAP', {
       fontFamily: FONT,
       fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '5. QUIT TO MAP')
 
+    // The only mute a phone can reach (#143). M was the only one this game
+    // had, and only on the title menu; the label carries the live state.
+    const btnSound = this.add.text(-66, 40, soundLabel(), {
+      fontFamily: FONT,
+      fontSize: '8px',
+      color: '#e0f8cf',
+      resolution: 2,
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', soundLabel())
+
     btnResume.on('pointerdown', () => this.executePauseAction(0))
     btnHelp.on('pointerdown', () => this.executePauseAction(1))
     btnSkip.on('pointerdown', () => this.executePauseAction(2))
     btnRestart.on('pointerdown', () => this.executePauseAction(3))
     btnQuit.on('pointerdown', () => this.executePauseAction(4))
+    btnSound.on('pointerdown', () => this.executePauseAction(5))
 
     this.pauseContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2, [
       bgGfx,
@@ -169,11 +188,12 @@ export class UIScene extends Phaser.Scene {
       btnSkip,
       btnRestart,
       btnQuit,
+      btnSound,
     ])
       .setDepth(3000)
       .setVisible(false)
 
-    this.pauseOptionsText = [btnResume, btnHelp, btnSkip, btnRestart, btnQuit]
+    this.pauseOptionsText = [btnResume, btnHelp, btnSkip, btnRestart, btnQuit, btnSound]
   }
 
   private createHelpModal() {
@@ -199,7 +219,7 @@ export class UIScene extends Phaser.Scene {
       'ICE: Crates fly',
       'UNDO: B or Z',
       'RESET: SELECT/R',
-      '',
+      'SOUND: Pause/M',
       'Lvls 11-50 by',
       'D.W. Skinner',
     ]
@@ -252,6 +272,9 @@ export class UIScene extends Phaser.Scene {
     GameState.uiBlocking = this.pauseOpen
     
     if (this.pauseOpen) {
+      // M on the main menu can change the state while this panel is built and
+      // hidden, so the sound row is relabelled each time it opens (#143).
+      this.pauseOptionsText[5].setData('label', soundLabel())
       this.pauseSelectedIndex = 0
       this.updatePauseSelection()
     }
@@ -292,6 +315,12 @@ export class UIScene extends Phaser.Scene {
       this.togglePauseMenu()
       this.scene.stop('board')
       this.scene.start('levelselect')
+    } else if (idx === 5) { // Sound
+      setMuted(!isMuted())
+      const btn = this.pauseOptionsText[5]
+      btn.setData('label', soundLabel())
+      this.pauseSelectedIndex = 5
+      this.updatePauseSelection()
     }
   }
 

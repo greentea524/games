@@ -1,11 +1,13 @@
 import Phaser from 'phaser'
 import { GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST, CSS_DARKEST, CSS_MID, CSS_LIGHT } from '../constants'
 import { GameState } from '../state'
-import { sfx } from '../audio'
+import { sfx, isMuted, setMuted } from '../audio'
 
 export class PauseScene extends Phaser.Scene {
   private selectedIndex = 0
-  private menuItems: string[] = ['RESUME', 'QUIT TO MENU']
+  // SOUND is here so a phone can mute mid-level (#143): the shell has no M key,
+  // and M was the only mute this game had. Its label is the live state.
+  private menuItems: string[] = ['RESUME', 'SOUND', 'QUIT TO MENU']
   private menuTexts: Phaser.GameObjects.Text[] = []
   private cursorGfx!: Phaser.GameObjects.Graphics
 
@@ -29,7 +31,7 @@ export class PauseScene extends Phaser.Scene {
     const startY = 80
     this.menuTexts = []
     this.menuItems.forEach((item, index) => {
-      const txt = this.add.text(GBC_WIDTH / 2, startY + index * 16, item, {
+      const txt = this.add.text(GBC_WIDTH / 2, startY + index * 16, this.labelFor(item), {
         fontFamily: FONT,
         fontSize: '8px',
         color: CSS_MID,
@@ -60,6 +62,10 @@ export class PauseScene extends Phaser.Scene {
     })
   }
 
+  private labelFor(item: string): string {
+    return item === 'SOUND' ? `SOUND: ${isMuted() ? 'OFF' : 'ON'}` : item
+  }
+
   private moveSelection(dir: number) {
     sfx.hit()
     this.selectedIndex += dir
@@ -84,9 +90,16 @@ export class PauseScene extends Phaser.Scene {
 
   private handleSelection() {
     sfx.menuSelect()
-    if (this.selectedIndex === 0) {
+    const item = this.menuItems[this.selectedIndex]
+    if (item === 'RESUME') {
       this.resumeGame()
-    } else if (this.selectedIndex === 1) {
+    } else if (item === 'SOUND') {
+      setMuted(!isMuted())
+      // Audible confirmation on the way back on, as Static's does.
+      if (!isMuted()) sfx.menuSelect()
+      this.menuTexts[this.selectedIndex].setText(this.labelFor(item))
+      this.updateSelection()
+    } else if (item === 'QUIT TO MENU') {
       this.quitToMenu()
     }
   }

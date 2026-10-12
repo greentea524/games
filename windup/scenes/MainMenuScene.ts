@@ -165,7 +165,7 @@ export class MainMenuScene extends Phaser.Scene {
       this.viewState = 'how-to'
       this.menuTexts.forEach(t => t.setVisible(false))
       this.cursorGfx.setVisible(false)
-      this.infoText.setText("Move: D-PAD\nJump: A (or Z)\nWall Jump: Jump while sliding down walls!\n\nRecharge energy at Stations.")
+      this.infoText.setText("Move: D-PAD\nJump: A (or Z)\nWall Jump: Jump while sliding down walls!\nSound: START menu (or M)\n\nRecharge energy at Stations.")
       this.infoText.setVisible(true)
     } else if (option === 'ABOUT') {
       this.viewState = 'about'

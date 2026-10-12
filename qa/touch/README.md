@@ -87,11 +87,18 @@ assuming.** A context left suspended should be silent, but a brand-new
 `toggle` and a `label` as well as a selector. What it found about the games
 matters more than the check:
 
-- **Only Static has a mute a finger can reach** — `Sound: ON/OFF` in its pause
-  overlay, tapped as a button. The other four mute on the M key and nothing
-  else, with no menu item and no mention of M on screen; on a phone they
-  cannot be muted at all. The check drives M, the only control they have, and
-  the gap is left to its own issue — adding controls is design, not testing.
+- **Only Static had a mute a finger could reach** — `Sound: ON/OFF` in its
+  pause overlay. The other four muted on the M key and nothing else, so on a
+  phone they could not be muted at all. #143 gave each a Sound item: Windup's
+  pause scene, Lantern Keeper's pause overlay, Cart & Crate's pause panel, and
+  Pocket Dungeon's title menu (it has no pause menu). The check taps each one
+  the way a phone player does, and holds its label to the real state — a
+  label that flips without muting fails "its label is never wrong". Controls:
+  each new handler made a no-op turns "reports it off" and "nothing comes out"
+  red in all four; a label flipped without muting, in Cart & Crate and Pocket
+  Dungeon, turns "nothing comes out" and "label is never wrong" red while
+  "reports it off" stays green, which is why the label check alone was never
+  enough.
 - **Windup's M did nothing on its title menu.** `addKey('M')` and a `KeyM`
   branch in `handleInput` both toggled, so each press muted and unmuted in the
   same frame. Fixed: the branch is gone. The first run of this check was red
