@@ -103,7 +103,11 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5, 0)
 
     // ── Menu Buttons (navigable with UP/DOWN + ENTER) ──
-    const btnY = 100
+    // Three rows since #143 added SOUND, so they sit 11px apart rather than 14:
+    // the class description above runs to two lines and ends at 96, and the
+    // run record below has to stay on the screen.
+    const btnY = 99
+    const rowGap = 11
     this.menuItems = []
 
     const startBtn = this.add.text(GBC_WIDTH / 2, btnY, 'START', {
@@ -111,17 +115,24 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
     this.menuItems.push(startBtn)
 
-    const shopBtn = this.add.text(GBC_WIDTH / 2, btnY + 14, 'SHOP', {
+    const shopBtn = this.add.text(GBC_WIDTH / 2, btnY + rowGap, 'SHOP', {
       fontFamily: FONT, fontSize: '8px', color: '#86b06a', resolution: 4,
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
     this.menuItems.push(shopBtn)
 
+    // The only mute a phone can reach between runs (#143): the shell has no M
+    // key, and M was the only mute this game had. The label is the live state.
+    const soundBtn = this.add.text(GBC_WIDTH / 2, btnY + rowGap * 2, '', {
+      fontFamily: FONT, fontSize: '8px', color: '#86b06a', resolution: 4,
+    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
+    this.menuItems.push(soundBtn)
+
     // ── Run History ──
     const divider2 = this.add.graphics()
-    divider2.fillStyle(0x506850); divider2.fillRect(20, 128, GBC_WIDTH - 40, 1)
+    divider2.fillStyle(0x506850); divider2.fillRect(20, 131, GBC_WIDTH - 40, 1)
 
     // One line, abbreviated: two lines of 8px text ran off the bottom edge.
-    this.add.text(GBC_WIDTH / 2, 132, `RUNS ${meta.totalRuns} WIN ${meta.totalVictories} BEST ${meta.bestFloor}`, {
+    this.add.text(GBC_WIDTH / 2, 134, `RUNS ${meta.totalRuns} WIN ${meta.totalVictories} BEST ${meta.bestFloor}`, {
       fontFamily: FONT, fontSize: '8px', color: '#506850', resolution: 4,
     }).setOrigin(0.5, 0)
 
@@ -157,16 +168,18 @@ export class TitleScene extends Phaser.Scene {
     })
 
     const mKey = this.input.keyboard!.addKey('M')
-    mKey.on('down', () => {
-      setMuted(!isMuted())
-      if (!isMuted()) sfx.menuSelect()
-    })
+    // Through the menu's own toggle, so the SOUND row's label follows M too.
+    mKey.on('down', () => this.toggleSound())
 
     // ── Touch / Click Input ──
     this.arrowLeft.on('pointerdown', () => this.cycleClass(-1))
     this.arrowRight.on('pointerdown', () => this.cycleClass(1))
     startBtn.on('pointerdown', () => { sfx.menuSelect(); this.startRun() })
     shopBtn.on('pointerdown', () => { sfx.menuSelect(); this.scene.start('shop') })
+    soundBtn.on('pointerdown', () => {
+      this.menuIndex = 2
+      this.toggleSound()
+    })
   }
 
   private cycleClass(dir: number) {
@@ -178,6 +191,13 @@ export class TitleScene extends Phaser.Scene {
   private confirmMenu() {
     if (this.menuIndex === 0) this.startRun()
     else if (this.menuIndex === 1) this.scene.start('shop')
+    else if (this.menuIndex === 2) this.toggleSound()
+  }
+
+  private toggleSound() {
+    setMuted(!isMuted())
+    if (!isMuted()) sfx.menuSelect()
+    this.updateMenuCursor()
   }
 
   private startRun() {
@@ -187,7 +207,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   private updateMenuCursor() {
-    const labels = ['START', 'SHOP']
+    const labels = ['START', 'SHOP', `SOUND: ${isMuted() ? 'OFF' : 'ON'}`]
     for (let i = 0; i < this.menuItems.length; i++) {
       if (i === this.menuIndex) {
         this.menuItems[i].setText(`\u25B6 ${labels[i]}`)

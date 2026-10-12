@@ -4,7 +4,7 @@ import { MapScene } from './scenes/MapScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PlayScene } from './scenes/PlayScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
-import { ensureCtx, isMuted, music, sfx } from './audio'
+import { ensureCtx, isMuted, music, setMuted, sfx } from './audio'
 import { setupDpad } from '../shared/dpad'
 import { setupButtons } from '../shared/buttons'
 import { exposeForQA, exposeSoundForQA } from '../shared/devtools'
@@ -97,9 +97,16 @@ const overlayText = document.getElementById('overlay-text')
 let overlayMode: 'pause' | 'info' | null = null
 
 let pauseSelectedIndex = 0
+/**
+ * The pause overlay's buttons, in order. One list, read by the markup's
+ * keyboard navigation and its selection marker alike: the count was written
+ * out as 3 in two places, which a fourth item (#143) would have left behind.
+ */
+const PAUSE_BUTTONS = ['btn-pause-resume', 'btn-pause-controls', 'btn-pause-sound', 'btn-pause-exit']
+/** Sound's label carries its state, as Static's does (#143). */
+const soundLabel = () => `Sound: ${isMuted() ? 'OFF' : 'ON'}`
 const updatePauseMenuSelection = () => {
-  const buttons = ['btn-pause-resume', 'btn-pause-controls', 'btn-pause-exit']
-  buttons.forEach((id, index) => {
+  PAUSE_BUTTONS.forEach((id, index) => {
     const btn = document.getElementById(id)
     if (btn) {
       if (index === pauseSelectedIndex) {
@@ -131,6 +138,7 @@ function toggleOverlay(mode: 'pause' | 'info') {
         <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px; align-items:center;">
           <button id="btn-pause-resume" class="overlay-btn">Resume</button>
           <button id="btn-pause-controls" class="overlay-btn">Controls</button>
+          <button id="btn-pause-sound" class="overlay-btn">${soundLabel()}</button>
           <button id="btn-pause-exit" class="overlay-btn">Exit Game</button>
         </div>
       `
@@ -143,6 +151,16 @@ function toggleOverlay(mode: 'pause' | 'info') {
         toggleOverlay('info')
       })
       
+      // The only mute a phone can reach: M was the only one this game had (#143).
+      document.getElementById('btn-pause-sound')?.addEventListener('click', () => {
+        setMuted(!isMuted())
+        if (!isMuted()) sfx.jump()
+        const btn = document.getElementById('btn-pause-sound')
+        if (btn) btn.innerText = soundLabel()
+        pauseSelectedIndex = PAUSE_BUTTONS.indexOf('btn-pause-sound')
+        updatePauseMenuSelection()
+      })
+
       document.getElementById('btn-pause-exit')?.addEventListener('click', () => {
         toggleOverlay('pause') // close overlay
         game.scene.stop('play')
@@ -158,7 +176,8 @@ function toggleOverlay(mode: 'pause' | 'info') {
         <b>Controls</b><br/>
         Arrows / D-Pad: Move & Jump<br/>
         Z / A Button: Jump<br/>
-        X / B Button: Dash<br/><br/>
+        X / B Button: Dash<br/>
+        Sound: Pause menu, or M<br/><br/>
         Press SELECT or Shift to resume.</p>
         <div style="margin-top:15px;">
           <button id="btn-info-back" class="overlay-btn">Back</button>
@@ -182,14 +201,13 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault()
     e.stopPropagation()
     if (e.key === 'ArrowUp') {
-      pauseSelectedIndex = (pauseSelectedIndex - 1 + 3) % 3
+      pauseSelectedIndex = (pauseSelectedIndex - 1 + PAUSE_BUTTONS.length) % PAUSE_BUTTONS.length
       updatePauseMenuSelection()
     } else if (e.key === 'ArrowDown') {
-      pauseSelectedIndex = (pauseSelectedIndex + 1) % 3
+      pauseSelectedIndex = (pauseSelectedIndex + 1) % PAUSE_BUTTONS.length
       updatePauseMenuSelection()
     } else if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z' || e.key === 'KeyZ') {
-       const buttons = ['btn-pause-resume', 'btn-pause-controls', 'btn-pause-exit']
-       document.getElementById(buttons[pauseSelectedIndex])?.click()
+       document.getElementById(PAUSE_BUTTONS[pauseSelectedIndex])?.click()
     } else if (e.key === 'Escape') {
        toggleOverlay('pause')
     }

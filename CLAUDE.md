@@ -154,8 +154,9 @@ down there: measure the instant the button is clicked and you catch Anomaly
 Room's mute *ramp* rather than its silence, and a brand-new `AudioContext` is
 `running` in this headless browser, so a suspended-context defect cannot be
 staged under the driver at all. The Phaser five are checked too since #142, by
-`qa/touch/sound.mjs` — and only Static's mute is reachable by touch; the other
-four have the M key and nothing else, which is its own issue.
+`qa/touch/sound.mjs`, and since #143 every one has a Sound item a phone can
+reach — the suite taps it, and holds its label to the real mute state. Pocket
+Dungeon's is on its title, because it has no pause menu.
 
 **Listening found two games whose sound was broken in ways no other check
 could see (#142).** Windup's M toggled twice per press and did nothing on its
