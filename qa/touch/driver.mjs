@@ -54,7 +54,11 @@ const AUDIO_PROBE = `
     const real = Object.getOwnPropertyDescriptor(proto, 'destination')
     if (!real?.get) return
 
-    const state = { analysers: [], peak: 0, contexts: 0 }
+    /** Samples per RMS reading — the size AUDIBLE was calibrated at. */
+    const WINDOW = 2048
+    /** Samples of history read each tick: the largest an analyser holds. */
+    const HISTORY = 32768
+    const state = { analysers: [], peak: 0, contexts: 0, resetAt: new Map() }
     window.__audio = {
       /** Peak RMS across every context since the last reset. */
       peak: () => state.peak,
@@ -62,6 +66,10 @@ const AUDIO_PROBE = `
       contexts: () => state.contexts,
       reset() {
         state.peak = 0
+        // Each analyser holds 0.7 s of history, so without this the first
+        // read after a reset would count sound from before it — a mute check
+        // would hear the game as it was before the mute.
+        for (const a of state.analysers) state.resetAt.set(a, a.context.currentTime)
       },
     }
 
@@ -76,7 +84,7 @@ const AUDIO_PROBE = `
           this.__probing = true
           try {
             const analyser = this.createAnalyser()
-            analyser.fftSize = 2048
+            analyser.fftSize = HISTORY
             analyser.connect(output)
             this.__probe = analyser
             state.analysers.push(analyser)
@@ -91,7 +99,16 @@ const AUDIO_PROBE = `
       },
     })
 
-    const buf = new Float32Array(2048)
+    // Each tick reads the analyser's whole history — about 0.7 s, the most an
+    // AnalyserNode keeps — and takes the loudest WINDOW-sample stretch in it.
+    // It used to read one WINDOW per animation frame, which covered the
+    // timeline only while frames came faster than a window lasts (~45 ms). On
+    // a machine rendering WebGL in software, at 10 frames a second, it covered
+    // under half of it, and a short blip could fall between two reads: Tube
+    // Runner's retry blip read 0.0000 under load. The measure is unchanged —
+    // RMS over WINDOW samples, which is what AUDIBLE is calibrated against —
+    // and now no sound is missed unless frames are 0.7 s apart.
+    const buf = new Float32Array(HISTORY)
     const tick = () => {
       for (const a of state.analysers) {
         try {
@@ -99,10 +116,16 @@ const AUDIO_PROBE = `
         } catch {
           continue
         }
-        let sum = 0
-        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i]
-        const rms = Math.sqrt(sum / buf.length)
-        if (rms > state.peak) state.peak = rms
+        // Only what was heard since the last reset: the history ends now, so
+        // the newest samples are at the end and the reset falls this far back.
+        const since = (a.context.currentTime - (state.resetAt.get(a) ?? 0)) * a.context.sampleRate
+        const from = Math.max(0, buf.length - Math.floor(since))
+        for (let end = buf.length; end - WINDOW >= from; end -= WINDOW) {
+          let sum = 0
+          for (let i = end - WINDOW; i < end; i++) sum += buf[i] * buf[i]
+          const rms = Math.sqrt(sum / WINDOW)
+          if (rms > state.peak) state.peak = rms
+        }
       }
       requestAnimationFrame(tick)
     }

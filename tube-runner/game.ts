@@ -168,7 +168,13 @@ const BEHIND = 4
  */
 const OPENING_RUNWAY = RING_SPACING * 2.5
 
-/** Seconds the end screen ignores input, matching shared/runSummary. */
+/**
+ * Seconds the end screen ignores input, matching shared/runSummary — in real
+ * time, as runSummary's are. It used to be timed on the run's clock, which is
+ * clamped to 1/20 s a frame, so on a device drawing 10 frames a second the
+ * lock ran at half speed and lasted a full second: a retry tap at 0.7 s was
+ * swallowed. The clamp is right for the run and wrong for a thumb.
+ */
 const OVER_LOCK = 0.5
 
 /** The handle `exposeForQA` publishes. */
@@ -508,7 +514,7 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
 
   function endRun() {
     screen = 'over'
-    overAt = elapsed
+    overAt = performance.now()
     const result = recordRun(cleared)
     best = result.best
     isRecord = result.isRecord
@@ -521,7 +527,7 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
 
   function press() {
     if (screen === 'run') return
-    if (screen === 'over' && elapsed - overAt < OVER_LOCK) return
+    if (screen === 'over' && performance.now() - overAt < OVER_LOCK * 1000) return
     playBlip()
     startRun()
   }

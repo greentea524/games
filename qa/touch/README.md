@@ -368,6 +368,27 @@ with its hint untouched (*not consumed: ArrowLeft*).
 
 ## Notes for anyone extending this
 
+- **The 3D games may run at 10 frames a second here, and nothing may assume
+  otherwise.** A container with no GPU renders WebGL in SwiftShader, on the
+  CPU: measured at 10–14 frames a second for Tube Runner and Tilt Maze on an
+  idle four-core machine, against 60 for Static. Three checks had quietly
+  depended on frames, and all three failed there while passing on a faster
+  container:
+  - Tube Runner timed its retry lock on the run's clock, which is clamped to
+    1/20 s a frame, so the lock stretched to a second and the suite's retry
+    tap was swallowed. A game fix: the lock is real time now, as runSummary's
+    is — a thumb works in real time.
+  - Tilt Maze's thumb-driven win is a feedback loop over CDP round trips, and
+    at two frames a pass its 0.55 / 0.45 gains overshot the goal both ways.
+    0.35 / 0.6 settles in 3–5 s there.
+  - The audio probe read one 45 ms window per animation frame, so at 10 fps it
+    heard under half the timeline and a short blip could vanish between
+    reads. It reads the analyser's whole 0.7 s history now, in the same
+    2048-sample windows, counting only what follows the last reset.
+  Prove a timing-sensitive check under load before trusting it: two shell
+  busy-loops on a four-core container push these games to a few frames a
+  second, which is how the third of these was found.
+
 - **Use CDP, not Playwright's touch helpers.** `page.touchscreen.tap` is one
   contact and cannot drag, and PointerEvents from `evaluate()` are untrusted
   so `setPointerCapture` rejects them — which is exactly the mechanism
