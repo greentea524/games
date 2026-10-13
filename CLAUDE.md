@@ -240,6 +240,16 @@ the pre-init sizing script in any `index.html` changes its hash; the browser
 then declines to run it, nothing throws, and every functional check goes on
 passing. `npm run qa:csp` recomputes it. If you touch that script, run it.
 
+**A check must not assume 60 frames a second.** A container with no GPU
+renders WebGL on the CPU (SwiftShader): Tube Runner and Tilt Maze measured
+10–14 frames a second on an idle machine, Static 60. Three checks failed
+there and passed elsewhere — a retry lock timed on a clamped game clock, a
+thumb-steering loop tuned for a fast round trip, and the audio probe, which
+read one 45 ms window per frame and so missed short sounds between frames.
+All three are fixed and `qa/touch/README.md` has the measurements. Before
+trusting anything timed, run it with two shell busy-loops alongside; that is
+how the probe's gap was found, after the other two fixes had gone green.
+
 **Make a check prove it can fail.** Several checks in this repo passed for the
 wrong reason when first written — asserting a fall speed was capped, against a
 player standing still on the ground. Where the defect is known, reintroduce it

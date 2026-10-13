@@ -589,16 +589,22 @@ async function run() {
   // ------------------------------------------------------------- the sound
 
   // Listened to rather than read off the label (#136). A tap starts or retries a
-  // run, and both play a blip.
+  // run, and both play a blip — but only from the title or the end screen: a
+  // tap during a run steers, silently. This used to be four taps half a second
+  // apart, on the bet that one would land after a crash. Under load the run
+  // outlasted all four — the run's clock is clamped per frame, so a slow
+  // machine stretches it — and the check heard nothing (peak 0.0000, twice).
+  // So it waits for the run to end, waits out the end screen's input lock,
+  // and taps once: one blip, at any frame rate.
   await checkSound({
     page,
     check,
     selector: '.tr-sound',
     play: async () => {
-      for (let i = 0; i < 4; i++) {
-        await hand.tap(PAD, right.x, right.y)
-        await page.waitForTimeout(500)
-      }
+      await page.waitForFunction(() => window.__game.screen() !== 'run', null, { timeout: 30_000 })
+      await page.waitForTimeout(700) // OVER_LOCK is 0.5 s, in real time
+      await hand.tap(PAD, right.x, right.y)
+      await page.waitForTimeout(400)
     },
   })
 

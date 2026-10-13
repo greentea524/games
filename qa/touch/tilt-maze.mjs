@@ -64,12 +64,17 @@ const goalOf = (page) =>
  * game the way a thumb does rather than reaching past the input layer to
  * `steer()`.
  */
-async function dragTo(page, hand, origin, sx, sz) {
-  const radius = await page.evaluate(() => {
+async function dragTo(page, hand, origin, sx, sz, radius) {
+  radius ??= await dragRadius(page)
+  await hand.move(PAD, origin.x + sx * radius, origin.y + sz * radius)
+}
+
+/** The drag length the game reads as full lean, in CSS pixels. */
+function dragRadius(page) {
+  return page.evaluate(() => {
     const c = document.querySelector('#stage canvas')
     return Math.max(40, Math.min(c.clientWidth, c.clientHeight) * 0.22)
   })
-  await hand.move(PAD, origin.x + sx * radius, origin.y + sz * radius)
 }
 
 async function run() {
@@ -172,12 +177,24 @@ async function run() {
   // well as pulling toward the goal — steering only by position can only ever
   // be full lean one way or the other, and rolls the marble wall to wall for
   // ever without ever coming to rest on the goal.
+  //
+  // The gains are for a slow machine as much as a fast one. Each pass is a CDP
+  // round trip or two, and on a container rendering WebGL in software (10-14
+  // frames a second under SwiftShader) a pass spans two frames, so the
+  // controller steers on a marble that has already moved. At 0.55 / 0.45 it
+  // overshot the goal both ways — 3.25, then 2.12 against a goal at 2 — and
+  // won in 8 to 12 s or not within 25 s, three runs out of three on one
+  // machine. At 0.35 / 0.6, more damped, it settles in 3 to 5 s there, and
+  // more damping only makes a fast machine's tighter loop steadier. The radius
+  // is read once, rather than on every pass, for the same reason: it was a
+  // third round trip in a loop whose problem was round trips.
   await page.evaluate(() => window.__game.restart())
   await page.waitForTimeout(300)
   const goal = await goalOf(page)
   check('the level has a goal to reach', goal !== null)
 
   await hand.down(PAD, centre.x, centre.y)
+  const radius = await dragRadius(page)
   const deadline = Date.now() + 25_000
   let won = false
   while (Date.now() < deadline) {
@@ -191,8 +208,9 @@ async function run() {
       page,
       hand,
       centre,
-      clamp((goal.x - s.ball.x) * 0.55 - s.velocity.x * 0.45),
-      clamp((goal.z - s.ball.z) * 0.55 - s.velocity.z * 0.45),
+      clamp((goal.x - s.ball.x) * 0.35 - s.velocity.x * 0.6),
+      clamp((goal.z - s.ball.z) * 0.35 - s.velocity.z * 0.6),
+      radius,
     )
   }
   await hand.up(PAD)
