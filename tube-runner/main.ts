@@ -19,7 +19,7 @@
 // check: sliding a thumb from one side to the other reverses the turn without
 // ever passing through "not turning", because both contacts are tracked and
 // the newest side wins.
-import { createGame } from './game'
+import { createGame, STEER_LEFT, STEER_RIGHT } from './game'
 import { createHud } from './hud'
 import { exposeForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
@@ -43,10 +43,14 @@ createHud(game, {
 
 const canvas = game.stage.renderer.domElement
 
-/** Which side of the canvas a point is on. */
+/**
+ * Which way a point on the canvas steers: the left half toward the left of
+ * the screen, the right half toward the right. See `STEER_LEFT` for why that
+ * is not simply -1 and 1.
+ */
 const sideOf = (clientX: number): -1 | 1 => {
   const rect = canvas.getBoundingClientRect()
-  return clientX - rect.left < rect.width / 2 ? -1 : 1
+  return clientX - rect.left < rect.width / 2 ? STEER_LEFT : STEER_RIGHT
 }
 
 /**
@@ -123,7 +127,7 @@ function applyKeys() {
   // Both at once cancels rather than picking a winner. A keyboard can hold two
   // arrows where a thumb cannot be on two sides at once, and drifting under
   // both would be a surprise either way.
-  game.steer(left === right ? 0 : left ? -1 : 1)
+  game.steer(left === right ? 0 : left ? STEER_LEFT : STEER_RIGHT)
 }
 
 window.addEventListener('keydown', (e) => {

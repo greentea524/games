@@ -84,6 +84,43 @@ const GAMES = [
     },
   },
   {
+    game: 'tube-runner',
+    what: 'the camera trails the runner through a turn',
+    // #145: the runner swings across the screen as they steer and the camera
+    // eases round after them. That swing is camera motion the player did not
+    // have before, so under the preference the camera stays locked behind the
+    // runner, as it always was — and the runner never leaves the middle.
+    async measure({ page, hand }) {
+      await page.waitForSelector('#stage canvas')
+      await page.waitForTimeout(1200)
+      const left = await canvasPoint(page, 0.22, 0.5, '#stage canvas')
+      const right = await canvasPoint(page, 0.78, 0.5, '#stage canvas')
+      await hand.tap(PAD, right.x, right.y)
+      await page.waitForTimeout(300)
+      const before = await page.evaluate(() => window.__game.angle())
+      await hand.down(PAD, left.x, left.y)
+      let most = 0
+      for (let i = 0; i < 6; i++) {
+        await page.waitForTimeout(100)
+        most = Math.max(most, await page.evaluate(() => Math.abs(window.__game.runnerScreen().x)))
+      }
+      const after = await page.evaluate(() => window.__game.angle())
+      await hand.up(PAD)
+      // Thousandths of the half-width: a locked camera projects the runner at
+      // 1e-16 or so, which is the same as nothing and is not the same as 0.
+      const value = Math.round(most * 1000) / 1000
+      let turned = Math.abs(after - before)
+      if (turned > Math.PI) turned = Math.PI * 2 - turned
+      // The turn is the denominator: it says the hold steered the runner both
+      // times, so a still camera means the camera was held, not the input lost.
+      return {
+        value,
+        note: `runner up to ${value.toFixed(3)} of the half-width from centre, over a ${turned.toFixed(2)} rad turn`,
+        busy: Math.round(turned * 100) / 100,
+      }
+    },
+  },
+  {
     game: 'tower-stacker',
     what: 'a landing shakes the camera',
     async measure({ page, hand }) {

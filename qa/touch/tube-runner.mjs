@@ -386,10 +386,15 @@ async function run() {
   await page.waitForTimeout(320)
   const rollEnd = await state(page)
   await hand.up(PAD)
+  // "Toward the left side" is the direction a left-side hold turned above,
+  // not a sign written in here: #145 found the left of the screen had been
+  // sending the runner right, and a check that hard-coded -1 for left would
+  // have asserted the old mistake.
+  const rollTurn = turnBetween(rollStart.angle, rollEnd.angle)
   check(
     'rolling a thumb to the other side reverses the turn',
-    rollEnd.screen === 'run' && turnBetween(rollStart.angle, rollEnd.angle) < -0.4,
-    `turned ${turnBetween(rollStart.angle, rollEnd.angle).toFixed(2)} rad after crossing the middle`,
+    rollEnd.screen === 'run' && Math.sign(rollTurn) === Math.sign(leftTurn) && Math.abs(rollTurn) > 0.4,
+    `turned ${rollTurn.toFixed(2)} rad after crossing the middle, toward the left side's ${Math.sign(leftTurn) > 0 ? '+' : '-'}`,
   )
 
   // Two thumbs down at once: the newest side wins. Cancelling to zero would
@@ -405,10 +410,55 @@ async function run() {
   const twoEnd = await state(page)
   await hand.up(ACT)
   await hand.up(PAD)
+  const twoTurn = turnBetween(twoStart.angle, twoEnd.angle)
   check(
     'a second thumb on the other side takes over',
-    twoEnd.screen === 'run' && turnBetween(twoStart.angle, twoEnd.angle) < -0.3,
-    `turned ${turnBetween(twoStart.angle, twoEnd.angle).toFixed(2)} rad once the second thumb landed`,
+    twoEnd.screen === 'run' && Math.sign(twoTurn) === Math.sign(leftTurn) && Math.abs(twoTurn) > 0.3,
+    `turned ${twoTurn.toFixed(2)} rad once the second thumb landed`,
+  )
+
+  // ------------------------------- the runner moves, not the tube (#145)
+  //
+  // Everything above measures the runner's *angle*, and all of it passed when
+  // the complaint was made: a left hold changed the angle, the camera followed
+  // the angle exactly, and the player saw the tube turn with the runner pinned
+  // in the middle. The angle cannot tell those apart. What the player sees can,
+  // so this reads the runner's position on the screen — projected through the
+  // camera by the game's QA handle — and requires a hold to carry them toward
+  // the side held, and a release to bring them back.
+  const onScreen = () => page.evaluate(() => window.__game.runnerScreen())
+  const leanFrom = async (side) => {
+    await freshRun(page)
+    const start = await onScreen()
+    await hand.down(PAD, side.x, side.y)
+    await page.waitForTimeout(600)
+    const held = await onScreen()
+    await hand.up(PAD)
+    await page.waitForTimeout(1200)
+    const released = await onScreen()
+    return { start, held, released }
+  }
+  const leftLean = await leanFrom(left)
+  const rightLean = await leanFrom(right)
+  check(
+    'a run starts with the runner in the middle of the screen',
+    Math.abs(leftLean.start.x) < 0.05 && Math.abs(rightLean.start.x) < 0.05,
+    `x ${leftLean.start.x.toFixed(2)}, ${rightLean.start.x.toFixed(2)}`,
+  )
+  check(
+    'holding the left side moves the runner left on the screen',
+    leftLean.held.x < -0.25,
+    `x ${leftLean.held.x.toFixed(2)} of the half-width`,
+  )
+  check(
+    'and holding the right side moves them right',
+    rightLean.held.x > 0.25,
+    `x ${rightLean.held.x.toFixed(2)}`,
+  )
+  check(
+    'and letting go brings them back to the middle',
+    Math.abs(leftLean.released.x) < 0.1 && Math.abs(rightLean.released.x) < 0.1,
+    `x ${leftLean.released.x.toFixed(2)}, ${rightLean.released.x.toFixed(2)} 1.2 s after the lift`,
   )
 
   // ------------------------------------------- the rate is not eased into
