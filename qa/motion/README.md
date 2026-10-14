@@ -34,6 +34,7 @@ later arrives after the decision has been made.
 | game | decoration | default | under the preference |
 | --- | --- | --- | --- |
 | tube-runner | the score pulses as a ring is cleared | 3 pulses / 9 rings | **0** / 10 rings |
+| tube-runner | the camera trails the runner through a turn (#145) | runner 0.449 of the half-width from centre | **0.000**, over the same turn |
 | tower-stacker | a landing shakes the camera | peak 0.0062 | **0.0000** |
 | windup | the steam vents emit | 2 emitters | **0** |
 | lantern-keeper | the fireflies drift | 30 of 30 moved | **0** of 30 |
@@ -88,6 +89,7 @@ the control changed the right thing.
 | Control | Result |
 | --- | --- |
 | `!prefersReducedMotion()` dropped from `tube-runner/hud.ts`'s pulse | 2 pulses under the preference |
+| the camera trailing under the preference too (`tube-runner/game.ts`, #145) | runner 0.450 of the half-width from centre |
 | `reduced ? 0 :` dropped from Tower Stacker's two `shake =` lines | peak 0.0058 |
 | the early `return` dropped from Windup's `renderVents` | 2 emitters |
 | the `if (still) continue` dropped from Lantern Keeper's fireflies | 30 of 30 moved |

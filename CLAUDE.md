@@ -235,6 +235,18 @@ Both readers compare `COURSE_KEY` (names and pars) and ignore a best from
 another course. Any game whose levels are counted into one score has this
 shape.
 
+**Tube Runner's steering moves the runner, not the tube (#145).** The camera
+used to sit at the runner's angle every frame, which pinned them to the middle
+of the screen, so steering showed only as the tube turning. It trails now: the
+runner swings up to 0.44 of the half-width toward the side held, and the
+camera eases round after them. That exposed a second, older fault the locked
+camera had hidden — the left of the screen steered the runner *right* — so the
+input uses `STEER_LEFT` / `STEER_RIGHT` from `game.ts`, which record the
+handedness once. The touch suite reads the runner's position on the screen
+through `runnerScreen()`: every angle check passed against the original
+complaint, and only a check on what the player sees could tell. Under reduced
+motion the camera stays locked, and `qa:motion` holds it to that as a pair.
+
 **The CSP hashes an inline script, and a stale hash fails silently.** Editing
 the pre-init sizing script in any `index.html` changes its hash; the browser
 then declines to run it, nothing throws, and every functional check goes on

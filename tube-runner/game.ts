@@ -32,6 +32,7 @@ import {
   RING_SPACING,
   ROTATE_SPEED,
   TUBE_RADIUS,
+  angleDelta,
   clearsRing,
   generateGaps,
   nextGap,
@@ -125,6 +126,48 @@ const CAM_LOOK_AHEAD = 13
 const CAM_LOOK_RADIUS = CAM_RADIUS * 0.35
 
 /**
+ * How the camera follows the runner round the tube (#145).
+ *
+ * It used to sit at the runner's own angle every frame, so the runner was
+ * pinned bottom-centre and the only thing that could move when you steered
+ * was the tube — players read pressing left as turning the tube. The input
+ * always moved the runner; the camera hid it.
+ *
+ * Now the camera trails: the runner moves across the screen the moment you
+ * steer, and the camera eases round after them, re-centring when you let go.
+ * A camera that never turned was the other choice, and it fails at the top of
+ * the tube, where the runner is upside down and left on the screen is right on
+ * the stick.
+ *
+ * `CAM_FOLLOW` is the catch-up rate, per second. `CAM_MAX_LAG` caps how far
+ * the runner may get ahead, in radians round the tube, so a long hold cannot
+ * carry them off the screen. Neither touches `ROTATE_SPEED`, which the
+ * fairness bound in track.ts is derived from — this moves the camera, not the
+ * runner. Under reduced motion the camera stays locked, as it always was.
+ *
+ * Measured on a phone viewport, as the runner's x in normalised device
+ * coordinates: a held turn settles at +-0.44, and a release re-centres to
+ * 0.06 within 0.2 s. The cap was 0.45 rad first, which put the runner at
+ * +-0.78 — at the edge of the screen, under the thumb holding that side.
+ */
+const CAM_FOLLOW = 5
+const CAM_MAX_LAG = 0.25
+
+/**
+ * The `steer()` directions that move the runner left and right *on screen*.
+ *
+ * Positive steering increases the runner's angle, and with the camera behind
+ * them and its up toward the axis, an increasing angle carries them to the
+ * left of the screen. The input layer had it the other way round — the left
+ * of the screen and the left arrow sent -1 — and nobody could tell while the
+ * camera pinned the runner to the middle: a turning tube reads either way.
+ * Measured once the camera trailed (#145): holding the left half put the
+ * runner at x = +0.78 of the screen's half-width, on the right.
+ */
+export const STEER_LEFT = 1 as const
+export const STEER_RIGHT = -1 as const
+
+/**
  * The height the runner is modelled at, before scaling.
  *
  * The parts below are laid out at a comfortable size to read and edit; the
@@ -210,6 +253,12 @@ export interface TubeGame {
   press(): void
   /** Hold a direction: -1, 1, or 0 for neither. */
   steer(direction: -1 | 0 | 1): void
+  /**
+   * Where the runner is on the screen, in normalised device coordinates:
+   * x and y in -1..1, centre 0. Read-only, for the check that steering moves
+   * the runner on screen rather than turning the tube (#145).
+   */
+  runnerScreen(): { x: number; y: number }
 }
 
 interface Ring {
@@ -436,6 +485,8 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
   let screen: Screen = 'title'
   let playerAngle = 0
   let steering: -1 | 0 | 1 = 0
+  /** Where the camera sits round the tube; trails `playerAngle` (#145). */
+  let camAngle = 0
   let playerZ = 0
   let cleared = 0
   let spawned = 0
@@ -474,6 +525,7 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
 
   function reset() {
     playerAngle = 0
+    camAngle = 0
     steering = 0
     playerZ = 0
     cleared = 0
@@ -603,8 +655,15 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
     const reduced = prefersReducedMotion()
     poseRunner(runPhase, reduced)
 
-    const radialX = Math.cos(playerAngle)
-    const radialY = Math.sin(playerAngle)
+    if (reduced) {
+      camAngle = playerAngle
+    } else {
+      camAngle += angleDelta(camAngle, playerAngle) * Math.min(1, dt * CAM_FOLLOW)
+      const lag = angleDelta(camAngle, playerAngle)
+      if (Math.abs(lag) > CAM_MAX_LAG) camAngle = playerAngle - Math.sign(lag) * CAM_MAX_LAG
+    }
+    const radialX = Math.cos(camAngle)
+    const radialY = Math.sin(camAngle)
     // Behind the runner and inward of them, so they sit low in the frame with
     // the tube opening out ahead. `up` points at the axis, which is what makes
     // the player's side of the tube read as the floor.
@@ -657,6 +716,11 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
     steer(direction) {
       if (direction !== 0) ensureCtx()
       steering = direction
+    },
+    runnerScreen() {
+      camera.updateMatrixWorld()
+      const p = runner.position.clone().project(camera)
+      return { x: p.x, y: p.y }
     },
   }
 }
