@@ -18,7 +18,13 @@ export const GRAVITY = 9.82
 export const BALL_RADIUS = 0.16
 
 /**
- * Damping stands in for rolling resistance, which cannon-es does not model.
+ * Damping used to stand in for rolling resistance, which cannon-es does not
+ * model, and it stood in badly (#146): damping takes a *fraction* of the
+ * speed each second, so a ball never stops, it creeps. Every putt, at any
+ * power, ended in about 3.5 s of a ball barely moving before the game would
+ * let you strike again. `ROLLING_DECEL` below is the real thing — a constant
+ * deceleration that brings the ball to an actual stop — and these are now
+ * lowered to keep the range the holes were built around.
  *
  * Both numbers are calibrated against one measurement — how far a full-power
  * putt rolls on an unbounded flat green — because that distance is what
@@ -30,15 +36,38 @@ export const BALL_RADIUS = 0.16
  * ball rolls, so spin is where most of its energy lives. Below about 0.5 it
  * stops rolling cleanly and starts hopping, at which point distance is no
  * longer monotonic in power — a three-quarter putt outruns a full one — and
- * the game becomes unaimable. These settle at 12.0 units at full power, which
- * clears the longest authored line with enough left over that no hole needs a
- * maximum stroke.
+ * the game becomes unaimable. With `ROLLING_DECEL` these settle at 12.2
+ * units at full power — 12.0 before #146 — which clears the longest authored
+ * line with enough left over that no hole needs a maximum stroke.
  *
  * Measure with an unbounded green if you change them. A 14-unit hole clips a
  * ball that would have rolled further, and the wall reads as the ball's range.
  */
-const LINEAR_DAMPING = 0.25
-const ANGULAR_DAMPING = 0.6
+const LINEAR_DAMPING = 0.08
+const ANGULAR_DAMPING = 0.55
+
+/**
+ * Rolling resistance: a constant deceleration, in world units per second
+ * squared, applied while the ball is touching a green (#146).
+ *
+ * Constant is the point. It takes the same speed off a slow ball as a fast
+ * one, so the last metre ends in a stop instead of the ever-slower creep that
+ * damping alone produced: measured on a flat green, the wait from 1 u/s to
+ * "you can putt again" fell from 3.56 s to about 1.7 s, at every power.
+ * Raising the green's contact friction was the obvious idea and does nothing
+ * at all — cannon-es applies friction to a sliding ball, and these roll.
+ *
+ * **It applies on level greens only.** The at-rest detector is right only if
+ * a ball on the gentlest authored ramp keeps accelerating, and resistance
+ * takes away from that. Applied everywhere, it broke the detector at the
+ * values #146 proposed: released from a dead stop on a `MIN_SLOPE` ramp, a
+ * ball under 0.4 sat "still" for 0.45 s against a 0.35 s window and was called
+ * at rest halfway down — and 0.3 failed too. A ball can never rest on a ramp,
+ * so the creep this removes only ever happened on the flat anyway.
+ * `rest_test.ts` releases a ball on that ramp, and stages resistance on ramps
+ * to watch the detector break.
+ */
+export const ROLLING_DECEL = 0.4
 
 /** The hardest a putt can be struck, in world units per second. */
 export const MAX_PUTT_SPEED = 11
@@ -57,11 +86,19 @@ export const REST_SPIN = 1.1
  * How long the ball must stay slow before it counts as stopped.
  *
  * **Derived, not chosen.** A ball released on the gentlest slope the holes
- * author accelerates at `GRAVITY * sin(MIN_SLOPE)`, so it climbs from a dead
- * stop through `REST_SPEED` in `REST_SPEED / (GRAVITY * sin(MIN_SLOPE))`
- * seconds. Wait longer than that and a ball on any authored slope is
- * guaranteed to break the threshold before the timer completes — so the
- * detector cannot mistake "rolling slowly downhill" for "stopped".
+ * author gathers speed at `ROLL_ACCEL`, so it climbs from a dead stop past
+ * the still thresholds in `STILL_SPEED / ROLL_ACCEL` seconds. Wait longer
+ * than that and a ball on any authored slope is guaranteed to break a
+ * threshold before the timer completes — so the detector cannot mistake
+ * "rolling slowly downhill" for "stopped".
+ *
+ * Until #146 this used the full `GRAVITY * sin(MIN_SLOPE)` and `REST_SPEED`,
+ * which describes a sliding block. A rolling ball gets 5/7 of that
+ * acceleration — the rest goes into spin — and crosses the spin threshold
+ * (`REST_SPIN * BALL_RADIUS`, 0.176 u/s) before the speed one. Measured, the
+ * stated 2.2x margin was really 1.6x: a ball stopped dead on the gentlest
+ * ramp stayed still for 0.217 s against a 0.353 s window. The window is 0.395 s
+ * now, and the margin is what it says.
  *
  * The margin is what makes it robust rather than exactly-just-barely: damping
  * shaves the real acceleration slightly below the ideal, and a ball can be
@@ -71,7 +108,11 @@ export const REST_SPIN = 1.1
  * `MIN_SLOPE`, `REST_SPEED` or gravity moves this and stays correct.
  */
 export const REST_MARGIN = 2.2
-export const REST_TIME = (REST_SPEED / (GRAVITY * Math.sin(MIN_SLOPE))) * REST_MARGIN
+/** How fast a rolling ball gathers speed on the gentlest authored slope. */
+export const ROLL_ACCEL = (5 / 7) * GRAVITY * Math.sin(MIN_SLOPE)
+/** The speed a rolling ball reaches when the first still threshold breaks. */
+export const STILL_SPEED = Math.min(REST_SPEED, REST_SPIN * BALL_RADIUS)
+export const REST_TIME = (STILL_SPEED / ROLL_ACCEL) * REST_MARGIN
 
 /** Horizontal distance within which a slow ball drops into the cup. */
 export const CUP_RADIUS = 0.3
@@ -108,6 +149,10 @@ export interface SimOptions {
   restSpeed?: number
   restSpin?: number
   restTime?: number
+  /** Overridable so the tests can compare with and without it (#146). */
+  rollingDecel?: number
+  /** Apply it on ramps too — the defect `rest_test.ts` stages, never the game. */
+  rollingOnRamps?: boolean
 }
 
 export function createSim(hole: Hole, options: SimOptions = {}): Sim {
@@ -115,6 +160,8 @@ export function createSim(hole: Hole, options: SimOptions = {}): Sim {
     restSpeed = REST_SPEED,
     restSpin = REST_SPIN,
     restTime = REST_TIME,
+    rollingDecel = ROLLING_DECEL,
+    rollingOnRamps = false,
   } = options
 
   const world = new World({ gravity: new Vec3(0, -GRAVITY, 0) })
@@ -135,6 +182,8 @@ export function createSim(hole: Hole, options: SimOptions = {}): Sim {
     new ContactMaterial(ballMaterial, wallMaterial, { friction: 0.06, restitution: 0.5 }),
   )
 
+  /** The level greens: the only surfaces that apply rolling resistance. */
+  const flatGreens = new Set<Body>()
   for (const box of hole.boxes) {
     const body = new Body({
       mass: 0,
@@ -147,6 +196,9 @@ export function createSim(hole: Hole, options: SimOptions = {}): Sim {
       q.setFromEuler(box.tiltX ?? 0, 0, box.tiltZ ?? 0)
       body.quaternion.copy(q)
     }
+    if (box.surface === 'green' && (rollingOnRamps || !(box.tiltX || box.tiltZ))) {
+      flatGreens.add(body)
+    }
     world.addBody(body)
   }
 
@@ -158,6 +210,30 @@ export function createSim(hole: Hole, options: SimOptions = {}): Sim {
     angularDamping: ANGULAR_DAMPING,
   })
   world.addBody(ball)
+
+  // Rolling resistance, after every fixed physics step rather than every
+  // rendered frame, so it takes the same speed off at 10 frames a second as at
+  // 60. Spin is scaled with speed, so the ball keeps rolling rather than
+  // skidding as it slows.
+  //
+  // **Level greens only.** A ball can never come to rest on a ramp — that is
+  // what the at-rest detector is built on — so the creep #146 is about only
+  // ever happens on the flat. On a ramp, resistance would only eat into the
+  // acceleration the detector depends on: released from a dead stop on the
+  // gentlest one, a ball under 0.4 u/s^2 stayed "still" for 0.45 s against a
+  // 0.35 s window, and was called at rest halfway down the slope.
+  world.addEventListener('postStep', () => {
+    if (rollingDecel <= 0) return
+    const onFlat = world.contacts.some(
+      (c) => (c.bi === ball && flatGreens.has(c.bj)) || (c.bj === ball && flatGreens.has(c.bi)),
+    )
+    if (!onFlat) return
+    const speed = ball.velocity.length()
+    if (speed < 1e-6) return
+    const k = Math.max(0, 1 - (rollingDecel * FIXED_STEP) / speed)
+    ball.velocity.scale(k, ball.velocity)
+    ball.angularVelocity.scale(k, ball.angularVelocity)
+  })
 
   let still = 0
 
