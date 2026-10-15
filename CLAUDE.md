@@ -235,6 +235,21 @@ Both readers compare `COURSE_KEY` (names and pars) and ignore a best from
 another course. Any game whose levels are counted into one score has this
 shape.
 
+**Minigolf's grass slows the ball through rolling resistance, and only on
+level greens (#146).** Contact friction in cannon-es acts on *sliding*, and a
+putt rolls, so raising the grass's friction does nothing. Damping is
+proportional, so it leaves a long tail of creep at low speed. `ROLLING_DECEL`
+is a constant deceleration. It cut the time from 1 u/s to rest from 3.56 s to
+1.75 s. It is applied only
+on level greens. Applying it everywhere, as the ticket proposed, slows a ball
+on the gentlest ramp enough that the at-rest detector calls it stopped while it
+is still on the slope. The ticket's 0.083 s figure came from *dropping* the
+ball onto the slope rather than settling it and letting go. `rest_test.ts`
+stages exactly that case through `rollingOnRamps` and must catch it. The same
+work found that `REST_TIME`'s derivation used a sliding block's acceleration
+and the wrong threshold, so its "2.2× margin" was 1.6×. It now uses a rolling
+sphere's 5/7 g·sinθ, against `STILL_SPEED`.
+
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
 of the screen, so steering showed only as the tube turning. It trails now: the

@@ -16,11 +16,14 @@
 // steepest authored slope to confirm it holds in the simulation and not only
 // in the arithmetic.
 import {
-  GRAVITY,
+  MAX_PUTT_SPEED,
   REST_MARGIN,
   REST_SPEED,
   REST_TIME,
+  ROLL_ACCEL,
+  STILL_SPEED,
   createSim,
+  type SimOptions,
 } from './physics'
 import { HOLES, MAX_SLOPE, MIN_SLOPE, type Box, type Hole } from './holes'
 
@@ -69,7 +72,7 @@ function rampCourse(slope: number): Hole {
  * first version — began with the ball already above the speed threshold, so
  * the timer never started and degrading it proved nothing.
  */
-function settleOnRamp(slope: number, options = {}) {
+function settleOnRamp(slope: number, options: SimOptions = {}) {
   const sim = createSim(rampCourse(slope), options)
   // Above the surface at the tee end, then dropped. The height is not
   // computed — an earlier version placed the ball at a hand-derived surface
@@ -104,12 +107,14 @@ function settleOnRamp(slope: number, options = {}) {
 // --- the derivation itself ------------------------------------------------
 
 {
-  const accel = GRAVITY * Math.sin(MIN_SLOPE)
-  const crossing = REST_SPEED / accel
+  // A *rolling* ball's acceleration, 5/7 of g sin(theta), and the threshold it
+  // breaks first. #146 found the old version used a sliding block's and the
+  // speed threshold, and its 2.2x margin was really 1.6x.
+  const crossing = STILL_SPEED / ROLL_ACCEL
   check(
     'the rest window outlasts a ball accelerating on the gentlest slope',
     REST_TIME > crossing,
-    `waits ${REST_TIME.toFixed(3)}s; a ball crosses ${REST_SPEED} u/s in ${crossing.toFixed(3)}s`,
+    `waits ${REST_TIME.toFixed(3)}s; a rolling ball passes ${STILL_SPEED.toFixed(3)} u/s in ${crossing.toFixed(3)}s`,
   )
   check(
     'and with margin, not just barely',
@@ -164,6 +169,89 @@ function settleOnRamp(slope: number, options = {}) {
     'and is never called at rest on the way down',
     !calledAtRest,
     'slow is not stopped',
+  )
+}
+
+// --- and not on the gentlest one either, with rolling resistance (#146) ------
+//
+// The steepest slope above is the easy case. The detector's whole derivation
+// is about the *gentlest*, where gravity barely beats whatever slows the ball
+// — and #146 added something that slows it. Resistance applies on level greens
+// only, so on a ramp it must change nothing; staged on ramps too, the ball is
+// called at rest halfway down, which is how the flat-only rule was found.
+
+{
+  const watch = (options: SimOptions) => {
+    const sim = settleOnRamp(MIN_SLOPE, options)
+    let calledAtRest = false
+    let longest = 0
+    for (let t = 0; t < 3; t += 1 / 120) {
+      sim.step(1 / 120)
+      longest = Math.max(longest, sim.stillFor())
+      if (sim.atRest()) calledAtRest = true
+    }
+    return { calledAtRest, longest }
+  }
+  const real = watch({})
+  check(
+    'released from a dead stop on the gentlest slope, the ball is never called at rest',
+    !real.calledAtRest && real.longest < REST_TIME / 1.5,
+    `still for at most ${real.longest.toFixed(3)} s against a ${REST_TIME.toFixed(3)} s window`,
+  )
+  const staged = watch({ rollingOnRamps: true })
+  check(
+    'and resistance on ramps too would break that — the staged defect is caught',
+    staged.calledAtRest,
+    `still for ${staged.longest.toFixed(3)} s — called at rest on the ramp`,
+  )
+}
+
+// --- the ball stops rather than creeping (#146) -----------------------------
+//
+// Damping alone took a fraction of the speed each second, so every putt ended
+// in about 3.5 s of a ball barely moving before the game would let you strike
+// again. Measured on an unbounded flat green, from the moment the ball drops
+// under 1 u/s to the moment the detector calls it at rest — and the full-power
+// range, which the holes were built around and must not move.
+
+{
+  const flatGreen: Hole = {
+    name: 'flat',
+    par: 1,
+    tee: { x: 0, z: 0 },
+    cup: { x: 100, y: 0, z: 100 },
+    boxes: [{ x: 0, y: -0.2, z: 0, w: 200, h: 0.4, d: 200, surface: 'green' }],
+  }
+  const roll = (options: SimOptions, power: number) => {
+    const sim = createSim(flatGreen, options)
+    for (let t = 0; t < 0.3; t += 1 / 120) sim.step(1 / 120)
+    sim.putt(0, -1, power)
+    let slowAt: number | null = null
+    let t = 0
+    for (; t < 20; t += 1 / 120) {
+      sim.step(1 / 120)
+      if (slowAt === null && sim.ball.velocity.length() < 1) slowAt = t
+      if (sim.atRest()) break
+    }
+    return { tail: t - (slowAt ?? t), distance: -sim.ball.position.z }
+  }
+  const full = roll({}, 1)
+  const soft = roll({}, 0.3)
+  check(
+    'a putt stops within two seconds of slowing under 1 u/s, at any power',
+    full.tail < 2 && soft.tail < 2,
+    `${full.tail.toFixed(2)} s at full power, ${soft.tail.toFixed(2)} s at 0.3 — 3.56 s each before #146`,
+  )
+  check(
+    'and a full-power putt still carries the range the holes were built for',
+    Math.abs(full.distance - 12) < 0.5,
+    `${full.distance.toFixed(2)} units at ${MAX_PUTT_SPEED} u/s — 12.0 before #146`,
+  )
+  const creep = roll({ rollingDecel: 0 }, 1)
+  check(
+    'and without rolling resistance the creep comes back — the check can tell',
+    creep.tail > 2,
+    `${creep.tail.toFixed(2)} s with damping alone`,
   )
 }
 
