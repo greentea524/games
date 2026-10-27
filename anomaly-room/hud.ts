@@ -94,8 +94,17 @@ export function createHud(game: AnomalyGame, audio: RoomAudio, hooks: HudHooks):
     hint.textContent = 'Something is different. Tap it — or look with the arrow keys and press Space when it is in the centre.'
 
     panel.hidden = phase === 'looking'
+    panel.classList.toggle('ar-panel-study', phase === 'study')
     const anomaly = game.anomaly()
-    if (phase === 'right' || phase === 'won') {
+    if (phase === 'study') {
+      // The run's opening (#148). Without it the first change landed on
+      // something the player had never looked at, and round one was a guess.
+      panelTitle.textContent = 'Study the room'
+      panelBody.textContent =
+        'Look around and remember what is where. Once you are ready, something will change while you are looking the other way.'
+      panelBtn.textContent = 'Ready'
+      panelBtn.onclick = () => game.ready()
+    } else if (phase === 'right' || phase === 'won') {
       panelTitle.textContent = phase === 'won' ? 'Room cleared' : 'Found it'
       panelBody.textContent = anomaly
         ? `${anomaly.label} ${KIND_TEXT[anomaly.kind] ?? 'had changed'}.`

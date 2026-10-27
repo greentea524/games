@@ -83,6 +83,20 @@
   backdrop-filter: blur(3px);
   text-align: center;
 }
+/* The study phase's panel is the one that must not hide the room: the whole
+   point of it is to look at what is behind it (#148). A bar along the foot
+   instead, clear above, with the room still draggable through it. */
+.ar-panel.ar-panel-study {
+  inset: auto 0 0 0;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 28px 20px calc(24px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(4, 7, 10, 0.9), rgba(4, 7, 10, 0));
+  backdrop-filter: none;
+}
+.ar-panel-study .ar-panel-title { font-size: clamp(1.3rem, 5vw, 1.8rem); }
+.ar-panel-study .ar-panel-body { max-width: 420px; font-size: 0.92rem; }
+
 .ar-panel-title { margin: 0; font-size: clamp(1.6rem, 6vw, 2.4rem); font-weight: 700; }
 .ar-panel-body { margin: 0 0 6px; color: #9fb4c6; }
 
