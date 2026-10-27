@@ -25,15 +25,27 @@ import {
   type Candidate,
   type Pose,
 } from './room'
-import { MISSES, ROUNDS, pickRound, seeded, type Rng, type Round } from './rounds'
+import { MISSES, ROUNDS, boundsOf, frustumOf, pickRound, seeded, type Rng, type Round } from './rounds'
 import { applyPose, buildModel, resolveHit } from './models'
 
 /** How long the room sits unchanged at the start of a round, in seconds. */
 const SETTLE = 0.6
 
+/**
+ * How long an object must have been on screen, in total, before a round may
+ * change it (#148). Long enough that a fast sweep past it does not count as
+ * having looked; short enough that a player who turns slowly once round the
+ * room has seen everything in it.
+ */
+export const SEEN_TIME = 0.3
+
 export { MISSES, ROUNDS }
 
-export type Phase = 'looking' | 'right' | 'wrong' | 'over' | 'won'
+/**
+ * `study` opens every run (#148): the player looks round and learns the room,
+ * and nothing changes until they say they are ready.
+ */
+export type Phase = 'study' | 'looking' | 'right' | 'wrong' | 'over' | 'won'
 
 /** Pitch clamp. #114 asks for roughly 80 degrees, which is this in radians. */
 const PITCH_LIMIT = (80 * Math.PI) / 180
@@ -83,6 +95,10 @@ export interface AnomalyGame {
   anomaly(): { id: string; label: string; kind: string } | null
   /** True once the anomaly for this round has actually been applied. */
   armed(): boolean
+  /** Candidates that have been on screen long enough to count as seen. */
+  seen(): string[]
+  /** Ends the study phase. Nothing changes before this. */
+  ready(): void
   next(): void
   restart(): void
   onChange(fn: () => void): void
@@ -187,10 +203,14 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
   let rng: Rng = seeded(seed)
   let roundNo = 0
   let misses = 0
-  let phase: Phase = 'looking'
+  let phase: Phase = 'study'
   let current: Round | null = null
   let settleLeft = SETTLE
   const used = new Set<string>()
+  /** Seconds each candidate has spent on screen this run. */
+  const onScreenFor = new Map<string, number>()
+  const seenNow = () =>
+    new Set([...onScreenFor].filter(([, t]) => t >= SEEN_TIME).map(([id]) => id))
   /** Where each candidate is now. Only `restart` puts the room back. */
   const poses = new Map<string, Pose>()
   const listeners: (() => void)[] = []
@@ -209,6 +229,21 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
   }
 
   /**
+   * Counts how long each candidate has been on screen (#148), by the same
+   * frustum the round picker uses, against the object itself rather than its
+   * shadow: a shadow is not a look at the thing.
+   */
+  function watch(dt: number) {
+    if (phase !== 'study' && phase !== 'looking') return
+    const frustum = frustumOf(camera)
+    for (const piece of pieces) {
+      const id = piece.candidate.id
+      const box = boundsOf(poses.get(id) ?? homePose(piece.candidate))
+      if (!box.isEmpty() && frustum.intersectsBox(box)) onScreenFor.set(id, (onScreenFor.get(id) ?? 0) + dt)
+    }
+  }
+
+  /**
    * Tries to arm this round's anomaly.
    *
    * Called every frame until it succeeds, because whether anything is eligible
@@ -220,7 +255,7 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
     if (current || phase !== 'looking') return
     settleLeft -= dt
     if (settleLeft > 0) return
-    const round = pickRound(camera, rng, { used, poses })
+    const round = pickRound(camera, rng, { used, poses, seen: seenNow() })
     if (!round) return
     current = round
     used.add(round.candidate.id)
@@ -282,6 +317,11 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
         ? { id: current.candidate.id, label: current.candidate.label, kind: current.mutation.kind }
         : null,
     armed: () => current !== null,
+    seen: () => [...seenNow()],
+    ready() {
+      if (phase !== 'study') return
+      beginRound()
+    },
     next() {
       // A wrong flag does not hand out a fresh anomaly. It costs a guess and
       // puts the player back in the same room looking for the same thing,
@@ -301,7 +341,16 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
       roundNo = 0
       misses = 0
       used.clear()
-      beginRound()
+      // A new run is a new room to learn: everything goes home, nothing is
+      // seen yet, and it opens on the study phase again. Done here, at a run's
+      // boundary, where there is nothing yet to find — and it is what the
+      // comment on `poses` always claimed restart did, while the last run's
+      // eight changes carried silently into the next.
+      resetRoom()
+      onScreenFor.clear()
+      current = null
+      phase = 'study'
+      notify()
     },
     onChange(fn) {
       listeners.push(fn)
@@ -317,6 +366,7 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
     if (stopped) return
     const dt = Math.min(0.1, (now - last) / 1000)
     last = now
+    watch(dt)
     tryArm(dt)
     stage.render(scene, camera)
     requestAnimationFrame(frame)

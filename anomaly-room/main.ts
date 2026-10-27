@@ -162,9 +162,14 @@ const LOOK_KEYS = new Set([
 
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'Enter') {
+    e.preventDefault()
+    // Ready, while the room is being studied; flag what is ahead after that.
+    if (game.phase() === 'study') {
+      game.ready()
+      return
+    }
     const result = game.flag(0.5, 0.5)
     if (result) audio.sting(result.correct)
-    e.preventDefault()
     return
   }
   if (LOOK_KEYS.has(e.code)) {

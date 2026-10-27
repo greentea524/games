@@ -164,6 +164,16 @@ export interface PickOptions {
    */
   poses?: ReadonlyMap<string, Pose>
   /**
+   * Candidates the player has actually had on screen, when given.
+   *
+   * Out of view is not enough on its own (#148). The first round armed 0.6 s
+   * after load, from whatever was behind a player who had not yet turned
+   * round — so it always changed something they had never seen, and the round
+   * was a blind guess: 0 of 2,000 seeds landed on anything in the opening
+   * view. A change is only findable if the player knew the "before".
+   */
+  seen?: ReadonlySet<string>
+  /**
    * Off, the picker ignores the frustum entirely. Nothing in the game passes
    * this — it exists so `anomaly_test.ts` can degrade the rule and watch the
    * check that guards it go red.
@@ -181,19 +191,21 @@ export interface PickOptions {
  * eligible — which the caller should treat as "wait and ask again", not as an
  * error. In a room where the player can see maybe a sixth of the space at
  * once, eligible candidates are the overwhelming majority; running out means
- * they are staring at the one wall everything is against.
+ * they are staring at the one wall everything is against, or have not yet
+ * looked at anything that is now behind them.
  */
 export function pickRound(
   camera: THREE.PerspectiveCamera,
   rng: Rng,
   options: PickOptions = {},
 ): Round | null {
-  const { used = new Set<string>(), poses, frustumFilter = true, shadowFilter = true } = options
+  const { used = new Set<string>(), poses, seen, frustumFilter = true, shadowFilter = true } = options
   const frustum = frustumOf(camera)
 
   const eligible: Round[] = []
   const fallback: Round[] = []
   for (const candidate of CANDIDATES) {
+    if (seen && !seen.has(candidate.id)) continue
     const before = poses?.get(candidate.id) ?? homePose(candidate)
     for (const mutation of candidate.mutations) {
       const after = applyMutation(candidate, mutation)

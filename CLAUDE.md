@@ -262,6 +262,14 @@ guesses. `resolveHit` passes hidden meshes over, except where *this* round's
 object vanished. Every QA check here finds the answer through `anomaly()`, so
 none of them ever played the game as a player does, and none could see this.
 
+**Anomaly Room changes only what the player has seen (#148).** "Out of view"
+was the only rule, and at load everything out of view had never been seen. So
+round 1 was a blind guess on 2,000 of 2,000 seeds. Every run now opens on a
+study phase that ends with Ready. The game counts each object's time on
+screen, and `pickRound`'s `seen` option limits a round to objects with at least
+`SEEN_TIME` of it. Being out of view is necessary for a fair change; being seen
+before is necessary too, and only the first was ever checked.
+
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
 of the screen, so steering showed only as the tube turning. It trails now: the

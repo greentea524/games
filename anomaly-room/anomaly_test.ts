@@ -361,6 +361,45 @@ for (const candidate of CANDIDATES) {
   )
 }
 
+// --- a change is to something the player has seen (#148) -------------------
+//
+// The first round used to arm 0.6 s after load from whatever was out of view
+// — which, for a player who had not turned yet, was everything they had never
+// seen. The game counts what has been on screen now, and the picker only
+// chooses from that.
+
+for (const [name, aspect] of [['phone', 390 / 844], ['desktop', 16 / 9]] as const) {
+  const opening = frustumOf(look(0, 0, aspect))
+  const seen = new Set(CANDIDATES.filter((c) => opening.intersectsBox(boundsOf(homePose(c)))).map((c) => c.id))
+  const N = 500
+  let blind = 0
+  let onSeen = 0
+  let drawn = 0
+  for (let i = 0; i < N; i++) {
+    const unfiltered = pickRound(look(0, 0, aspect), seeded(i))
+    if (unfiltered && !seen.has(unfiltered.candidate.id)) blind++
+    const turned = pickRound(look(Math.PI, 0, aspect), seeded(i), { seen })
+    if (turned) {
+      drawn++
+      if (seen.has(turned.candidate.id)) onSeen++
+    }
+  }
+  check(
+    `${name}: without the rule, round one changes something never seen — the check can tell`,
+    blind === N,
+    `${blind} of ${N} picks were outside the opening view of ${[...seen].join(', ')}`,
+  )
+  check(
+    `${name}: with it, the player who has only seen the opening view waits while facing it`,
+    pickRound(look(0, 0, aspect), seeded(1), { seen }) === null,
+  )
+  check(
+    `${name}: and once they turn round, every change is to something they saw`,
+    drawn === N && onSeen === N,
+    `${onSeen} of ${drawn} picks`,
+  )
+}
+
 // --- the models stay inside their boxes (#147) -------------------------------
 //
 // The round picker decides what is out of view from each candidate's box in
