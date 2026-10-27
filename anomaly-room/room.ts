@@ -85,7 +85,7 @@ export interface Candidate extends Solid {
  */
 export const SHELL_SOLIDS: Solid[] = [
   { id: 'floor', position: v(0, -SHELL / 2, 0), size: v(ROOM_HALF * 2, SHELL, ROOM_HALF * 2), colour: 0x6d6355 },
-  { id: 'ceiling', position: v(0, ROOM_HEIGHT + SHELL / 2, 0), size: v(ROOM_HALF * 2, SHELL, ROOM_HALF * 2), colour: 0x453f38 },
+  { id: 'ceiling', position: v(0, ROOM_HEIGHT + SHELL / 2, 0), size: v(ROOM_HALF * 2, SHELL, ROOM_HALF * 2), colour: 0x5c554b },
   { id: 'wall-n', position: v(0, ROOM_HEIGHT / 2, -ROOM_HALF - SHELL / 2), size: v(ROOM_HALF * 2, ROOM_HEIGHT, SHELL), colour: 0x7b7264 },
   { id: 'wall-s', position: v(0, ROOM_HEIGHT / 2, ROOM_HALF + SHELL / 2), size: v(ROOM_HALF * 2, ROOM_HEIGHT, SHELL), colour: 0x7b7264 },
   { id: 'wall-w', position: v(-ROOM_HALF - SHELL / 2, ROOM_HEIGHT / 2, 0), size: v(SHELL, ROOM_HEIGHT, ROOM_HALF * 2), colour: 0x6f6759 },

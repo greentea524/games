@@ -135,10 +135,13 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
   camera.rotation.order = 'YXZ'
   stage.track(camera)
 
-  // A hard, directional key with a low ambient. The ratio between them is the
-  // atmosphere: raise the ambient and the room turns into a diagram.
-  scene.add(new THREE.AmbientLight(0x6b7d8c, lambertIntensity(0.34)))
-  const key = new THREE.DirectionalLight(0xffe6c4, lambertIntensity(0.78))
+  // A hard, directional key with a lower ambient. The ratio between them is
+  // the atmosphere: raise the ambient far enough and the room turns into a
+  // diagram. It was raised once, in #149, and measured: the walls the player
+  // faces first sit outside the key's reach, and at 0.34 they averaged 34 of
+  // 255 — moody in a screenshot, too dark to study a room in.
+  scene.add(new THREE.AmbientLight(0x8b949c, lambertIntensity(0.62)))
+  const key = new THREE.DirectionalLight(0xffe6c4, lambertIntensity(0.95))
   // From `room.ts`, because the round picker projects shadows along this same
   // vector to decide what is safe to change. Two copies of it would drift.
   key.position.set(KEY_LIGHT.position.x, KEY_LIGHT.position.y, KEY_LIGHT.position.z)
@@ -155,9 +158,13 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
   key.shadow.bias = -0.0015
   scene.add(key)
   scene.add(key.target)
-  // A cold bounce from the opposite corner, so the shadowed side of an object
+  // A cool bounce from the opposite corner, so the shadowed side of an object
   // is dim rather than black — a silhouette with no interior reads as a hole.
-  const bounce = new THREE.DirectionalLight(0x3d6180, lambertIntensity(0.2))
+  // It is also the only direct light the north and west walls get, because
+  // the key comes from their side of the room, so it carries more of the
+  // room's brightness than its name suggests. No shadows: the round picker
+  // reasons about the key's alone.
+  const bounce = new THREE.DirectionalLight(0x9fb0c0, lambertIntensity(0.5))
   bounce.position.set(4.5, 1.6, 4)
   scene.add(bounce)
 

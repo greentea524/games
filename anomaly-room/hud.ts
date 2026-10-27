@@ -1,7 +1,7 @@
 // The Anomaly Room's HUD (#114, #118), as DOM over the canvas.
 import { MISSES, ROUNDS, type AnomalyGame } from './game'
 import type { RoomAudio } from './audio'
-import { recordRun } from './save'
+import { loadAnomalySave, recordRun, type AnomalySave } from './save'
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -13,6 +13,9 @@ function el<K extends keyof HTMLElementTagNameMap>(
   if (text !== undefined) node.textContent = text
   return node
 }
+
+/** A sentence's first letter up: the labels are written to sit mid-sentence. */
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /** What a round did, in the words a player would use about it. */
 const KIND_TEXT: Record<string, string> = {
@@ -78,6 +81,10 @@ export function createHud(game: AnomalyGame, audio: RoomAudio, hooks: HudHooks):
   overlay.append(panel)
 
   let recorded = false
+  /** The save as the run that just ended left it, for the end screens. */
+  let record: AnomalySave | null = null
+  /** Whether that run beat the best that stood before it — not merely tied. */
+  let newBest = false
 
   function refresh() {
     const phase = game.phase()
@@ -93,22 +100,45 @@ export function createHud(game: AnomalyGame, audio: RoomAudio, hooks: HudHooks):
     hint.hidden = phase !== 'looking' || !game.armed()
     hint.textContent = 'Something is different. Tap it — or look with the arrow keys and press Space when it is in the centre.'
 
+    // Recorded before the panel is written, so an end screen can say how this
+    // run compares with the best — including when this run is the best.
+    if (phase === 'won' || phase === 'over') {
+      if (!recorded) {
+        recorded = true
+        const before = loadAnomalySave().best
+        record = recordRun(game.round(), phase === 'won')
+        newBest = game.round() > before
+      }
+    } else {
+      recorded = false
+    }
+
     panel.hidden = phase === 'looking'
     panel.classList.toggle('ar-panel-study', phase === 'study')
     const anomaly = game.anomaly()
     if (phase === 'study') {
       // The run's opening (#148). Without it the first change landed on
       // something the player had never looked at, and round one was a guess.
+      // The goal is said here because nothing else said it (#150): the top
+      // bar's "Round 1/8" was the only hint that a run ends at all.
+      const best = loadAnomalySave().best
       panelTitle.textContent = 'Study the room'
-      panelBody.textContent =
-        'Look around and remember what is where. Once you are ready, something will change while you are looking the other way.'
+      panelBody.textContent = [
+        'Look around and remember what is where. Once you are ready, something will change while you are looking the other way.',
+        `Find all ${ROUNDS} changes — ${MISSES} wrong guesses end the run.${best > 0 ? ` Your best: ${best} of ${ROUNDS}.` : ''}`,
+      ].join('\n')
       panelBtn.textContent = 'Ready'
       panelBtn.onclick = () => game.ready()
     } else if (phase === 'right' || phase === 'won') {
       panelTitle.textContent = phase === 'won' ? 'Room cleared' : 'Found it'
-      panelBody.textContent = anomaly
-        ? `${anomaly.label} ${KIND_TEXT[anomaly.kind] ?? 'had changed'}.`
-        : ''
+      const what = anomaly ? `${sentence(anomaly.label)} ${KIND_TEXT[anomaly.kind] ?? 'had changed'}.` : ''
+      // The room keeps its changes — putting one back could happen in plain
+      // sight — and a player who was not told so read it as a broken reset
+      // (#150). So the panel says it.
+      panelBody.textContent =
+        phase === 'won'
+          ? [what, `All ${ROUNDS} found.${record ? ` Rooms cleared: ${record.cleared}.` : ''}`].join('\n')
+          : [what, 'It stays that way — the next change will be somewhere else.'].join('\n')
       panelBtn.textContent = phase === 'won' ? 'Again' : 'Next round'
       panelBtn.onclick = phase === 'won' ? () => game.restart() : () => game.next()
     } else if (phase === 'wrong') {
@@ -118,21 +148,15 @@ export function createHud(game: AnomalyGame, audio: RoomAudio, hooks: HudHooks):
       panelBtn.onclick = () => game.next()
     } else if (phase === 'over') {
       panelTitle.textContent = 'Out of guesses'
-      panelBody.textContent = anomaly
-        ? `It was ${anomaly.label} — it ${KIND_TEXT[anomaly.kind] ?? 'had changed'}.`
-        : ''
+      const found = game.round()
+      panelBody.textContent = [
+        anomaly ? `It was ${anomaly.label} — it ${KIND_TEXT[anomaly.kind] ?? 'had changed'}.` : '',
+        `You found ${found} of ${ROUNDS}.${record ? (newBest ? ' A new best.' : ` Your best: ${record.best}.`) : ''}`,
+      ].join('\n')
       panelBtn.textContent = 'Try again'
       panelBtn.onclick = () => game.restart()
     }
 
-    if (phase === 'won' || phase === 'over') {
-      if (!recorded) {
-        recorded = true
-        recordRun(game.round(), phase === 'won')
-      }
-    } else {
-      recorded = false
-    }
   }
 
   game.onChange(refresh)

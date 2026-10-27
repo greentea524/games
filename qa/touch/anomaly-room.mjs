@@ -128,6 +128,12 @@ async function run() {
     panel.shown && panel.title === 'Study the room' && panel.top > panel.height * 0.5,
     `"${panel.title}", top at ${Math.round((panel.top / panel.height) * 100)}% of the screen`,
   )
+  const studyText = await page.evaluate(() => document.querySelector('.ar-panel-body')?.textContent ?? '')
+  check(
+    'and says what a run asks of the player',
+    /Find all 8 changes/.test(studyText) && /3 wrong guesses end the run/.test(studyText),
+    `"${studyText.split('\n').pop()}"`,
+  )
   await page.waitForTimeout(1500)
   check('nothing changes while the room is being studied', !(await state(page)).armed)
 
@@ -280,10 +286,11 @@ async function run() {
       afterHit.round === beforeHit.round + 1 && afterHit.phase === 'right',
       `round ${beforeHit.round + 1} -> ${afterHit.round + 1}`,
     )
-    check(
-      'and the panel names what it was',
-      await page.evaluate(() => document.querySelector('.ar-panel-body')?.textContent?.length > 0),
-    )
+    const found = await page.evaluate(() => document.querySelector('.ar-panel-body')?.textContent ?? '')
+    check('and the panel names what it was', found.length > 0, `"${found.split('\n')[0]}"`)
+    // #150. The room keeps its changes by design, and a player who was not
+    // told so took it for a reset that never happened.
+    check('and says the change stays', /stays that way/.test(found), `"${found.split('\n').pop()}"`)
   }
 
   // ---------------------------------------------------------- the sound
@@ -326,6 +333,13 @@ async function run() {
       }
     }),
   )
+
+  // The best is shown where the next run starts, read from that same save.
+  await page.reload()
+  await page.waitForSelector('#stage canvas')
+  await page.waitForTimeout(800)
+  const nextStudy = await page.evaluate(() => document.querySelector('.ar-panel-body')?.textContent ?? '')
+  check('and the next run opens with the best in view', /Your best: 5 of 8/.test(nextStudy), `"${nextStudy.split('\n').pop()}"`)
 
   check(
     'there is a way back to the hub',
