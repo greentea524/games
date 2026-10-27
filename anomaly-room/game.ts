@@ -26,6 +26,7 @@ import {
   type Pose,
 } from './room'
 import { MISSES, ROUNDS, pickRound, seeded, type Rng, type Round } from './rounds'
+import { applyPose, buildModel, resolveHit } from './models'
 
 /** How long the room sits unchanged at the start of a round, in seconds. */
 const SETTLE = 0.6
@@ -147,7 +148,7 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
   const room = new THREE.Group()
   scene.add(room)
 
-  const shellMaterials = new Map<string, THREE.Material>()
+  const shellIds = new Set<string>()
   for (const solid of SHELL_SOLIDS) {
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(solid.size.x, solid.size.y, solid.size.z),
@@ -157,47 +158,29 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
     mesh.receiveShadow = true
     mesh.name = solid.id
     room.add(mesh)
-    shellMaterials.set(solid.id, mesh.material as THREE.Material)
+    shellIds.add(solid.id)
   }
 
-  /** One candidate's meshes: the object, and the copy a `twin` round makes. */
+  /** One candidate's models: the object, and the copy a `twin` round makes. */
   interface Piece {
     candidate: Candidate
-    mesh: THREE.Mesh
-    twin: THREE.Mesh
+    mesh: THREE.Object3D
+    twin: THREE.Object3D
   }
 
+  // Built from parts in `models.ts` (#147), each inside the box `room.ts`
+  // gives it, so the round picker's reasoning about boxes is still about what
+  // is drawn.
   const pieces: Piece[] = []
   for (const candidate of CANDIDATES) {
-    const material = new THREE.MeshLambertMaterial({ color: candidate.colour })
-    const build = () => {
-      // Unit geometry, posed by `scale`. A mutation that changes size would
-      // otherwise mean rebuilding geometry every round, and three.js does not
-      // dispose the old one for you.
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material)
-      mesh.castShadow = true
-      mesh.receiveShadow = true
-      mesh.name = candidate.id
-      room.add(mesh)
-      return mesh
-    }
-    const mesh = build()
-    const twin = build()
-    twin.visible = false
+    const mesh = buildModel(candidate, 'main')
+    const twin = buildModel(candidate, 'twin')
+    room.add(mesh, twin)
     pieces.push({ candidate, mesh, twin })
   }
 
   function pose(piece: Piece, p: Pose) {
-    piece.mesh.visible = p.visible
-    piece.mesh.position.set(p.position.x, p.position.y, p.position.z)
-    piece.mesh.scale.set(p.size.x, p.size.y, p.size.z)
-    piece.mesh.rotation.y = p.yaw
-    piece.twin.visible = p.twin !== null
-    if (p.twin) {
-      piece.twin.position.set(p.twin.x, p.twin.y, p.twin.z)
-      piece.twin.scale.set(p.size.x, p.size.y, p.size.z)
-      piece.twin.rotation.y = p.yaw
-    }
+    applyPose(piece.mesh, piece.twin, piece.candidate, p)
   }
 
   let stopped = false
@@ -271,13 +254,13 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
       // before they can name it.
       point.set(nx * 2 - 1, -(ny * 2 - 1))
       raycaster.setFromCamera(point, camera)
-      const hit = raycaster.intersectObjects(room.children, false)[0]
-      if (!hit) return null
-      const id = hit.object.name
+      const hits = raycaster.intersectObjects(room.children, true)
       // The shell is not an answer. Flagging a wall is neither right nor
       // wrong — it is a missed tap, and charging a life for it would make
-      // looking around feel dangerous.
-      return shellMaterials.has(id) ? null : id
+      // looking around feel dangerous. Hidden objects are passed over, except
+      // where this round's vanished object stood; `resolveHit` says why.
+      const vanished = current?.mutation.kind === 'vanish' ? current.candidate.id : null
+      return resolveHit(hits, shellIds, vanished)
     },
     flag(nx, ny) {
       if (phase !== 'looking' || !current) return null

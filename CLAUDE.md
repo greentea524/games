@@ -250,6 +250,18 @@ work found that `REST_TIME`'s derivation used a sliding block's acceleration
 and the wrong threshold, so its "2.2× margin" was 1.6×. It now uses a rolling
 sphere's 5/7 g·sinθ, against `STILL_SPEED`.
 
+**Anomaly Room's models live inside their boxes, and a tap hits only what is
+drawn (#147).** The round picker decides what is out of view, shadow included,
+from each candidate's box in `room.ts`. So the models in `models.ts` are
+built from parts *inside* that box, and `anomaly_test.ts` holds every one to it.
+A model that poked out could change on screen while the picker believed it
+was hidden. three's raycaster does not skip hidden meshes. The game used to take the
+first thing a ray touched, so every hidden twin under the player's feet, and
+every object vanished in an earlier round, went on catching taps and spending
+guesses. `resolveHit` passes hidden meshes over, except where *this* round's
+object vanished. Every QA check here finds the answer through `anomaly()`, so
+none of them ever played the game as a player does, and none could see this.
+
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
 of the screen, so steering showed only as the tube turning. It trails now: the

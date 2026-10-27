@@ -21,6 +21,7 @@
 import * as THREE from 'three'
 import { CANDIDATES, EYE, SHELL_SOLIDS, applyMutation, homePose, type Candidate, type Mutation, type Pose } from './room'
 import { MISSES, ROUNDS, boundsOf, frustumOf, onScreen, pickRound, seeded } from './rounds'
+import { applyPose, buildModel, resolveHit } from './models'
 
 let ok = true
 const check = (name: string, pass: boolean, note?: string) => {
@@ -123,31 +124,48 @@ function look(yaw: number, pitch: number, aspect = 390 / 844): THREE.Perspective
 // --- rule two: every mutation is visible from the eye ------------------------
 
 /**
- * The room as meshes, with one candidate posed however a round left it.
+ * The room as the player sees it, with one candidate posed however a round
+ * left it.
  *
+ * The real models from `models.ts`, posed by the same `applyPose` the game
+ * uses (#147) — a box standing in for a chair would score its gaps as solid.
  * Rebuilt per pose rather than mutated in place: `Raycaster` reads world
  * matrices, and a stale one is a silent wrong answer rather than an error.
  */
 function build(posed: Map<string, Pose>): THREE.Object3D {
   const root = new THREE.Object3D()
-  const add = (id: string, pose: Pose, at = pose.position) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(pose.size.x, pose.size.y, pose.size.z))
-    mesh.name = id
-    mesh.position.set(at.x, at.y, at.z)
-    mesh.rotation.y = pose.yaw
-    root.add(mesh)
-  }
   for (const s of SHELL_SOLIDS) {
-    add(s.id, { position: s.position, size: s.size, yaw: 0, visible: true, twin: null })
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.size.x, s.size.y, s.size.z))
+    mesh.name = s.id
+    mesh.position.set(s.position.x, s.position.y, s.position.z)
+    root.add(mesh)
   }
   for (const c of CANDIDATES) {
     const pose = posed.get(c.id) ?? homePose(c)
-    if (pose.visible) add(c.id, pose)
-    if (pose.twin) add(c.id, pose, pose.twin)
+    const main = modelOf(c, 'main')
+    const twin = modelOf(c, 'twin')
+    applyPose(main, twin, c, pose)
+    // Hidden objects are left out: what the eye sees is what is drawn.
+    if (main.visible) root.add(main)
+    if (twin.visible) root.add(twin)
   }
   root.updateMatrixWorld(true)
   return root
 }
+
+/** A candidate's model — or a plain box for the controls this file invents. */
+function modelOf(c: Candidate, role: 'main' | 'twin'): THREE.Object3D {
+  if (CONTROLS.has(c.id)) {
+    const group = new THREE.Group()
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(c.size.x, c.size.y, c.size.z))
+    mesh.name = c.id
+    mesh.userData.role = role
+    group.add(mesh)
+    return group
+  }
+  return buildModel(c, role)
+}
+const CONTROLS = new Set(['hidden'])
 
 /**
  * Angular spacing between sample rays, in radians.
@@ -155,8 +173,8 @@ function build(posed: Map<string, Pose>): THREE.Object3D {
  * Fixed, not a fraction of the object — which is the whole point. The first
  * version gridded a square cone sized to the object and scored a change as a
  * fraction of that cone, which quietly punished anything long and thin: the
- * shelf is two metres of wall and eighteen centimetres tall, so most of its
- * cone is empty, and shortening it by a third scored under two percent while a
+ * shelf was then two metres of wall and eighteen centimetres tall, so most of
+ * its cone was empty, and shortening it by a third scored under two percent while a
  * far smaller change to a compact object scored ten times that. Sampling at a
  * constant angular step instead makes the score a solid angle — how much of
  * what the player sees actually changes — which is the thing being asked.
@@ -340,6 +358,126 @@ for (const candidate of CANDIDATES) {
     'a turn too small to find is caught',
     nudge > 0 && nudge < DETECTABLE,
     `${(nudge / DETECTABLE).toFixed(2)}x the floor, and not zero`,
+  )
+}
+
+// --- the models stay inside their boxes (#147) -------------------------------
+//
+// The round picker decides what is out of view from each candidate's box in
+// `room.ts`, and projects that box's shadow. A model poking out of its box
+// could be on screen while the picker believed it was not.
+
+/** How far a model's parts reach past its candidate's box, in metres. */
+function overhang(model: THREE.Object3D, c: Candidate): number {
+  model.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(model, true)
+  const h = { x: c.size.x / 2, y: c.size.y / 2, z: c.size.z / 2 }
+  return Math.max(
+    0,
+    box.max.x - h.x, -h.x - box.min.x,
+    box.max.y - h.y, -h.y - box.min.y,
+    box.max.z - h.z, -h.z - box.min.z,
+  )
+}
+
+const FIT = 1e-6
+{
+  const worst = CANDIDATES.map((c) => ({ c, over: overhang(buildModel(c, 'main'), c) })).sort((a, b) => b.over - a.over)[0]
+  check(
+    'every model fits inside the box the round picker reasons about',
+    worst.over <= FIT,
+    `largest overhang ${(worst.over * 1000).toFixed(2)} mm, on ${worst.c.label}`,
+  )
+  // Staged: the stool with its legs splayed a centimetre wider.
+  const stool = CANDIDATES.find((c) => c.id === 'stool')
+  if (!stool) throw new Error('the stool is gone from the room')
+  const wide = buildModel(stool, 'main')
+  wide.scale.set(1.05, 1, 1.05)
+  const over = overhang(wide, stool)
+  check('and a model that pokes out is caught', over > FIT, `${(over * 1000).toFixed(1)} mm past its box`)
+}
+
+// --- a tap means what is on screen (#147) ------------------------------------
+//
+// Three's raycaster does not skip hidden meshes, and the game used to take the
+// first thing a ray touched. So the twin of every object, hidden and parked at
+// the origin, answered a tap on the floor at the player's feet, and an object
+// that vanished in one round went on answering taps where it had stood — each
+// a wrong guess — for the rest of the run.
+
+/** The room the way the game holds it: hidden things are present, not absent. */
+function gameRoom(posed: Map<string, Pose>): THREE.Object3D {
+  const root = new THREE.Object3D()
+  for (const s of SHELL_SOLIDS) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.size.x, s.size.y, s.size.z))
+    mesh.name = s.id
+    mesh.position.set(s.position.x, s.position.y, s.position.z)
+    root.add(mesh)
+  }
+  for (const c of CANDIDATES) {
+    const main = buildModel(c, 'main')
+    const twin = buildModel(c, 'twin')
+    applyPose(main, twin, c, posed.get(c.id) ?? homePose(c))
+    root.add(main, twin)
+  }
+  root.updateMatrixWorld(true)
+  return root
+}
+
+const SHELL_IDS = new Set(SHELL_SOLIDS.map((s) => s.id))
+/** The rule the game shipped with: the first thing the ray touches. */
+const firstTouched = (hits: THREE.Intersection[]) => {
+  const id = hits[0]?.object.name ?? null
+  return id && SHELL_IDS.has(id) ? null : id
+}
+
+function tap(root: THREE.Object3D, at: THREE.Vector3) {
+  const eye = new THREE.Vector3(EYE.x, EYE.y, EYE.z)
+  const ray = new THREE.Raycaster(eye, at.clone().sub(eye).normalize())
+  ray.far = 60
+  return ray.intersectObject(root, true)
+}
+
+{
+  const room = gameRoom(new Map())
+  const hits = tap(room, new THREE.Vector3(0.05, 0, 0.05))
+  check('a tap on the floor at your feet is not a guess', resolveHit(hits, SHELL_IDS, null) === null,
+    `resolves to ${resolveHit(hits, SHELL_IDS, null)}`)
+  // Staged: the hidden twins back at the origin, where the game left them.
+  // `resolveHit` alone must still pass them over; the old rule cannot.
+  for (const o of room.children) if (!o.visible) o.position.set(0, 0, 0)
+  room.updateMatrixWorld(true)
+  const staged = tap(room, new THREE.Vector3(0.05, 0, 0.05))
+  check(
+    'and with the twins under your feet, only the old rule spends a guess there',
+    resolveHit(staged, SHELL_IDS, null) === null && firstTouched(staged) !== null,
+    `old rule flags ${firstTouched(staged)}`,
+  )
+}
+
+{
+  // The plant vanished in an earlier round, and this round is about something
+  // else. The spot where it stood is wall now.
+  const plant = CANDIDATES.find((c) => c.id === 'plant')
+  if (!plant) throw new Error('the plant is gone from the room')
+  const gone = applyMutation(plant, { kind: 'vanish' })
+  const room = gameRoom(new Map([[plant.id, gone]]))
+  const where = new THREE.Vector3(plant.position.x, plant.position.y + 0.25, plant.position.z)
+  const hits = tap(room, where)
+  check(
+    'a spot an object vanished from in an earlier round is not a guess',
+    resolveHit(hits, SHELL_IDS, null) === null,
+    `resolves to ${resolveHit(hits, SHELL_IDS, null)}`,
+  )
+  check(
+    'and the rule the game shipped with is caught spending one there',
+    firstTouched(hits) === plant.id,
+    `first touched: ${firstTouched(hits)}`,
+  )
+  check(
+    'but in the round it vanished, that spot is how you point at it',
+    resolveHit(hits, SHELL_IDS, plant.id) === plant.id,
+    `resolves to ${resolveHit(hits, SHELL_IDS, plant.id)}`,
   )
 }
 

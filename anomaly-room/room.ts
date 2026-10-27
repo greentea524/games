@@ -154,8 +154,10 @@ export const CANDIDATES: Candidate[] = [
   {
     id: 'shelf',
     label: 'the shelf',
-    position: v(-4.75, 1.6, 0.6),
-    size: v(0.5, 0.18, 2.2),
+    // Tall enough to hold books a player can see from across the room (#147).
+    // Its board sits where the old eighteen-centimetre box's bottom was.
+    position: v(-4.75, 1.68, 0.6),
+    size: v(0.5, 0.34, 2.2),
     colour: 0x60533f,
     // Down the wall, and shorter along it. Never out from the wall.
     mutations: [move(0, -0.55, 0), scale(1, 1, 0.6), vanish],
