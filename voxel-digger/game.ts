@@ -1,8 +1,8 @@
 // Voxel Digger (#115), on the standalone stage (#118).
 //
-// A block of rock with something buried in it. Tap a cube to dig it out, orbit
-// to look from another side, and name what you found in as few digs as you
-// can.
+// A block of rock with something buried in it. Tap a face to dig a 3×3 patch
+// out of it (#151), orbit to look from another side, and name what you found
+// in as few digs as you can.
 //
 // The whole block is one `InstancedMesh` — #115's reason for existing, along
 // with instance-aware raycasting — so a thousand-odd cubes cost one draw call
@@ -15,7 +15,17 @@
 import * as THREE from 'three'
 import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
 import { BLOCK, DIG_BUDGET, SHAPES, allCells, unkey, type Shape } from './block'
-import { createState, isDiggable, isVisible, removedSet, type DigState } from './dig'
+import {
+  brushCells,
+  createState,
+  digStroke,
+  isDiggable,
+  isVisible,
+  removedSet,
+  undoStroke,
+  type Axis,
+  type DigState,
+} from './dig'
 import { createIndex, type InstanceIndex } from './instances'
 
 export { DIG_BUDGET, SHAPES }
@@ -50,7 +60,10 @@ const COLOURS = {
 export interface VoxelGame {
   stage: Stage3D
   phase(): Phase
+  /** Taps spent. A tap digs a patch (#151), so this is not cubes. */
   digs(): number
+  /** Cubes dug out, across every tap. */
+  dug(): number
   budget(): number
   /** The shape actually buried, revealed only once the round is over. */
   answer(): Shape | null
@@ -64,10 +77,13 @@ export interface VoxelGame {
    * What is under a normalised viewport point: a rock cell that can be dug, a
    * cube of the find, or nothing.
    */
-  probe(nx: number, ny: number): { cell: number; kind: 'rock' | 'find' } | null
-  /** Digs whatever is under a point. Returns the cell dug, or null. */
-  dig(nx: number, ny: number): number | null
-  /** Puts the last dug cube back. #115 asks for this; a mis-tap is cheap. */
+  probe(nx: number, ny: number): { cell: number; kind: 'rock' | 'find'; axis: Axis } | null
+  /**
+   * Digs the patch around whatever is under a point, across the face that was
+   * tapped. Returns the cubes dug, or null when nothing was.
+   */
+  dig(nx: number, ny: number): number[] | null
+  /** Puts the last tap's cubes back. #115 asks for this; a mis-tap is cheap. */
   undo(): boolean
   /** Names the find. Ends the round either way. */
   guess(id: string): boolean
@@ -253,7 +269,8 @@ export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame
   const game: VoxelGame = {
     stage,
     phase: () => phase,
-    digs: () => state.removed.length,
+    digs: () => state.strokes.length,
+    dug: () => state.removed.length,
     budget: () => DIG_BUDGET,
     answer: () => (phase === 'digging' ? null : answer),
     exposed: () => findIndex.count(),
@@ -285,28 +302,41 @@ export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame
       const cell = (isRock ? rockIndex : findIndex).cellOf(hit.instanceId)
       if (cell < 0) return null
       if (isRock && !isDiggable(state, cell, removedSet(state))) return null
-      return { cell, kind: isRock ? 'rock' : 'find' }
+      // Which face was hit, as an axis. The instances are only ever
+      // translated, so the geometry's own face normal is already axis-aligned
+      // in the world.
+      const n = hit.face?.normal ?? new THREE.Vector3(0, 1, 0)
+      const ax = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)]
+      const axis = ax.indexOf(Math.max(...ax)) as Axis
+      return { cell, kind: isRock ? 'rock' : 'find', axis }
     },
     dig(nx, ny) {
-      if (phase !== 'digging' || state.removed.length >= DIG_BUDGET) return null
+      if (phase !== 'digging' || state.strokes.length >= DIG_BUDGET) return null
       const target = game.probe(nx, ny)
       // The find is not diggable, and tapping it costs nothing. Charging a dig
       // for touching the thing you are trying to uncover would be a tax on
       // looking closely. `probe` has already rejected anything unreachable.
       if (!target || target.kind !== 'rock') return null
-      const result = rockIndex.remove(target.cell)
-      if (!result) return null
-      state.removed.push(target.cell)
-      applyRemoval(rockMesh, rockIndex, result, COLOURS.rock)
+      // The patch across the tapped face (#151). `brushCells` applies the same
+      // rules a single dig does to every cube in it.
+      const cells = brushCells(state, target.cell, target.axis)
+      if (cells.length === 0) return null
+      for (const cell of cells) {
+        const result = rockIndex.remove(cell)
+        if (result) applyRemoval(rockMesh, rockIndex, result, COLOURS.rock)
+      }
+      digStroke(state, cells)
       refreshFind()
       notify()
-      return target.cell
+      return cells
     },
     undo() {
-      if (phase !== 'digging' || state.removed.length === 0) return false
-      const cell = state.removed.pop()!
-      const slot = rockIndex.restore(cell)
-      writeSlot(rockMesh, slot, cell, COLOURS.rock)
+      if (phase !== 'digging' || state.strokes.length === 0) return false
+      // Back in reverse, so each cube returns to the slot order it left.
+      for (const cell of undoStroke(state).reverse()) {
+        const slot = rockIndex.restore(cell)
+        writeSlot(rockMesh, slot, cell, COLOURS.rock)
+      }
       rockMesh.count = rockIndex.count()
       rockMesh.instanceMatrix.needsUpdate = true
       if (rockMesh.instanceColor) rockMesh.instanceColor.needsUpdate = true

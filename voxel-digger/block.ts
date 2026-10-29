@@ -53,8 +53,16 @@ export function makeBlock(size: number, shapeSize = SHAPE_SIZE): Block {
  */
 export const BLOCK = makeBlock(13)
 
-/** Digs a player gets before they have to name what they found. */
-export const DIG_BUDGET = 40
+/**
+ * Taps a player gets before they have to name what they found.
+ *
+ * Counted in taps since #151, when a tap became a 3×3 patch. It was forty
+ * single cubes, about 1.7× what the worst shape cost a player digging
+ * straight shafts into the faces (24). The same player with the patch needs
+ * 8 to 12 taps (`dig_test.ts` plays it), so this keeps roughly twice that —
+ * and still takes far more rock than forty cubes ever could.
+ */
+export const DIG_BUDGET = 24
 
 /** Cells pack into one integer so they can live in a `Set`. */
 export const key = (b: Block, x: number, y: number, z: number): number =>

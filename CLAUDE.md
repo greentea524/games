@@ -270,6 +270,17 @@ screen, and `pickRound`'s `seen` option limits a round to objects with at least
 `SEEN_TIME` of it. Being out of view is necessary for a fair change; being seen
 before is necessary too, and only the first was ever checked.
 
+**Voxel Digger's tap digs a 3×3 patch, and a best carries its unit (#151).**
+A one-cube shaft four deep shows its floor only within about 14° of straight
+down, so the find was hard to see however well you dug. `brushCells` takes the
+tapped face's 3×3, one layer deep. It goes through the same rules as a single
+dig, and `dig_test.ts` audits random taps against them. A plain square patch
+that ignores those rules is its control. The budget is 24 taps, set from a
+player who digs straight shafts, not from the omniscient solver, which needs
+four whatever the brush. A best is stored with `SCORE_UNIT` because a round
+costs about half the taps it did. Change the brush and old bests drop out of
+the game and off the hub badge, as Minigolf's do when its course changes.
+
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
 of the screen, so steering showed only as the tube turning. It trails now: the
