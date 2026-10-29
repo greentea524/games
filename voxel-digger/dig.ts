@@ -16,8 +16,11 @@ import {
   SHAPES,
   allCells,
   cellsOf,
+  inside,
+  key,
   neighbours,
   onSurface,
+  unkey,
   type Block,
   type Shape,
 } from './block'
@@ -28,10 +31,16 @@ export interface DigState {
   shape: ReadonlySet<number>
   /** Rock cells dug out so far, in the order they went. */
   removed: number[]
+  /**
+   * How many cells each tap took, in order (#151). A tap digs a patch, so the
+   * player's count — and what undo puts back — is taps, while every rule
+   * above it still reasons about cells. Their sum is always `removed.length`.
+   */
+  strokes: number[]
 }
 
 export function createState(shape: Shape, block: Block = BLOCK): DigState {
-  return { block, shape: cellsOf(block, shape), removed: [] }
+  return { block, shape: cellsOf(block, shape), removed: [], strokes: [] }
 }
 
 /**
@@ -65,7 +74,11 @@ export function isVisible(block: Block, k: number, removed: ReadonlySet<number>)
 }
 
 /** Rock that can be dug right now: visible, and not part of the shape. */
-export function isDiggable(state: DigState, k: number, removed = removedSet(state)): boolean {
+export function isDiggable(
+  state: DigState,
+  k: number,
+  removed: ReadonlySet<number> = removedSet(state),
+): boolean {
   return !state.shape.has(k) && isVisible(state.block, k, removed)
 }
 
@@ -110,6 +123,117 @@ export function survivors(state: DigState, candidates: Shape[] = SHAPES): Shape[
 /** True once only one candidate is left — the point at which a guess is fair. */
 export const identified = (state: DigState, candidates: Shape[] = SHAPES): boolean =>
   survivors(state, candidates).length === 1
+
+// --- the brush (#151) ---------------------------------------------------------
+//
+// A tap used to take one cube, and a one-cube hole in a thirteen-cube block is
+// a shaft you can only see down by looking straight into it. So a tap takes a
+// patch: the cube tapped and its neighbours across the face that was tapped,
+// one layer deep. The hole is three cubes wide and still goes down one cube a
+// tap, so depth costs what it always cost and a hole can be looked into from
+// an angle.
+//
+// The patch follows the rules a single dig does — it takes only rock, and
+// only rock already in view — so a tap can never reach anything a player
+// could not have dug one cube at a time. It is also clipped where the find
+// cuts across it: the patch spreads from the tapped cube and does not jump
+// the find to dig rock on its far side.
+
+/** An axis by index: 0 is x, 1 is y, 2 is z. */
+export type Axis = 0 | 1 | 2
+
+/** How far a tap's patch reaches from the cube tapped: 1 makes it 3×3. */
+export const BRUSH = 1
+
+/**
+ * What a score is counted in, stored beside it.
+ *
+ * A best set one cube a tap is not a best at three-by-three — the same round
+ * costs about half the taps now — so the save and the hub's badge both ignore
+ * a best from another brush, the way Minigolf ignores one from another
+ * course (#141).
+ */
+export const SCORE_UNIT = `taps of ${2 * BRUSH + 1}x${2 * BRUSH + 1}`
+
+/**
+ * The axes along which a cell shows a face: toward a dug-out neighbour, or
+ * toward the outside of the block. Those are the faces a player can tap.
+ */
+export function openAxes(block: Block, k: number, removed: ReadonlySet<number>): Axis[] {
+  const { x, y, z } = unkey(block, k)
+  const c = [x, y, z]
+  const out: Axis[] = []
+  for (const axis of [0, 1, 2] as Axis[]) {
+    for (const step of [-1, 1]) {
+      const n = [...c]
+      n[axis] += step
+      if (!inside(block, n[0], n[1], n[2]) || removed.has(key(block, n[0], n[1], n[2]))) {
+        out.push(axis)
+        break
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * The cells one tap takes: `target` and the rock around it across the face
+ * that runs perpendicular to `axis`, within `radius`.
+ *
+ * Grown outward from the target through the patch rather than read off as a
+ * square, so the find — which cannot be dug — stops it, the way a wall
+ * would. Empty when the target itself is not diggable.
+ */
+export function brushCells(
+  state: DigState,
+  target: number,
+  axis: Axis,
+  radius = BRUSH,
+  removed: ReadonlySet<number> = removedSet(state),
+): number[] {
+  const b = state.block
+  if (!isDiggable(state, target, removed)) return []
+  const t = unkey(b, target)
+  const origin = [t.x, t.y, t.z]
+  const [u, w] = ([0, 1, 2] as Axis[]).filter((a) => a !== axis)
+  const out: number[] = []
+  const seen = new Set<number>([target])
+  const queue = [target]
+  for (let head = 0; head < queue.length; head++) {
+    const k = queue[head]
+    if (!removed.has(k)) out.push(k)
+    const c = unkey(b, k)
+    const at = [c.x, c.y, c.z]
+    for (const [du, dw] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const n = [...at]
+      n[u] += du
+      n[w] += dw
+      if (Math.abs(n[u] - origin[u]) > radius || Math.abs(n[w] - origin[w]) > radius) continue
+      if (!inside(b, n[0], n[1], n[2])) continue
+      const nk = key(b, n[0], n[1], n[2])
+      if (seen.has(nk)) continue
+      seen.add(nk)
+      // Spread through what is already open, and through rock the player can
+      // see. Not through the find, and not through rock still out of sight.
+      if (removed.has(nk) || isDiggable(state, nk, removed)) queue.push(nk)
+    }
+  }
+  return out
+}
+
+/** Takes one tap's cells out of the block. */
+export function digStroke(state: DigState, cells: readonly number[]): void {
+  if (cells.length === 0) return
+  state.removed.push(...cells)
+  state.strokes.push(cells.length)
+}
+
+/** Puts the last tap's cells back, and returns them. */
+export function undoStroke(state: DigState): number[] {
+  const n = state.strokes.pop()
+  if (n === undefined) return []
+  return state.removed.splice(state.removed.length - n, n)
+}
 
 // --- reachability -----------------------------------------------------------
 

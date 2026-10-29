@@ -13,11 +13,8 @@ export async function pose(page) {
     // that can see its floor, which is the same thing a player discovers.
     g.orbit(0, 1.42 - g.view().pitch)
     await new Promise((r) => requestAnimationFrame(r))
-    const cols = []
-    for (let i = -1; i <= 1; i++) {
-      for (let j = -1; j <= 1; j++) cols.push([0.5 + i * 0.026, 0.5 + j * 0.034])
-    }
-    for (let pass = 0; pass < 5; pass++) for (const [nx, ny] of cols) g.dig(nx, ny)
+    // One tap a layer: a tap takes the 3×3 patch around the cube (#151).
+    for (let pass = 0; pass < 5; pass++) g.dig(0.5, 0.5)
     // Then only a little off vertical, and closer. Tip much further and the
     // pit's own walls hide its floor, which leaves a card showing a plain
     // brown cube — true to the game's first ten seconds and useless as a card.

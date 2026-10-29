@@ -7,6 +7,7 @@
 // Kept out of App.tsx because the interesting part is not the rendering, it is
 // deciding what "progress" means per game, and that is worth testing.
 import { COURSE_KEY } from '../minigolf/holes'
+import { SCORE_UNIT } from '../voxel-digger/dig'
 import { loadSave } from './storage'
 
 export interface GameStatus {
@@ -196,7 +197,8 @@ function anomalyRoomStatus(): GameStatus {
 function voxelDiggerStatus(): GameStatus {
   const d = readPayload('voxel_digger_save')
   if (!d) return NONE
-  const best = typeof d.best === 'number' ? d.best : 0
+  // A best counted one cube a tap is not a best in taps of a patch (#151).
+  const best = typeof d.best === 'number' && d.unit === SCORE_UNIT ? d.best : 0
   const finds = typeof d.finds === 'number' ? d.finds : 0
   if (finds === 0 || best === 0) return NONE
   return { completed: true, progress: `Best ${best}` }

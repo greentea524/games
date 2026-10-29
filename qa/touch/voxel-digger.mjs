@@ -18,6 +18,7 @@ const { check, finish } = checker()
 const state = (page) =>
   page.evaluate(() => ({
     digs: window.__game.digs(),
+    dug: window.__game.dug(),
     budget: window.__game.budget(),
     phase: window.__game.phase(),
     exposed: window.__game.exposed(),
@@ -70,7 +71,7 @@ async function run() {
   check('the block starts untouched', opening.digs === 0 && opening.exposed === 0)
   check('and nothing is buried in plain sight', opening.answer === null, 'the answer is withheld')
 
-  // ------------------------------------------------------ a tap digs a cube
+  // --------------------------------------------- a tap digs a 3×3 patch (#151)
 
   const centre = await canvasPoint(page, 0.5, 0.5, '#stage canvas')
   const aimed = await page.evaluate(() => window.__game.probe(0.5, 0.5))
@@ -79,7 +80,21 @@ async function run() {
   await hand.tap(PAD, centre.x, centre.y)
   await page.waitForTimeout(250)
   const afterTap = await state(page)
-  check('a tap digs exactly one cube', afterTap.digs === 1, `${afterTap.digs} dug`)
+  // Nine, less whatever the block's edge cuts off: the middle of the screen
+  // often lands near an edge of the block's top face.
+  const expected = await page.evaluate(async ({ cell, axis }) => {
+    const { BLOCK, unkey } = await import('/games/voxel-digger/block.ts')
+    const c = unkey(BLOCK, cell)
+    const at = [c.x, c.y, c.z]
+    const span = (a) => [-1, 0, 1].filter((d) => at[a] + d >= 0 && at[a] + d < BLOCK.size).length
+    const [u, w] = [0, 1, 2].filter((a) => a !== axis)
+    return span(u) * span(w)
+  }, aimed)
+  check(
+    'a tap spends one dig and takes the 3×3 patch around the cube',
+    afterTap.digs === 1 && afterTap.dug === expected && expected >= 4,
+    `${afterTap.digs} dig, ${afterTap.dug} cubes of ${expected} the block's edge leaves`,
+  )
   check(
     'and it digs the cube that was under the finger',
     (await page.evaluate((cell) => window.__game.probe(0.5, 0.5)?.cell !== cell, aimed.cell)) === true,
@@ -94,7 +109,11 @@ async function run() {
   await page.evaluate(() => document.querySelector('.vd-undo').click())
   await page.waitForTimeout(200)
   const undone = await state(page)
-  check('undo puts the cube back and refunds the dig', undone.digs === 0, `${undone.digs} digs`)
+  check(
+    'undo puts the whole patch back and refunds the dig',
+    undone.digs === 0 && undone.dug === 0,
+    `${undone.digs} digs, ${undone.dug} cubes out`,
+  )
   check(
     'and the cube really is back where it was',
     (await page.evaluate((cell) => window.__game.probe(0.5, 0.5)?.cell === cell, aimed.cell)) === true,
@@ -244,6 +263,24 @@ async function run() {
     saved?.v === 1 && saved.best === 11 && saved.finds >= 1,
     saved ? `v${saved.v} best ${saved.best} finds ${saved.finds}` : 'unreadable',
   )
+  // #151: a best counted one cube a tap is not a best in taps of a patch.
+  const migrated = await page.evaluate(async () => {
+    localStorage.setItem('voxel_digger_save', JSON.stringify({ v: 1, d: { best: 3, finds: 7 } }))
+    const { loadDiggerSave } = await import('/games/voxel-digger/save.ts')
+    return loadDiggerSave()
+  })
+  check(
+    'a best from one-cube digs is set aside, and the finds are kept',
+    migrated.best === 0 && migrated.finds === 7,
+    `best ${migrated.best}, finds ${migrated.finds}`,
+  )
+  await page.evaluate(() => {
+    localStorage.removeItem('voxel_digger_save')
+  })
+  await page.evaluate(async () => {
+    const { recordFind } = await import('/games/voxel-digger/save.ts')
+    recordFind(11)
+  })
   check(
     'and a better round replaces it while a worse one does not',
     await page.evaluate(async () => {
