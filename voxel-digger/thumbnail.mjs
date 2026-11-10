@@ -10,6 +10,13 @@ export const viewport = { width: 900, height: 690 }
 export async function pose(page) {
   await page.evaluate(async () => {
     const g = window.__game
+    // Always the skull: which shape is buried is random, and a card that is
+    // a different picture every time it is retaken cannot be reviewed. The
+    // round is still one a player can be dealt.
+    const random = Math.random
+    Math.random = () => 0.01
+    g.restart()
+    Math.random = random
     const look = (yaw, pitch) => {
       const v = g.view()
       g.orbit(yaw - v.yaw, pitch - v.pitch)
@@ -32,8 +39,8 @@ export async function pose(page) {
     // face that is tapped.
     look(0, 1.42)
     tapCube(MID, SIZE - 1, MID)
-    look(Math.PI / 2, 0.02)
-    tapCube(SIZE - 1, MID - 1, MID)
+    look(0, 0.02)
+    tapCube(MID, MID, SIZE - 1)
     // Then the angle the game opens at.
     look(0.7, 0.62)
     await new Promise((r) => requestAnimationFrame(r))

@@ -37,7 +37,7 @@ export interface Block {
 }
 
 /** Every shape is authored in a cube this many cells on a side. */
-export const SHAPE_SIZE = 5
+export const SHAPE_SIZE = 7
 
 export function makeBlock(size: number, shapeSize = SHAPE_SIZE): Block {
   return { size, shapeSize, shapeMin: Math.floor((size - shapeSize) / 2) }
@@ -50,8 +50,10 @@ export function makeBlock(size: number, shapeSize = SHAPE_SIZE): Block {
  * surface and the find and the best possible round is three digs, which leaves
  * a score of "how few digs" almost nothing to say. Four cells of cover puts
  * the floor around five and gives a careful player somewhere to be careful.
- * (Written when a dig was one cube. A drill reaches the find in one tap
- * whatever the cover, #152; the cover is now what makes the find a surprise.)
+ * (Written when a dig was one cube and the shapes were five on a side. A
+ * drill reaches the find in one tap whatever the cover, #152, and the shapes
+ * are seven on a side, #153, under three cells of cover: enough to hide what
+ * is buried, in a block small enough that the find is most of what you see.)
  */
 export const BLOCK = makeBlock(13)
 
@@ -93,73 +95,79 @@ export interface Shape {
 /**
  * Four things that could be down there.
  *
- * What matters is not that they look different. Ruling a candidate out means
- * exposing one cell where it and the truth disagree — so every pair has to
- * disagree somewhere the player can actually *get to*. A difference sealed
- * inside the shape is invisible for ever: rock cannot be dug through the
- * buried object, so a pocket enclosed on all six faces by shape is unreachable
- * whatever the budget. The skull has two such pockets, its eye sockets, and
- * two candidates differing only there would be indistinguishable while
- * rendering as obviously different objects.
+ * Drawn seven cubes on a side (#153). At five they were blobs that shared
+ * their top two layers — a cap added so the first dig told nothing — and none
+ * of them looked like its name: the skull's eye sockets were sealed inside it.
+ * At seven there is room for the features a name promises, and each is drawn
+ * to be recognised from its front, which faces +z: the bottom row of every
+ * layer below.
  *
- * `dig_test.ts` puts that layout back and checks the solver cannot separate
- * it, because it is not a mistake anyone would catch by reading.
+ * What matters for play is not that they look different but that every pair
+ * disagrees somewhere the player can *get to*. A difference sealed inside a
+ * shape is invisible for ever: rock cannot be dug through the buried object,
+ * so a pocket enclosed on all six faces is unreachable. None of these has
+ * one, and `dig_test.ts` stages one to check it would be caught.
  */
-/**
- * The two top layers, which every candidate shares.
- *
- * Without this the puzzle was over on the third dig: the natural first move is
- * straight down, and whatever it uncovered was unique to one shape. Sharing
- * the cap means the first thing you reach tells you only that you have reached
- * it, and the shapes have to be told apart lower down or from the side —
- * which is what makes the digging a decision rather than a formality.
- */
-const CAP_TOP = ['.....', '.###.', '.###.', '.###.', '.....']
-const CAP_UPPER = ['.###.', '#####', '#####', '#####', '.###.']
-
 export const SHAPES: Shape[] = [
   {
     id: 'skull',
     name: 'Skull',
+    // A domed cranium over two open sockets, a nose hole, and a narrower jaw
+    // with a row of teeth.
     layers: [
-      ['.....', '.###.', '.#.#.', '.###.', '.....'],
-      ['.###.', '#####', '#.#.#', '#####', '.###.'],
-      ['.###.', '#####', '#####', '#####', '.###.'],
-      CAP_UPPER,
-      CAP_TOP,
+      ['.......', '.......', '..###..', '.#####.', '.#####.', '.#####.', '.#.#.#.'],
+      ['.......', '..###..', '.#####.', '.#####.', '.#####.', '.#####.', '.#####.'],
+      ['..###..', '.#####.', '#######', '#######', '#######', '###.###', '.##.##.'],
+      ['..###..', '.#####.', '#######', '#######', '#######', '#..#..#', '...#...'],
+      ['..###..', '.#####.', '#######', '#######', '#######', '#..#..#', '...#...'],
+      ['..###..', '.#####.', '#######', '#######', '#######', '#######', '.#####.'],
+      ['.......', '..###..', '.#####.', '.#####.', '.#####.', '..###..', '.......'],
     ],
   },
   {
     id: 'fish',
     name: 'Fish',
+    // Side-on: a forked tail at the left, a fin above and below, and an eye
+    // that goes clean through the head. The body is three cubes thick and the
+    // tail and fins one, so it reads as a fish from the side and as a blade
+    // from either end.
     layers: [
-      ['..#..', '.###.', '#####', '.###.', '..#..'],
-      ['.###.', '#####', '#####', '#####', '.###.'],
-      ['..#..', '.###.', '#####', '.###.', '..#..'],
-      CAP_UPPER,
-      CAP_TOP,
+      ['.......', '.......', '.......', '...##..', '.......', '.......', '.......'],
+      ['.......', '.......', '..####.', '#.####.', '..####.', '.......', '.......'],
+      ['.......', '.......', '..#####', '#######', '..#####', '.......', '.......'],
+      ['.......', '.......', '..#####', '.######', '..#####', '.......', '.......'],
+      ['.......', '.......', '..###.#', '#####.#', '..###.#', '.......', '.......'],
+      ['.......', '.......', '..####.', '#.####.', '..####.', '.......', '.......'],
+      ['.......', '.......', '.......', '...##..', '.......', '.......', '.......'],
     ],
   },
   {
     id: 'coil',
     name: 'Coil',
+    // A spring: one continuous strip winding up the outside, half a turn to
+    // a layer, around an empty middle.
     layers: [
-      ['#####', '#...#', '#...#', '#...#', '#####'],
-      ['....#', '....#', '....#', '....#', '....#'],
-      ['#####', '#....', '#....', '#....', '#####'],
-      CAP_UPPER,
-      CAP_TOP,
+      ['#######', '......#', '......#', '......#', '......#', '......#', '......#'],
+      ['#......', '#......', '#......', '#......', '#......', '#......', '#######'],
+      ['#######', '......#', '......#', '......#', '......#', '......#', '......#'],
+      ['#......', '#......', '#......', '#......', '#......', '#......', '#######'],
+      ['#######', '......#', '......#', '......#', '......#', '......#', '......#'],
+      ['#......', '#......', '#......', '#......', '#......', '#......', '#######'],
+      ['#######', '......#', '......#', '......#', '......#', '......#', '......#'],
     ],
   },
   {
     id: 'key',
     name: 'Key',
+    // Standing on its bit: a ring to hold it by, a shaft, and two teeth.
     layers: [
-      ['.###.', '.#.#.', '.###.', '..#..', '..#..'],
-      ['#####', '##.##', '#####', '.###.', '.#.#.'],
-      ['.###.', '.#.#.', '.###.', '..#..', '..#..'],
-      CAP_UPPER,
-      CAP_TOP,
+      ['.......', '.......', '...##..', '...##..', '...##..', '.......', '.......'],
+      ['.......', '.......', '...###.', '...###.', '...###.', '.......', '.......'],
+      ['.......', '.......', '...#...', '...#...', '...#...', '.......', '.......'],
+      ['.......', '.......', '.#####.', '.#####.', '.#####.', '.......', '.......'],
+      ['.......', '.......', '.#...#.', '.#...#.', '.#...#.', '.......', '.......'],
+      ['.......', '.......', '.#...#.', '.#...#.', '.#...#.', '.......', '.......'],
+      ['.......', '.......', '.#####.', '.#####.', '.#####.', '.......', '.......'],
     ],
   },
 ]

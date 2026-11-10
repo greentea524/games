@@ -297,6 +297,15 @@ brush drops out of the game and off the hub badge, as Minigolf's does when its
 course changes. The overlay holds canvases too now, so select the game's own
 with `#stage > canvas`.
 
+**Voxel Digger's shapes are seven cubes a side and share nothing (#153).** At
+five they were blobs under a common two-layer cap, and none looked like its
+name. They are redrawn to be recognised: a skull with open sockets, a side-on
+fish, a coil that winds, a key. Two things follow. The coil is hollow, so a
+drill down its middle finds nothing; any check that taps must not assume the
+first tap hits. And which shape is buried is random, so the touch suite deals
+each of the four in turn and the hub card always deals the skull. A check that
+passes on three shapes in four is a flake waiting to happen.
+
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
 of the screen, so steering showed only as the tube turning. It trails now: the

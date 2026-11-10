@@ -11,10 +11,10 @@
 // budget is not the only thing that can make a layout unwinnable: two shapes
 // that differ *only* inside a pocket sealed on all six faces by shape cells
 // can never be told apart, because rock cannot be dug through the buried
-// object and the difference is behind it. No budget fixes that. The skull has
-// two such pockets — its eye sockets — so the layout is one edit away from
-// shipping, and it would render as two obviously different objects while being
-// literally indistinguishable in play.
+// object and the difference is behind it. No budget fixes that. The first
+// skull, five cubes on a side, had two such pockets — its eye sockets — so the
+// layout was one edit away from shipping two obviously different objects that
+// were literally indistinguishable in play.
 import {
   BLOCK,
   PROOF_BUDGET,
@@ -160,37 +160,56 @@ for (const shape of SHAPES) {
   )
 }
 
+/**
+ * A shape with one cube taken out of its solid middle: a pocket of rock
+ * sealed on all six faces by the shape itself.
+ *
+ * Staged rather than found. The five-cube skull had two of these by accident
+ * — its eye sockets — which is how the failure was first noticed; the shapes
+ * drawn in #153 have none, so the control builds its own.
+ */
+function hollowed(shape: Shape): Shape {
+  const has = (x: number, y: number, z: number) => shape.layers[y]?.[z]?.[x] === '#'
+  for (let y = 1; y < shape.layers.length - 1; y++) {
+    for (let z = 1; z < shape.layers[y].length - 1; z++) {
+      for (let x = 1; x < shape.layers[y][z].length - 1; x++) {
+        const buried =
+          has(x, y, z) && has(x - 1, y, z) && has(x + 1, y, z) && has(x, y - 1, z) && has(x, y + 1, z) && has(x, y, z - 1) && has(x, y, z + 1)
+        if (!buried) continue
+        return {
+          id: `${shape.id}-hollowed`,
+          name: `${shape.name} with a hollow`,
+          layers: shape.layers.map((plane, i) =>
+            i === y ? plane.map((line, j) => (j === z ? line.slice(0, x) + '.' + line.slice(x + 1) : line)) : plane,
+          ),
+        }
+      }
+    }
+  }
+  throw new Error(`${shape.name} has no solid middle to hollow`)
+}
+
 {
-  // The failure a budget cannot fix. `skull` has rock pockets sealed on all
-  // six faces by its own cells; a candidate that differs from it only there is
-  // unreachable however long you dig.
+  // The failure a budget cannot fix: a candidate that differs from another
+  // only in rock sealed inside it is unreachable however long you dig.
   const skull = SHAPES.find((s) => s.id === 'skull')
   if (!skull) throw new Error('the skull is gone')
   const cells = cellsOf(BLOCK, skull)
-  const sealed = allCells(BLOCK).filter(
-    (k) =>
-      !cells.has(k) &&
-      neighbours(BLOCK, k).length === 6 &&
-      neighbours(BLOCK, k).every((n) => cells.has(n)),
-  )
-  check('the skull really does have a sealed pocket', sealed.length > 0, `${sealed.length} of them`)
-
-  const { x, y, z } = unkey(BLOCK, sealed[0])
-  const layer = y - BLOCK.shapeMin
-  const row = z - BLOCK.shapeMin
-  const col = x - BLOCK.shapeMin
-  const filled: Shape = {
-    id: 'skull-filled',
-    name: 'Skull with one socket filled',
-    layers: skull.layers.map((plane, i) =>
-      i === layer
-        ? plane.map((line, j) =>
-            j === row ? line.slice(0, col) + '#' + line.slice(col + 1) : line,
-          )
-        : plane,
-    ),
+  const hollow = hollowed(skull)
+  const sealedIn = (shape: Shape) => {
+    const own = cellsOf(BLOCK, shape)
+    return allCells(BLOCK).filter(
+      (k) => !own.has(k) && neighbours(BLOCK, k).length === 6 && neighbours(BLOCK, k).every((n) => own.has(n)),
+    ).length
   }
-  const pair = [skull, filled]
+  check(
+    'none of the shapes has a pocket of rock sealed inside it',
+    SHAPES.every((s) => sealedIn(s) === 0),
+    SHAPES.map((s) => `${s.name} ${sealedIn(s)}`).join(', '),
+  )
+  check('and the staged one really does', sealedIn(hollow) === 1, `${sealedIn(hollow)} sealed pocket`)
+
+  const pair = [skull, hollow]
   check(
     'two shapes differing only inside a sealed pocket are caught',
     solve(skull, pair, PROOF_BUDGET * 4).left === 2,
@@ -198,7 +217,7 @@ for (const shape of SHAPES) {
   )
   check(
     'and they really are different shapes, not the same one twice',
-    cellsOf(BLOCK, filled).size === cells.size + 1,
+    cellsOf(BLOCK, hollow).size === cells.size - 1,
     'one cell apart, and invisible',
   )
 }
@@ -444,16 +463,12 @@ const differing = (a: string, b: string) => {
     `closest are ${where}: ${least} samples apart`,
   )
 
-  // Staged: the skull with one eye socket filled in. It is a different shape
-  // and no picture can show it — the socket is sealed inside.
+  // Staged: the skull with a cube missing from its solid middle. It is a
+  // different shape and no picture can show it — the hollow is sealed inside.
   const skull = SHAPES.find((s) => s.id === 'skull')
   if (!skull) throw new Error('the skull is gone')
-  const filled: Shape = {
-    ...skull,
-    id: 'skull-filled',
-    layers: skull.layers.map((layer, y) => (y === 1 ? layer.map((row, z) => (z === 2 ? '###.#' : row)) : layer)),
-  }
-  const same = FACINGS.every((f) => differing(silhouette(skull, f), silhouette(filled, f)) === 0)
+  const hollow = hollowed(skull)
+  const same = FACINGS.every((f) => differing(silhouette(skull, f), silhouette(hollow, f)) === 0)
   check('and two shapes that differ only inside draw the same, so the check can tell', same)
 
   // A quarter-turn is a real turn: the key is not symmetrical, so its picture

@@ -126,8 +126,10 @@ function edgedFace(): THREE.Texture {
   if (ctx) {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, size, size)
-    ctx.strokeStyle = 'rgba(70, 38, 0, 0.75)'
-    ctx.lineWidth = 6
+    // Thin and soft. At seven cubes a side a heavy edge is a grid drawn over
+    // the shape, and the grid is what you see instead of it (#153).
+    ctx.strokeStyle = 'rgba(70, 38, 0, 0.5)'
+    ctx.lineWidth = 3
     ctx.strokeRect(0, 0, size, size)
   }
   const texture = new THREE.CanvasTexture(canvas)

@@ -8,13 +8,13 @@
 // end the moment the count reached one, and the decision the score is about
 // ("have I seen enough?") would be gone.
 import { SHAPES, type VoxelGame } from './game'
-import type { Shape } from './block'
+import { SHAPE_SIZE, type Shape } from './block'
 import { shapePolygons, type Face, type Facing } from './preview'
 import { loadDiggerSave, recordFind } from './save'
 
 /** A picture's edge in CSS pixels, and the cube edges it has to hold. */
-const PICTURE = 66
-const PICTURE_SPAN = 10.6
+const PICTURE = 72
+const PICTURE_SPAN = 2 * SHAPE_SIZE + 0.6
 
 const FACE_FILL: Record<Face, string> = { cap: '#f6c666', left: '#d48f2a', right: '#96601a' }
 
@@ -26,11 +26,11 @@ function drawPicture(canvas: HTMLCanvasElement, shape: Shape, facing: Facing) {
   if (!ctx) return
   const scale = canvas.width / PICTURE_SPAN
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  // The picture spans five cubes either side of centre across, and from five
-  // up to five down — or ten up, seen from below.
-  const midY = facing.below ? -5 : 0
-  ctx.lineWidth = Math.max(0.75, ratio * 0.45)
-  ctx.strokeStyle = 'rgba(40, 24, 4, 0.4)'
+  // The picture spans the shape's size either side of centre across, and from
+  // that far up to that far down — or twice that up, seen from below.
+  const midY = facing.below ? -SHAPE_SIZE : 0
+  ctx.lineWidth = Math.max(0.5, ratio * 0.35)
+  ctx.strokeStyle = 'rgba(40, 24, 4, 0.32)'
   ctx.lineJoin = 'round'
   for (const poly of shapePolygons(shape, facing)) {
     ctx.beginPath()

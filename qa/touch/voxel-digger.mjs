@@ -166,21 +166,7 @@ async function run() {
 
   // ------------------------------------------------- digging down to the find
 
-  await lookDown(page)
-  await page.evaluate(() => window.__game.dig(0.5, 0.5))
-  const found = await state(page)
-  check(
-    'one tap straight down reaches the buried shape',
-    found.exposed > 0 && found.digs === 1,
-    `${found.exposed} cube(s) showing after ${found.digs} dig`,
-  )
-
-  // ------------------------------------------- the find shows through (#152)
-  //
-  // From the angle the game opens at, the floor of that hole is hidden by its
-  // own walls — which is how a player could dig the find out and still not
-  // see it. Uncovered cubes glow through the rock, and this counts them on
-  // screen: orange pixels, with the glow and without.
+  // Orange pixels on screen: the find, seen directly or glowing through rock.
   const orange = () =>
     page.evaluate(
       () =>
@@ -197,28 +183,70 @@ async function run() {
           ),
         ),
     )
-  await page.evaluate(() => {
-    const g = window.__game
-    const v = g.view()
-    g.orbit(0.7 - v.yaw, 0.3 - v.pitch)
-  })
-  const hidden = (await page.evaluate(() => {
+  /** Deals a chosen shape, so no check here depends on which one came up. */
+  const deal = (index) =>
+    page.evaluate((i) => {
+      const random = Math.random
+      Math.random = () => i / 4 + 0.01
+      window.__game.restart()
+      Math.random = random
+    }, index)
+  const lowAngle = () =>
+    page.evaluate(() => {
+      const g = window.__game
+      const v = g.view()
+      g.orbit(0.7 - v.yaw, 0.3 - v.pitch)
+    })
+
+  // Every shape in turn. The coil is hollow, so a drill down its middle goes
+  // clean through and uncovers nothing — which is fair, and is why this tries
+  // the middle first and then works outward rather than insisting on one tap.
+  for (const [index, name] of ['Skull', 'Fish', 'Coil', 'Key'].entries()) {
+    await deal(index)
+    await lookDown(page)
+    for (const nx of [0.5, 0.42, 0.36, 0.3]) {
+      await page.evaluate((x) => window.__game.dig(x, 0.5), nx)
+      if ((await state(page)).exposed > 0) break
+    }
+    const reached = await state(page)
+    check(
+      `${name}: a tap or two straight down reaches it`,
+      reached.exposed > 0 && reached.digs <= 3,
+      `${reached.exposed} cube(s) showing after ${reached.digs} dig(s)`,
+    )
+    // From a low angle the hole's own walls are in the way, and what was
+    // uncovered has to show through the rock (#152).
+    await lowAngle()
+    const glowing = await orange()
+    await page.evaluate(() => window.__game.setGlow(false))
+    const without = await orange()
+    await page.evaluate(() => window.__game.setGlow(true))
+    check(
+      `${name}: and what was uncovered shows through the rock`,
+      glowing > without + 400,
+      `${glowing} orange pixels with the glow, ${without} without`,
+    )
+  }
+
+  // The control, on the skull: one drill down the middle, where from a low
+  // angle no ray reaches the find at all — so without the glow there is
+  // nothing on screen, and the count above cannot be passing on a direct view.
+  await deal(0)
+  await lookDown(page)
+  await page.evaluate(() => window.__game.dig(0.5, 0.5))
+  const found = await state(page)
+  await lowAngle()
+  const hidden = await page.evaluate(() => {
     const g = window.__game
     for (let ny = 0.1; ny <= 0.9; ny += 0.01) {
       for (let nx = 0.05; nx <= 0.95; nx += 0.01) if (g.probe(nx, ny)?.kind === 'find') return false
     }
     return true
-  }))
+  })
   check('from a low angle the hole hides the find itself', hidden, 'no ray reaches it')
-  const glowing = await orange()
   await page.evaluate(() => window.__game.setGlow(false))
   const dark = await orange()
   await page.evaluate(() => window.__game.setGlow(true))
-  check(
-    'yet what was uncovered still shows, through the rock',
-    glowing > 400,
-    `${glowing} orange pixels on screen`,
-  )
   check('and without the glow there is nothing to see — the check can tell', dark === 0, `${dark} orange pixels`)
   await lookDown(page)
 
