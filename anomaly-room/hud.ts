@@ -56,6 +56,17 @@ export function createHud(game: AnomalyGame, audio: RoomAudio, hooks: HudHooks):
   lookBtn.onclick = () => hooks.mouseLook()
   overlay.append(lookBtn)
 
+  // What can be chosen was never shown (#176). This outlines all of it for a
+  // couple of seconds; pressing or hovering outlines one thing at a time.
+  const showBtn = el('button', 'ar-btn ar-show', 'Show objects')
+  showBtn.type = 'button'
+  showBtn.onclick = () => game.showSelectable()
+  overlay.append(showBtn)
+
+  // The name of whatever is under the finger or mouse.
+  const target = el('p', 'ar-target')
+  overlay.append(target)
+
   const sound = el('button', 'ar-btn ar-sound')
   sound.type = 'button'
   sound.onclick = () => {
@@ -112,6 +123,12 @@ export function createHud(game: AnomalyGame, audio: RoomAudio, hooks: HudHooks):
     } else {
       recorded = false
     }
+
+    const choosing = phase === 'study' || phase === 'looking'
+    showBtn.hidden = !choosing
+    const label = choosing ? game.pointedLabel() : null
+    target.hidden = !label
+    target.textContent = label ?? ''
 
     panel.hidden = phase === 'looking'
     panel.classList.toggle('ar-panel-study', phase === 'study')

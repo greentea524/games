@@ -270,6 +270,14 @@ screen, and `pickRound`'s `seen` option limits a round to objects with at least
 `SEEN_TIME` of it. Being out of view is necessary for a fair change; being seen
 before is necessary too, and only the first was ever checked.
 
+**Anomaly Room outlines what can be chosen (#176).** Nothing said which
+things in the room could be flagged. Pressing or hovering now outlines the one
+object under the pointer and names it, and "Show objects" outlines all twelve
+for a couple of seconds. The outline is the candidate's box as a wire frame,
+parented to its model. It is taken out of raycasting: a line has a wide hit
+area, and an outline left in would be chosen in place of the wall behind it.
+`anomaly_test.ts` keeps a frame with raycasting left on as its control.
+
 **Voxel Digger's tap drills, and a check must play from the angle a player
 does (#151, #152).** #151 widened the dig to a 3×3 patch and was verified by a
 player who looked straight down every shaft. From the angle the game opens at,
@@ -305,6 +313,18 @@ drill down its middle finds nothing; any check that taps must not assume the
 first tap hits. And which shape is buried is random, so the touch suite deals
 each of the four in turn and the hub card always deals the skull. A check that
 passes on three shapes in four is a flake waiting to happen.
+
+**Pocket Dungeon is 240×216 with 24-pixel tiles, part-way through a rework
+(#155 to #159).** #155 changed the canvas and left the art alone, so two
+things are temporary. `BootScene.enlarge` scales the 16-pixel sprites by one
+and a half, which leaves pixels of two widths. The title, shop, HUD and
+game-over screens are still laid out for 160×144 and shown through
+`legacyCamera`. Both go as #156 to #159 redraw each piece at the new size.
+Two checks had the old screen written into them, a tile of 16 and a width of
+160, and failed by tapping the wrong tile while the game was right. A check
+should read sizes from the game. `qa/touch/sound.mjs` and `static.mjs` still
+carry a literal 160: correct for the games they drive today, and the next
+thing to break when one of those is resized.
 
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle

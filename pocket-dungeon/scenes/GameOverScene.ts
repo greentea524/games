@@ -4,6 +4,7 @@ import { GameState } from '../state'
 import { recordRun, loadMeta, recoverGear } from '../meta'
 import type { RunStats } from '../meta'
 import { music, sfx } from '../audio'
+import { legacyCamera } from '../legacy'
 import { showRunSummary } from '../../shared/runSummary'
 import { RELIC_TARGET } from '../relics'
 
@@ -13,6 +14,8 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(data: { victory: boolean }) {
+    // `shared/runSummary` lays its panel out for 160×144.
+    legacyCamera(this)
     this.cameras.main.setBackgroundColor('#0b0f0c')
 
     music.stop()
