@@ -270,16 +270,32 @@ screen, and `pickRound`'s `seen` option limits a round to objects with at least
 `SEEN_TIME` of it. Being out of view is necessary for a fair change; being seen
 before is necessary too, and only the first was ever checked.
 
-**Voxel Digger's tap digs a 3×3 patch, and a best carries its unit (#151).**
-A one-cube shaft four deep shows its floor only within about 14° of straight
-down, so the find was hard to see however well you dug. `brushCells` takes the
-tapped face's 3×3, one layer deep. It goes through the same rules as a single
-dig, and `dig_test.ts` audits random taps against them. A plain square patch
-that ignores those rules is its control. The budget is 24 taps, set from a
-player who digs straight shafts, not from the omniscient solver, which needs
-four whatever the brush. A best is stored with `SCORE_UNIT` because a round
-costs about half the taps it did. Change the brush and old bests drop out of
-the game and off the hub badge, as Minigolf's do when its course changes.
+**Voxel Digger's tap drills, and a check must play from the angle a player
+does (#151, #152).** #151 widened the dig to a 3×3 patch and was verified by a
+player who looked straight down every shaft. From the angle the game opens at,
+that fix did nothing. The second tap at one spot lands on the hole's wall and
+digs sideways, and six taps found nothing. A tap now drills: `drillCells`
+carries the 3×3 straight in from the tapped face until each column meets the
+find or leaves the block. Every cube it takes is one a single dig could have
+taken, in that order, and `dig_test.ts` replays random drills to hold it to
+that.
+
+Three things had to come with it, and each was invisible to the old checks:
+
+- **Glow.** Uncovered find cubes are drawn again with `GreaterDepth`, so they
+  show through the rock from any side. The touch suite counts orange pixels
+  with the glow on and off.
+- **Pictures.** The guesses were four words with nothing to compare the find
+  against. Each now has a picture from `preview.ts`, drawn for the side the
+  block is seen from.
+- **Fit.** The block did not fit a phone screen. The camera distance now
+  follows the screen's shape.
+
+There is no dig limit; `PROOF_BUDGET` is only the bound the solvability proof
+works within. A best is stored with `SCORE_UNIT`, so a best from an earlier
+brush drops out of the game and off the hub badge, as Minigolf's does when its
+course changes. The overlay holds canvases too now, so select the game's own
+with `#stage > canvas`.
 
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle

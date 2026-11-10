@@ -197,7 +197,7 @@ function anomalyRoomStatus(): GameStatus {
 function voxelDiggerStatus(): GameStatus {
   const d = readPayload('voxel_digger_save')
   if (!d) return NONE
-  // A best counted one cube a tap is not a best in taps of a patch (#151).
+  // A best counted in another unit of digging is not a best in this one (#151, #152).
   const best = typeof d.best === 'number' && d.unit === SCORE_UNIT ? d.best : 0
   const finds = typeof d.finds === 'number' ? d.finds : 0
   if (finds === 0 || best === 0) return NONE

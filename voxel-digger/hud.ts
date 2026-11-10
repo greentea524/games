@@ -1,12 +1,51 @@
 // Voxel Digger's HUD (#115, #118), as DOM over the canvas.
 //
-// The four candidates are on screen the whole time, and which of them are
-// still *possible* deliberately is not. The game knows — `dig.ts` can work it
+// The four candidates are on screen the whole time, each with a picture of
+// what it looks like from the side the block is being viewed from (#152) —
+// a name alone gave a player nothing to compare the find with. Which of them
+// are still *possible* deliberately is not shown. The game knows — `dig.ts` can work it
 // out exactly — and showing it would play the game for you: the round would
 // end the moment the count reached one, and the decision the score is about
 // ("have I seen enough?") would be gone.
-import { DIG_BUDGET, SHAPES, type VoxelGame } from './game'
-import { recordFind } from './save'
+import { SHAPES, type VoxelGame } from './game'
+import type { Shape } from './block'
+import { shapePolygons, type Face, type Facing } from './preview'
+import { loadDiggerSave, recordFind } from './save'
+
+/** A picture's edge in CSS pixels, and the cube edges it has to hold. */
+const PICTURE = 66
+const PICTURE_SPAN = 10.6
+
+const FACE_FILL: Record<Face, string> = { cap: '#f6c666', left: '#d48f2a', right: '#96601a' }
+
+/** Draws a candidate into its button's canvas, as seen from `facing`. */
+function drawPicture(canvas: HTMLCanvasElement, shape: Shape, facing: Facing) {
+  const ratio = Math.min(window.devicePixelRatio || 1, 2)
+  canvas.width = canvas.height = Math.round(PICTURE * ratio)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const scale = canvas.width / PICTURE_SPAN
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  // The picture spans five cubes either side of centre across, and from five
+  // up to five down — or ten up, seen from below.
+  const midY = facing.below ? -5 : 0
+  ctx.lineWidth = Math.max(0.75, ratio * 0.45)
+  ctx.strokeStyle = 'rgba(40, 24, 4, 0.4)'
+  ctx.lineJoin = 'round'
+  for (const poly of shapePolygons(shape, facing)) {
+    ctx.beginPath()
+    poly.points.forEach(([x, y], i) => {
+      const px = canvas.width / 2 + x * scale
+      const py = canvas.height / 2 + (y - midY) * scale
+      if (i === 0) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    })
+    ctx.closePath()
+    ctx.fillStyle = FACE_FILL[poly.face]
+    ctx.fill()
+    ctx.stroke()
+  }
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -40,8 +79,13 @@ export function createHud(game: VoxelGame): void {
   const guesses = el('div', 'vd-guesses')
   const guessLabel = el('p', 'vd-guess-label', 'What is it?')
   const row = el('div', 'vd-guess-row')
+  const pictures: { canvas: HTMLCanvasElement; shape: Shape }[] = []
   for (const shape of SHAPES) {
-    const button = el('button', 'vd-btn vd-guess', shape.name)
+    const button = el('button', 'vd-btn vd-guess')
+    const canvas = el('canvas', 'vd-picture')
+    canvas.setAttribute('aria-hidden', 'true')
+    button.append(canvas, el('span', 'vd-guess-name', shape.name))
+    pictures.push({ canvas, shape })
     button.type = 'button'
     button.onclick = () => {
       const right = game.guess(shape.id)
@@ -50,15 +94,15 @@ export function createHud(game: VoxelGame): void {
     }
     row.append(button)
   }
-  guesses.append(guessLabel, row)
-  overlay.append(guesses)
-
+  // In the same column as the guesses, above them, so it can never land on
+  // top of them however the row wraps.
   const hint = el(
     'p',
     'vd-hint',
-    'Drag — or use the arrow keys — to turn the block. Tap a face to dig a 3×3 patch out of it.',
+    'Tap the block to drill into it — the drill stops at what is buried. Drag, or use the arrow keys, to turn it.',
   )
-  overlay.append(hint)
+  guesses.append(hint, guessLabel, row)
+  overlay.append(guesses)
 
   const panel = el('div', 'vd-panel')
   const panelTitle = el('h2', 'vd-panel-title')
@@ -69,19 +113,28 @@ export function createHud(game: VoxelGame): void {
   panel.append(panelTitle, panelBody, panelBtn)
   overlay.append(panel)
 
+  let drawnFor = ''
+
   function refresh() {
     const digs = game.digs()
     const phase = game.phase()
-    digLabel.textContent = `${digs}/${DIG_BUDGET} digs`
+    // No limit (#152): the score is the count, and a cap on top of it only
+    // ever ended a round before the find had been seen.
+    const best = loadDiggerSave().best
+    digLabel.textContent = `${digs === 1 ? '1 dig' : `${digs} digs`}${best > 0 ? ` · best ${best}` : ''}`
+
+    const facing = game.facing()
+    const key = `${facing.quarter}${facing.below}`
+    if (key !== drawnFor) {
+      drawnFor = key
+      for (const { canvas, shape } of pictures) drawPicture(canvas, shape, facing)
+    }
     const exposed = game.exposed()
     exposedLabel.textContent = exposed === 1 ? '1 cube showing' : `${exposed} cubes showing`
     undo.disabled = digs === 0 || phase !== 'digging'
     hint.hidden = digs > 0
 
-    // Out of digs is not the end of the round — you still have to name it. The
-    // budget bounds how much you can learn, not how long you have.
-    guessLabel.textContent =
-      digs >= DIG_BUDGET ? 'Out of digs. What is it?' : 'What is it?'
+    guessLabel.textContent = 'What is it? Fewer digs is a better score.'
     guesses.hidden = phase !== 'digging'
 
     panel.hidden = phase === 'digging'

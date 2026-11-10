@@ -11,7 +11,8 @@ export interface DiggerSave {
   finds: number
   /**
    * `SCORE_UNIT` when `best` was set (#151). Absent in saves from when a dig
-   * was one cube, whose best is ignored rather than compared with taps.
+   * was one cube, and different in saves from #151's patches; either way the
+   * best is ignored rather than compared with drills (#152).
    */
   unit: string
 }

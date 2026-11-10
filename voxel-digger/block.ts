@@ -50,19 +50,21 @@ export function makeBlock(size: number, shapeSize = SHAPE_SIZE): Block {
  * surface and the find and the best possible round is three digs, which leaves
  * a score of "how few digs" almost nothing to say. Four cells of cover puts
  * the floor around five and gives a careful player somewhere to be careful.
+ * (Written when a dig was one cube. A drill reaches the find in one tap
+ * whatever the cover, #152; the cover is now what makes the find a surprise.)
  */
 export const BLOCK = makeBlock(13)
 
 /**
- * Taps a player gets before they have to name what they found.
+ * The bound the solvability proof works inside, in single cubes.
  *
- * Counted in taps since #151, when a tap became a 3×3 patch. It was forty
- * single cubes, about 1.7× what the worst shape cost a player digging
- * straight shafts into the faces (24). The same player with the patch needs
- * 8 to 12 taps (`dig_test.ts` plays it), so this keeps roughly twice that —
- * and still takes far more rock than forty cubes ever could.
+ * This was the player's dig limit until #152. The game no longer stops anyone
+ * digging — the score is the number of digs, and a limit on top of it only
+ * ever ended rounds before the find had been seen. It stays as the bound
+ * `dig_test.ts` proves every layout solvable within, one cube at a time, which
+ * is a stricter question than anything a drill asks.
  */
-export const DIG_BUDGET = 24
+export const PROOF_BUDGET = 40
 
 /** Cells pack into one integer so they can live in a `Set`. */
 export const key = (b: Block, x: number, y: number, z: number): number =>

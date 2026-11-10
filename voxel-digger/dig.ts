@@ -2,17 +2,17 @@
 //
 // The rules are small. A cell is rock, buried shape, or dug out. You may dig a
 // rock cell if you can see it, you may not dig the shape, and seeing a cell
-// tells you which of the two it is. Everything else — scoring, the budget, the
+// tells you which of the two it is. Everything else — scoring, the drill, the
 // guess — sits on top of that.
 //
 // The part worth care is what "you have dug enough" means, because the game
 // ends on a guess and a guess is only fair if the answer was actually knowable.
 // It is knowable when exactly one candidate shape is still consistent with
 // everything the player can see, and `dig_test.ts` proves that state is always
-// reachable inside the budget by playing every layout with a solver.
+// reachable inside `PROOF_BUDGET` by playing every layout with a solver.
 import {
   BLOCK,
-  DIG_BUDGET,
+  PROOF_BUDGET,
   SHAPES,
   allCells,
   cellsOf,
@@ -124,23 +124,28 @@ export function survivors(state: DigState, candidates: Shape[] = SHAPES): Shape[
 export const identified = (state: DigState, candidates: Shape[] = SHAPES): boolean =>
   survivors(state, candidates).length === 1
 
-// --- the brush (#151) ---------------------------------------------------------
+// --- the drill (#151, #152) ---------------------------------------------------
 //
-// A tap used to take one cube, and a one-cube hole in a thirteen-cube block is
-// a shaft you can only see down by looking straight into it. So a tap takes a
-// patch: the cube tapped and its neighbours across the face that was tapped,
-// one layer deep. The hole is three cubes wide and still goes down one cube a
-// tap, so depth costs what it always cost and a hole can be looked into from
-// an angle.
+// A tap used to take one cube, then (#151) a 3×3 patch one layer deep. Both
+// left the player aiming at the floor of a hole they could not see into: at
+// the opening camera angle the second tap at the same spot lands on the
+// hole's wall, digs sideways, and six taps in nothing has been found.
 //
-// The patch follows the rules a single dig does — it takes only rock, and
-// only rock already in view — so a tap can never reach anything a player
-// could not have dug one cube at a time. It is also clipped where the find
-// cuts across it: the patch spreads from the tapped cube and does not jump
-// the find to dig rock on its far side.
+// So a tap drills. It takes the 3×3 patch across the tapped face and carries
+// each of its nine columns straight in, away from the face, until that column
+// meets the find or leaves the block. One tap reaches the find from any face,
+// and a column that misses it leaves a hole clean through — which says
+// "nothing here" as plainly as the find says "something".
+//
+// Every cube a drill takes is one a player could have dug one at a time, in
+// the order the drill takes them: the patch is rock already in view, and each
+// cube deeper is uncovered by the one before it. The find is never dug and
+// never jumped — a column stops dead at it.
 
 /** An axis by index: 0 is x, 1 is y, 2 is z. */
 export type Axis = 0 | 1 | 2
+/** Which way along an axis: toward higher coordinates, or lower. */
+export type Dir = 1 | -1
 
 /** How far a tap's patch reaches from the cube tapped: 1 makes it 3×3. */
 export const BRUSH = 1
@@ -148,28 +153,32 @@ export const BRUSH = 1
 /**
  * What a score is counted in, stored beside it.
  *
- * A best set one cube a tap is not a best at three-by-three — the same round
- * costs about half the taps now — so the save and the hub's badge both ignore
- * a best from another brush, the way Minigolf ignores one from another
- * course (#141).
+ * A best set one cube a tap is not a best in drills — the same round costs a
+ * fraction of the taps now — so the save and the hub's badge both ignore a
+ * best from another unit, the way Minigolf ignores one from another course
+ * (#141).
  */
-export const SCORE_UNIT = `taps of ${2 * BRUSH + 1}x${2 * BRUSH + 1}`
+export const SCORE_UNIT = `drills of ${2 * BRUSH + 1}x${2 * BRUSH + 1}`
 
 /**
- * The axes along which a cell shows a face: toward a dug-out neighbour, or
- * toward the outside of the block. Those are the faces a player can tap.
+ * The faces a cell shows: toward a dug-out neighbour, or toward the outside
+ * of the block. Each is given as the way a drill tapped there would travel —
+ * `dir` points *into* the rock, away from the open side.
  */
-export function openAxes(block: Block, k: number, removed: ReadonlySet<number>): Axis[] {
+export function openFaces(
+  block: Block,
+  k: number,
+  removed: ReadonlySet<number>,
+): { axis: Axis; dir: Dir }[] {
   const { x, y, z } = unkey(block, k)
   const c = [x, y, z]
-  const out: Axis[] = []
+  const out: { axis: Axis; dir: Dir }[] = []
   for (const axis of [0, 1, 2] as Axis[]) {
-    for (const step of [-1, 1]) {
+    for (const step of [-1, 1] as Dir[]) {
       const n = [...c]
       n[axis] += step
       if (!inside(block, n[0], n[1], n[2]) || removed.has(key(block, n[0], n[1], n[2]))) {
-        out.push(axis)
-        break
+        out.push({ axis, dir: -step as Dir })
       }
     }
   }
@@ -177,32 +186,30 @@ export function openAxes(block: Block, k: number, removed: ReadonlySet<number>):
 }
 
 /**
- * The cells one tap takes: `target` and the rock around it across the face
- * that runs perpendicular to `axis`, within `radius`.
+ * The patch a tap covers on the tapped layer: `target` and what surrounds it
+ * across the face perpendicular to `axis`, within `radius` — open cells
+ * included, because a drill carries on through them.
  *
- * Grown outward from the target through the patch rather than read off as a
- * square, so the find — which cannot be dug — stops it, the way a wall
- * would. Empty when the target itself is not diggable.
+ * Grown outward from the target rather than read off as a square, so the
+ * find — which cannot be dug — stops it, the way a wall would, and so does
+ * rock still out of sight.
  */
-export function brushCells(
+function patch(
   state: DigState,
   target: number,
   axis: Axis,
-  radius = BRUSH,
-  removed: ReadonlySet<number> = removedSet(state),
+  radius: number,
+  removed: ReadonlySet<number>,
 ): number[] {
   const b = state.block
   if (!isDiggable(state, target, removed)) return []
   const t = unkey(b, target)
   const origin = [t.x, t.y, t.z]
   const [u, w] = ([0, 1, 2] as Axis[]).filter((a) => a !== axis)
-  const out: number[] = []
   const seen = new Set<number>([target])
   const queue = [target]
   for (let head = 0; head < queue.length; head++) {
-    const k = queue[head]
-    if (!removed.has(k)) out.push(k)
-    const c = unkey(b, k)
+    const c = unkey(b, queue[head])
     const at = [c.x, c.y, c.z]
     for (const [du, dw] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const n = [...at]
@@ -213,9 +220,51 @@ export function brushCells(
       const nk = key(b, n[0], n[1], n[2])
       if (seen.has(nk)) continue
       seen.add(nk)
-      // Spread through what is already open, and through rock the player can
-      // see. Not through the find, and not through rock still out of sight.
       if (removed.has(nk) || isDiggable(state, nk, removed)) queue.push(nk)
+    }
+  }
+  return queue
+}
+
+/** The rock a tap's patch takes on the tapped layer alone: the drill's first cut. */
+export function brushCells(
+  state: DigState,
+  target: number,
+  axis: Axis,
+  radius = BRUSH,
+  removed: ReadonlySet<number> = removedSet(state),
+): number[] {
+  return patch(state, target, axis, radius, removed).filter((k) => !removed.has(k))
+}
+
+/**
+ * The cells one tap takes: the patch around `target`, and each of its columns
+ * carried along `axis` in direction `dir` until it meets the find or leaves
+ * the block. Empty when the target itself is not diggable.
+ *
+ * Returned column by column, nearest cube first, which is an order every cube
+ * in it could legally have been dug in — `dig_test.ts` replays it that way.
+ */
+export function drillCells(
+  state: DigState,
+  target: number,
+  axis: Axis,
+  dir: Dir,
+  radius = BRUSH,
+  removed: ReadonlySet<number> = removedSet(state),
+): number[] {
+  const b = state.block
+  const out: number[] = []
+  for (const start of patch(state, target, axis, radius, removed)) {
+    const c = unkey(b, start)
+    const at = [c.x, c.y, c.z]
+    while (inside(b, at[0], at[1], at[2])) {
+      const k = key(b, at[0], at[1], at[2])
+      if (state.shape.has(k)) break
+      // Open space is passed through: a drill that crosses an earlier hole
+      // carries on into the rock on its far side.
+      if (!removed.has(k)) out.push(k)
+      at[axis] += dir
     }
   }
   return out
@@ -327,7 +376,7 @@ export interface Solution {
 export function solve(
   shape: Shape,
   candidates: Shape[] = SHAPES,
-  budget = DIG_BUDGET,
+  budget = PROOF_BUDGET,
   block: Block = BLOCK,
 ): Solution {
   const state = createState(shape, block)
