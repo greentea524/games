@@ -345,6 +345,36 @@ export function buildModel(candidate: Candidate, role: Role): THREE.Group {
 }
 
 /**
+ * A candidate's box as a wire frame: the mark that says "this can be chosen"
+ * (#176).
+ *
+ * Nothing in the room said which things could be flagged — walls, floor and
+ * the twelve objects were all just scenery until a tap either counted or did
+ * not. This is drawn round an object while a finger or the mouse is on it,
+ * and round all of them at once on request.
+ *
+ * It is the candidate's box from `room.ts`, at the home size the model was
+ * built at, so it rides the model's own scale and pose. And it is taken out
+ * of raycasting: a line has a generous hit area, and an outline that could be
+ * tapped would be chosen in place of the wall behind it — or instead of a
+ * neighbouring object — and spend a guess.
+ */
+export function buildOutline(candidate: Candidate): THREE.LineSegments {
+  const box = new THREE.BoxGeometry(candidate.size.x, candidate.size.y, candidate.size.z)
+  const lines = new THREE.LineSegments(
+    new THREE.EdgesGeometry(box),
+    new THREE.LineBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0, depthTest: false }),
+  )
+  box.dispose()
+  lines.name = candidate.id
+  lines.userData.outline = true
+  lines.renderOrder = 10
+  lines.visible = false
+  lines.raycast = () => {}
+  return lines
+}
+
+/**
  * Puts a candidate's two copies where a pose says.
  *
  * Scale is relative to the home size the model was built at, so a model keeps

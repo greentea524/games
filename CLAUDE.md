@@ -270,6 +270,14 @@ screen, and `pickRound`'s `seen` option limits a round to objects with at least
 `SEEN_TIME` of it. Being out of view is necessary for a fair change; being seen
 before is necessary too, and only the first was ever checked.
 
+**Anomaly Room outlines what can be chosen (#176).** Nothing said which
+things in the room could be flagged. Pressing or hovering now outlines the one
+object under the pointer and names it, and "Show objects" outlines all twelve
+for a couple of seconds. The outline is the candidate's box as a wire frame,
+parented to its model. It is taken out of raycasting: a line has a wide hit
+area, and an outline left in would be chosen in place of the wall behind it.
+`anomaly_test.ts` keeps a frame with raycasting left on as its control.
+
 **Voxel Digger's tap drills, and a check must play from the angle a player
 does (#151, #152).** #151 widened the dig to a 3×3 patch and was verified by a
 player who looked straight down every shaft. From the angle the game opens at,

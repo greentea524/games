@@ -73,6 +73,12 @@ const LOOK_PER_PIXEL = 0.0055
 /** A press that stays within this many pixels is a tap, not a drag. */
 const TAP_SLOP = 10
 
+/** Tells the game where a pointer is, so it can outline what is under it. */
+function pointAt(e: PointerEvent) {
+  const rect = canvas.getBoundingClientRect()
+  game.point((e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height)
+}
+
 let dragId: number | null = null
 let lastX = 0
 let lastY = 0
@@ -86,6 +92,9 @@ canvas.addEventListener('pointerdown', (e) => {
   lastX = downX = e.clientX
   lastY = downY = e.clientY
   travelled = 0
+  // Outline whatever is under the press (#176): on a touch screen this is the
+  // only moment the game can say "that is a thing you can choose".
+  pointAt(e)
   // The audio context cannot start before a gesture, so this is the moment.
   audio.wake()
   try {
@@ -101,14 +110,22 @@ canvas.addEventListener('pointermove', (e) => {
   // movement steers directly.
   if (document.pointerLockElement === canvas) {
     game.turn(e.movementX * LOOK_PER_PIXEL, e.movementY * LOOK_PER_PIXEL)
+    // Locked, the aim is the centre of the screen.
+    game.point(0.5, 0.5)
     return
   }
-  if (e.pointerId !== dragId) return
+  if (e.pointerId !== dragId) {
+    // A mouse moving with no button held: outline what it is over.
+    if (dragId === null && e.pointerType === 'mouse') pointAt(e)
+    return
+  }
   const dx = e.clientX - lastX
   const dy = e.clientY - lastY
   lastX = e.clientX
   lastY = e.clientY
   travelled += Math.hypot(dx, dy)
+  // Once it is a drag it is not a choice, and the outline goes.
+  if (travelled > TAP_SLOP * 2) game.point(null, null)
   // Negated, because a drag moves the *room*: pull left and what was off the
   // right edge comes into view, which means the head turned right. Mouse look
   // above is the opposite convention and deliberately so — under pointer lock
@@ -120,6 +137,9 @@ canvas.addEventListener('pointermove', (e) => {
 const endDrag = (e: PointerEvent) => {
   if (e.pointerId !== dragId) return
   dragId = null
+  // A finger that has lifted is pointing at nothing; a mouse is still there.
+  if (e.pointerType === 'mouse') pointAt(e)
+  else game.point(null, null)
   const moved = Math.hypot(e.clientX - downX, e.clientY - downY)
   // Both the straight-line distance and the path length: a drag that curls
   // back to where it started has moved a long way and is not a tap.
@@ -129,6 +149,9 @@ const endDrag = (e: PointerEvent) => {
   if (result) audio.sting(result.correct)
 }
 canvas.addEventListener('pointerup', endDrag)
+canvas.addEventListener('pointerleave', () => {
+  if (dragId === null) game.point(null, null)
+})
 canvas.addEventListener('pointercancel', endDrag)
 
 // ---------------------------------------------------------- pointer lock
@@ -190,7 +213,11 @@ function pollKeys() {
   if (held.has('ArrowDown') || held.has('KeyS')) pitch += KEY_STEP
   // Held rather than stepped per keypress, so turning is a smooth sweep and
   // not a stutter at the operating system's key-repeat rate.
-  if (yaw || pitch) game.turn(yaw, pitch)
+  if (yaw || pitch) {
+    game.turn(yaw, pitch)
+    // With the keys, Space flags the centre — so that is what is outlined.
+    game.point(0.5, 0.5)
+  }
   requestAnimationFrame(pollKeys)
 }
 requestAnimationFrame(pollKeys)

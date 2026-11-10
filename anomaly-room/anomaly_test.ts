@@ -21,7 +21,7 @@
 import * as THREE from 'three'
 import { CANDIDATES, EYE, SHELL_SOLIDS, applyMutation, homePose, type Candidate, type Mutation, type Pose } from './room'
 import { MISSES, ROUNDS, boundsOf, frustumOf, onScreen, pickRound, seeded } from './rounds'
-import { applyPose, buildModel, resolveHit } from './models'
+import { applyPose, buildModel, buildOutline, resolveHit } from './models'
 
 let ok = true
 const check = (name: string, pass: boolean, note?: string) => {
@@ -518,6 +518,32 @@ function tap(root: THREE.Object3D, at: THREE.Vector3) {
     resolveHit(hits, SHELL_IDS, plant.id) === plant.id,
     `resolves to ${resolveHit(hits, SHELL_IDS, plant.id)}`,
   )
+}
+
+// --- an outline is not a thing you can tap (#176) ---------------------------
+//
+// Selectable objects are outlined with a wire frame of their box. A line has
+// a generous hit area, so an outline left in raycasting would be chosen in
+// place of whatever is behind it — and spend a guess on a tap aimed at a wall.
+
+{
+  const clock = CANDIDATES.find((c) => c.id === 'clock')
+  if (!clock) throw new Error('the clock is gone from the room')
+  const aim = (frame: THREE.Object3D) => {
+    const root = new THREE.Object3D()
+    frame.visible = true
+    root.add(frame)
+    root.updateMatrixWorld(true)
+    // Straight at one edge of the frame, from a metre in front of it.
+    const from = new THREE.Vector3(clock.size.x / 2, 0, 1)
+    const ray = new THREE.Raycaster(from, new THREE.Vector3(0, 0, -1))
+    return ray.intersectObject(root, true).length
+  }
+  check('an outline cannot be hit by a tap', aim(buildOutline(clock)) === 0)
+  // Staged: the same frame with its raycast left as three.js ships it.
+  const plain = buildOutline(clock)
+  plain.raycast = THREE.LineSegments.prototype.raycast
+  check('where the same frame left in raycasting can, and is caught', aim(plain) > 0, `${aim(plain)} hit(s)`)
 }
 
 console.log(ok ? '\nALL ANOMALY ROOM CHECKS PASS' : '\nANOMALY ROOM CHECKS FAILED')

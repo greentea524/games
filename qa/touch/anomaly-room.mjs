@@ -194,6 +194,65 @@ async function run() {
     `${steady.misses} miss(es) after six full drags`,
   )
 
+  // ------------------------------------- what can be chosen is shown (#176)
+
+  await lookAt(page, 0, 0.25)
+  const object = await page.evaluate(() => {
+    const g = window.__game
+    for (let ny = 0.2; ny <= 0.7; ny += 0.02) {
+      for (let nx = 0.1; nx <= 0.9; nx += 0.02) {
+        const id = g.probe(nx, ny)
+        if (id) return { nx, ny, id }
+      }
+    }
+    return null
+  })
+  if (object) {
+    const spot = await canvasPoint(page, object.nx, object.ny, '#stage canvas')
+    await hand.down(PAD, spot.x, spot.y)
+    await page.waitForTimeout(200)
+    const pressed = await page.evaluate(() => ({
+      id: window.__game.pointed(),
+      outlined: window.__game.outlined(),
+      label: document.querySelector('.ar-target')?.hidden === false ? document.querySelector('.ar-target').textContent : null,
+    }))
+    check(
+      'pressing on an object outlines it and names it',
+      pressed.id === object.id && pressed.outlined >= 1 && Boolean(pressed.label),
+      `${pressed.id}, "${pressed.label}", ${pressed.outlined} outline(s)`,
+    )
+    // Slide off into a drag: it is no longer a choice, so the outline goes.
+    await hand.move(PAD, spot.x - 60, spot.y)
+    await hand.move(PAD, spot.x - 120, spot.y)
+    await page.waitForTimeout(150)
+    check('and dragging away drops the outline', (await page.evaluate(() => window.__game.pointed())) === null)
+    await hand.up(PAD)
+  } else {
+    check('an object is on screen to press', false)
+  }
+
+  await lookAt(page, 0, 0.5)
+  const wall = await canvasPoint(page, 0.5, 0.2, '#stage canvas')
+  await hand.down(PAD, wall.x, wall.y)
+  await page.waitForTimeout(150)
+  check('pressing on the room itself outlines nothing', (await page.evaluate(() => window.__game.outlined())) === 0)
+  await hand.up(PAD)
+
+  await lookAt(page, 0, 0.25)
+  const showAt = await page.evaluate(() => {
+    const r = document.querySelector('.ar-show').getBoundingClientRect()
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+  })
+  const before176 = await state(page)
+  await hand.tap(PAD, showAt.x, showAt.y)
+  await page.waitForTimeout(300)
+  const shown = await page.evaluate(() => window.__game.outlined())
+  check('"Show objects" outlines everything that can be chosen', shown === 12, `${shown} of 12`)
+  await page.waitForTimeout(3200)
+  const faded = await page.evaluate(() => window.__game.outlined())
+  check('and they fade again', faded === 0, `${faded} left`)
+  check('none of which cost a guess', (await state(page)).misses === before176.misses)
+
   // ------------------------------------------------ study, then ready
 
   // A slow look round, the way the panel asks: a pause at each eighth.

@@ -26,10 +26,13 @@ import {
   type Pose,
 } from './room'
 import { MISSES, ROUNDS, boundsOf, frustumOf, pickRound, seeded, type Rng, type Round } from './rounds'
-import { applyPose, buildModel, resolveHit } from './models'
+import { applyPose, buildModel, buildOutline, resolveHit } from './models'
 
 /** How long the room sits unchanged at the start of a round, in seconds. */
 const SETTLE = 0.6
+
+/** How long "show objects" keeps every outline up, in seconds (#176). */
+const SHOW_ALL_TIME = 2.5
 
 /**
  * How long an object must have been on screen, in total, before a round may
@@ -95,6 +98,20 @@ export interface AnomalyGame {
   anomaly(): { id: string; label: string; kind: string } | null
   /** True once the anomaly for this round has actually been applied. */
   armed(): boolean
+  /**
+   * Says where the finger or mouse is, as a normalised viewport point, or
+   * nulls for nowhere. Whatever can be flagged there is outlined; returns its
+   * name, or null for the room itself.
+   */
+  point(nx: number | null, ny: number | null): string | null
+  /** The id of the object currently outlined under the pointer, if any. */
+  pointed(): string | null
+  /** Its name, as the round summary would say it: "the clock". */
+  pointedLabel(): string | null
+  /** Outlines everything that can be flagged, for a couple of seconds. */
+  showSelectable(): void
+  /** How many outlines are on screen now. */
+  outlined(): number
   /** Candidates that have been on screen long enough to count as seen. */
   seen(): string[]
   /** Ends the study phase. Nothing changes before this. */
@@ -195,9 +212,21 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
   // gives it, so the round picker's reasoning about boxes is still about what
   // is drawn.
   const pieces: Piece[] = []
+  const outlines: THREE.LineSegments[] = []
+  /** The object under the finger or mouse, if any. */
+  let pointed: string | null = null
+  /** Seconds left of every outline being shown at once. */
+  let showAllLeft = 0
   for (const candidate of CANDIDATES) {
     const mesh = buildModel(candidate, 'main')
     const twin = buildModel(candidate, 'twin')
+    // One outline for each copy, as a child, so it follows the copy's pose
+    // and disappears with it (#176).
+    for (const model of [mesh, twin]) {
+      const outline = buildOutline(candidate)
+      model.add(outline)
+      outlines.push(outline)
+    }
     room.add(mesh, twin)
     pieces.push({ candidate, mesh, twin })
   }
@@ -324,6 +353,20 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
         ? { id: current.candidate.id, label: current.candidate.label, kind: current.mutation.kind }
         : null,
     armed: () => current !== null,
+    point(nx, ny) {
+      const id = nx === null || ny === null ? null : game.probe(nx, ny)
+      const changed = id !== pointed
+      pointed = id
+      if (changed) notify()
+      return game.pointedLabel()
+    },
+    pointed: () => pointed,
+    pointedLabel: () =>
+      pointed ? (pieces.find((p) => p.candidate.id === pointed)?.candidate.label ?? null) : null,
+    showSelectable() {
+      showAllLeft = SHOW_ALL_TIME
+    },
+    outlined: () => outlines.filter((o) => o.visible && o.parent?.visible).length,
     seen: () => [...seenNow()],
     ready() {
       if (phase !== 'study') return
@@ -375,6 +418,16 @@ export function createGame(parent: HTMLElement, seed = Date.now()): AnomalyGame 
     last = now
     watch(dt)
     tryArm(dt)
+    // Outlines: full on the object pointed at, fainter and fading on the rest
+    // while they are all being shown. Only while a tap would mean something.
+    const choosing = phase === 'study' || phase === 'looking'
+    showAllLeft = Math.max(0, showAllLeft - dt)
+    const all = choosing ? Math.min(1, showAllLeft / 0.5) * 0.7 : 0
+    for (const outline of outlines) {
+      const strength = choosing && outline.name === pointed ? 1 : all
+      ;(outline.material as THREE.LineBasicMaterial).opacity = strength
+      outline.visible = strength > 0.01
+    }
     stage.render(scene, camera)
     requestAnimationFrame(frame)
   }
