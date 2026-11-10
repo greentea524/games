@@ -318,6 +318,18 @@ through `runnerScreen()`: every angle check passed against the original
 complaint, and only a check on what the player sees could tell. Under reduced
 motion the camera stays locked, and `qa:motion` holds it to that as a pair.
 
+**Tube Runner's camera follows on a spring, and its speed must not jump
+(#154).** #145's trailing camera was an exponential catch-up with a hard cap.
+The cap engaged 0.1 s into every turn and jumped the camera's speed by 2.35
+rad/s, which is the speed the whole tube turns at on screen. `follow.ts` is a
+critically damped spring whose stiffness is derived from `ROTATE_SPEED` and
+the lag wanted, so there is no cap to hit. Smooth the camera, never the
+runner: the track's fairness bound assumes the runner turns at full rate from
+the moment they ask. The first spring solved each frame as if the runner stood
+still, and settled at less than half the lag at 12 frames a second;
+`follow_test.ts` steps it from 240 down to 12 and keeps that version as a
+control.
+
 **The CSP hashes an inline script, and a stale hash fails silently.** Editing
 the pre-init sizing script in any `index.html` changes its hash; the browser
 then declines to run it, nothing throws, and every functional check goes on
