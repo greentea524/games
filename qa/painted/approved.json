@@ -1,6 +1,6 @@
 {
   "static": {
-    "note": "A painted village with a HUD and a score line the game does not have. The drift is known, recorded in qa/thumbnails.mjs, and accepted \u2014 this baseline exists so the NEXT drift is not.",
+    "note": "A painted village with a HUD and a score line the game does not have. The drift is known, recorded in qa/thumbnails.mjs, and accepted — this baseline exists so the NEXT drift is not.",
     "art": "12687b5955b3a48e6053e6e68dafa137ac405064f5f60636b0ba2b4ff488f930",
     "textures": "f507231b785a33c881ec3a386011bbfd296b6237446d55dcdcea83dc16bf1b34",
     "keys": 101,
@@ -25,7 +25,7 @@
   "pocket-dungeon": {
     "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye. Its DMG art was unreachable when this was recorded; #134 wired the palette toggle, so the hashed art is now art a player can actually see.",
     "art": "24c156be67a95d315b274771eaa331dac018621fa57516ce4be994f04a3eee0c",
-    "textures": "d636c3d69c0b41a650b23c203b698e2f87ac24920890bccbf88d806e1d261423",
+    "textures": "28788f1e6d3711de71ec84fb4b88d2510817795a00366a4296804806b47136ab",
     "keys": 68,
     "nondeterministic": []
   },

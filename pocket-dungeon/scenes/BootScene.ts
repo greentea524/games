@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { TILE, PAL, GBC_PAL } from '../constants'
+import { TILE, LEGACY_TILE, SCALE, PAL, GBC_PAL } from '../constants'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -24,11 +24,52 @@ export class BootScene extends Phaser.Scene {
       this.buildChests(mode)
       this.buildRelics(mode)
     })
+    this.enlarge()
     this.scene.start('title')
   }
 
+  /**
+   * Enlarges every texture drawn above from the old 16-pixel grid to the
+   * 24-pixel tile (#155).
+   *
+   * The builders still draw at 16 pixels: this ticket changes the canvas and
+   * leaves the art alone, so the game is whole at the new size before any of
+   * it is redrawn. One and a half is not a whole number of pixels, so an
+   * enlarged sprite has pixels of two widths, and it shows. That is the cost
+   * of doing this in two steps, and it ends as #156 and #157 replace each
+   * builder with art drawn at 24 — at which point its key is skipped here,
+   * and when none are left this goes.
+   *
+   * The HUD's relic pips are left alone: the HUD is still laid out for the
+   * old screen and shown through a zoomed camera, which enlarges them itself.
+   */
+  private enlarge() {
+    const reserved = new Set(['__DEFAULT', '__MISSING', '__WHITE', '__NORMAL'])
+    for (const key of this.textures.getTextureKeys()) {
+      if (reserved.has(key) || key.startsWith('relicpip_')) continue
+      const source = this.textures.get(key).getSourceImage() as HTMLCanvasElement
+      if (source.height !== LEGACY_TILE) continue
+      const width = Math.round(source.width * SCALE)
+      const height = Math.round(source.height * SCALE)
+      const copy = document.createElement('canvas')
+      copy.width = width
+      copy.height = height
+      const ctx = copy.getContext('2d')
+      if (!ctx) continue
+      ctx.imageSmoothingEnabled = false
+      ctx.drawImage(source, 0, 0, width, height)
+      this.textures.remove(key)
+      const texture = this.textures.addCanvas(key, copy)
+      // A tileset is a strip of tiles and is addressed by frame.
+      if (texture && width > height) {
+        for (let i = 0; i < width / TILE; i++) texture.add(i, 0, i * TILE, 0, TILE, TILE)
+      }
+    }
+  }
+
   private buildTileset(mode: 'dmg' | 'gbc') {
-    const T = TILE
+    // Drawn on the old grid and enlarged afterwards; see `enlarge`.
+    const T = LEGACY_TILE
     const at = (i: number) => i * T
 
     const build = (key: string, colors: any, isDmg: boolean) => {

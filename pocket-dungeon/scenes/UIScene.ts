@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, LEGACY_HEIGHT as GBC_HEIGHT, FONT, CSS_LIGHTEST } from '../constants'
+import { legacyCamera } from '../legacy'
 import { GameState } from '../state'
 import { RELICS } from '../relics'
 
@@ -22,6 +23,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
+    legacyCamera(this)
     // Top HUD background
     this.add.rectangle(0, 0, GBC_WIDTH, 15, 0x000000, 0.8).setOrigin(0, 0)
 

@@ -1,6 +1,31 @@
-export const GBC_WIDTH = 160
-export const GBC_HEIGHT = 144
-export const TILE = 16
+/**
+ * The screen, in game pixels (#155).
+ *
+ * It was the Game Boy's own 160×144 with 16-pixel tiles. The hub card's
+ * painting has about one and a half times that detail, and there is no room
+ * for it at 16 pixels a tile — so the screen is 240×216 with 24-pixel tiles.
+ * That is still ten tiles by nine: the game shows exactly as much dungeon as
+ * it did, with 2.25 times the pixels in each tile.
+ */
+export const GBC_WIDTH = 240
+export const GBC_HEIGHT = 216
+export const TILE = 24
+
+/**
+ * The size everything was first drawn and laid out at.
+ *
+ * #155 changes the canvas and nothing about the art, so the sprites are still
+ * authored on a 16-pixel grid and enlarged, and the title, shop, HUD and
+ * game-over screens are still laid out for 160×144 and shown through a
+ * camera zoomed by `SCALE`. Each of those is replaced by art and layout made
+ * at the new size in #156 to #159; when the last goes, so do these.
+ */
+export const LEGACY_WIDTH = 160
+export const LEGACY_HEIGHT = 144
+export const LEGACY_TILE = 16
+export const SCALE = TILE / LEGACY_TILE
+/** A length measured on the old 16-pixel grid, at the new size. */
+export const sx = (n: number): number => Math.round(n * SCALE)
 
 // Classic DMG 4-color palette
 export const PAL = {

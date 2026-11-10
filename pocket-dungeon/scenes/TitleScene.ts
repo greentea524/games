@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, FONT } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, FONT, SCALE } from '../constants'
+import { legacyCamera } from '../legacy'
 import { GameState } from '../state'
 import { loadMeta, CLASSES } from '../meta'
 import type { ClassName } from '../meta'
@@ -23,6 +24,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create() {
+    legacyCamera(this)
     this.cameras.main.setBackgroundColor('#0b0f0c')
 
     const meta = loadMeta()
@@ -47,10 +49,12 @@ export class TitleScene extends Phaser.Scene {
     // had scrolled to, because `create` resets `classIndex` to 0.
     const heroPreview = (this.heroPreview = this.add
       .sprite(20, 16, `hero_${GameState.paletteMode}_down`)
-      .setScale(1.4))
+      // The sprite textures are already enlarged; the zoomed camera would
+      // enlarge them a second time.
+      .setScale(1.4 / SCALE))
     const ratPreview = (this.ratPreview = this.add
       .sprite(140, 16, `rat_${GameState.paletteMode}`)
-      .setScale(1.2))
+      .setScale(1.2 / SCALE))
     this.tweens.add({
       targets: heroPreview,
       y: '+=2',

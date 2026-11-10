@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, FONT } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, FONT } from '../constants'
+import { legacyCamera } from '../legacy'
 import {
   loadMeta, CLASSES, SHOP_ITEMS, unlockClass, purchaseShopItem,
   keepsakeCost, buyKeepsake,
@@ -46,6 +47,7 @@ export class ShopScene extends Phaser.Scene {
   }
 
   create() {
+    legacyCamera(this)
     this.cameras.main.setBackgroundColor('#0b0f0c')
     this.cursor = 0
     this.first = 0

@@ -306,6 +306,18 @@ first tap hits. And which shape is buried is random, so the touch suite deals
 each of the four in turn and the hub card always deals the skull. A check that
 passes on three shapes in four is a flake waiting to happen.
 
+**Pocket Dungeon is 240×216 with 24-pixel tiles, part-way through a rework
+(#155 to #159).** #155 changed the canvas and left the art alone, so two
+things are temporary. `BootScene.enlarge` scales the 16-pixel sprites by one
+and a half, which leaves pixels of two widths. The title, shop, HUD and
+game-over screens are still laid out for 160×144 and shown through
+`legacyCamera`. Both go as #156 to #159 redraw each piece at the new size.
+Two checks had the old screen written into them, a tile of 16 and a width of
+160, and failed by tapping the wrong tile while the game was right. A check
+should read sizes from the game. `qa/touch/sound.mjs` and `static.mjs` still
+carry a literal 160: correct for the games they drive today, and the next
+thing to break when one of those is resized.
+
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
 of the screen, so steering showed only as the tube turning. It trails now: the
