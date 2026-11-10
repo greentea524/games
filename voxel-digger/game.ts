@@ -1,8 +1,9 @@
 // Voxel Digger (#115), on the standalone stage (#118).
 //
-// A block of rock with something buried in it. Tap a face to dig a 3×3 patch
-// out of it (#151), orbit to look from another side, and name what you found
-// in as few digs as you can.
+// A block of rock with something buried in it. Tap a face to drill a 3×3 core
+// into it (#152), orbit to look from another side, and name what you found in
+// as few digs as you can. What a drill uncovers glows through the rock, so it
+// can be seen from any side and not only straight down the hole.
 //
 // The whole block is one `InstancedMesh` — #115's reason for existing, along
 // with instance-aware raycasting — so a thousand-odd cubes cost one draw call
@@ -14,21 +15,23 @@
 // Nothing here decides whether a round is winnable.
 import * as THREE from 'three'
 import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
-import { BLOCK, DIG_BUDGET, SHAPES, allCells, unkey, type Shape } from './block'
+import { BLOCK, SHAPES, allCells, unkey, type Shape } from './block'
 import {
-  brushCells,
   createState,
   digStroke,
+  drillCells,
   isDiggable,
   isVisible,
   removedSet,
   undoStroke,
   type Axis,
+  type Dir,
   type DigState,
 } from './dig'
+import { facingOf, type Facing } from './preview'
 import { createIndex, type InstanceIndex } from './instances'
 
-export { DIG_BUDGET, SHAPES }
+export { SHAPES }
 
 export type Phase = 'digging' | 'right' | 'wrong'
 
@@ -55,32 +58,44 @@ const COLOURS = {
   background: 0x0d1016,
   rock: 0x8d8271,
   find: 0xe8a63a,
+  glow: 0xffb040,
 }
 
 export interface VoxelGame {
   stage: Stage3D
   phase(): Phase
-  /** Taps spent. A tap digs a patch (#151), so this is not cubes. */
+  /** Taps spent. A tap drills a core (#152), so this is not cubes. */
   digs(): number
   /** Cubes dug out, across every tap. */
   dug(): number
-  budget(): number
   /** The shape actually buried, revealed only once the round is over. */
   answer(): Shape | null
   /** How many of the buried shape's cubes are currently in view. */
   exposed(): number
   /** Orbit angles, radians, and the camera's distance from the block. */
   view(): { yaw: number; pitch: number; distance: number }
+  /** Which side the block is being looked at from, for the HUD's pictures. */
+  facing(): Facing
+  /**
+   * Turns the glow of uncovered find cubes through the rock on or off. It is
+   * always on in play; this exists so the check that guards it can turn it
+   * off and watch the find disappear.
+   */
+  setGlow(on: boolean): void
   orbit(dYaw: number, dPitch: number): void
   zoom(factor: number): void
   /**
    * What is under a normalised viewport point: a rock cell that can be dug, a
    * cube of the find, or nothing.
    */
-  probe(nx: number, ny: number): { cell: number; kind: 'rock' | 'find'; axis: Axis } | null
+  probe(
+    nx: number,
+    ny: number,
+  ): { cell: number; kind: 'rock' | 'find'; axis: Axis; dir: Dir } | null
   /**
-   * Digs the patch around whatever is under a point, across the face that was
-   * tapped. Returns the cubes dug, or null when nothing was.
+   * Drills into whatever is under a point: the 3×3 around the cube, straight
+   * in from the face that was tapped, until the find or the far side of the
+   * block. Returns the cubes dug, or null when nothing was.
    */
   dig(nx: number, ny: number): number[] | null
   /** Puts the last tap's cubes back. #115 asks for this; a mis-tap is cheap. */
@@ -98,8 +113,29 @@ export interface VoxelGame {
 // vector and its view direction are parallel and the block spins on the spot.
 const MIN_PITCH = -1.5
 const MAX_PITCH = 1.5
-const MIN_DISTANCE = 16
-const MAX_DISTANCE = 60
+// Zoom, as a multiple of the distance at which the block fits the screen.
+const MIN_ZOOM = 0.38
+const MAX_ZOOM = 1.45
+
+/** A white square with a darker border: one cube face, as a texture. */
+function edgedFace(): THREE.Texture {
+  const size = 64
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, size, size)
+    // Thin and soft. At seven cubes a side a heavy edge is a grid drawn over
+    // the shape, and the grid is what you see instead of it (#153).
+    ctx.strokeStyle = 'rgba(70, 38, 0, 0.5)'
+    ctx.lineWidth = 3
+    ctx.strokeRect(0, 0, size, size)
+  }
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
 
 export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame {
   const stage = createStage3D({ parent, background: COLOURS.background })
@@ -116,6 +152,12 @@ export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame
   const rim = new THREE.DirectionalLight(0x6f96c0, lambertIntensity(0.3))
   rim.position.set(-12, 4, -9)
   scene.add(rim)
+  // From underneath, because the shapes differ most in their lower layers and
+  // the block is meant to be turned over: with the key and rim both above,
+  // the underside had the ambient alone and read as one dark slab (#152).
+  const under = new THREE.DirectionalLight(0xc9b79a, lambertIntensity(0.42))
+  under.position.set(5, -14, 7)
+  scene.add(under)
 
   const block = new THREE.Group()
   // Centred on the origin so orbiting turns around the block rather than
@@ -154,14 +196,43 @@ export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame
   )
   const findMesh = new THREE.InstancedMesh(
     geometry,
-    new THREE.MeshLambertMaterial({ color: COLOURS.find }),
+    // Each face carries a darker edge, so the find reads as cubes that can be
+    // counted against the pictures on the guess buttons. Uncovered whole, one
+    // flat orange hid where one cube ended and the next began (#152).
+    new THREE.MeshLambertMaterial({ color: COLOURS.find, map: edgedFace() }),
     // Only ever holds the find's own cubes, so it is sized for the shape box
     // rather than the block.
     BLOCK.shapeSize ** 3,
   )
+  // The glow (#152): the same uncovered cubes again, drawn only where rock is
+  // in the way. `GreaterDepth` is the whole trick — a fragment passes when
+  // something already drawn is *nearer* than it — so a cube the player has
+  // uncovered shows through the block from every side, dimmed, instead of
+  // only down the hole it was found through. It shows nothing the rules do
+  // not already call visible: it is fed the same cells as `findMesh`.
+  //
+  // Order matters. Rock is opaque and goes first. The glow is next, tested
+  // against the rock alone; then the find itself, which is flagged
+  // transparent only so that it sorts after the glow and paints over it
+  // wherever the find is in plain view.
+  const glowMesh = new THREE.InstancedMesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color: COLOURS.glow,
+      transparent: true,
+      opacity: 0.5,
+      depthFunc: THREE.GreaterDepth,
+      depthWrite: false,
+    }),
+    BLOCK.shapeSize ** 3,
+  )
+  glowMesh.renderOrder = 1
+  findMesh.renderOrder = 2
+  ;(findMesh.material as THREE.Material).transparent = true
   rockMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
   findMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-  block.add(rockMesh, findMesh)
+  glowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  block.add(rockMesh, glowMesh, findMesh)
 
   const scratch = new THREE.Matrix4()
   const tint = new THREE.Color()
@@ -231,6 +302,7 @@ export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame
   function refreshFind() {
     findIndex = createIndex(visibleFindCells())
     rebuild(findMesh, findIndex, COLOURS.find)
+    rebuild(glowMesh, findIndex, COLOURS.glow)
   }
 
   function load() {
@@ -248,11 +320,52 @@ export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame
 
   let yaw = 0.7
   let pitch = 0.62
-  // Far enough back that the block clears the guess buttons along the bottom
-  // of the HUD. A block that overlaps them reads as being behind a menu.
+  let zoom = 1
   let distance = 42
+  let framedFor = 0
+
+  /**
+   * The distance at which the whole block is on screen, whatever the screen's
+   * shape.
+   *
+   * It was a fixed 42, chosen on a wide screen so the block clears the guess
+   * buttons. On a phone held upright the view is less than half as wide as it
+   * is tall, and at 42 the block's left and right corners were off the screen
+   * (#152) — so the distance is whichever of the two directions needs more.
+   */
+  function fitDistance(): number {
+    const radius = (BLOCK.size / 2) * Math.sqrt(3)
+    const halfV = (camera.fov * Math.PI) / 360
+    const halfH = Math.atan(Math.tan(halfV) * camera.aspect)
+    return Math.max((radius / Math.sin(halfV)) * 1.46, (radius / Math.sin(halfH)) * 1.05)
+  }
+
+  /**
+   * Height of the HUD along the bottom of the screen, in CSS pixels: the hint,
+   * the question and the row of pictured guesses.
+   */
+  const HUD_BAND = 170
+
+  /**
+   * Lifts the picture so the block sits in the space above the guesses rather
+   * than in the middle of the screen, underneath them. A view offset moves
+   * the projection and not the camera, so a tap still lands where it looks
+   * like it lands — the raycaster reads the same matrix.
+   */
+  function frameForScreen() {
+    const aspect = camera.aspect
+    const height = Math.max(1, stage.renderer.domElement.clientHeight)
+    const lift = Math.min(0.14, HUD_BAND / 2 / height)
+    // `setViewOffset` also rewrites the aspect from its first two arguments,
+    // so they are given in units that leave it as it was.
+    camera.setViewOffset(aspect, 1, 0, lift, aspect, 1)
+    camera.updateProjectionMatrix()
+  }
 
   function placeCamera() {
+    if (camera.aspect !== framedFor) frameForScreen()
+    framedFor = camera.aspect
+    distance = fitDistance() * zoom
     camera.position.set(
       Math.sin(yaw) * Math.cos(pitch) * distance,
       Math.sin(pitch) * distance,
@@ -271,20 +384,28 @@ export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame
     phase: () => phase,
     digs: () => state.strokes.length,
     dug: () => state.removed.length,
-    budget: () => DIG_BUDGET,
     answer: () => (phase === 'digging' ? null : answer),
     exposed: () => findIndex.count(),
     view: () => ({ yaw, pitch, distance }),
+    facing: () => facingOf(yaw, pitch),
+    setGlow(on) {
+      glowMesh.visible = on
+    },
     orbit(dYaw, dPitch) {
+      const before = facingOf(yaw, pitch)
       yaw += dYaw
       // Clamped short of the poles: at exactly vertical the camera's up vector
       // and its view direction are parallel and `lookAt` has no way to choose
       // a roll, so the block spins on the spot.
       pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, pitch + dPitch))
       placeCamera()
+      // The HUD's pictures follow the side being looked at, and only need
+      // telling when it changes — not on every pixel of a drag.
+      const after = facingOf(yaw, pitch)
+      if (after.quarter !== before.quarter || after.below !== before.below) notify()
     },
     zoom(factor) {
-      distance = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, distance * factor))
+      zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor))
       placeCamera()
     },
     probe(nx, ny) {
@@ -308,18 +429,20 @@ export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame
       const n = hit.face?.normal ?? new THREE.Vector3(0, 1, 0)
       const ax = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)]
       const axis = ax.indexOf(Math.max(...ax)) as Axis
-      return { cell, kind: isRock ? 'rock' : 'find', axis }
+      // A drill goes in through the face, which is against its normal.
+      const dir: Dir = [n.x, n.y, n.z][axis] > 0 ? -1 : 1
+      return { cell, kind: isRock ? 'rock' : 'find', axis, dir }
     },
     dig(nx, ny) {
-      if (phase !== 'digging' || state.strokes.length >= DIG_BUDGET) return null
+      if (phase !== 'digging') return null
       const target = game.probe(nx, ny)
       // The find is not diggable, and tapping it costs nothing. Charging a dig
       // for touching the thing you are trying to uncover would be a tax on
       // looking closely. `probe` has already rejected anything unreachable.
       if (!target || target.kind !== 'rock') return null
-      // The patch across the tapped face (#151). `brushCells` applies the same
-      // rules a single dig does to every cube in it.
-      const cells = brushCells(state, target.cell, target.axis)
+      // A core straight in from the tapped face (#152). `drillCells` takes
+      // only cubes a single dig could have taken, in an order it could have.
+      const cells = drillCells(state, target.cell, target.axis, target.dir)
       if (cells.length === 0) return null
       for (const cell of cells) {
         const result = rockIndex.remove(cell)
@@ -366,6 +489,9 @@ export function createGame(parent: HTMLElement, seed = Math.random()): VoxelGame
 
   function frame() {
     if (stopped) return
+    // The stage sets the camera's aspect when the canvas is measured or
+    // resized; the framing depends on it, so it follows.
+    if (camera.aspect !== framedFor) placeCamera()
     stage.render(scene, camera)
     requestAnimationFrame(frame)
   }

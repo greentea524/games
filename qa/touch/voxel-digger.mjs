@@ -19,7 +19,6 @@ const state = (page) =>
   page.evaluate(() => ({
     digs: window.__game.digs(),
     dug: window.__game.dug(),
-    budget: window.__game.budget(),
     phase: window.__game.phase(),
     exposed: window.__game.exposed(),
     view: window.__game.view(),
@@ -28,7 +27,7 @@ const state = (page) =>
 
 const canvasMetrics = (page) =>
   page.evaluate(() => {
-    const c = document.querySelector('#stage canvas')
+    const c = document.querySelector('#stage > canvas')
     return {
       cssWidth: c.clientWidth,
       cssHeight: c.clientHeight,
@@ -50,7 +49,7 @@ async function run() {
   console.log('\n### voxel-digger ###\n')
   const t = await launchTouch(gameUrl('voxel-digger'))
   const { page, hand } = t
-  await page.waitForSelector('#stage canvas')
+  await page.waitForSelector('#stage > canvas')
   await page.waitForTimeout(1200)
 
   // ------------------------------------------------- the stage's contract
@@ -71,29 +70,20 @@ async function run() {
   check('the block starts untouched', opening.digs === 0 && opening.exposed === 0)
   check('and nothing is buried in plain sight', opening.answer === null, 'the answer is withheld')
 
-  // --------------------------------------------- a tap digs a 3×3 patch (#151)
+  // ------------------------------------------------- a tap drills (#152)
 
-  const centre = await canvasPoint(page, 0.5, 0.5, '#stage canvas')
+  const centre = await canvasPoint(page, 0.5, 0.5, '#stage > canvas')
   const aimed = await page.evaluate(() => window.__game.probe(0.5, 0.5))
   check('there is a cube under the middle of the screen', aimed?.kind === 'rock', `${aimed?.cell}`)
 
   await hand.tap(PAD, centre.x, centre.y)
   await page.waitForTimeout(250)
   const afterTap = await state(page)
-  // Nine, less whatever the block's edge cuts off: the middle of the screen
-  // often lands near an edge of the block's top face.
-  const expected = await page.evaluate(async ({ cell, axis }) => {
-    const { BLOCK, unkey } = await import('/games/voxel-digger/block.ts')
-    const c = unkey(BLOCK, cell)
-    const at = [c.x, c.y, c.z]
-    const span = (a) => [-1, 0, 1].filter((d) => at[a] + d >= 0 && at[a] + d < BLOCK.size).length
-    const [u, w] = [0, 1, 2].filter((a) => a !== axis)
-    return span(u) * span(w)
-  }, aimed)
+  // More than the nine cubes of one layer: the drill carries on in.
   check(
-    'a tap spends one dig and takes the 3×3 patch around the cube',
-    afterTap.digs === 1 && afterTap.dug === expected && expected >= 4,
-    `${afterTap.digs} dig, ${afterTap.dug} cubes of ${expected} the block's edge leaves`,
+    'a tap spends one dig and drills a core into the block',
+    afterTap.digs === 1 && afterTap.dug > 9,
+    `${afterTap.digs} dig, ${afterTap.dug} cubes`,
   )
   check(
     'and it digs the cube that was under the finger',
@@ -110,7 +100,7 @@ async function run() {
   await page.waitForTimeout(200)
   const undone = await state(page)
   check(
-    'undo puts the whole patch back and refunds the dig',
+    'undo puts the whole core back and refunds the dig',
     undone.digs === 0 && undone.dug === 0,
     `${undone.digs} digs, ${undone.dug} cubes out`,
   )
@@ -148,8 +138,8 @@ async function run() {
   // -------------------------------------------------------- two fingers zoom
 
   const before = await state(page)
-  const a = await canvasPoint(page, 0.38, 0.5, '#stage canvas')
-  const b = await canvasPoint(page, 0.62, 0.5, '#stage canvas')
+  const a = await canvasPoint(page, 0.38, 0.5, '#stage > canvas')
+  const b = await canvasPoint(page, 0.62, 0.5, '#stage > canvas')
   await hand.down(PAD, a.x, a.y)
   await hand.down(ACT, b.x, b.y)
   await hand.move(PAD, a.x - 70, a.y)
@@ -176,18 +166,122 @@ async function run() {
 
   // ------------------------------------------------- digging down to the find
 
-  await lookDown(page)
-  for (let i = 0; i < 12; i++) {
-    await page.evaluate(() => window.__game.dig(0.5, 0.5))
-    const s = await state(page)
-    if (s.exposed > 0) break
+  // Orange pixels on screen: the find, seen directly or glowing through rock.
+  const orange = () =>
+    page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              const { data } = window.__game.stage.readPixels()
+              let n = 0
+              for (let i = 0; i < data.length; i += 4) {
+                if (data[i] > 120 && data[i] - data[i + 2] > 80) n++
+              }
+              resolve(n)
+            }),
+          ),
+        ),
+    )
+  /** Deals a chosen shape, so no check here depends on which one came up. */
+  const deal = (index) =>
+    page.evaluate((i) => {
+      const random = Math.random
+      Math.random = () => i / 4 + 0.01
+      window.__game.restart()
+      Math.random = random
+    }, index)
+  const lowAngle = () =>
+    page.evaluate(() => {
+      const g = window.__game
+      const v = g.view()
+      g.orbit(0.7 - v.yaw, 0.3 - v.pitch)
+    })
+
+  // Every shape in turn. The coil is hollow, so a drill down its middle goes
+  // clean through and uncovers nothing — which is fair, and is why this tries
+  // the middle first and then works outward rather than insisting on one tap.
+  for (const [index, name] of ['Skull', 'Fish', 'Coil', 'Key'].entries()) {
+    await deal(index)
+    await lookDown(page)
+    for (const nx of [0.5, 0.42, 0.36, 0.3]) {
+      await page.evaluate((x) => window.__game.dig(x, 0.5), nx)
+      if ((await state(page)).exposed > 0) break
+    }
+    const reached = await state(page)
+    check(
+      `${name}: a tap or two straight down reaches it`,
+      reached.exposed > 0 && reached.digs <= 3,
+      `${reached.exposed} cube(s) showing after ${reached.digs} dig(s)`,
+    )
+    // From a low angle the hole's own walls are in the way, and what was
+    // uncovered has to show through the rock (#152).
+    await lowAngle()
+    const glowing = await orange()
+    await page.evaluate(() => window.__game.setGlow(false))
+    const without = await orange()
+    await page.evaluate(() => window.__game.setGlow(true))
+    check(
+      `${name}: and what was uncovered shows through the rock`,
+      glowing > without + 400,
+      `${glowing} orange pixels with the glow, ${without} without`,
+    )
   }
+
+  // The control, on the skull: one drill down the middle, where from a low
+  // angle no ray reaches the find at all — so without the glow there is
+  // nothing on screen, and the count above cannot be passing on a direct view.
+  await deal(0)
+  await lookDown(page)
+  await page.evaluate(() => window.__game.dig(0.5, 0.5))
   const found = await state(page)
-  check(
-    'a shaft straight down reaches the buried shape',
-    found.exposed > 0,
-    `${found.exposed} cube(s) showing after ${found.digs} digs`,
+  await lowAngle()
+  const hidden = await page.evaluate(() => {
+    const g = window.__game
+    for (let ny = 0.1; ny <= 0.9; ny += 0.01) {
+      for (let nx = 0.05; nx <= 0.95; nx += 0.01) if (g.probe(nx, ny)?.kind === 'find') return false
+    }
+    return true
+  })
+  check('from a low angle the hole hides the find itself', hidden, 'no ray reaches it')
+  await page.evaluate(() => window.__game.setGlow(false))
+  const dark = await orange()
+  await page.evaluate(() => window.__game.setGlow(true))
+  check('and without the glow there is nothing to see — the check can tell', dark === 0, `${dark} orange pixels`)
+  await lookDown(page)
+
+  // ------------------------------------- the pictures on the guesses (#152)
+
+  const pictures = await page.evaluate(() =>
+    [...document.querySelectorAll('.vd-guess canvas')].map((c) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+      let n = 0
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++
+      return { painted: n, url: c.toDataURL() }
+    }),
   )
+  check(
+    'every guess carries a picture of its shape',
+    pictures.length === 4 && pictures.every((p) => p.painted > 500),
+    pictures.map((p) => p.painted).join(', ') + ' painted pixels',
+  )
+  check('and no two pictures are the same', new Set(pictures.map((p) => p.url)).size === 4)
+  await page.evaluate(() => {
+    const g = window.__game
+    g.orbit(Math.PI / 2, 0)
+  })
+  await page.waitForTimeout(150)
+  const turned = await page.evaluate(() => [...document.querySelectorAll('.vd-guess canvas')].map((c) => c.toDataURL()))
+  check(
+    'and they turn when the block is turned',
+    turned.filter((url, i) => url !== pictures[i].url).length >= 1,
+    `${turned.filter((url, i) => url !== pictures[i].url).length} of 4 redrawn after a quarter-turn`,
+  )
+  await page.evaluate(() => {
+    const g = window.__game
+    g.orbit(-Math.PI / 2, 0)
+  })
+
   // Where the find can actually be seen, rather than where it was assumed to
   // be. A shaft straight down uncovers the cube *beside* its floor as often as
   // the one under it, so the ray that dug the shaft usually still lands on
@@ -205,7 +299,7 @@ async function run() {
   check('and the find is in view from the shaft', findAt !== null)
 
   if (findAt) {
-    const spot = await canvasPoint(page, findAt.nx, findAt.ny, '#stage canvas')
+    const spot = await canvasPoint(page, findAt.nx, findAt.ny, '#stage > canvas')
     const beforeFindTap = await state(page)
     await hand.tap(PAD, spot.x, spot.y)
     await page.waitForTimeout(250)
