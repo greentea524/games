@@ -73,6 +73,7 @@ async function putt(page, hand, dx, dz, power) {
   // A first small move, so the drag is a drag and not a tap.
   await hand.move(PAD, start.x - dx * radius * 0.2, start.y - dz * radius * 0.2)
   await hand.move(PAD, start.x - dx * radius * power, start.y - dz * radius * power)
+  await hand.settle()
   const held = await state(page)
   await hand.up(PAD)
   return held
@@ -112,6 +113,7 @@ async function run() {
   const origin = await canvasPoint(page, 0.5, 0.62, '#stage canvas')
   await hand.down(PAD, origin.x, origin.y)
   await hand.move(PAD, origin.x, origin.y + radius * 0.5)
+  await hand.settle()
   const pulledBack = await state(page)
   check(
     'pulling back toward the player aims up the hole',
@@ -125,6 +127,7 @@ async function run() {
   )
 
   await hand.move(PAD, origin.x, origin.y + radius * 0.9)
+  await hand.settle()
   const pulledFar = await state(page)
   check(
     'pulling further increases the power',
@@ -134,6 +137,7 @@ async function run() {
 
   // Sideways, to prove the aim is a direction and not just a magnitude.
   await hand.move(PAD, origin.x - radius * 0.6, origin.y)
+  await hand.settle()
   const pulledLeft = await state(page)
   check(
     'pulling left aims right',

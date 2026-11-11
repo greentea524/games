@@ -145,6 +145,7 @@ async function run() {
   await hand.down(PAD, centre.x, centre.y)
   await hand.move(PAD, centre.x - 60, centre.y)
   await hand.move(PAD, centre.x - 140, centre.y)
+  await hand.settle()
   const dragged = await state(page)
   await hand.up(PAD)
   check(
@@ -157,6 +158,7 @@ async function run() {
   await hand.down(PAD, centre.x, centre.y)
   await hand.move(PAD, centre.x, centre.y + 70)
   await hand.move(PAD, centre.x, centre.y + 150)
+  await hand.settle()
   const pitched = await state(page)
   await hand.up(PAD)
   check(
