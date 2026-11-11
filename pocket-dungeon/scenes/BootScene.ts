@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { TILE, LEGACY_TILE, SCALE, PAL, GBC_PAL } from '../constants'
+import { CATACOMB, CELLAR, DMG as DMG_TILES, FRAME, TILE_PX, VAULT, drawTileset, type TilePalette } from '../tiles'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -67,120 +68,51 @@ export class BootScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Floors and walls, drawn at the new tile size by `tiles.ts` (#156). Being
+   * 24 pixels high already, `enlarge` leaves them alone.
+   */
   private buildTileset(mode: 'dmg' | 'gbc') {
-    // Drawn on the old grid and enlarged afterwards; see `enlarge`.
-    const T = LEGACY_TILE
-    const at = (i: number) => i * T
-
-    const build = (key: string, colors: any, isDmg: boolean) => {
-      if (this.textures.exists(key)) return
-      const g = this.make.graphics({}, false)
-
-      // 0: Room Floor
-      g.fillStyle(colors.floorBg); g.fillRect(at(0), 0, T, T)
-      g.fillStyle(colors.floorDetail); g.fillRect(at(0) + 3, 3, 1, 1); g.fillRect(at(0) + 11, 11, 1, 1)
-
-      const drawRaisedWall = (offsetX: number) => {
-        g.fillStyle(colors.wallLine); g.fillRect(offsetX, 0, T, T)
-        g.fillStyle(colors.wallBg); g.fillRect(offsetX + 1, 1, T - 2, T - 2)
-        // Alpha belongs in fillStyle. Graphics has no globalAlpha, so these
-        // three assignments did nothing and the highlight and shadow were
-        // painted at full strength.
-        // Highlight
-        g.fillStyle(isDmg ? PAL.lightest : 0xffffff, 0.25)
-        g.fillRect(offsetX + 1, 1, T - 2, 1); g.fillRect(offsetX + 1, 1, 1, T - 2)
-        // Shadow
-        g.fillStyle(isDmg ? PAL.darkest : 0x000000, 0.4)
-        g.fillRect(offsetX + 1, T - 2, T - 2, 1); g.fillRect(offsetX + T - 2, 1, 1, T - 2)
-      }
-
-      // 1: Wall (raised block)
-      drawRaisedWall(at(1))
-
-      // 2: Stairs Down
-      g.fillStyle(colors.floorBg); g.fillRect(at(2), 0, T, T)
-      g.fillStyle(colors.stairsBg)
-      for (let y = 2; y < T - 2; y += 3) g.fillRect(at(2) + 2, y, T - 4, 2)
-      if (!isDmg && colors.stairsStep) {
-        g.fillStyle(colors.stairsStep)
-        for (let y = 3; y < T - 2; y += 3) g.fillRect(at(2) + 2, y, T - 4, 1)
-      }
-
-      // 3: Corridor / Path Tile (distinct paved stone walkway)
-      const pathBg = isDmg ? PAL.light : colors.pathBg ?? 0x1e1828
-      const pathLine = isDmg ? PAL.dark : colors.pathLine ?? 0x3d304a
-      g.fillStyle(pathBg); g.fillRect(at(3), 0, T, T)
-      g.fillStyle(pathLine)
-      g.fillRect(at(3) + 1, 1, T - 2, 1); g.fillRect(at(3) + 1, T - 2, T - 2, 1) // top/bottom edge lines
-      g.fillRect(at(3) + 3, 4, 4, 4); g.fillRect(at(3) + 9, 8, 4, 4) // stone paving slabs
-
-      // 4: Cracked Floor Tile
-      g.fillStyle(colors.floorBg); g.fillRect(at(4), 0, T, T)
-      g.fillStyle(colors.floorDetail)
-      g.fillRect(at(4) + 4, 3, 1, 4); g.fillRect(at(4) + 5, 6, 4, 1); g.fillRect(at(4) + 8, 7, 1, 4)
-
-      // 5: Wall with Torch
-      drawRaisedWall(at(5))
-      // Torch bracket
-      g.fillStyle(isDmg ? PAL.darkest : 0x201510); g.fillRect(at(5) + 7, 7, 2, 5)
-      // Flame
-      g.fillStyle(isDmg ? PAL.lightest : 0xffa000); g.fillRect(at(5) + 6, 4, 4, 4)
-      g.fillStyle(isDmg ? PAL.light : 0xffff00); g.fillRect(at(5) + 7, 5, 2, 2)
-
-      // 6: Wall with Banner / Shield
-      drawRaisedWall(at(6))
-      // Banner
-      g.fillStyle(isDmg ? PAL.darkest : 0xaa2030); g.fillRect(at(6) + 5, 3, 6, 9)
-      g.fillStyle(isDmg ? PAL.lightest : 0xffd700); g.fillRect(at(6) + 7, 5, 2, 5)
-
-      // 7: Rug / Altar Floor (center room decoration)
-      g.fillStyle(colors.floorBg); g.fillRect(at(7), 0, T, T)
-      g.fillStyle(isDmg ? PAL.light : (colors.rugColor ?? 0x882035)); g.fillRect(at(7) + 2, 2, T - 4, T - 4)
-      g.fillStyle(isDmg ? PAL.lightest : 0xffd700); g.fillRect(at(7) + 3, 3, T - 6, 1); g.fillRect(at(7) + 3, T - 4, T - 6, 1)
-
-      // 8: Bones / Debris Floor
-      g.fillStyle(colors.floorBg); g.fillRect(at(8), 0, T, T)
-      g.fillStyle(isDmg ? PAL.lightest : 0xe0d8c0)
-      g.fillRect(at(8) + 4, 5, 3, 2); g.fillRect(at(8) + 9, 10, 3, 2) // skulls/bones
-      g.fillStyle(colors.floorDetail); g.fillRect(at(8) + 5, 6, 1, 1); g.fillRect(at(8) + 10, 11, 1, 1)
-
-      g.generateTexture(key, T * 9, T)
-      g.destroy()
-
-      const tex = this.textures.get(key)
-      for (let i = 0; i < 9; i++) {
-        tex.add(i, 0, i * T, 0, T, T)
-      }
+    const sets: [string, TilePalette, boolean][] =
+      mode === 'dmg'
+        ? [['tiles_dmg_v2', DMG_TILES, true]]
+        : [
+            ['tiles_gbc_cellar_v2', CELLAR, false],
+            ['tiles_gbc_catacomb_v2', CATACOMB, false],
+            ['tiles_gbc_vault_v2', VAULT, false],
+          ]
+    for (const [key, palette, dmg] of sets) {
+      if (this.textures.exists(key)) continue
+      const canvas = document.createElement('canvas')
+      canvas.width = TILE_PX * FRAME.count
+      canvas.height = TILE_PX
+      const ctx = canvas.getContext('2d')
+      if (!ctx) continue
+      drawTileset(ctx, palette, dmg)
+      const texture = this.textures.addCanvas(key, canvas)
+      if (!texture) continue
+      for (let i = 0; i < FRAME.count; i++) texture.add(i, 0, i * TILE_PX, 0, TILE_PX, TILE_PX)
     }
+    if (mode === 'gbc' && !this.textures.exists('torchglow')) this.buildTorchGlow()
+  }
 
-    if (mode === 'dmg') {
-      build('tiles_dmg_v2', {
-        floorBg: PAL.lightest, floorDetail: PAL.light,
-        wallBg: PAL.dark, wallLine: PAL.darkest,
-        stairsBg: PAL.dark
-      }, true)
-    } else {
-      build('tiles_gbc_cellar_v2', {
-        floorBg: GBC_PAL.floorBg, floorDetail: GBC_PAL.floorDetail,
-        wallBg: GBC_PAL.wallBg, wallLine: GBC_PAL.wallLine,
-        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep,
-        pathBg: 0x1d1626, pathLine: 0x3d304a, rugColor: 0x882035,
-      }, false)
-      
-      build('tiles_gbc_catacomb_v2', {
-        floorBg: GBC_PAL.catacombFloorBg, floorDetail: GBC_PAL.catacombFloorDetail,
-        wallBg: GBC_PAL.catacombWallBg, wallLine: GBC_PAL.catacombWallLine,
-        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep,
-        pathBg: 0x302418, pathLine: 0x584028, rugColor: 0x904020,
-      }, false)
-      
-      build('tiles_gbc_vault_v2', {
-        floorBg: GBC_PAL.vaultFloorBg, floorDetail: GBC_PAL.vaultFloorDetail,
-        wallBg: GBC_PAL.vaultWallBg, wallLine: GBC_PAL.vaultWallLine,
-        stairsBg: GBC_PAL.stairsBg, stairsStep: GBC_PAL.stairsStep,
-        pathBg: 0x122430, pathLine: 0x306080, rugColor: 0x207090,
-      }, false)
-    }
+  /**
+   * A soft warm pool for under a wall torch (#156): a radial gradient, white
+   * at the middle so the colour comes from the tint it is drawn with.
+   */
+  private buildTorchGlow() {
+    const size = TILE * 7
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    g.addColorStop(0, 'rgba(255,255,255,1)')
+    g.addColorStop(0.45, 'rgba(255,255,255,0.45)')
+    g.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, size, size)
+    this.textures.addCanvas('torchglow', canvas)
   }
 
   private drawKnightHero(

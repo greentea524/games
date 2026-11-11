@@ -320,6 +320,11 @@ things are temporary. `BootScene.enlarge` scales the 16-pixel sprites by one
 and a half, which leaves pixels of two widths. The title, shop, HUD and
 game-over screens are still laid out for 160×144 and shown through
 `legacyCamera`. Both go as #156 to #159 redraw each piece at the new size.
+#156 drew the floors and walls at 24 in `tiles.ts`: flagstones, a brick face
+where a room is below a wall, a darker capstone rim where it is beside or
+above, and nothing where there is no room within a cell. The rim was first
+drawn lighter than the floor and read as more floor; `tiles_test.ts` holds
+every biome's rim below its floor, and the green screen to its four tones.
 Two checks had the old screen written into them, a tile of 16 and a width of
 160, and failed by tapping the wrong tile while the game was right. A check
 should read sizes from the game. `qa/touch/sound.mjs` and `static.mjs` still
