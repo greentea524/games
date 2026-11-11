@@ -17,15 +17,21 @@ const MAX_VISIBLE_USABLE = 5
 // the 'WALL TORCH / Lighting the way' text described something that was not
 // happening. Giving the player's own light a floor above zero is what lets
 // torchlight read as light.
+//
+// #156 lightened the two the player can see: a room in sight read 30% dark
+// and the card shows it bright. Unseen stays where it was, since hiding the
+// floor plan is the point of it. Torch-lit, explored, in sight and unseen
+// are still four clear steps: 0, 0.42, 0.12 and 0.85 before torchlight.
 const FOG_UNSEEN = 0.85
-const FOG_EXPLORED = 0.55
-const FOG_SIGHTED = 0.3
+const FOG_EXPLORED = 0.42
+const FOG_SIGHTED = 0.12
 const TORCH_RADIUS = 3.5
 const TORCH_LIFT = 0.42
 const TORCH_FLICKER = 0.05
 
 import { GameState, TurnState } from '../state'
 import { MapGenerator } from '../MapGenerator'
+import { FRAME, floorFrame, wallFrame } from '../tiles'
 import { RNG } from '../rng'
 import type { AIType, AIContext } from '../enemies'
 import {
@@ -299,6 +305,9 @@ export class DungeonScene extends Phaser.Scene {
 
     const biome = getBiome(GameState.floorDepth)
     const tileKey = mode === 'dmg' ? 'tiles_dmg_v2' : `tiles_gbc_${biome}_v2`
+    const floorSeed = GameState.seed + GameState.floorDepth
+    // Black beyond the rooms (#156): the rock there is not drawn at all.
+    this.cameras.main.setBackgroundColor(mode === 'dmg' ? '#0f380f' : '#07090a')
 
     // Initialize explored grid & fog layer
     this.explored = Array.from({ length: this.mapHeight }, () => Array(this.mapWidth).fill(false))
@@ -311,20 +320,32 @@ export class DungeonScene extends Phaser.Scene {
         const px = x * TILE + TILE / 2
         const py = y * TILE + TILE / 2
 
-        let frameIndex = 0
-        if (char === ' ') frameIndex = -1
-        else if (char === '#') frameIndex = 1
-        else if (char === 'T') frameIndex = 5
-        else if (char === 'B') frameIndex = 6
-        else if (char === 'S') frameIndex = this.modifier?.hideStairs ? 0 : 2
-        else if (char === 'c') frameIndex = 3
-        else if (char === 'r') frameIndex = 7
-        else if (char === 'k') frameIndex = 4
-        else if (char === 'b') frameIndex = 8
-        else frameIndex = 0
+        // Which frame each cell gets is in `tiles.ts` (#156): walls by what
+        // is next to them, floors by a pattern that does not repeat.
+        let frameIndex: number
+        if (char === '#' || char === ' ') frameIndex = wallFrame(this.grid, x, y)
+        else if (char === 'T') frameIndex = FRAME.torch
+        else if (char === 'B') frameIndex = FRAME.banner
+        else if (char === 'S') frameIndex = this.modifier?.hideStairs ? floorFrame(x, y, floorSeed) : FRAME.stairs
+        else if (char === 'c') frameIndex = FRAME.path
+        else if (char === 'r') frameIndex = FRAME.rug
+        else if (char === 'k') frameIndex = FRAME.cracked
+        else if (char === 'b') frameIndex = FRAME.bones
+        else frameIndex = floorFrame(x, y, floorSeed)
 
         if (frameIndex !== -1) {
           this.add.image(px, py, tileKey, frameIndex)
+        }
+        // A warm pool of light under each torch, on the floor in front of it
+        // (#156). Below the fog, so it is hidden wherever the floor is.
+        if (char === 'T' && mode === 'gbc') {
+          this.add
+            .image(px, py + TILE, 'torchglow')
+            .setTint(0xffa040)
+            .setScale(5 / 7)
+            .setAlpha(0.2)
+            .setBlendMode(Phaser.BlendModes.ADD)
+            .setDepth(1)
         }
 
         // Fog layer overlay
