@@ -315,11 +315,9 @@ each of the four in turn and the hub card always deals the skull. A check that
 passes on three shapes in four is a flake waiting to happen.
 
 **Pocket Dungeon is 240×216 with 24-pixel tiles, part-way through a rework
-(#155 to #159).** #155 changed the canvas and left the art alone, so two
-things are temporary. `BootScene.enlarge` scales the 16-pixel sprites by one
-and a half, which leaves pixels of two widths. The title, shop, HUD and
-game-over screens are still laid out for 160×144 and shown through
-`legacyCamera`. Both go as #156 to #159 redraw each piece at the new size.
+(#155 to #159).** #155 changed the canvas and left the art alone, and one thing is still
+temporary: the title, shop, HUD and game-over screens are laid out for
+160×144 and shown through `legacyCamera`, until #158 and #159 redraw them.
 #156 drew the floors and walls at 24 in `tiles.ts`: flagstones, a brick face
 where a room is below a wall, a darker capstone rim where it is beside or
 above, and nothing where there is no room within a cell. The rim was first
@@ -330,6 +328,17 @@ Two checks had the old screen written into them, a tile of 16 and a width of
 should read sizes from the game. `qa/touch/sound.mjs` and `static.mjs` still
 carry a literal 160: correct for the games they drive today, and the next
 thing to break when one of those is resized.
+
+**Pocket Dungeon's sprites are pictures in `sprites.ts`, and the outline is
+added for them (#157).** Each is 24 rows of letters, one letter an ink with a
+colour and a green-screen tone. `pixels()` puts a one-pixel dark edge round
+the silhouette, so a pale bone or scroll needs no retoning to survive the pale
+floor. Two things went wrong on the way. Art drawn up to the tile's edge has
+no room for that edge, and `qa:contrast` failed the boss, brute and choir on
+it: keep a picture one pixel inside the tile. And on the green screen a sprite
+whose inks all map to the lightest tone is an outline round nothing;
+`DMG_SWAP` gives those sprites a second tone inside. `sprites_test.ts` holds
+both, with a crown staged on the top edge as its control.
 
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
@@ -369,6 +378,14 @@ read one 45 ms window per frame and so missed short sounds between frames.
 All three are fixed and `qa/touch/README.md` has the measurements. Before
 trusting anything timed, run it with two shell busy-loops alongside; that is
 how the probe's gap was found, after the other two fixes had gone green.
+
+**A touch move arrives with the next frame, so settle before reading (#182).**
+Eight checks sent a move and read the game on the next line. On a slow
+renderer the read came first: a 120 pixel drag measured as 50, and which check
+failed changed from run to run. `hand.settle()` waits two frames, one to
+deliver the move and one for the game to act on it. It is a call a check
+makes, not part of `move`, because the steering loops are tuned for a fast
+round trip.
 
 **Make a check prove it can fail.** Several checks in this repo passed for the
 wrong reason when first written — asserting a fall speed was capped, against a
