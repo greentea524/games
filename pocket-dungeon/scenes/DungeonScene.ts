@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST, sx } from '../constants'
+import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, sx } from '../constants'
+import { THEME, css } from '../theme'
 
 /**
  * How many usable items the gear panel shows at once (#105).
@@ -1086,7 +1087,7 @@ export class DungeonScene extends Phaser.Scene {
     const text = this.add
       .text(TILE * 2, sx(24), body, {
         fontFamily: '"Press Start 2P", monospace',
-        fontSize: `${sx(8)}px`,
+        fontSize: '8px',
         color: '#ffd700',
         align: 'center',
         resolution: 1,
@@ -1107,9 +1108,10 @@ export class DungeonScene extends Phaser.Scene {
   private showDamageText(x: number, y: number, text: string, color: string) {
     const txt = this.add.text(x, y, text, {
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: `${sx(8)}px`,
+      fontSize: '8px',
       color: color,
-      resolution: 2,
+      // A red number over the red rug had nothing to stand on at this size.
+      shadow: { offsetX: 1, offsetY: 1, color: '#000000', fill: true },
     }).setOrigin(0.5).setDepth(20)
 
     this.tweens.add({
@@ -1500,16 +1502,15 @@ export class DungeonScene extends Phaser.Scene {
     const backdrop = this.add
       .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, 0x000000, 0.97)
       .setOrigin(0, 0)
-    const text = this.add.text(sx(8), sx(17), `- GEAR -\n${body}`, {
+    const text = this.add.text(12, 28, `- GEAR -\n${body}`, {
       fontFamily: FONT,
-      fontSize: `${sx(7)}px`,
-      color: CSS_LIGHTEST,
+      fontSize: '8px',
+      // The HUD's white, or the green screen's lightest tone (#159).
+      color: css(THEME[GameState.paletteMode].text),
       align: 'left',
-      // Names run past 20 characters at 7px on a 160px screen, and an
-      // unwrapped line just leaves the screen.
-      wordWrap: { width: GBC_WIDTH - sx(16) },
-      resolution: 2,
-      lineSpacing: 1,
+      // An unwrapped line just leaves the screen.
+      wordWrap: { width: GBC_WIDTH - 24 },
+      lineSpacing: 2,
     })
     panel.add([backdrop, text])
     this.gearPanel = panel

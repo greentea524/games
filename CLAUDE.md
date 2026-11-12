@@ -314,10 +314,9 @@ first tap hits. And which shape is buried is random, so the touch suite deals
 each of the four in turn and the hub card always deals the skull. A check that
 passes on three shapes in four is a flake waiting to happen.
 
-**Pocket Dungeon is 240×216 with 24-pixel tiles, part-way through a rework
-(#155 to #159).** #155 changed the canvas and left the art alone, and one thing is still
-temporary: the title, shop and game-over screens are laid out for
-160×144 and shown through `legacyCamera`, until #159 redraws them.
+**Pocket Dungeon is 240×216 with 24-pixel tiles, reworked to match its card
+(#155 to #159).** Every screen is laid out at that size now. `sx()` remains
+for the dungeon's offsets, which were written as lengths on a 16-pixel tile.
 #156 drew the floors and walls at 24 in `tiles.ts`: flagstones, a brick face
 where a room is below a wall, a darker capstone rim where it is beside or
 above, and nothing where there is no room within a cell. The rim was first
@@ -354,6 +353,16 @@ bar; it reads the bar in DMG now, and at once failed the empty pip, drawn in
 `PAL.dark` on a `PAL.darkest` bar. The game has no level, so the card's LEVEL is not on
 the bar, and the turn counter is gone because nothing in play shows the
 player a use for it.
+
+**Pocket Dungeon's other screens use the HUD's font and colours, from
+`theme.ts` (#159).** Title, shop and game-over are laid out at 240×216 with
+text at 8 pixels or twice it, and `legacyCamera` is gone. `THEME` has a set
+for each palette, and the toggle recolours the title and shop in place.
+`screens_test.ts` wraps every description the way the screen does: the shop
+was first given two lines for it, and a recovered regeneration ring takes
+three. `showRunSummary` takes a `screen` size for a game that is not 160×144.
+The dungeon's floating text was 12 pixels, which this font cannot draw
+cleanly; it is 8 with a shadow now.
 
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle

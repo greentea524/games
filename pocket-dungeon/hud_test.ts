@@ -1,7 +1,7 @@
 // The HUD's layout holds at the longest values the game reaches (#158).
 //
 //   npx tsx pocket-dungeon/hud_test.ts
-import { GBC_HEIGHT, GBC_WIDTH, LEGACY_HEIGHT, LEGACY_WIDTH } from './constants'
+import { GBC_HEIGHT, GBC_WIDTH } from './constants'
 import { FINAL_DEPTH, RELICS } from './relics'
 import { BAR_HEIGHT, CELL, ICONS, collision, hpFill, layout, type HudValues } from './hud'
 import { ITEMS } from './items'
@@ -42,7 +42,7 @@ for (const [name, values] of cases) {
 
 // The control: the same HUD does not fit the screen it replaced, so the check
 // above is measuring something.
-const old = collision(layout(longest, LEGACY_WIDTH, LEGACY_HEIGHT), LEGACY_WIDTH, LEGACY_HEIGHT)
+const old = collision(layout(longest, 160, 144), 160, 144)
 check('and the check can fail: this layout does not fit 160×144', old !== null, old ?? 'it fitted')
 
 const boxes = layout(longest, GBC_WIDTH, GBC_HEIGHT)

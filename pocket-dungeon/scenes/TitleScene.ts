@@ -1,11 +1,20 @@
 import Phaser from 'phaser'
-import { LEGACY_WIDTH as GBC_WIDTH, FONT, SCALE } from '../constants'
-import { legacyCamera } from '../legacy'
+import { GBC_WIDTH, FONT } from '../constants'
 import { GameState } from '../state'
 import { loadMeta, CLASSES } from '../meta'
 import type { ClassName } from '../meta'
 import { music, sfx, isMuted, setMuted } from '../audio'
+import { CELL, THEME, TITLE, css, type Theme } from '../theme'
 
+type Role = keyof Omit<Theme, 'bg' | 'rule'>
+
+/**
+ * The title, laid out for 240×216 in the HUD's font and colours (#159).
+ *
+ * Every line is 8 pixels or a whole multiple of it, on whole pixels, with no
+ * stroke. Each text is kept with the role it plays, so the palette toggle can
+ * recolour the screen in place.
+ */
 export class TitleScene extends Phaser.Scene {
   private classIndex = 0
   private menuIndex = 0
@@ -18,130 +27,79 @@ export class TitleScene extends Phaser.Scene {
   private menuItems: Phaser.GameObjects.Text[] = []
   private heroPreview!: Phaser.GameObjects.Sprite
   private ratPreview!: Phaser.GameObjects.Sprite
+  private inked: { text: Phaser.GameObjects.Text; role: Role }[] = []
+  private rules: Phaser.GameObjects.Rectangle[] = []
 
   constructor() {
     super('title')
   }
 
-  create() {
-    legacyCamera(this)
-    this.cameras.main.setBackgroundColor('#0b0f0c')
+  /** A line of text, remembered with its role so the palette can change. */
+  private label(x: number, y: number, text: string, role: Role, size = CELL) {
+    const t = this.add.text(x, y, text, { fontFamily: FONT, fontSize: `${size}px`, align: 'center' })
+    this.inked.push({ text: t, role })
+    return t
+  }
 
+  create() {
     const meta = loadMeta()
     this.classKeys = meta.unlockedClasses as ClassName[]
     this.classIndex = 0
     this.menuIndex = 0
+    this.inked = []
+    this.rules = []
+    const mid = GBC_WIDTH / 2
 
     // ── Title Block ──
-    this.add.text(GBC_WIDTH / 2, 6, 'POCKET', {
-      fontFamily: FONT, fontSize: '16px', color: '#e0f8cf',
-      resolution: 4, align: 'center',
-    }).setOrigin(0.5, 0)
+    this.label(mid, 10, 'POCKET', 'text', CELL * 2).setOrigin(0.5, 0)
+    this.label(mid, 30, 'DUNGEON', 'dim', CELL * 2).setOrigin(0.5, 0)
 
-    this.add.text(GBC_WIDTH / 2, 20, 'DUNGEON', {
-      fontFamily: FONT, fontSize: '8px', color: '#86b06a',
-      resolution: 4, align: 'center',
-    }).setOrigin(0.5, 0)
-
-    // Sprite preview: hero flanked by a dungeon threat, in the title's side margins
-    // Held as fields so `reloadPalette` can retexture them. Restarting the
-    // scene instead would also work and would throw away the class the player
-    // had scrolled to, because `create` resets `classIndex` to 0.
-    const heroPreview = (this.heroPreview = this.add
-      .sprite(20, 16, `hero_${GameState.paletteMode}_down`)
-      // The sprite textures are already enlarged; the zoomed camera would
-      // enlarge them a second time.
-      .setScale(1.4 / SCALE))
-    const ratPreview = (this.ratPreview = this.add
-      .sprite(140, 16, `rat_${GameState.paletteMode}`)
-      .setScale(1.2 / SCALE))
+    // The hero and a dungeon threat, either side of the name. Held as fields
+    // so `reloadPalette` can retexture them. Twice their size: a whole
+    // multiple, so their pixels stay square.
+    this.heroPreview = this.add.sprite(34, 28, `hero_${GameState.paletteMode}_down`).setScale(2)
+    this.ratPreview = this.add.sprite(GBC_WIDTH - 34, 28, `rat_${GameState.paletteMode}`).setScale(2)
     this.tweens.add({
-      targets: heroPreview,
-      y: '+=2',
-      duration: 500,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
+      targets: this.heroPreview, y: '+=2', duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     })
     this.tweens.add({
-      targets: ratPreview,
-      x: '+=2',
-      duration: 350,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
+      targets: this.ratPreview, x: '+=2', duration: 350, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     })
 
-    // ── Divider Line ──
-    const divider = this.add.graphics()
-    divider.fillStyle(0x506850); divider.fillRect(20, 33, GBC_WIDTH - 40, 1)
+    this.rules.push(this.add.rectangle(20, 54, GBC_WIDTH - 40, 1, 0).setOrigin(0, 0))
 
-    // ── Gold ──
-    // Drawn once per visit to this scene, never updated in place.
-    this.add.text(GBC_WIDTH / 2, 38, `${meta.gold} GOLD`, {
-      fontFamily: FONT, fontSize: '8px', color: '#ffd700', resolution: 4,
-    }).setOrigin(0.5, 0)
+    // ── Gold ── drawn once per visit to this scene, never updated in place.
+    this.label(mid, 62, `${meta.gold} GOLD`, 'gold').setOrigin(0.5, 0)
 
     // ── Class Selector ──
-    this.arrowLeft = this.add.text(14, 56, '\u25C0', {
-      fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 4,
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true })
+    this.arrowLeft = this.label(24, 82, '◀', 'text').setOrigin(0, 0.5).setInteractive({ useHandCursor: true })
+    this.classLabel = this.label(mid, 82, '', 'text').setOrigin(0.5, 0.5)
+    this.arrowRight = this.label(GBC_WIDTH - 24, 82, '▶', 'text')
+      .setOrigin(1, 0.5)
+      .setInteractive({ useHandCursor: true })
+    this.statsText = this.label(mid, 96, '', 'text').setOrigin(0.5, 0)
+    this.classDesc = this.label(mid, TITLE.descY, '', 'dim')
+      .setOrigin(0.5, 0)
+      .setWordWrapWidth(TITLE.descChars * CELL)
+      .setLineSpacing(2)
 
-    this.classLabel = this.add.text(GBC_WIDTH / 2, 56, '', {
-      fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 4,
-    }).setOrigin(0.5, 0.5)
-
-    this.arrowRight = this.add.text(GBC_WIDTH - 14, 56, '\u25B6', {
-      fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 4,
-    }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
-
-    // ── Class Stats ──
-    this.statsText = this.add.text(GBC_WIDTH / 2, 68, '', {
-      fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 4,
-    }).setOrigin(0.5, 0)
-
-    // ── Class Description ──
-    this.classDesc = this.add.text(GBC_WIDTH / 2, 80, '', {
-      fontFamily: FONT, fontSize: '8px', color: '#7a9a62', resolution: 4,
-      wordWrap: { width: 136 }, align: 'center',
-    }).setOrigin(0.5, 0)
-
-    // ── Menu Buttons (navigable with UP/DOWN + ENTER) ──
-    // Three rows since #143 added SOUND, so they sit 11px apart rather than 14:
-    // the class description above runs to two lines and ends at 96, and the
-    // run record below has to stay on the screen.
-    const btnY = 99
-    const rowGap = 11
-    this.menuItems = []
-
-    const startBtn = this.add.text(GBC_WIDTH / 2, btnY, 'START', {
-      fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 4,
-    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
-    this.menuItems.push(startBtn)
-
-    const shopBtn = this.add.text(GBC_WIDTH / 2, btnY + rowGap, 'SHOP', {
-      fontFamily: FONT, fontSize: '8px', color: '#86b06a', resolution: 4,
-    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
-    this.menuItems.push(shopBtn)
-
-    // The only mute a phone can reach between runs (#143): the shell has no M
-    // key, and M was the only mute this game had. The label is the live state.
-    const soundBtn = this.add.text(GBC_WIDTH / 2, btnY + rowGap * 2, '', {
-      fontFamily: FONT, fontSize: '8px', color: '#86b06a', resolution: 4,
-    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
-    this.menuItems.push(soundBtn)
+    // ── Menu (UP/DOWN + ENTER, or a tap) ──
+    // SOUND is the only mute a phone can reach between runs (#143): the shell
+    // has no M key. Its label is the live state.
+    this.menuItems = [0, 1, 2].map((i) =>
+      this.label(mid, TITLE.menuY + i * TITLE.menuGap, '', 'dim')
+        .setOrigin(0.5, 0)
+        .setInteractive({ useHandCursor: true }),
+    )
+    const [startBtn, shopBtn, soundBtn] = this.menuItems
 
     // ── Run History ──
-    const divider2 = this.add.graphics()
-    divider2.fillStyle(0x506850); divider2.fillRect(20, 131, GBC_WIDTH - 40, 1)
-
-    // One line, abbreviated: two lines of 8px text ran off the bottom edge.
-    this.add.text(GBC_WIDTH / 2, 134, `RUNS ${meta.totalRuns} WIN ${meta.totalVictories} BEST ${meta.bestFloor}`, {
-      fontFamily: FONT, fontSize: '8px', color: '#506850', resolution: 4,
-    }).setOrigin(0.5, 0)
+    this.rules.push(this.add.rectangle(20, 190, GBC_WIDTH - 40, 1, 0).setOrigin(0, 0))
+    this.label(mid, TITLE.recordY, `RUNS ${meta.totalRuns} WIN ${meta.totalVictories} BEST ${meta.bestFloor}`, 'dim')
+      .setOrigin(0.5, 0)
 
     this.updateClassDisplay()
-    this.updateMenuCursor()
+    this.applyTheme()
 
     music.play('title')
 
@@ -211,28 +169,36 @@ export class TitleScene extends Phaser.Scene {
   }
 
   private updateMenuCursor() {
+    const theme = THEME[GameState.paletteMode]
     const labels = ['START', 'SHOP', `SOUND: ${isMuted() ? 'OFF' : 'ON'}`]
     for (let i = 0; i < this.menuItems.length; i++) {
-      if (i === this.menuIndex) {
-        this.menuItems[i].setText(`\u25B6 ${labels[i]}`)
-        this.menuItems[i].setColor('#ffffff')
-      } else {
-        this.menuItems[i].setText(`  ${labels[i]}`)
-        this.menuItems[i].setColor('#86b06a')
-      }
+      const on = i === this.menuIndex
+      this.menuItems[i].setText(`${on ? '▶' : ' '} ${labels[i]}`)
+      this.menuItems[i].setColor(css(on ? theme.text : theme.dim))
     }
   }
 
+  /** Colours everything for the palette in use. */
+  private applyTheme() {
+    const theme = THEME[GameState.paletteMode]
+    this.cameras.main.setBackgroundColor(theme.bg)
+    for (const { text, role } of this.inked) text.setColor(css(theme[role]))
+    for (const rule of this.rules) rule.setFillStyle(theme.rule, 1)
+    this.updateMenuCursor()
+  }
+
   /**
-   * Re-textures the two previews for the palette the player just chose (#134).
+   * Redraws the screen for the palette the player just chose (#134, #159).
    *
-   * The title screen is the one place this game shows sprites outside the
-   * dungeon, so without it a toggle pressed here does nothing visible and
-   * reads as a dead control.
+   * The title is the one place this game shows sprites outside the dungeon,
+   * so without it a toggle pressed here does nothing visible and reads as a
+   * dead control. In place, not by restarting: `create` resets the class the
+   * player had scrolled to.
    */
   reloadPalette() {
     this.heroPreview?.setTexture(`hero_${GameState.paletteMode}_down`)
     this.ratPreview?.setTexture(`rat_${GameState.paletteMode}`)
+    this.applyTheme()
   }
 
   private updateClassDisplay() {

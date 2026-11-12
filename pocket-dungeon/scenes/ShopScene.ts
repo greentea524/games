@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
-import { LEGACY_WIDTH as GBC_WIDTH, FONT } from '../constants'
-import { legacyCamera } from '../legacy'
+import { GBC_WIDTH, FONT } from '../constants'
+import { GameState } from '../state'
+import { CELL, MARGIN, SHOP, THEME, css } from '../theme'
 import {
   loadMeta, CLASSES, SHOP_ITEMS, unlockClass, purchaseShopItem,
   keepsakeCost, buyKeepsake,
@@ -19,15 +20,11 @@ interface MenuItem {
 }
 
 /**
- * Rows the list can show at once.
- *
- * Measured, not chosen: rows start at y=37 and step 12, and the description
- * divider sits at y=97, so the sixth row would be drawn *on* the divider with
- * its text running into the description underneath. Before #86 the shop held
- * exactly five entries — two classes and three unlocks — so it was already
- * full to the pixel and could not have grown by one without this.
+ * Rows the list can show at once: the description's divider sits under the
+ * last. Before #86 the shop held exactly as many entries as it had rows, and
+ * could not have grown by one without the list scrolling.
  */
-const MAX_VISIBLE = 5
+const MAX_VISIBLE = SHOP.rows
 
 export class ShopScene extends Phaser.Scene {
   private items: MenuItem[] = []
@@ -41,14 +38,17 @@ export class ShopScene extends Phaser.Scene {
   private descText!: Phaser.GameObjects.Text
   private goldText!: Phaser.GameObjects.Text
   private infoText!: Phaser.GameObjects.Text
+  private titleText!: Phaser.GameObjects.Text
+  private backBtn!: Phaser.GameObjects.Text
+  private rules: Phaser.GameObjects.Rectangle[] = []
+  /** What the feedback line is saying, so a palette change can recolour it. */
+  private infoRole: 'good' | 'bad' | 'dim' = 'dim'
 
   constructor() {
     super('shop')
   }
 
   create() {
-    legacyCamera(this)
-    this.cameras.main.setBackgroundColor('#0b0f0c')
     this.cursor = 0
     this.first = 0
 
@@ -89,43 +89,27 @@ export class ShopScene extends Phaser.Scene {
       })
     }
 
-    // ── Title ──
-    this.add.text(GBC_WIDTH / 2, 1, 'SHOP', {
-      fontFamily: FONT, fontSize: '16px', color: '#ffd700', resolution: 4,
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5, 0)
-
-    this.goldText = this.add.text(GBC_WIDTH / 2, 21, `${meta.gold} GOLD`, {
-      fontFamily: FONT, fontSize: '8px', color: '#ffd700', resolution: 4,
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5, 0)
-
-    // ── Divider ──
-    const div = this.add.graphics()
-    div.fillStyle(0x506850); div.fillRect(20, 33, GBC_WIDTH - 40, 1)
+    // ── Layout ── for 240×216, in the HUD's font: 8 pixels or twice it, on
+    // whole pixels, no stroke (#159). Colours are set by `applyTheme`.
+    const mid = GBC_WIDTH / 2
+    const style = { fontFamily: FONT, fontSize: `${CELL}px` }
+    this.titleText = this.add.text(mid, 8, 'SHOP', { ...style, fontSize: `${CELL * 2}px` }).setOrigin(0.5, 0)
+    this.goldText = this.add.text(mid, 30, `${meta.gold} GOLD`, style).setOrigin(0.5, 0)
+    this.rules = [46, SHOP.dividerY].map((y) => this.add.rectangle(20, y, GBC_WIDTH - 40, 1, 0).setOrigin(0, 0))
 
     // ── Item List ──
-    // Name and cost are separate columns: at 8px (monospaced, 8px/char) a
-    // single combined string would run past the 160px screen edge.
+    // Name and cost are separate columns, left and right aligned. One text
+    // pair per *visible* row, not per entry. The row's meaning moves with the
+    // window, so the click handler reads `this.first` at click time rather
+    // than closing over an entry index that would go stale the moment the
+    // list scrolled.
     this.itemTexts = []
     this.costTexts = []
-    const startY = 37
-    const rowH = 12
-    // One text pair per *visible* row, not per entry. The row's meaning moves
-    // with the window, so the click handler reads `this.first` at click time
-    // rather than closing over an entry index that would go stale the moment
-    // the list scrolled.
     const rows = Math.min(this.items.length, MAX_VISIBLE)
     for (let i = 0; i < rows; i++) {
-      const rowStyle = {
-        fontFamily: FONT, fontSize: '8px',
-        color: '#e0f8cf', resolution: 4,
-        stroke: '#000000', strokeThickness: 2,
-      }
-      const txt = this.add.text(4, startY + i * rowH, '', rowStyle)
-        .setInteractive({ useHandCursor: true })
-      const cost = this.add.text(GBC_WIDTH - 4, startY + i * rowH, '', rowStyle)
-        .setOrigin(1, 0)
+      const y = SHOP.rowsY + i * SHOP.rowGap
+      const txt = this.add.text(MARGIN, y, '', style).setInteractive({ useHandCursor: true })
+      const cost = this.add.text(GBC_WIDTH - MARGIN, y, '', style).setOrigin(1, 0)
 
       txt.on('pointerdown', () => {
         const index = this.first + i
@@ -139,47 +123,26 @@ export class ShopScene extends Phaser.Scene {
       this.costTexts.push(cost)
     }
 
-    // Centred *on the dividers*, which is the only clear space on this screen.
-    // They were first put in the right-hand gutter at the top and bottom of
-    // the list, and the screenshot showed why that fails: the rows are packed
-    // to the pixel between the dividers, so the lower marker landed on top of
-    // the fifth row's cost and the upper one on the gold line. Names are left
-    // aligned and costs right aligned, so the middle of a divider is the one
-    // place nothing else can reach.
-    const markerStyle = {
-      fontFamily: FONT, fontSize: '8px', color: '#ffd700', resolution: 4,
-      stroke: '#000000', strokeThickness: 2,
-    }
-    this.moreAbove = this.add.text(GBC_WIDTH / 2, 33, '', markerStyle).setOrigin(0.5, 0.5)
-    this.moreBelow = this.add.text(GBC_WIDTH / 2, 97, '', markerStyle).setOrigin(0.5, 0.5)
+    // Centred *on the dividers*. Names are left aligned and costs right
+    // aligned, so the middle of a divider is the one place nothing else can
+    // reach; in the gutters the markers landed on a row's cost.
+    this.moreAbove = this.add.text(mid, 46, '', style).setOrigin(0.5, 0.5)
+    this.moreBelow = this.add.text(mid, SHOP.dividerY, '', style).setOrigin(0.5, 0.5)
 
-    // ── Description Area ──
-    const descDiv = this.add.graphics()
-    descDiv.fillStyle(0x506850); descDiv.fillRect(20, 97, GBC_WIDTH - 40, 1)
+    this.descText = this.add.text(mid, SHOP.descY, '', { ...style, align: 'center' })
+      .setOrigin(0.5, 0)
+      .setWordWrapWidth(SHOP.descChars * CELL)
+      .setLineSpacing(2)
+    this.infoText = this.add.text(mid, SHOP.infoY, '', style).setOrigin(0.5, 0)
 
-    this.descText = this.add.text(GBC_WIDTH / 2, 101, '', {
-      fontFamily: FONT, fontSize: '8px', color: '#b8d8a0', resolution: 4,
-      stroke: '#000000', strokeThickness: 2,
-      wordWrap: { width: 150 }, align: 'center',
-    }).setOrigin(0.5, 0)
-
-    // ── Feedback Text ──
-    this.infoText = this.add.text(GBC_WIDTH / 2, 121, '', {
-      fontFamily: FONT, fontSize: '8px', color: '#ff8888', resolution: 4,
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5, 0)
-
-    // ── Back Button ──
-    const backBtn = this.add.text(GBC_WIDTH / 2, 132, '\u25C0 BACK', {
-      fontFamily: FONT, fontSize: '8px', color: '#86b06a', resolution: 4,
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
-
+    const backBtn = (this.backBtn = this.add.text(mid, SHOP.backY, '\u25C0 BACK', style)
+      .setOrigin(0.5, 0)
+      .setInteractive({ useHandCursor: true }))
     backBtn.on('pointerdown', () => { sfx.menuCancel(); this.scene.start('title') })
-    backBtn.on('pointerover', () => backBtn.setColor('#e0f8cf'))
-    backBtn.on('pointerout', () => backBtn.setColor('#86b06a'))
+    backBtn.on('pointerover', () => backBtn.setColor(css(THEME[GameState.paletteMode].text)))
+    backBtn.on('pointerout', () => backBtn.setColor(css(THEME[GameState.paletteMode].dim)))
 
-    this.updateCursor()
+    this.applyTheme()
 
     // ── Keyboard Input ──
     const cursors = this.input.keyboard!.createCursorKeys()
@@ -205,7 +168,34 @@ export class ShopScene extends Phaser.Scene {
     xKey.on('down', () => { sfx.menuCancel(); this.scene.start('title') })
   }
 
+  /** Colours everything for the palette in use (#159). */
+  private applyTheme() {
+    const theme = THEME[GameState.paletteMode]
+    this.cameras.main.setBackgroundColor(theme.bg)
+    this.titleText.setColor(css(theme.gold))
+    this.goldText.setColor(css(theme.gold))
+    this.moreAbove.setColor(css(theme.gold))
+    this.moreBelow.setColor(css(theme.gold))
+    this.descText.setColor(css(theme.text))
+    this.backBtn.setColor(css(theme.dim))
+    this.rules.forEach((r) => r.setFillStyle(theme.rule, 1))
+    const said = this.infoText.text
+    this.updateCursor()
+    this.say(said, this.infoRole)
+  }
+
+  /** The palette toggle, pressed while the shop is open. */
+  reloadPalette() {
+    this.applyTheme()
+  }
+
+  private say(text: string, role: 'good' | 'bad' | 'dim') {
+    this.infoRole = role
+    this.infoText.setText(text).setColor(css(THEME[GameState.paletteMode][role]))
+  }
+
   private updateCursor() {
+    const theme = THEME[GameState.paletteMode]
     // Scroll only far enough to bring the cursor back into view, so the list
     // stays put while moving within the window.
     const rows = this.itemTexts.length
@@ -231,9 +221,10 @@ export class ShopScene extends Phaser.Scene {
       this.itemTexts[i].setText(`${prefix}${item.name}`)
       this.costTexts[i].setText(costStr)
 
-      const color = item.owned ? '#7e9a7c' : index === this.cursor ? '#ffffff' : '#e0f8cf'
-      this.itemTexts[i].setColor(color)
-      this.costTexts[i].setColor(item.owned ? '#7e9a7c' : '#ffd700')
+      // Owned rows step back; the cursor's row is the one in full white.
+      const here = index === this.cursor
+      this.itemTexts[i].setColor(css(here ? theme.text : theme.dim))
+      this.costTexts[i].setColor(css(item.owned ? theme.dim : theme.gold))
     }
 
     this.moreAbove.setText(this.first > 0 ? '\u25B2' : '')
@@ -247,8 +238,7 @@ export class ShopScene extends Phaser.Scene {
     const item = this.items[this.cursor]
     if (!item || item.owned) {
       sfx.menuCancel()
-      this.infoText.setText('ALREADY OWNED')
-      this.infoText.setColor('#888888')
+      this.say('ALREADY OWNED', 'dim')
       return
     }
 
@@ -279,12 +269,10 @@ export class ShopScene extends Phaser.Scene {
       // "PURCHASED!" has been unreachable since this screen was built; it
       // showed up the moment #86 added a check that read the line back.
       this.updateCursor()
-      this.infoText.setText(item.type === 'keepsake' ? 'KEPT FOR NEXT RUN' : 'PURCHASED!')
-      this.infoText.setColor('#88ff88')
+      this.say(item.type === 'keepsake' ? 'KEPT FOR NEXT RUN' : 'PURCHASED!', 'good')
     } else {
       sfx.menuCancel()
-      this.infoText.setText('NOT ENOUGH GOLD')
-      this.infoText.setColor('#ff8888')
+      this.say('NOT ENOUGH GOLD', 'bad')
     }
   }
 }
