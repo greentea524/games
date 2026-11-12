@@ -348,7 +348,10 @@ it clear of overlaps at three-digit HP, four-digit gold and the best gear in
 the item table. The same layout on 160×144 must fail, as the control. The
 shell rounds the screen's corners, which no layout check sees: with a 6-pixel
 margin the bottom line lost the foot of its last digit to the curve.
-Screenshot the corners. The game has no level, so the card's LEVEL is not on
+Screenshot the corners. `qa:contrast` read the bar's tone before switching
+palette, so the green screen's pips were scored against the colour mode's
+bar; it reads the bar in DMG now, and at once failed the empty pip, drawn in
+`PAL.dark` on a `PAL.darkest` bar. The game has no level, so the card's LEVEL is not on
 the bar, and the turn counter is gone because nothing in play shows the
 player a use for it.
 
