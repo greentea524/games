@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { TILE, PAL, GBC_PAL, WORLD_PALS } from '../constants'
+// Drawn on the old 16-pixel grid and enlarged afterwards; see `enlarge`.
+import { LEGACY_TILE as TILE, TILE as NEW_TILE, SCALE, PAL, GBC_PAL, WORLD_PALS } from '../constants'
 
 type Facing = 'down' | 'up' | 'left' | 'right'
 
@@ -20,7 +21,35 @@ export class BootScene extends Phaser.Scene {
         this.buildBorderDressing(mode, w)
       }
     })
+    this.enlarge()
     this.scene.start('mainmenu')
+  }
+
+  /**
+   * Enlarges every texture drawn below from the old 16-pixel grid to the
+   * 24-pixel tile (#160).
+   *
+   * This ticket changes the canvas and leaves the art alone, so the game is
+   * whole at the new size before any of it is redrawn. One and a half is not
+   * a whole number of pixels, so an enlarged sprite has pixels of two widths,
+   * and it shows. That ends as #161 to #163 replace each builder with art
+   * drawn at 24; when none are left, this goes.
+   */
+  private enlarge() {
+    const reserved = new Set(['__DEFAULT', '__MISSING', '__WHITE', '__NORMAL'])
+    for (const key of this.textures.getTextureKeys()) {
+      if (reserved.has(key)) continue
+      const source = this.textures.get(key).getSourceImage() as HTMLCanvasElement
+      if (source.width !== TILE || source.height !== TILE) continue
+      const copy = document.createElement('canvas')
+      copy.width = copy.height = NEW_TILE
+      const ctx = copy.getContext('2d')
+      if (!ctx) continue
+      ctx.imageSmoothingEnabled = false
+      ctx.drawImage(source, 0, 0, Math.round(TILE * SCALE), Math.round(TILE * SCALE))
+      this.textures.remove(key)
+      this.textures.addCanvas(key, copy)
+    }
   }
 
   private buildTileset(mode: 'dmg' | 'gbc', world: number) {

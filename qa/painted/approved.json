@@ -32,7 +32,7 @@
   "cart-crate": {
     "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
     "art": "d1ad5e0233bc6b14706d70928fd41270cc800ad6ef9292a7a23f64938daa0c3a",
-    "textures": "a374f1bff1b20ae67f1bc92795ee4130e2746cfe92a43277bb1c252891235770",
+    "textures": "d9489cb08f1fad4f46d1b3a0c5421f57a9a511742ed50b4a81250287b760eb34",
     "keys": 74,
     "nondeterministic": []
   }

@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT, PAL } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, LEGACY_HEIGHT as GBC_HEIGHT, FONT, PAL } from '../constants'
+import { legacyCamera } from '../legacy'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem } from '../save'
@@ -26,6 +27,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144 (#160).
+    legacyCamera(this)
     const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
 
     // Top Bar Pill Background for High Contrast in MONO and COLOR modes

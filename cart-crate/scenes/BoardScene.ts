@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { TILE, FONT, PAL, GBC_PAL, WORLD_PALS } from '../constants'
+import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, PAL, GBC_PAL, WORLD_PALS, sx } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem, recordHighestUnlocked } from '../save'
@@ -437,8 +437,8 @@ export class BoardScene extends Phaser.Scene {
     if (!this.textures.exists(texKey)) {
       const g = this.make.graphics({ x: 0, y: 0 }, false)
       g.fillStyle(0xffffff, 1)
-      g.fillRect(0, 0, 2, 2)
-      g.generateTexture(texKey, 2, 2)
+      g.fillRect(0, 0, 3, 3)
+      g.generateTexture(texKey, 3, 3)
       g.destroy()
     }
 
@@ -453,9 +453,9 @@ export class BoardScene extends Phaser.Scene {
         const cx = c.tx * TILE + TILE / 2
         const cy = c.ty * TILE + TILE / 2
         const emitter = this.add.particles(cx, cy, texKey, {
-          speed: { min: 60, max: 150 },
+          speed: { min: sx(60), max: sx(150) },
           angle: { min: 0, max: 360 },
-          gravityY: 260,
+          gravityY: sx(260),
           lifespan: { min: 500, max: 900 },
           quantity: 16,
           scale: { start: 1, end: 0.3 },
@@ -474,13 +474,13 @@ export class BoardScene extends Phaser.Scene {
     const mapPixelWidth = this.mapWidth * TILE
     const mapPixelHeight = this.mapHeight * TILE
 
-    if (mapPixelWidth > 160 || mapPixelHeight > 144) {
-      this.cameras.main.setBounds(0, 0, Math.max(160, mapPixelWidth), Math.max(144, mapPixelHeight))
+    if (mapPixelWidth > GBC_WIDTH || mapPixelHeight > GBC_HEIGHT) {
+      this.cameras.main.setBounds(0, 0, Math.max(GBC_WIDTH, mapPixelWidth), Math.max(GBC_HEIGHT, mapPixelHeight))
       this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
     } else {
-      const offsetX = (160 - mapPixelWidth) / 2
-      const offsetY = (144 - mapPixelHeight) / 2
-      this.cameras.main.setBounds(-offsetX, -offsetY, 160, 144)
+      const offsetX = (GBC_WIDTH - mapPixelWidth) / 2
+      const offsetY = (GBC_HEIGHT - mapPixelHeight) / 2
+      this.cameras.main.setBounds(-offsetX, -offsetY, GBC_WIDTH, GBC_HEIGHT)
       this.cameras.main.stopFollow()
       this.cameras.main.setScroll(-offsetX, -offsetY)
     }
@@ -844,7 +844,7 @@ export class BoardScene extends Phaser.Scene {
       // 3 bouncy jumps for joy
       this.tweens.add({
         targets: this.player,
-        y: this.player.y - 8,
+        y: this.player.y - sx(8),
         yoyo: true,
         repeat: 2,
         duration: 150,
@@ -860,6 +860,7 @@ export class BoardScene extends Phaser.Scene {
           showRunSummary(this, {
             title: `LEVEL ${levelConfig.id} CLEAR`,
             palette: PAL,
+            screen: { width: GBC_WIDTH, height: GBC_HEIGHT },
             stats: [
               { label: 'MOVES', value: `${moves}`, highlight: isBest },
               { label: 'PAR', value: `${levelConfig.parMoves}` },
@@ -956,9 +957,9 @@ export class BoardScene extends Phaser.Scene {
     
     // Draw a simple triangle arrow
     arrow.beginPath()
-    arrow.moveTo(-4, -4)
-    arrow.lineTo(4, 0)
-    arrow.lineTo(-4, 4)
+    arrow.moveTo(-6, -6)
+    arrow.lineTo(6, 0)
+    arrow.lineTo(-6, 6)
     arrow.closePath()
     arrow.fillPath()
 
@@ -972,8 +973,8 @@ export class BoardScene extends Phaser.Scene {
     this.tweens.add({
       targets: arrow,
       alpha: 0,
-      y: arrow.y + (nextMove === 'U' ? -6 : nextMove === 'D' ? 6 : 0),
-      x: arrow.x + (nextMove === 'L' ? -6 : nextMove === 'R' ? 6 : 0),
+      y: arrow.y + (nextMove === 'U' ? -9 : nextMove === 'D' ? 9 : 0),
+      x: arrow.x + (nextMove === 'L' ? -9 : nextMove === 'R' ? 9 : 0),
       duration: 1000,
       ease: 'Quad.easeOut',
       onComplete: () => arrow.destroy()
@@ -981,7 +982,7 @@ export class BoardScene extends Phaser.Scene {
   }
 
   showToast(msg: string) {
-    const toast = this.add.text(this.cameras.main.worldView.centerX, this.cameras.main.worldView.centerY - 20, msg, {
+    const toast = this.add.text(this.cameras.main.worldView.centerX, this.cameras.main.worldView.centerY - sx(20), msg, {
       fontFamily: FONT,
       fontSize: '8px',
       color: '#ffcc00',
@@ -993,7 +994,7 @@ export class BoardScene extends Phaser.Scene {
     this.tweens.add({
       targets: toast,
       alpha: 0,
-      y: toast.y - 10,
+      y: toast.y - sx(10),
       delay: 1000,
       duration: 500,
       onComplete: () => toast.destroy()

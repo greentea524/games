@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, FONT } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, FONT, SCALE } from '../constants'
+import { legacyCamera } from '../legacy'
 import { GameState } from '../state'
 import { music, isMuted, setMuted } from '../audio'
 
@@ -12,6 +13,8 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144 (#160).
+    legacyCamera(this)
     this.cameras.main.setBackgroundColor('#081820')
 
     // Two lines: 'CART CRATE' on one is 163px at 16px, wider than the screen.
@@ -38,9 +41,9 @@ export class MainMenuScene extends Phaser.Scene {
     // Sprite preview: the courier fox pushing a crate onto its target
     const mode = GameState.paletteMode
     const keyPrefix = mode === 'gbc' ? '_w1' : ''
-    const targetPreview = this.add.sprite(GBC_WIDTH / 2 + 20, 80, `target_${mode}${keyPrefix}`).setScale(1.8)
-    const cratePreview = this.add.sprite(GBC_WIDTH / 2, 80, `crate_${mode}${keyPrefix}`).setScale(1.8)
-    this.add.sprite(GBC_WIDTH / 2 - 22, 80, `player_${mode}_right`).setScale(1.8)
+    const targetPreview = this.add.sprite(GBC_WIDTH / 2 + 20, 80, `target_${mode}${keyPrefix}`).setScale(1.8 / SCALE)
+    const cratePreview = this.add.sprite(GBC_WIDTH / 2, 80, `crate_${mode}${keyPrefix}`).setScale(1.8 / SCALE)
+    this.add.sprite(GBC_WIDTH / 2 - 22, 80, `player_${mode}_right`).setScale(1.8 / SCALE)
     this.tweens.add({
       targets: cratePreview,
       x: '+=4',

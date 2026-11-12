@@ -364,6 +364,18 @@ three. `showRunSummary` takes a `screen` size for a game that is not 160×144.
 The dungeon's floating text was 12 pixels, which this font cannot draw
 cleanly; it is 8 with a shadow now.
 
+**Cart & Crate is 240×216 with 24-pixel tiles, part-way through the same
+rework (#160 to #165).** #160 changed the canvas and left the art alone, as
+#155 did for Pocket Dungeon, so two things are temporary. `BootScene.enlarge`
+scales the 16-pixel textures by one and a half, which leaves pixels of two
+widths. The menu, level select and HUD are still laid out for 160×144 and
+shown through `legacyCamera`. The screen is still ten tiles by nine, so the
+six levels larger than that scroll exactly as they did. A check that taps an
+object in a scene behind that camera must multiply by the camera's zoom:
+`tapObject` in `qa/touch/sound.mjs` takes it from the game. And a key sent
+with no hold falls between frames on the menu, which polls `JustDown`; hold
+it for a frame or the screenshot script sits on the title for ever.
+
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
 of the screen, so steering showed only as the tube turning. It trails now: the
