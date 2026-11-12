@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { cornerFrames, drawnBox, floorFrame, isVoid, wallFrame } from '../tiles'
 import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, PAL, GBC_PAL, WORLD_PALS, sx } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
@@ -18,6 +19,13 @@ export interface CrateInstance {
   docked: boolean
   destroyed?: boolean
 }
+
+/**
+ * How much of the screen the HUD's two bars cover, in screen pixels. The HUD
+ * is still laid out for the old screen: 14 and 12 pixels there, enlarged.
+ */
+const HUD_TOP = sx(14)
+const HUD_BOTTOM = sx(12)
 
 export class BoardScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite
@@ -170,17 +178,23 @@ export class BoardScene extends Phaser.Scene {
         const px = x * TILE + TILE / 2
         const py = y * TILE + TILE / 2
 
+        // A wall above puts the floor under it in shade.
+        const floor = floorFrame(x, y, y > 0 && this.floorGrid[y - 1][x] === '#')
+
         if (char === '#') {
-          let texKey = 'wall'
-          if (y === 0) {
-            texKey = (x % 2 === 0) ? 'shelf' : 'pegboard'
-          } else if (y === this.mapHeight - 1 || x === 0 || x === this.mapWidth - 1) {
-            texKey = 'barrel'
+          // A wall with no floor beside it is not the edge of anything: left
+          // undrawn, so the room sits in the dark instead of in a slab of wall.
+          if (!isVoid(this.floorGrid, x, y)) {
+            this.floorSprites[y][x] = this.add.image(px, py, tKey('wall'), wallFrame(this.floorGrid, x, y))
+            for (const corner of cornerFrames(this.floorGrid, x, y)) {
+              this.add.image(px, py, tKey('wallcorner'), corner)
+            }
           }
-          this.floorSprites[y][x] = this.add.image(px, py, tKey(texKey))
         } else if (char === 'T') {
-          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'))
-          const targetSprite = this.add.image(px, py, tKey('target'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'), floor)
+          // Above the floor of the cells round it: a filled target's glow
+          // reaches past its own tile.
+          const targetSprite = this.add.image(px, py, tKey('target')).setDepth(1)
           this.targetSprites[y][x] = targetSprite
           this.setTargetEmpty(x, y)
         } else if (char === 'I') {
@@ -190,7 +204,7 @@ export class BoardScene extends Phaser.Scene {
         } else if (char === 'O') {
           this.floorSprites[y][x] = this.add.image(px, py, tKey('hole'))
         } else {
-          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'), floor)
         }
 
         if (char === 'C' || char === '*') {
@@ -198,8 +212,7 @@ export class BoardScene extends Phaser.Scene {
           this.floorGrid[y][x] = isTarget ? 'T' : '.'
           
           if (isTarget) {
-            this.add.image(px, py, tKey('floor'))
-            const targetSprite = this.add.image(px, py, tKey('target'))
+            const targetSprite = this.add.image(px, py, tKey('target')).setDepth(1)
             this.targetSprites[y][x] = targetSprite
             this.setTargetLit(x, y, false, false)
           }
@@ -232,7 +245,9 @@ export class BoardScene extends Phaser.Scene {
     if (img) {
       if (char === 'O') img.setTexture(this.getTextureKey('hole'))
       else if (char === 'X') img.setTexture(this.getTextureKey('cracked'))
-      else if (char === '.') img.setTexture(this.getTextureKey('floor'))
+      else if (char === '.') {
+        img.setTexture(this.getTextureKey('floor'), floorFrame(tx, ty, ty > 0 && this.floorGrid[ty - 1][tx] === '#'))
+      }
     }
   }
 
@@ -249,30 +264,19 @@ export class BoardScene extends Phaser.Scene {
     const mode = GameState.paletteMode
     const tKey = this.getTextureKey.bind(this)
 
+    // Every texture here is `<kind>_dmg` or `<kind>_gbc_w<world>`, so the
+    // kind is read off the key and the same frame is kept. A kind added later
+    // switches without being named here, which is how the decor was missed
+    // (#134).
     this.children.each((child: Phaser.GameObjects.GameObject) => {
-      if (child instanceof Phaser.GameObjects.Image) {
-        const key = child.texture.key
-        if (key.startsWith('floor_')) child.setTexture(tKey('floor'))
-        else if (key.startsWith('wall_')) child.setTexture(tKey('wall'))
-        else if (key.startsWith('ice_')) child.setTexture(tKey('ice'))
-        else if (key.startsWith('cracked_')) child.setTexture(tKey('cracked'))
-        else if (key.startsWith('hole_')) child.setTexture(tKey('hole'))
-        // The decor, which this list missed until #134's reachability check
-        // caught it: 34 `*_gbc_w1` sprites stayed on screen in DMG mode, so
-        // the DMG shelf, pegboard and barrel art `qa:contrast` scores could
-        // not be seen. Every entry in this chain is a sprite kind somebody
-        // had to remember — see the note on `reloadPalette` above.
-        else if (key.startsWith('shelf_')) child.setTexture(tKey('shelf'))
-        else if (key.startsWith('pegboard_')) child.setTexture(tKey('pegboard'))
-        else if (key.startsWith('barrel_')) child.setTexture(tKey('barrel'))
-      } else if (child instanceof Phaser.GameObjects.Sprite) {
-        const key = child.texture.key
-        if (key.startsWith('crate_')) {
-          child.setTexture(tKey('crate'))
-        } else if (key.startsWith('player_')) {
-          child.setTexture(`player_${mode}_${this.facing}`)
-        }
+      if (!(child instanceof Phaser.GameObjects.Image) && !(child instanceof Phaser.GameObjects.Sprite)) return
+      const key = child.texture.key
+      if (key.startsWith('player_')) {
+        child.setTexture(`player_${mode}_${this.facing}`)
+        return
       }
+      const kind = key.match(/^(.+?)_(?:dmg|gbc_w\d+)$/)?.[1]
+      if (kind) child.setTexture(tKey(kind), child.frame.name)
     })
 
     // Re-apply each pad's glow state (empty pulse vs. satisfied lit).
@@ -470,20 +474,39 @@ export class BoardScene extends Phaser.Scene {
     })
   }
 
+  /**
+   * Frames the level.
+   *
+   * What is framed is the part that is drawn, not the whole grid (#161):
+   * levels are padded with rows of wall that are no longer drawn, and a room
+   * centred as if they were sits against the top of the screen with its upper
+   * wall under the HUD.
+   *
+   * A level that fits between the HUD's two bars is centred there. One that
+   * fits the screen but not that gap is centred on the screen, its outer wall
+   * under the bars as before: counting the bars against it would make eleven
+   * more levels scroll. One larger than the screen scrolls with the fox, as
+   * it always did.
+   */
   private updateCamera() {
-    const mapPixelWidth = this.mapWidth * TILE
-    const mapPixelHeight = this.mapHeight * TILE
+    const box = drawnBox(this.floorGrid)
+    const width = box.width * TILE
+    const height = box.height * TILE
 
-    if (mapPixelWidth > GBC_WIDTH || mapPixelHeight > GBC_HEIGHT) {
+    if (width > GBC_WIDTH || height > GBC_HEIGHT) {
+      const mapPixelWidth = this.mapWidth * TILE
+      const mapPixelHeight = this.mapHeight * TILE
       this.cameras.main.setBounds(0, 0, Math.max(GBC_WIDTH, mapPixelWidth), Math.max(GBC_HEIGHT, mapPixelHeight))
       this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
-    } else {
-      const offsetX = (GBC_WIDTH - mapPixelWidth) / 2
-      const offsetY = (GBC_HEIGHT - mapPixelHeight) / 2
-      this.cameras.main.setBounds(-offsetX, -offsetY, GBC_WIDTH, GBC_HEIGHT)
-      this.cameras.main.stopFollow()
-      this.cameras.main.setScroll(-offsetX, -offsetY)
+      return
     }
+    const between = GBC_HEIGHT - HUD_TOP - HUD_BOTTOM
+    const top = height <= between ? HUD_TOP + (between - height) / 2 : (GBC_HEIGHT - height) / 2
+    const scrollX = Math.round(box.x * TILE - (GBC_WIDTH - width) / 2)
+    const scrollY = Math.round(box.y * TILE - top)
+    this.cameras.main.setBounds(scrollX, scrollY, GBC_WIDTH, GBC_HEIGHT)
+    this.cameras.main.stopFollow()
+    this.cameras.main.setScroll(scrollX, scrollY)
   }
 
   setPlayerPos(tx: number, ty: number, facing: Facing) {

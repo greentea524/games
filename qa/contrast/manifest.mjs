@@ -74,14 +74,16 @@ export const GAMES = [
     advance: 2,
     scene: 'board',
     surfaces: {
-      floor: { texture: 'floor_dmg' },
+      // Frame 0 of the floor strip: the plain square (#161). All four frames
+      // are the lightest tone on the green screen.
+      floor: { texture: 'floor_dmg', frame: 0 },
     },
     on: {
       floor: [
         'player_dmg_down', 'player_dmg_up', 'player_dmg_left', 'player_dmg_right',
         'crate_dmg', 'target_dmg', 'target_lit_dmg',
         'hole_dmg',
-        'wall_dmg', 'shelf_dmg', 'pegboard_dmg', 'barrel_dmg',
+        'wall_dmg', 'wallcorner_dmg',
       ],
     },
     // Ice and cracked ground are floor with a mark on it — that is what they
