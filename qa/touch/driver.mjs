@@ -241,6 +241,20 @@ export async function launchTouch(url, options = {}) {
         touchPoints: [{ x: p.x, y: p.y, id }],
       })
     },
+    /**
+     * Wait until the page has been handed the moves sent so far.
+     *
+     * A touch move is delivered with the next frame, not when it is sent. A
+     * check that reads the game straight after `move` passes at 60 frames a
+     * second and, on a slow renderer, reads the position before the move: a
+     * 120 pixel drag measured as 50. Two frames is one to deliver and one for
+     * the game to act on it.
+     */
+    async settle() {
+      await page.evaluate(
+        () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
+      )
+    },
     /** Press, hold, release: the shape of a normal button press. */
     async tap(id, x, y, holdMs = 120) {
       await hand.down(id, x, y)
