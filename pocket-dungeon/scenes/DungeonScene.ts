@@ -1453,12 +1453,8 @@ export class DungeonScene extends Phaser.Scene {
       slot('WPN', inv.equippedWeapon),
       slot('ARM', inv.equippedArmor),
       slot('ACC', inv.equippedAccessory),
-      // Keys (#59) live here rather than in the HUD. Measured, not assumed:
-      // with "STARVING!" and a four-digit gold count on screen, the bottom bar
-      // leaves 18px between the gold readout and ATK, and "K:2" renders at
-      // 20px — so a HUD counter overlaps ATK at values the game actually
-      // reaches. The issue's premise that the HUD already displays keys was
-      // not true; there was no key counter, and there is no room for one.
+      // Keys (#59) were shown only here while the HUD had no room for them.
+      // #158's wider bar has a slot for them too; the panel keeps its line.
       `KEY ${keys > 0 ? `x${keys}` : '--'}`,
     ].join('\n')
 

@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { TILE, PAL } from '../constants'
+import { ICONS, iconKey } from '../hud'
 import { SPRITES, SPRITE_PX, pixels, textureKey, type Mode } from '../sprites'
 import { CATACOMB, CELLAR, DMG as DMG_TILES, FRAME, TILE_PX, VAULT, drawTileset, type TilePalette } from '../tiles'
 
@@ -13,6 +14,7 @@ export class BootScene extends Phaser.Scene {
       this.buildTileset(mode)
       this.buildSprites(mode)
       this.buildRelicPips(mode)
+      this.buildHudIcons(mode)
     })
     this.scene.start('title')
   }
@@ -41,12 +43,29 @@ export class BootScene extends Phaser.Scene {
   }
 
   /**
+   * The HUD's heart and slot pictures, 8x8 (#158). One colour each; on the
+   * green screen that colour is the lightest tone, against the dark bar.
+   */
+  private buildHudIcons(mode: Mode) {
+    for (const [name, icon] of Object.entries(ICONS)) {
+      const key = iconKey(name, mode)
+      if (this.textures.exists(key)) continue
+      const g = this.make.graphics({}, false)
+      g.fillStyle(mode === 'dmg' ? PAL.lightest : icon.gbc)
+      icon.rows.forEach((row, y) => {
+        for (let x = 0; x < row.length; x++) if (row[x] === '#') g.fillRect(x, y, 1, 1)
+      })
+      g.generateTexture(key, icon.rows[0].length, icon.rows.length)
+      g.destroy()
+    }
+  }
+
+  /**
    * The HUD's relic pips, 6x6 (#84). `_held` is the filled one.
    *
    * A pip is not the relic scaled down — at 6px a scaled sprite is mush — so
    * it is its own shape, filled for a relic held and hollow for one still out
-   * there. Still drawn at the old size: the HUD is laid out for the old
-   * screen and shown through a zoomed camera until #158.
+   * there.
    */
   private buildRelicPips(mode: Mode) {
     const isDmg = mode === 'dmg'

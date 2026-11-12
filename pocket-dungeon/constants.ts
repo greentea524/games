@@ -14,11 +14,9 @@ export const TILE = 24
 /**
  * The size everything was first drawn and laid out at.
  *
- * #155 changes the canvas and nothing about the art, so the sprites are still
- * authored on a 16-pixel grid and enlarged, and the title, shop, HUD and
- * game-over screens are still laid out for 160×144 and shown through a
- * camera zoomed by `SCALE`. Each of those is replaced by art and layout made
- * at the new size in #156 to #159; when the last goes, so do these.
+ * The title, shop and game-over screens are still laid out for 160×144 and
+ * shown through a camera zoomed by `SCALE`, until #159 lays them out at the
+ * new size; when the last goes, so do these.
  */
 export const LEGACY_WIDTH = 160
 export const LEGACY_HEIGHT = 144
