@@ -1,105 +1,135 @@
 import Phaser from 'phaser'
-import { LEGACY_WIDTH as GBC_WIDTH, LEGACY_HEIGHT as GBC_HEIGHT, FONT, CSS_LIGHTEST } from '../constants'
-import { legacyCamera } from '../legacy'
+import { GBC_WIDTH, GBC_HEIGHT, FONT, PAL } from '../constants'
 import { GameState } from '../state'
 import { RELICS } from '../relics'
+import { BAR_HEIGHT, CELL, foodState, hpFill, iconKey, layout, type Box, type HudValues } from '../hud'
 
-/** Pip art is 6x6 (see BootScene.buildRelics), laid out edge to edge. */
-const PIP = 6
-/** Breathing room between the gold figure and the first pip. */
-const PIP_GAP = 4
+/**
+ * What the HUD is drawn in, per palette (#158).
+ *
+ * One colour family for everything the player reads; yellow and red are kept
+ * for the two food warnings, which are signals and not decoration. The green
+ * screen has no red to warn with, so there the word STARVING! carries it.
+ */
+const INK = {
+  gbc: { bar: 0x0b0b12, text: 0xf4f4f4, low: 0xffcc00, bad: 0xff5050, track: 0x3a3a48, fill: 0xe84858 },
+  dmg: { bar: PAL.darkest, text: PAL.lightest, low: PAL.lightest, bad: PAL.lightest, track: PAL.dark, fill: PAL.lightest },
+} as const
 
+const css = (n: number) => `#${n.toString(16).padStart(6, '0')}`
+
+/**
+ * The two status bars, laid out for 240×216 by `hud.ts` (#158).
+ *
+ * Every position comes from `layout()`, the same function `hud_test.ts`
+ * checks for overlaps, so what is tested is what is drawn. The font is used
+ * at its native 8 pixels, on whole pixels, with no stroke: the bars are solid
+ * and the text needs nothing behind it.
+ */
 export class UIScene extends Phaser.Scene {
-  private hpText!: Phaser.GameObjects.Text
-  private floorText!: Phaser.GameObjects.Text
-  private turnText!: Phaser.GameObjects.Text
-  private hungerText!: Phaser.GameObjects.Text
-  private atkText!: Phaser.GameObjects.Text
-  private goldText!: Phaser.GameObjects.Text
-  private relicPips: Phaser.GameObjects.Image[] = []
+  private bars: Phaser.GameObjects.Rectangle[] = []
+  private texts = new Map<string, Phaser.GameObjects.Text>()
+  private icons = new Map<string, Phaser.GameObjects.Image>()
+  private pips: Phaser.GameObjects.Image[] = []
+  private track!: Phaser.GameObjects.Rectangle
+  private fill!: Phaser.GameObjects.Rectangle
 
   constructor() {
     super('ui')
   }
 
   create() {
-    legacyCamera(this)
-    // Top HUD background
-    this.add.rectangle(0, 0, GBC_WIDTH, 15, 0x000000, 0.8).setOrigin(0, 0)
-
-    // Bottom HUD background
-    this.add.rectangle(0, GBC_HEIGHT - 15, GBC_WIDTH, 15, 0x000000, 0.8).setOrigin(0, 0)
-
-    const textStyle = (color: string, size: string = '7px') => ({
-      fontFamily: FONT,
-      fontSize: size,
-      color: color,
-      resolution: 4,
-      stroke: '#000000',
-      strokeThickness: 2,
-    })
-
-    this.hpText = this.add.text(6, 4, '', textStyle(CSS_LIGHTEST))
-    this.floorText = this.add.text(GBC_WIDTH / 2, 4, '', textStyle(CSS_LIGHTEST)).setOrigin(0.5, 0)
-    this.turnText = this.add.text(GBC_WIDTH - 6, 4, '', textStyle(CSS_LIGHTEST)).setOrigin(1, 0)
-
-    // Bottom bar
-    this.hungerText = this.add.text(6, GBC_HEIGHT - 11, '', textStyle('#88ff88', '6px'))
-    this.atkText = this.add.text(GBC_WIDTH - 6, GBC_HEIGHT - 11, '', textStyle('#ff8888', '6px')).setOrigin(1, 0)
-    // Gold and the relic pips (#84) are laid out as one group centred in the
-    // bottom bar, rather than each centred on its own. Measured in a browser
-    // first, the way #59's overlapping kill counter should have been. At the
-    // widest the bar ever gets — `FD:100`, `9999g`, three pips, `ATK:99` —
-    // the group runs x=53..108 between text ending at 45 and starting at 115,
-    // so the clearances are 8px on the left and 7px on the right.
-    this.goldText = this.add.text(0, GBC_HEIGHT - 11, '', textStyle('#ffd700', '6px')).setOrigin(0, 0)
-    this.relicPips = RELICS.map(() =>
-      this.add.image(0, GBC_HEIGHT - 10, `relicpip_empty_${GameState.paletteMode}`).setOrigin(0, 0),
-    )
+    this.bars = [
+      this.add.rectangle(0, 0, GBC_WIDTH, BAR_HEIGHT, 0).setOrigin(0, 0),
+      this.add.rectangle(0, GBC_HEIGHT - BAR_HEIGHT, GBC_WIDTH, BAR_HEIGHT, 0).setOrigin(0, 0),
+    ]
+    this.texts.clear()
+    this.icons.clear()
+    this.track = this.add.rectangle(0, 0, 1, 1, 0).setOrigin(0, 0)
+    this.fill = this.add.rectangle(0, 0, 1, 1, 0).setOrigin(0, 0)
+    const mode = GameState.paletteMode
+    this.pips = RELICS.map(() => this.add.image(0, 0, `relicpip_empty_${mode}`).setOrigin(0, 0))
+    for (const box of layout(this.values(), GBC_WIDTH, GBC_HEIGHT)) {
+      if (box.text !== undefined) {
+        this.texts.set(
+          box.name,
+          this.add.text(box.x, box.y, box.text, { fontFamily: FONT, fontSize: `${CELL}px`, color: '#ffffff' }),
+        )
+      } else if (box.name.endsWith('-icon') || box.name === 'heart') {
+        const picture = box.name.replace('-icon', '')
+        this.icons.set(box.name, this.add.image(box.x, box.y, iconKey(picture, mode)).setOrigin(0, 0))
+      }
+    }
+    this.draw()
   }
 
-  /**
-   * Lays gold and the pips out as one centred group.
-   *
-   * Re-run every frame because the gold figure changes width — a group
-   * positioned once at create time drifts off centre the moment the player
-   * banks their tenth coin.
-   */
-  private layoutBottomCentre() {
-    const pipsWidth = this.relicPips.length * PIP
-    const total = this.goldText.width + PIP_GAP + pipsWidth
-    const startX = Math.round((GBC_WIDTH - total) / 2)
-    this.goldText.setX(startX)
-    const pipsX = startX + this.goldText.width + PIP_GAP
-    this.relicPips.forEach((pip, i) => pip.setX(pipsX + i * PIP))
+  private values(): HudValues {
+    const inv = GameState.inventory
+    return {
+      floor: GameState.floorDepth,
+      hp: GameState.playerHp,
+      maxHp: GameState.maxHp,
+      food: GameState.hunger,
+      maxFood: GameState.maxHunger,
+      gold: GameState.runGold,
+      atk: GameState.playerAtk,
+      weapon: inv.equippedWeapon?.atkBonus ?? 0,
+      armour: inv.equippedArmor?.defBonus ?? 0,
+      keys: inv.count('key'),
+      relics: RELICS.length,
+    }
   }
 
   update() {
-    this.hpText.setText(`HP:${GameState.playerHp}/${GameState.maxHp}`)
-    this.floorText.setText(`F${GameState.floorDepth}`)
-    this.turnText.setText(`T:${GameState.turnsCount}`)
+    this.draw()
+  }
 
-    // Hunger display - flash red when starving
-    const hungerPct = GameState.hunger / GameState.maxHunger
-    if (hungerPct <= 0) {
-      this.hungerText.setColor('#ff4444')
-      this.hungerText.setText('STARVING!')
-    } else if (hungerPct <= 0.25) {
-      this.hungerText.setColor('#ffcc00')
-      this.hungerText.setText(`FD:${GameState.hunger}`)
-    } else {
-      this.hungerText.setColor('#88ff88')
-      this.hungerText.setText(`FD:${GameState.hunger}`)
-    }
-
-    this.atkText.setText(`ATK:${GameState.playerAtk}`)
-    this.goldText.setText(`${GameState.runGold}g`)
-
+  /**
+   * Puts every box where `layout()` says it is now.
+   *
+   * Every frame, because the numbers change width: HP is right-aligned and
+   * the gold is centred with the pips, so both move as they grow.
+   */
+  private draw() {
     const mode = GameState.paletteMode
-    this.relicPips.forEach((pip, i) => {
-      const held = GameState.relics.includes(RELICS[i].id)
-      pip.setTexture(`relicpip_${held ? 'held' : 'empty'}_${mode}`)
-    })
-    this.layoutBottomCentre()
+    const ink = INK[mode]
+    const values = this.values()
+    this.bars.forEach((bar) => bar.setFillStyle(ink.bar, 1))
+
+    const place = (box: Box) => {
+      const text = this.texts.get(box.name)
+      if (text && box.text !== undefined) {
+        text.setPosition(box.x, box.y)
+        if (text.text !== box.text) text.setText(box.text)
+        let colour: number = ink.text
+        if (box.name === 'food') {
+          const state = foodState(values)
+          colour = state === 'starving' ? ink.bad : state === 'low' ? ink.low : ink.text
+        }
+        if (text.style.color !== css(colour)) text.setColor(css(colour))
+        return
+      }
+      const icon = this.icons.get(box.name)
+      if (icon) {
+        icon.setPosition(box.x, box.y).setTexture(iconKey(box.name.replace('-icon', ''), mode))
+        return
+      }
+      if (box.name === 'hpbar') {
+        this.track.setPosition(box.x, box.y).setSize(box.width, box.height).setFillStyle(ink.track, 1)
+        const filled = hpFill(values.hp, values.maxHp, box.width - 2)
+        this.fill
+          .setPosition(box.x + 1, box.y + 1)
+          .setSize(filled, box.height - 2)
+          .setFillStyle(ink.fill, 1)
+          .setVisible(filled > 0)
+        return
+      }
+      if (box.name.startsWith('pip-')) {
+        const i = Number(box.name.slice(4))
+        const held = GameState.relics.includes(RELICS[i].id)
+        this.pips[i].setPosition(box.x, box.y).setTexture(`relicpip_${held ? 'held' : 'empty'}_${mode}`)
+      }
+    }
+    layout(values, GBC_WIDTH, GBC_HEIGHT).forEach(place)
   }
 }

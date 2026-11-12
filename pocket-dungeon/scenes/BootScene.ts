@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { TILE, PAL } from '../constants'
+import { ICONS, iconKey } from '../hud'
 import { SPRITES, SPRITE_PX, pixels, textureKey, type Mode } from '../sprites'
 import { CATACOMB, CELLAR, DMG as DMG_TILES, FRAME, TILE_PX, VAULT, drawTileset, type TilePalette } from '../tiles'
 
@@ -13,6 +14,7 @@ export class BootScene extends Phaser.Scene {
       this.buildTileset(mode)
       this.buildSprites(mode)
       this.buildRelicPips(mode)
+      this.buildHudIcons(mode)
     })
     this.scene.start('title')
   }
@@ -41,12 +43,29 @@ export class BootScene extends Phaser.Scene {
   }
 
   /**
+   * The HUD's heart and slot pictures, 8x8 (#158). One colour each; on the
+   * green screen that colour is the lightest tone, against the dark bar.
+   */
+  private buildHudIcons(mode: Mode) {
+    for (const [name, icon] of Object.entries(ICONS)) {
+      const key = iconKey(name, mode)
+      if (this.textures.exists(key)) continue
+      const g = this.make.graphics({}, false)
+      g.fillStyle(mode === 'dmg' ? PAL.lightest : icon.gbc)
+      icon.rows.forEach((row, y) => {
+        for (let x = 0; x < row.length; x++) if (row[x] === '#') g.fillRect(x, y, 1, 1)
+      })
+      g.generateTexture(key, icon.rows[0].length, icon.rows.length)
+      g.destroy()
+    }
+  }
+
+  /**
    * The HUD's relic pips, 6x6 (#84). `_held` is the filled one.
    *
    * A pip is not the relic scaled down — at 6px a scaled sprite is mush — so
    * it is its own shape, filled for a relic held and hollow for one still out
-   * there. Still drawn at the old size: the HUD is laid out for the old
-   * screen and shown through a zoomed camera until #158.
+   * there.
    */
   private buildRelicPips(mode: Mode) {
     const isDmg = mode === 'dmg'
@@ -54,13 +73,14 @@ export class BootScene extends Phaser.Scene {
       const key = `relicpip_${held ? 'held' : 'empty'}_${mode}`
       if (this.textures.exists(key)) continue
       const g = this.make.graphics({}, false)
-      // The pips sit on the black status bar, not on the dungeon floor, so
-      // they answer to *it*. Drawn in PAL.darkest and PAL.dark first, which is
-      // the same mistake as the floor sprites with the surface swapped: both
-      // tones vanished into the bar. A held pip is the lightest tone the ramp
-      // has; an empty one is a dimmer outline, and the fill-vs-outline shape
-      // is what separates them at 6px rather than the tone alone.
-      const tone = isDmg ? (held ? PAL.lightest : PAL.dark) : held ? 0xffd700 : 0x8a7a50
+      // The pips sit on the status bar, not on the dungeon floor, so they
+      // answer to *it*. They have been lost to it twice. First drawn in
+      // PAL.darkest and PAL.dark, both of which vanished into a black bar.
+      // Then #158 gave the green screen's bar the palette's own darkest tone,
+      // and the empty pip's PAL.dark outline had no pixel that stood out from
+      // it. Both pips are light now; filled against hollow is what separates
+      // them at 6px, not the tone.
+      const tone = isDmg ? (held ? PAL.lightest : PAL.light) : held ? 0xffd700 : 0x8a7a50
       g.fillStyle(tone)
       if (held) {
         g.fillRect(2, 0, 2, 6); g.fillRect(1, 1, 4, 4); g.fillRect(0, 2, 6, 2)

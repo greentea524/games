@@ -37,7 +37,7 @@ export const GAMES = [
       // point is what identifies the rectangle, so moving the bar without
       // moving this fails loudly rather than silently measuring the wrong
       // thing.
-      hud: { overlay: { scene: 'ui', at: [80, 136] }, over: 'floor' },
+      hud: { overlay: { scene: 'ui', at: [120, 204] }, over: 'floor' },
     },
     on: {
       // Everything the player is meant to pick out against the room floor.
@@ -57,7 +57,11 @@ export const GAMES = [
       // #84's pips. They were excluded for four issues on the grounds that
       // they answer to the status bar rather than the floor, which was true
       // and was the wrong conclusion: the bar is a surface, so it gets named.
-      hud: ['relicpip_held_dmg', 'relicpip_empty_dmg'],
+      hud: [
+        'relicpip_held_dmg', 'relicpip_empty_dmg',
+        // The heart and the three slot pictures (#158).
+        'hud_heart_dmg', 'hud_weapon_dmg', 'hud_armour_dmg', 'hud_keys_dmg',
+      ],
     },
     exclude: {
       tiles_dmg_v2: 'the tileset is the surface, not something drawn on it',

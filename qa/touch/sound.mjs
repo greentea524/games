@@ -174,12 +174,15 @@ await run('static', async ({ page, hand }, named) => {
 // phone player reaches it, with taps on the shell and on the screen. Until
 // #143 their only mute was the M key, which a phone does not have.
 
-/** Taps the centre of a game object, located in the 160-wide game space. */
+/**
+ * Taps the centre of a game object, located in the game's own space. The
+ * width is read from the game: Pocket Dungeon's is 240, the others' 160.
+ */
 async function tapObject(page, hand, locate) {
   const g = await page.evaluate(locate)
   if (!g) throw new Error('the control to tap is not on screen')
   const box = (await centreOf(page, 'canvas')).box
-  const scale = box.width / 160
+  const scale = box.width / (await page.evaluate(() => window.__game.scale.width))
   await hand.tap(ACT, box.x + g.x * scale, box.y + g.y * scale)
   await page.waitForTimeout(150)
 }

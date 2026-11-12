@@ -12,16 +12,12 @@ export const GBC_HEIGHT = 216
 export const TILE = 24
 
 /**
- * The size everything was first drawn and laid out at.
+ * The tile the dungeon's offsets were first written against.
  *
- * #155 changes the canvas and nothing about the art, so the sprites are still
- * authored on a 16-pixel grid and enlarged, and the title, shop, HUD and
- * game-over screens are still laid out for 160×144 and shown through a
- * camera zoomed by `SCALE`. Each of those is replaced by art and layout made
- * at the new size in #156 to #159; when the last goes, so do these.
+ * Every screen is laid out at the new size now (#159). What is left is `sx`:
+ * the dungeon's floating text and swipe distances were written as lengths on
+ * a 16-pixel tile, and are still read that way.
  */
-export const LEGACY_WIDTH = 160
-export const LEGACY_HEIGHT = 144
 export const LEGACY_TILE = 16
 export const SCALE = TILE / LEGACY_TILE
 /** A length measured on the old 16-pixel grid, at the new size. */
