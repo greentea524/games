@@ -183,7 +183,10 @@ async function tapObject(page, hand, locate) {
   if (!g) throw new Error('the control to tap is not on screen')
   const box = (await centreOf(page, 'canvas')).box
   const scale = box.width / (await page.evaluate(() => window.__game.scale.width))
-  await hand.tap(ACT, box.x + g.x * scale, box.y + g.y * scale)
+  // A scene still shown through an enlarging camera reports its objects in
+  // its own, smaller space; `zoom` carries them to the screen's.
+  const zoom = g.zoom ?? 1
+  await hand.tap(ACT, box.x + g.x * zoom * scale, box.y + g.y * zoom * scale)
   await page.waitForTimeout(150)
 }
 
@@ -319,8 +322,9 @@ const DRIVES = {
       label,
       toggle: () =>
         tapObject(page, hand, () => {
-          const b = window.__game.scene.getScene('ui').pauseOptionsText[5].getBounds()
-          return { x: b.centerX, y: b.centerY }
+          const ui = window.__game.scene.getScene('ui')
+          const b = ui.pauseOptionsText[5].getBounds()
+          return { x: b.centerX, y: b.centerY, zoom: ui.cameras.main.zoom }
         }),
     })
     named('and its label is never wrong', lies.length === 0, lies.join('; ') || 'matched the state at every reading')

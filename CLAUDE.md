@@ -364,6 +364,33 @@ three. `showRunSummary` takes a `screen` size for a game that is not 160×144.
 The dungeon's floating text was 12 pixels, which this font cannot draw
 cleanly; it is 8 with a shadow now.
 
+**Cart & Crate is 240×216 with 24-pixel tiles, part-way through the same
+rework (#160 to #165).** #160 changed the canvas and left the art alone, as
+#155 did for Pocket Dungeon, so two things are temporary. `BootScene.enlarge`
+scales the 16-pixel textures by one and a half, which leaves pixels of two
+widths. The menu, level select and HUD are still laid out for 160×144 and
+shown through `legacyCamera`. The screen is still ten tiles by nine, so the
+six levels larger than that scroll exactly as they did. A check that taps an
+object in a scene behind that camera must multiply by the camera's zoom:
+`tapObject` in `qa/touch/sound.mjs` takes it from the game. And a key sent
+with no hold falls between frames on the menu, which polls `JustDown`; hold
+it for a frame or the screenshot script sits on the title for ever.
+
+**Cart & Crate's floor, walls and targets are drawn by `tiles.ts`, and a
+level is framed by what is drawn (#161).** A grey-blue checker, walls with a
+top and a brick face where floor is below them, and a bright ✕ in a lit
+square. A wall cell takes one of 16 pieces from which sides face floor;
+`wallcorner` notches the inside corners. A wall with no floor within a cell is
+not drawn at all: levels are padded to ten by nine with rows of it, which as
+wall-top were a slab the size of the room. The camera then frames the drawn
+box, so a small room sits between the HUD bars with its upper wall in view.
+Counting the bars against every level was tried and would have made eleven
+more scroll; a level that fits the screen but not the gap is centred on the
+screen as before. A filled target is drawn 32 pixels square, so its glow
+shows round the crate that covers its tile. The shelf, pegboard and barrel
+border art is gone until #163 draws the warehouse. `reloadPalette` reads the
+kind off the texture key and keeps the frame, instead of naming each kind.
+
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
 of the screen, so steering showed only as the tube turning. It trails now: the

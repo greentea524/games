@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, LEGACY_HEIGHT as GBC_HEIGHT, FONT } from '../constants'
+import { legacyCamera } from '../legacy'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem, loadHighestUnlocked } from '../save'
@@ -19,6 +20,8 @@ export class LevelSelectScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144 (#160).
+    legacyCamera(this)
     this.pages = []
     this.levelNodes = []
     this.cameras.main.setBackgroundColor('#081820')
