@@ -366,10 +366,10 @@ cleanly; it is 8 with a shadow now.
 
 **Cart & Crate is 240×216 with 24-pixel tiles, part-way through the same
 rework (#160 to #165).** #160 changed the canvas and left the art alone, as
-#155 did for Pocket Dungeon, so two things are temporary. `BootScene.enlarge`
-scales the 16-pixel textures by one and a half, which leaves pixels of two
-widths. The menu, level select and HUD are still laid out for 160×144 and
-shown through `legacyCamera`. The screen is still ten tiles by nine, so the
+#155 did for Pocket Dungeon. The art has since been redrawn at 24 (#161,
+#162) and `BootScene.enlarge` is gone. One thing is still temporary: the
+menu, level select and HUD are laid out for 160×144 and shown through
+`legacyCamera`. The screen is still ten tiles by nine, so the
 six levels larger than that scroll exactly as they did. A check that taps an
 object in a scene behind that camera must multiply by the camera's zoom:
 `tapObject` in `qa/touch/sound.mjs` takes it from the game. And a key sent
@@ -390,6 +390,17 @@ screen as before. A filled target is drawn 32 pixels square, so its glow
 shows round the crate that covers its tile. The shelf, pegboard and barrel
 border art is gone until #163 draws the warehouse. `reloadPalette` reads the
 kind off the texture key and keeps the frame, instead of naming each kind.
+
+**Cart & Crate's fox and crates are pictures in `sprites.ts` (#162).** The
+same letter-per-pixel pictures and automatic outline as Pocket Dungeon's. The
+fox has a picture for each facing, and a step and a push for each: the game
+shows the push while a crate is moving and the step otherwise, and
+`finishMove` stands it up again. A crate on its target is its own picture,
+`crate_on`, with a brass frame, green slats and a tick; it was the same crate
+under a tint, which changed its colour and nothing else. `showCrateHome` is
+the one place that picks between the two, and undo calls it. On the green
+screen the uniform is pale: dark like the cap and trousers, the fox was one
+dark shape from the neck down.
 
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle

@@ -81,7 +81,10 @@ export const GAMES = [
     on: {
       floor: [
         'player_dmg_down', 'player_dmg_up', 'player_dmg_left', 'player_dmg_right',
-        'crate_dmg', 'target_dmg', 'target_lit_dmg',
+        // The fox mid-step and leaning into a crate (#162).
+        'player_dmg_down_step', 'player_dmg_up_step', 'player_dmg_left_step', 'player_dmg_right_step',
+        'player_dmg_down_push', 'player_dmg_up_push', 'player_dmg_left_push', 'player_dmg_right_push',
+        'crate_dmg', 'crate_on_dmg', 'target_dmg', 'target_lit_dmg',
         'hole_dmg',
         'wall_dmg', 'wallcorner_dmg',
       ],
