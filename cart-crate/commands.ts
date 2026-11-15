@@ -1,6 +1,5 @@
 import type { BoardScene, CrateInstance } from './scenes/BoardScene'
 import { TILE } from './constants'
-import { GameState } from './state'
 
 export interface ICommand {
   execute(): void
@@ -40,7 +39,6 @@ export class MoveCommand implements ICommand {
   }
 
   undo() {
-    const mode = GameState.paletteMode
     this.scene.setPlayerPos(this.record.playerPrevTX, this.record.playerPrevTY, this.record.facing)
 
     this.record.crackedTiles.forEach((t) => {
@@ -60,11 +58,7 @@ export class MoveCommand implements ICommand {
         this.record.cratePrevTX * TILE + TILE / 2,
         this.record.cratePrevTY * TILE + TILE / 2,
       )
-      if (this.record.crate.docked) {
-        this.record.crate.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : 0xffff44)
-      } else {
-        this.record.crate.sprite.clearTint()
-      }
+      this.scene.showCrateHome(this.record.crate)
 
       // Restore the target pads to match the crate's docked state.
       if (this.record.crateNextDocked && this.record.crateNextTX !== null && this.record.crateNextTY !== null) {

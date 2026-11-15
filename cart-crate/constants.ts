@@ -14,11 +14,10 @@ export const TILE = 24
 /**
  * The size everything was first drawn and laid out at.
  *
- * #160 changes the canvas and nothing about the art. `BootScene` still draws
- * on a 16-pixel grid and enlarges each texture once, and the menu, level
- * select and HUD are still laid out for 160×144 and shown through a camera
- * zoomed by `SCALE`. #161 to #165 replace each with art and layout made at
- * the new size; when the last goes, so do these.
+ * The art is drawn at 24 pixels now (#161, #162). The menu, level select
+ * and HUD are still laid out for 160×144 and shown through a camera zoomed
+ * by `SCALE`, until #164 and #165 lay them out at the new size; when the
+ * last goes, so do these.
  */
 export const LEGACY_WIDTH = 160
 export const LEGACY_HEIGHT = 144

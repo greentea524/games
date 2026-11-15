@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
+import { playerKey, type Facing } from '../sprites'
 import { cornerFrames, drawnBox, floorFrame, isVoid, wallFrame } from '../tiles'
-import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, PAL, GBC_PAL, WORLD_PALS, sx } from '../constants'
+import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, PAL, sx } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem, recordHighestUnlocked } from '../save'
@@ -9,7 +10,6 @@ import type { StepRecord } from '../commands'
 import type { UIScene } from './UIScene'
 import { showRunSummary } from '../../shared/runSummary'
 
-type Facing = 'down' | 'up' | 'left' | 'right'
 
 export interface CrateInstance {
   id: number
@@ -217,7 +217,7 @@ export class BoardScene extends Phaser.Scene {
             this.setTargetLit(x, y, false, false)
           }
           
-          const crateSprite = this.add.sprite(px, py, tKey('crate')).setDepth(5)
+          const crateSprite = this.add.sprite(px, py, tKey(isTarget ? 'crate_on' : 'crate')).setDepth(5)
           this.crates.push({
             tx: x,
             ty: y,
@@ -233,7 +233,7 @@ export class BoardScene extends Phaser.Scene {
     this.player = this.add.sprite(
       this.playerTX * TILE + TILE / 2,
       this.playerTY * TILE + TILE / 2,
-      `player_${mode}_` + this.facing
+      playerKey(mode, this.facing)
     ).setDepth(10)
 
     this.updateCamera()
@@ -272,7 +272,7 @@ export class BoardScene extends Phaser.Scene {
       if (!(child instanceof Phaser.GameObjects.Image) && !(child instanceof Phaser.GameObjects.Sprite)) return
       const key = child.texture.key
       if (key.startsWith('player_')) {
-        child.setTexture(`player_${mode}_${this.facing}`)
+        child.setTexture(playerKey(mode, this.facing))
         return
       }
       const kind = key.match(/^(.+?)_(?:dmg|gbc_w\d+)$/)?.[1]
@@ -286,17 +286,6 @@ export class BoardScene extends Phaser.Scene {
         const docked = this.crates.some((c) => !c.destroyed && c.docked && c.tx === x && c.ty === y)
         this.refreshTargetState(x, y, docked)
       })
-    })
-
-    const world = CAMPAIGN_LEVELS[GameState.currentLevelIndex]?.world || 1
-    const pal = mode === 'gbc' ? (WORLD_PALS[world - 1] || GBC_PAL) : GBC_PAL
-
-    this.crates.forEach((c) => {
-      if (c.docked && !c.destroyed) {
-        c.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : pal.crateLight)
-      } else {
-        c.sprite.clearTint()
-      }
     })
 
     this.updateCamera()
@@ -509,13 +498,24 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.setScroll(scrollX, scrollY)
   }
 
+  /**
+   * Gives a crate the picture for where it stands (#162).
+   *
+   * A crate on its target used to be the same crate with a tint over it. It
+   * is its own picture now — brass frame, green slats, a tick on the label —
+   * so it differs in shape as well as colour, on the green screen too.
+   */
+  showCrateHome(crate: { sprite: Phaser.GameObjects.Sprite; docked: boolean }) {
+    crate.sprite.setTexture(this.getTextureKey(crate.docked ? 'crate_on' : 'crate'))
+  }
+
   setPlayerPos(tx: number, ty: number, facing: Facing) {
     const mode = GameState.paletteMode
     this.playerTX = tx
     this.playerTY = ty
     this.facing = facing
     this.player.setPosition(tx * TILE + TILE / 2, ty * TILE + TILE / 2)
-    this.player.setTexture(`player_${mode}_${facing}`)
+    this.player.setTexture(playerKey(mode, facing))
   }
 
   undoMove() {
@@ -641,13 +641,13 @@ export class BoardScene extends Phaser.Scene {
     const mode = GameState.paletteMode
 
     if (finalPlayerTX < 0 || finalPlayerTX >= this.mapWidth || finalPlayerTY < 0 || finalPlayerTY >= this.mapHeight) {
-      this.player.setTexture(`player_${mode}_${this.facing}`)
+      this.player.setTexture(playerKey(mode, this.facing))
       return
     }
 
     const destTile = this.floorGrid[finalPlayerTY][finalPlayerTX]
     if (destTile === '#' || destTile === 'O') {
-      this.player.setTexture(`player_${mode}_${this.facing}`)
+      this.player.setTexture(playerKey(mode, this.facing))
       return
     }
 
@@ -662,13 +662,13 @@ export class BoardScene extends Phaser.Scene {
       pushTY = finalPlayerTY + dy
 
       if (pushTX < 0 || pushTX >= this.mapWidth || pushTY < 0 || pushTY >= this.mapHeight) {
-        this.player.setTexture(`player_${mode}_${this.facing}`)
+        this.player.setTexture(playerKey(mode, this.facing))
         return
       }
 
       let pushTile = this.floorGrid[pushTY][pushTX]
       if (pushTile === '#') {
-        this.player.setTexture(`player_${mode}_${this.facing}`)
+        this.player.setTexture(playerKey(mode, this.facing))
         return
       }
 
@@ -686,7 +686,7 @@ export class BoardScene extends Phaser.Scene {
 
       const crateAtPush = this.crates.find((c) => !c.destroyed && c.tx === pushTX && c.ty === pushTY)
       if (crateAtPush) {
-        this.player.setTexture(`player_${mode}_${this.facing}`)
+        this.player.setTexture(playerKey(mode, this.facing))
         return
       }
 
@@ -746,11 +746,7 @@ export class BoardScene extends Phaser.Scene {
       if (!crateFell) {
         const isTarget = this.floorGrid[pushTY][pushTX] === 'T'
         crateAtTarget.docked = isTarget
-        if (isTarget) {
-          crateAtTarget.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : 0xffff44)
-        } else {
-          crateAtTarget.sprite.clearTint()
-        }
+        this.showCrateHome(crateAtTarget)
       }
 
       // If the crate was docked and is now pushed off, the pad reverts to pulsing.
@@ -759,7 +755,9 @@ export class BoardScene extends Phaser.Scene {
       }
     }
 
-    this.player.setTexture(`player_${mode}_${this.facing}`)
+    // Leaning into the crate while it moves, mid-stride otherwise; `finishMove`
+    // stands the fox up again.
+    this.player.setTexture(playerKey(mode, this.facing, crateAtTarget ? 'push' : 'step'))
 
     const playerPX = finalPlayerTX * TILE + TILE / 2
     const playerPY = finalPlayerTY * TILE + TILE / 2
@@ -828,6 +826,7 @@ export class BoardScene extends Phaser.Scene {
 
   private finishMove(record: StepRecord) {
     this.isMoving = false
+    this.player.setTexture(playerKey(GameState.paletteMode, this.facing))
     GameState.movesCount++
     if (record.crate) GameState.pushesCount++
     this.undoStack.push(new MoveCommand(this, record))
