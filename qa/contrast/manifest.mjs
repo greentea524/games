@@ -77,8 +77,11 @@ export const GAMES = [
       // Frame 0 of the floor strip: the plain square (#161). All four frames
       // are the lightest tone on the green screen.
       floor: { texture: 'floor_dmg', frame: 0 },
+      // The warehouse outside the level (#163): its own, dark floor.
+      surround: { texture: 'decorfloor_dmg', frame: 0 },
     },
     on: {
+      surround: ['decor_dmg'],
       floor: [
         'player_dmg_down', 'player_dmg_up', 'player_dmg_left', 'player_dmg_right',
         // The fox mid-step and leaning into a crate (#162).
@@ -94,6 +97,7 @@ export const GAMES = [
     floorVariants: ['ice_dmg', 'cracked_dmg'],
     exclude: {
       floor_dmg: 'the floor is the surface',
+      decorfloor_dmg: 'the surround\'s floor is the surface',
     },
   },
   {

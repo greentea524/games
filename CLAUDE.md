@@ -387,8 +387,7 @@ box, so a small room sits between the HUD bars with its upper wall in view.
 Counting the bars against every level was tried and would have made eleven
 more scroll; a level that fits the screen but not the gap is centred on the
 screen as before. A filled target is drawn 32 pixels square, so its glow
-shows round the crate that covers its tile. The shelf, pegboard and barrel
-border art is gone until #163 draws the warehouse. `reloadPalette` reads the
+shows round the crate that covers its tile. `reloadPalette` reads the
 kind off the texture key and keeps the frame, instead of naming each kind.
 
 **Cart & Crate's fox and crates are pictures in `sprites.ts` (#162).** The
@@ -401,6 +400,20 @@ under a tint, which changed its colour and nothing else. `showCrateHome` is
 the one place that picks between the two, and undo calls it. On the green
 screen the uniform is pale: dark like the cap and trousers, the fox was one
 dark shape from the neck down.
+
+**Cart & Crate's warehouse is drawn only outside the level, by `decor.ts`
+(#163).** "Outside" is a cell beyond the grid, or a wall with no floor within
+a cell of it: the cells `tiles.ts` leaves undrawn. Each gets a dim floor, and
+some get a shelf, a tool rack, a barrel or stacked boxes, chosen from the
+level's number so a level always looks the same. Shelves and racks go in the
+row behind the room's back wall. It is all pulled toward grey and darkened,
+and `decor_test.ts` holds it darker than the play floor and never as bright
+as a crate, so the stacked boxes cannot be taken for one to push. Dimming
+wood and floor alike made them the same grey in two worlds, where a barrel
+was only its hoops; the wood is lifted clear of the floor. On the green
+screen the surround is the darkest tone with pale edges on things. Two levels
+fill the screen and get nothing. `levelView` is the one place a level's
+framing is worked out; the camera and the surround both read it.
 
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle

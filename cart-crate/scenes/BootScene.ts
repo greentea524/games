@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { DECOR, DMG_DECOR, decorPalette, drawDecor, drawDecorFloor } from '../decor'
 import { SPRITES, SPRITE_PX, pixels, textureKey, type Mode } from '../sprites'
 import {
   CORNER, DMG as DMG_TILES, FLOOR, LIT_PX, TILE_PX, WALL_FRAMES, drawCorners, drawCracked, drawFloor, drawHole,
@@ -54,6 +55,11 @@ export class BootScene extends Phaser.Scene {
     make('ice', TILE_PX, TILE_PX, (p) => drawIce(p, pal))
     make('cracked', TILE_PX, TILE_PX, (p) => drawCracked(p, pal, dmg))
     make('hole', TILE_PX, TILE_PX, (p) => drawHole(p, pal, dmg))
+
+    // The warehouse outside the level (#163), dimmed so it stays behind.
+    const decor = dmg ? DMG_DECOR : decorPalette(world)
+    make('decorfloor', 2 * TILE_PX, TILE_PX, (p) => drawDecorFloor(p, decor, dmg))
+    make('decor', DECOR.count * TILE_PX, TILE_PX, (p) => drawDecor(p, decor))
   }
 
   /**
