@@ -462,6 +462,20 @@ deliver the move and one for the game to act on it. It is a call a check
 makes, not part of `move`, because the steering loops are tuned for a fast
 round trip.
 
+**The shell cropped three games' pictures on every device, and every check
+looked through the crop (#183).** Windup, Pocket Dungeon and Cart & Crate use
+Phaser's `Scale.FIT`, which measures `#game`'s whole box, border and padding
+included. The canvas came out 60 CSS pixels wider than the space inside, and
+`overflow: hidden` cut 15 off each side: 6 to 12 game pixels, half a tile on a
+short phone. It was there for the life of the shell. It showed when #158 and
+#164 put HUD text nine pixels from the edge and a phone lost the first and
+last letters. `#game canvas` is held to `max-width: 100%` now, and
+`qa/touch/fit.mjs` measures the canvas against the space a player can see.
+Two habits hid it. Every touch check places its taps from the canvas's own
+box. And every screenshot taken for #155 to #163 was clipped to that box, on
+a desktop viewport. Screenshot the page at phone size, bezel included, before
+calling a layout done.
+
 **Make a check prove it can fail.** Several checks in this repo passed for the
 wrong reason when first written — asserting a fall speed was capped, against a
 player standing still on the ground. Where the defect is known, reintroduce it
