@@ -154,7 +154,9 @@ export async function launchTouch(url, options = {}) {
     )
   }
   const context = await browser.newContext({
-    viewport: PHONE,
+    // A check may ask for another size: the crop #183 fixed was worst on a
+    // short screen.
+    viewport: options.viewport ?? PHONE,
     hasTouch: true,
     isMobile: true,
     deviceScaleFactor: 3,

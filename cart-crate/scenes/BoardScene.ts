@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { playerKey, type Facing } from '../sprites'
+import { BAR_HEIGHT } from '../hud'
 import { DECOR, levelView, placeDecor, surround } from '../decor'
 import { cornerFrames, floorFrame, isVoid, wallFrame } from '../tiles'
 import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, PAL, sx } from '../constants'
@@ -21,12 +22,9 @@ export interface CrateInstance {
   destroyed?: boolean
 }
 
-/**
- * How much of the screen the HUD's two bars cover, in screen pixels. The HUD
- * is still laid out for the old screen: 14 and 12 pixels there, enlarged.
- */
-const HUD_TOP = sx(14)
-const HUD_BOTTOM = sx(12)
+/** How much of the screen the HUD's two bars cover. */
+const HUD_TOP = BAR_HEIGHT
+const HUD_BOTTOM = BAR_HEIGHT
 
 export class BoardScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite
@@ -612,12 +610,7 @@ export class BoardScene extends Phaser.Scene {
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.hintKey)) {
-      this.isHintMode = !this.isHintMode
-      if (this.isHintMode) {
-        this.showHint()
-      } else {
-        this.showToast('HINT MODE OFF')
-      }
+      this.toggleHint()
       return
     }
 
@@ -955,6 +948,17 @@ export class BoardScene extends Phaser.Scene {
         this.scene.restart()
       }
     })
+  }
+
+  hintOn() {
+    return this.isHintMode
+  }
+
+  /** H on a keyboard; the pause panel's HINT row on a phone (#164). */
+  toggleHint() {
+    this.isHintMode = !this.isHintMode
+    if (this.isHintMode) this.showHint()
+    else this.showToast('HINT MODE OFF')
   }
 
   showHint() {

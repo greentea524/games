@@ -368,8 +368,8 @@ cleanly; it is 8 with a shadow now.
 rework (#160 to #165).** #160 changed the canvas and left the art alone, as
 #155 did for Pocket Dungeon. The art has since been redrawn at 24 (#161,
 #162) and `BootScene.enlarge` is gone. One thing is still temporary: the
-menu, level select and HUD are laid out for 160×144 and shown through
-`legacyCamera`. The screen is still ten tiles by nine, so the
+menu and level select are laid out for 160×144 and shown through
+`legacyCamera`, until #165. The screen is still ten tiles by nine, so the
 six levels larger than that scroll exactly as they did. A check that taps an
 object in a scene behind that camera must multiply by the camera's zoom:
 `tapObject` in `qa/touch/sound.mjs` takes it from the game. And a key sent
@@ -414,6 +414,18 @@ was only its hoops; the wood is lifted clear of the floor. On the green
 screen the surround is the darkest tone with pale edges on things. Two levels
 fill the screen and get nothing. `levelView` is the one place a level's
 framing is worked out; the camera and the surround both read it.
+
+**Cart & Crate's HUD is placed by `hud.ts`, and its bottom line is written
+for the controls in the player's hands (#164).** Solid bars in the warehouse's
+dark, text at 8 pixels, the stage on the left, moves against par on the right
+and the level's best between them when there is one. `hud_test.ts` holds it
+clear at a three-digit stage and four-digit moves, with the old screen as its
+control. The bottom line named Z, H and R, which a phone does not have. It
+reads `B:UNDO SEL:RESET START:MENU` there and names the keys on a desktop.
+Writing it found that the hint had no phone control at all: it was the H key
+and nothing else. It is the pause panel's seventh row now, and
+`BoardScene.toggleHint` is the one path both use. The pause and help panels
+are in the same scene and take the same colours, on both palettes.
 
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
@@ -461,6 +473,20 @@ failed changed from run to run. `hand.settle()` waits two frames, one to
 deliver the move and one for the game to act on it. It is a call a check
 makes, not part of `move`, because the steering loops are tuned for a fast
 round trip.
+
+**The shell cropped three games' pictures on every device, and every check
+looked through the crop (#183).** Windup, Pocket Dungeon and Cart & Crate use
+Phaser's `Scale.FIT`, which measures `#game`'s whole box, border and padding
+included. The canvas came out 60 CSS pixels wider than the space inside, and
+`overflow: hidden` cut 15 off each side: 6 to 12 game pixels, half a tile on a
+short phone. It was there for the life of the shell. It showed when #158 and
+#164 put HUD text nine pixels from the edge and a phone lost the first and
+last letters. `#game canvas` is held to `max-width: 100%` now, and
+`qa/touch/fit.mjs` measures the canvas against the space a player can see.
+Two habits hid it. Every touch check places its taps from the canvas's own
+box. And every screenshot taken for #155 to #163 was clipped to that box, on
+a desktop viewport. Screenshot the page at phone size, bezel included, before
+calling a layout done.
 
 **Make a check prove it can fail.** Several checks in this repo passed for the
 wrong reason when first written — asserting a fall speed was capped, against a
