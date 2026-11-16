@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { LEGACY_WIDTH as GBC_WIDTH, SCALE } from '../constants'
 import { GameState } from '../state'
+import { crackleMs } from '../sprites'
+import { prefersReducedMotion } from '../../shared/motion'
 import { sfx, music } from '../audio'
 
 // Minimal title screen (#16): Continue restores the autosave; New Game
@@ -54,9 +56,10 @@ export class TitleScene extends Phaser.Scene {
     // Sprite preview: the kid, with the static-side entity flickering nearby
     const mode = GameState.paletteMode
     this.add.sprite(GBC_WIDTH / 2 - 18, 76, `kid_${mode}_down_0`).setScale(2 / SCALE).play(`walk_${mode}_down`)
-    const entityPreview = this.add.sprite(GBC_WIDTH / 2 + 18, 75, 'entity').setScale(1.6 / SCALE)
+    const entityPreview = this.add.sprite(GBC_WIDTH / 2 + 18, 75, `entity_${mode}`).setScale(1.6 / SCALE)
     this.time.addEvent({
-      delay: 180,
+      // Slowed with the rest of the static under reduced motion (#179).
+      delay: crackleMs(prefersReducedMotion()) + 70,
       loop: true,
       callback: () => entityPreview.setAlpha(Phaser.Math.FloatBetween(0.4, 1)),
     })

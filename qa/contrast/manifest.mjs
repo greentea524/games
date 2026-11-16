@@ -117,11 +117,16 @@ export const GAMES = [
       floor: [
       'kid_dmg_down_0', 'kid_dmg_down_1', 'kid_dmg_up_0', 'kid_dmg_up_1',
       'kid_dmg_left_0', 'kid_dmg_left_1', 'kid_dmg_right_0', 'kid_dmg_right_1',
-      'npc_dmg_mom_down', 'npc_dmg_ren_down', 'npc_dmg_gus_down', 'npc_dmg_baker_down',
+      // Every facing of everyone: each is its own picture since #179.
+      ...['mom', 'ren', 'gus', 'baker'].flatMap((id) => ['down', 'up', 'left', 'right'].map((f) => `npc_dmg_${id}_${f}`)),
       'item_dmg_flashlight', 'item_dmg_flashlight_dead', 'item_dmg_flower',
       'item_dmg_flower_fresh', 'item_dmg_photo', 'item_dmg_ledger', 'item_dmg_ren_key',
       'item_dmg_signal_shard', 'item_dmg_photo_intact', 'item_dmg_ledger_unredacted',
       'corruption_sealed_dmg', 'corruption_open_dmg',
+      // The second frame of everything that crackles, and the three that
+      // had no green-screen picture before #179.
+      'corruption_sealed_dmg_b', 'corruption_open_dmg_b',
+      'tv_dmg', 'tv_dmg_b', 'entity_dmg', 'entity_dmg_b', 'beacon_dmg',
       'prop_lamp_dmg', 'prop_sign_dmg', 'prop_barrel_dmg',
       'fountain_full_dmg', 'fountain_drained_dmg', 'hatch_dmg',
       'prop_bed_dmg', 'prop_bookshelf_dmg', 'prop_plant_dmg',
@@ -134,21 +139,6 @@ export const GAMES = [
       // The twelve tiles the maps are written in. They still collide, and
       // are no longer drawn (#178).
       tiles_dmg: 'the maps\' own tiles, hidden under the drawn village',
-      // The NPC side and back frames are the same art as their `_down` frame
-      // with a different face; checking one per NPC is enough to catch a tone
-      // mistake, and listing 16 near-identical keys would be noise.
-      'npc_dmg_mom_up': 'same body art as npc_dmg_mom_down',
-      'npc_dmg_mom_left': 'same body art as npc_dmg_mom_down',
-      'npc_dmg_mom_right': 'same body art as npc_dmg_mom_down',
-      'npc_dmg_ren_up': 'same body art as npc_dmg_ren_down',
-      'npc_dmg_ren_left': 'same body art as npc_dmg_ren_down',
-      'npc_dmg_ren_right': 'same body art as npc_dmg_ren_down',
-      'npc_dmg_gus_up': 'same body art as npc_dmg_gus_down',
-      'npc_dmg_gus_left': 'same body art as npc_dmg_gus_down',
-      'npc_dmg_gus_right': 'same body art as npc_dmg_gus_down',
-      'npc_dmg_baker_up': 'same body art as npc_dmg_baker_down',
-      'npc_dmg_baker_left': 'same body art as npc_dmg_baker_down',
-      'npc_dmg_baker_right': 'same body art as npc_dmg_baker_down',
     },
   },
   {
