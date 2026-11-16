@@ -37,6 +37,8 @@ export interface VillagePalette {
   canopyLight: Rgb
   canopyDark: Rgb
   outline: Rgb
+  /** A neutral near-black, for the edge of things that are not leaves. */
+  ink: Rgb
   trunk: Rgb
   roof: Rgb
   roofLight: Rgb
@@ -76,6 +78,7 @@ export const VILLAGE: VillagePalette = {
   canopyLight: 0x4ea64a,
   canopyDark: 0x1b5a26,
   outline: 0x103a18,
+  ink: 0x1c1410,
   trunk: 0x6b4423,
   roof: 0xb8433a,
   roofLight: 0xd4614f,
@@ -121,6 +124,7 @@ export const DMG_VILLAGE: VillagePalette = {
   canopyLight: PAL.light,
   canopyDark: PAL.darkest,
   outline: PAL.darkest,
+  ink: PAL.darkest,
   trunk: PAL.darkest,
   roof: PAL.dark,
   roofLight: PAL.light,
@@ -193,7 +197,7 @@ export const FRAME_COUNT = next
 // --- small tools -------------------------------------------------------------
 
 /** A filled disc, as rows. */
-function disc(p: Painter, cx: number, cy: number, r: number, colour: Rgb, clip: [number, number, number, number]) {
+export function disc(p: Painter, cx: number, cy: number, r: number, colour: Rgb, clip: [number, number, number, number]) {
   const [x0, y0, x1, y1] = clip
   for (let y = Math.ceil(cy - r); y <= Math.floor(cy + r); y++) {
     if (y < y0 || y >= y1) continue

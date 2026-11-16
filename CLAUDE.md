@@ -466,6 +466,12 @@ on the next frame without each beat having to ask. And the layer is painted
 twice at start: once at once, and again when the scene has finished building
 and the cells that signs and people stand in are known.
 
+The street furniture and the furniture are in `props.ts`, drawn through the
+same painter in the village's own colours: a barrel's wood is a door's wood.
+Each replaces the enlarged drawing `buildProps` made under the same key, at
+boot, before anything holds the old one. The items, the tear, the entity and
+the kid are still the old art: that is #179.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183
