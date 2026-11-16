@@ -374,8 +374,10 @@ if (paletteBtn) {
     const nextMode = GameState.paletteMode === 'gbc' ? 'dmg' : 'gbc'
     GameState.setPaletteMode(nextMode)
     updatePaletteBtn()
-    const worldScene = game?.scene?.getScene('world') as WorldScene
-    if (worldScene) worldScene.reloadPalette()
+    // Whichever scene is showing redraws itself. The world was reloaded
+    // whether or not it had started, which threw on the title (#181).
+    if (game?.scene.isActive('title')) game.scene.getScene('title').scene.restart()
+    else if (game?.scene.isActive('world')) (game.scene.getScene('world') as WorldScene).reloadPalette()
   })
 }
 

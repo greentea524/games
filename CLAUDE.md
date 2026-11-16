@@ -445,8 +445,8 @@ are specific to this game.
   world scene, it took the darkness overlay's canvas out from under it in the
   middle of the playthrough. A texture made later is enlarged by name.
 
-The title is still laid out for 160×144 behind a zoomed camera. The dialogue,
-inventory and toasts are on the real screen since #180.
+Every screen is on the real one now: the dialogue, inventory and toasts since
+#180, the title and endings since #181.
 
 **Static's village is drawn over its maps, not in them (#178).** The maps
 still hold twelve tile kinds, and that layer still collides and is still what
@@ -518,6 +518,29 @@ the objective and items are one press away in the bag.
 The touch check of the prompt used to read every text object in the scene. It
 passed on a prompt that was never shown. It now stands the kid in front of
 someone and reads the prompt that appears.
+
+**Static's title, endings and Static side follow the palette (#181).** The
+last of the five tickets was mostly a walk through every map in both worlds
+and both palettes, and it found four things.
+
+- **The palette switch threw on the title.** It reloaded the world scene
+  whether or not that had started. It restarts whichever scene is showing
+  now. Nothing caught it because `qa:contrast` only uses the switch in play.
+- **The title drew colour sprites on the green screen**, over its own text.
+  `screens.ts` lays it out and gives it a set of colours for each palette, and
+  `screens_test.ts` holds the green set to the four tones. The two figures
+  stand on a patch of lawn: the entity is dark and so is the screen.
+- **The Static side was slate blue on the green screen.** `StaticWorldFX`
+  is a duotone over the whole camera, so every pixel was a colour that mode
+  does not have, and no texture check could see it: the textures were right.
+  There it snaps the picture to the four tones and its grain is a speckle
+  of pixels moved a tone. Shifting every tone darker too was tried, and with
+  the darkness over it the town was one tone.
+- **The endings told a phone to press Z**, were wrapped by hand for the old
+  screen, and their tally was green in colour mode over the ending's words.
+
+The Static side's grain and glitch hold still under reduced motion. That one
+is not measured: it is a shader, and `qa:motion` reads game objects.
 
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover

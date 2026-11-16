@@ -17,6 +17,7 @@ import { NPCS, currentTarget } from '../dialogue'
 import { Darkness, type Light } from '../../shared/lighting'
 import { showRunSummary } from '../../shared/runSummary'
 import { crackleMs } from '../sprites'
+import { ENDING_THEME, css, endingLines, endingPrompt, summaryPalette, type Ending } from '../screens'
 import { minimap, minimapCorner, prompt as promptBox, promptText, type Corner } from '../hud'
 import { prefersReducedMotion } from '../../shared/motion'
 import { baseFrame, overFrame } from '../tiles'
@@ -1294,14 +1295,13 @@ export class WorldScene extends Phaser.Scene {
     sfx.sting()
 
     const empathy = GameState.getFlag('ending_empathy')
-    const bgColor = empathy ? 0xe0f0d0 : 0x08080e
-    const textColor = empathy ? '#0f380f' : '#9bbc0f'
-    // Hard-wrapped to 18 characters. At the font's native 8px that is 144px
-    // on a 160px screen; the old wrapping ran to 196px and was being clipped
-    // off both edges even at 7px.
-    const body = empathy
-      ? 'You step into the\nstatic and stay.\n\nThe lonely thing\nis lonely no more.\n\nThe town remembers\nall it lost.'
-      : 'You tear the\nsignal loose.\n\nThe static\nscreams, then\nfalls silent.\n\nThe town is safe.\n\nBut the vanished\nstay gone.'
+    // The words, their wrapping and their colours are in `screens.ts`, for
+    // the real screen and each palette (#181).
+    const which: Ending = empathy ? 'empathy' : 'severance'
+    const look = ENDING_THEME[GameState.paletteMode][which]
+    const bgColor = look.background
+    const textColor = css(look.text)
+    const body = endingLines(which).join('\n')
 
     const bg = this.add
       .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, bgColor)
@@ -1315,8 +1315,7 @@ export class WorldScene extends Phaser.Scene {
         fontSize: '8px',
         color: textColor,
         align: 'center',
-        // 1, not 3: at 8px the extra leading pushed the card past 144px tall.
-        lineSpacing: 1,
+        lineSpacing: 2,
         resolution: 1,
       })
       .setOrigin(0.5)
@@ -1327,7 +1326,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.time.delayedCall(3200, () => {
       const prompt = this.add
-        .text(GBC_WIDTH / 2, GBC_HEIGHT - 12, 'Z: on', {
+        .text(GBC_WIDTH / 2, GBC_HEIGHT - 20, endingPrompt(this.promptDesktop), {
           fontFamily: '"Press Start 2P", monospace',
           fontSize: '8px',
           color: textColor,
@@ -1345,11 +1344,13 @@ export class WorldScene extends Phaser.Scene {
       const showTally = () => {
         this.tweens.killTweensOf(prompt)
         prompt.destroy()
+        // The card has been read; the tally is not laid over its words.
+        txt.destroy()
         showRunSummary(this, {
           screen: { width: GBC_WIDTH, height: GBC_HEIGHT },
           title: 'THE RECORD',
           subtitle: empathy ? 'You stayed' : 'You cut it loose',
-          palette: PAL,
+          palette: summaryPalette(GameState.paletteMode),
           stats: [
             { label: 'CHAPTER', value: `${GameState.chapter}` },
             { label: 'FLAGS', value: `${Object.keys(GameState.flags).length}` },
