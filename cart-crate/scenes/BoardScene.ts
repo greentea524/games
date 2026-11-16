@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { playerKey, type Facing } from '../sprites'
-import { cornerFrames, drawnBox, floorFrame, isVoid, wallFrame } from '../tiles'
+import { DECOR, levelView, placeDecor, surround } from '../decor'
+import { cornerFrames, floorFrame, isVoid, wallFrame } from '../tiles'
 import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, PAL, sx } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
@@ -236,6 +237,7 @@ export class BoardScene extends Phaser.Scene {
       playerKey(mode, this.facing)
     ).setDepth(10)
 
+    this.renderSurround()
     this.updateCamera()
   }
 
@@ -478,24 +480,40 @@ export class BoardScene extends Phaser.Scene {
    * it always did.
    */
   private updateCamera() {
-    const box = drawnBox(this.floorGrid)
-    const width = box.width * TILE
-    const height = box.height * TILE
-
-    if (width > GBC_WIDTH || height > GBC_HEIGHT) {
+    const view = this.view()
+    if (view.follows) {
       const mapPixelWidth = this.mapWidth * TILE
       const mapPixelHeight = this.mapHeight * TILE
       this.cameras.main.setBounds(0, 0, Math.max(GBC_WIDTH, mapPixelWidth), Math.max(GBC_HEIGHT, mapPixelHeight))
       this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
       return
     }
-    const between = GBC_HEIGHT - HUD_TOP - HUD_BOTTOM
-    const top = height <= between ? HUD_TOP + (between - height) / 2 : (GBC_HEIGHT - height) / 2
-    const scrollX = Math.round(box.x * TILE - (GBC_WIDTH - width) / 2)
-    const scrollY = Math.round(box.y * TILE - top)
-    this.cameras.main.setBounds(scrollX, scrollY, GBC_WIDTH, GBC_HEIGHT)
+    this.cameras.main.setBounds(view.scrollX, view.scrollY, GBC_WIDTH, GBC_HEIGHT)
     this.cameras.main.stopFollow()
-    this.cameras.main.setScroll(scrollX, scrollY)
+    this.cameras.main.setScroll(view.scrollX, view.scrollY)
+  }
+
+  private view() {
+    return levelView(this.floorGrid, { width: GBC_WIDTH, height: GBC_HEIGHT }, { top: HUD_TOP, bottom: HUD_BOTTOM })
+  }
+
+  /**
+   * The warehouse outside the level (#163): a dim floor under every cell the
+   * camera can show that is not part of the level, and shelves, a tool rack,
+   * barrels and boxes on some of them. Chosen from the level's number, so a
+   * level always looks the same. Below everything in the level.
+   */
+  private renderSurround() {
+    const level = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
+    const cells = surround(this.floorGrid, this.view(), { width: GBC_WIDTH, height: GBC_HEIGHT })
+    for (const { x, y } of cells) {
+      this.add
+        .image(x * TILE + TILE / 2, y * TILE + TILE / 2, this.getTextureKey('decorfloor'), (((x + y) % 2) + 2) % 2)
+        .setDepth(-2)
+    }
+    for (const { x, y, kind } of placeDecor(this.floorGrid, cells, level.id)) {
+      this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, this.getTextureKey('decor'), DECOR[kind]).setDepth(-1)
+    }
   }
 
   /**
