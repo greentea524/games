@@ -576,6 +576,31 @@ The menu, map and boot screen are still laid out for 160×144 behind a camera
 zoomed from the top left. The inner green frame the ticket asked about was
 the shell's padding, already removed in #177.
 
+**Lantern Keeper's forest is drawn by `forest.ts`, at the screen's
+resolution (#172).** The world is 8 units to a tile and the camera magnifies
+by two, so a picture drawn at 16 pixels a tile and shown at half size is one
+drawn pixel to one screen pixel. Everything new is made that way.
+
+- **Stone.** The map's own layer still collides and is hidden. A second map
+  with 16-pixel tiles is laid over it at half scale, each piece chosen from
+  which neighbours are stone: a moss cap where the sky is above, a dark lip
+  underneath, and a darker mass with faint joints where a block is buried.
+- **Backdrop.** Three pictures that repeat both ways, fixed to the camera and
+  slid under it by different amounts. They are the size of the view and
+  inset, like the darkness, because the camera magnifies what is fixed to it.
+- **Light.** The darkness is the forest's own dark at 0.5 to 0.62, where it
+  was black at 0.76 to 0.82; `forest_test.ts` holds every stage lighter and
+  none out of its old order. A light is three rings, each lifting more
+  (`rings` on `shared/lighting.ts`), and a lit lantern and the keeper each
+  throw a warm glow, added over the darkness.
+- **Vines** sway from where they are rooted, and not under reduced motion.
+  `qa:motion` holds that as a pair, beside the fireflies.
+
+`forest_test.ts` holds the order of brightness: the forest behind is darker
+than any stone, the near leaves darker than the far trunks, moss brighter
+than stone and the light brighter than moss. The props, the keeper and the
+lanterns are still the old art, at one drawn pixel to two on screen: #173.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183

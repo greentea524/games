@@ -95,6 +95,9 @@ export const JUMP_ASSIST = {
 // Darkness overlay per level (issue #7) — kept below 1 so terrain
 // outlines stay faintly visible even without direct lantern light.
 // Later levels stay darker, but never fully opaque.
+// No longer what is drawn: `GLOOM_ALPHA` in `forest.ts` is (#172). Kept as the
+// record of what each stage was, which `forest_test.ts` holds the new values
+// against: every stage lighter, and none out of its order.
 export const DARKNESS_ALPHA: Record<string, number> = {
   level1: 0.76,
   // The Firefly Grove (#90) is the lightest stage in the game on purpose: it
