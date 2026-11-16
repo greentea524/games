@@ -17,7 +17,7 @@
 //   - `brushRadius` decides the per-radius texture cache key. Drop the rounding
 //     and a smoothly shrinking light mints a texture every frame — a leak that
 //     shows up as a slow death rather than a failure.
-import { brushRadius, reachesScreen } from './darkness'
+import { brushRadius, reachesScreen, zoomInset } from './darkness'
 
 let ok = true
 const check = (name: string, pass: boolean, note?: string) => {
@@ -95,6 +95,17 @@ check(
   reachesScreen(0, 0, 1, W, H),
   "brushRadius's floor case",
 )
+
+// A magnifying camera (#171). Lantern Keeper's sees 120 by 108 of a 240 by 216
+// screen, at twice the size.
+const [ix, iy] = zoomInset(240, 216, 2)
+const drawnAt = (p: number, c: number, zoom: number) => (p - c) * zoom + c
+check('an overlay at the inset lands on the screen\'s corner', drawnAt(ix, 120, 2) === 0 && drawnAt(iy, 108, 2) === 0, `inset ${ix}, ${iy}`)
+check('and its far corner on the screen\'s far corner', drawnAt(ix + 120, 120, 2) === 240 && drawnAt(iy + 108, 108, 2) === 216)
+// The control: where it used to go. At the corner it covers a quarter.
+check('and the check can fail: at 0 it starts off the screen', drawnAt(0, 120, 2) < 0)
+const [zx, zy] = zoomInset(160, 144, 1)
+check('with no zoom the inset is nothing, as Static has it', zx === 0 && zy === 0)
 
 console.log(ok ? '\nALL DARKNESS OVERLAY CHECKS PASS' : '\nFAILURES ABOVE')
 process.exit(ok ? 0 : 1)

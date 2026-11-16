@@ -542,6 +542,40 @@ and both palettes, and it found four things.
 The Static side's grain and glitch hold still under reduced motion. That one
 is not measured: it is a shader, and `qa:motion` reads game objects.
 
+**Lantern Keeper is 240×216 by its camera, and its world is untouched
+(#171).** A platformer's jumps are tuned in pixels, so the rule was that every
+speed and distance scale by one factor and none be missed. Here none was
+changed. `VIEW_ZOOM` is 2 and is applied in one place, the play camera; a tile
+is still 8 units and the keeper still runs at 60. On screen everything is
+exactly twice what it was, and the reachability checks pass untouched.
+
+Two, not the 1.5 the screen grew by. The keeper is six units tall. At 1.5
+that is 9 pixels of 216, the same twenty-fourth of the screen as before. At 2
+it is 12, an eighteenth, and the existing art is a clean two by two. A keeper
+drawn taller than its hitbox is for the art ticket. The cost is the view: fifteen tiles by thirteen and a half,
+down from twenty by eighteen. The keeper's light reaches three tiles and a
+dash five, so what is given up is dark.
+
+Three things a magnifying camera does that are easy to miss:
+
+- **It magnifies what is fixed to it, about the middle of the screen.** The
+  HUD is a scene of its own, `HudScene`, at the screen's real size. A launch
+  does not happen until the next frame, so it keeps what it is asked for
+  before then; and `prepare()` stops a new level drawing on the last level's
+  HUD, which is still up for one frame.
+- **The darkness overlay must be the size of the view, and inset.**
+  `zoomInset` in `shared/darkness.ts` is where to put it and how far a
+  light's place on it is from the camera's scroll. At zoom 1 both are 0, so
+  Static is unchanged.
+- **A level one screen tall now scrolls.** The keeper is dropped in above
+  the ground, so where they will stand is not known as the stage is built:
+  the stage's name goes at the top, and later messages go wherever the
+  keeper is not.
+
+The menu, map and boot screen are still laid out for 160×144 behind a camera
+zoomed from the top left. The inner green frame the ticket asked about was
+the shell's padding, already removed in #177.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183

@@ -1,6 +1,42 @@
-export const GBC_WIDTH = 160
-export const GBC_HEIGHT = 144
+// The screen is 240×216 (#171). It was 160×144.
+export const GBC_WIDTH = 240
+export const GBC_HEIGHT = 216
 export const TILE_SIZE = 8
+
+/**
+ * How much the play camera magnifies the forest (#171).
+ *
+ * This is the one factor the move to the larger screen scales the game by,
+ * and it is applied in one place: the camera. The world underneath is not
+ * touched. A tile is still 8 units, the keeper still runs 60 of them a second
+ * and jumps at 150, and every map, speed, gap and ledge is the number it was.
+ * So no length could be missed, because none was changed: on the screen each
+ * is exactly twice what it was, and a jump measured in tiles is the same jump.
+ *
+ * Two, not the one and a half the screen grew by. At 1.5 the view would be
+ * the twenty tiles by eighteen it always was and the keeper, who is six
+ * units tall, nine pixels of 216: the same speck, a twenty-fourth of the
+ * screen. At 2 the keeper is twelve, an eighteenth, and every pixel the art
+ * has is a clean two by two. The cost is the
+ * view: fifteen tiles by thirteen and a half. The keeper's own light reaches
+ * three tiles and a lantern's three and a half, a dash covers five and a
+ * double jump under six, so what is given up is dark forest past the reach of
+ * any move.
+ */
+export const VIEW_ZOOM = 2
+/** What the play camera sees, in world units. */
+export const VIEW_WIDTH = GBC_WIDTH / VIEW_ZOOM
+export const VIEW_HEIGHT = GBC_HEIGHT / VIEW_ZOOM
+
+/**
+ * The menu, the map and the boot screen are still laid out for 160×144, and
+ * are shown through a camera zoomed from the top left by `LEGACY_ZOOM`, as
+ * the other games' were while their art was redrawn. A later ticket lays
+ * them out on the real screen.
+ */
+export const LEGACY_WIDTH = 160
+export const LEGACY_HEIGHT = 144
+export const LEGACY_ZOOM = GBC_WIDTH / LEGACY_WIDTH
 
 // Fading firefly glow (KAN-113) — all tunable
 export const GLOW = {

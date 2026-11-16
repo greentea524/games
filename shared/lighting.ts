@@ -15,7 +15,7 @@
 // answers to the eye: an overlay that paints an opaque rectangle over the game
 // is the most visible defect a person can have.
 import Phaser from 'phaser'
-import { brushRadius, reachesScreen } from './darkness'
+import { zoomInset, brushRadius, reachesScreen } from './darkness'
 
 export interface Light {
   /** Centre, in world coordinates — conversion to screen space is handled here. */
@@ -69,8 +69,14 @@ export class Darkness {
   constructor(scene: Phaser.Scene, opts: DarknessOptions) {
     this.scene = scene
     this.color = opts.color ?? 0x000000
+    // A camera that magnifies does so about the middle of the screen, and
+    // that includes anything fixed to it. So the overlay is the size of what
+    // the camera sees, placed where magnifying it covers the screen: at zoom
+    // 1 that is the corner, as it always was (#171).
+    const cam = scene.cameras.main
+    const [ox, oy] = zoomInset(cam.width, cam.height, cam.zoom)
     this.rt = scene.add
-      .renderTexture(0, 0, opts.width, opts.height)
+      .renderTexture(ox, oy, opts.width, opts.height)
       .setOrigin(0)
       .setScrollFactor(0)
       .setDepth(opts.depth ?? 10)
@@ -105,8 +111,11 @@ export class Darkness {
       if (light.radius <= 0) continue
 
       const r = brushRadius(light.radius)
-      const sx = light.x - cam.scrollX
-      const sy = light.y - cam.scrollY
+      // The corner of what the camera sees, which under a zoom is not its
+      // scroll. Worked out here: `worldView` is a frame behind.
+      const [ox, oy] = zoomInset(cam.width, cam.height, cam.zoom)
+      const sx = light.x - cam.scrollX - ox
+      const sy = light.y - cam.scrollY - oy
 
       if (!reachesScreen(sx, sy, r, this.rt.width, this.rt.height)) continue
 

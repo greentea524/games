@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { TILE_SIZE, PAL, GBC_WIDTH } from '../constants'
+import { TILE_SIZE, PAL, LEGACY_WIDTH as GBC_WIDTH, LEGACY_ZOOM } from '../constants'
 import level1Url from '../assets/level1.json?url'
 import level2Url from '../assets/level2.json?url'
 import level3Url from '../assets/level3.json?url'
@@ -24,6 +24,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144 (#171): see `LEGACY_ZOOM`.
+    this.cameras.main.setOrigin(0, 0).setZoom(LEGACY_ZOOM)
     this.cameras.main.setBackgroundColor('#0f1a12')
 
     // Generate procedural textures first so preview sprites can be used
