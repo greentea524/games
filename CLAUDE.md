@@ -445,9 +445,8 @@ are specific to this game.
   world scene, it took the darkness overlay's canvas out from under it in the
   middle of the playthrough. A texture made later is enlarged by name.
 
-The title, dialogue and menus are still laid out for 160×144 behind a zoomed
-camera. `qa/touch/static.mjs` taps them through a literal 160, which is right
-for exactly as long as that is true.
+The title is still laid out for 160×144 behind a zoomed camera. The dialogue,
+inventory and toasts are on the real screen since #180.
 
 **Static's village is drawn over its maps, not in them (#178).** The maps
 still hold twelve tile kinds, and that layer still collides and is still what
@@ -491,6 +490,34 @@ their key now, as `tv_gbc`; they were single textures drawn in one palette.
 Static reads `shared/motion.ts` now. Under reduced motion the full-screen
 noise at a crossing is not shown, and the patches change every 640 ms instead
 of every 110. `qa:motion` holds both, each as a pair.
+
+**Static's text and minimap are placed by `hud.ts`, on the real screen
+(#180).** The UI was 160×144 through a zoomed camera, so 8-pixel text came out
+at 12, eighteen characters to a line. It is native now: twenty-six to a line,
+and `hud_test.ts` wraps every line in `dialogue.ts` and holds each to three
+rows. The scenes draw the lines `wrap()` returns with Phaser's wrapping off,
+so the test measures what is drawn. `dialogue.ts` reaches `localStorage` as it
+loads; the test stubs it and imports the file dynamically.
+
+- **The dialogue box goes to the top** when the kid, or who they face, would
+  be under it. The camera centres the kid in the town, but a room does not
+  scroll and its door is the bottom row.
+- **The minimap is two pixels a tile and changes corner.** It first only hid
+  when over something to walk up to. Every lamp post and signpost can be
+  looked at, so it was hidden for most of a walk. It keeps its corner while
+  that is clear, and moves to the next when not. The bottom right is its last
+  choice and is inset: the shell's rounded corner cut it, which a screenshot
+  showed and no layout check could. On the green screen it is four tones; it
+  was terracotta and blue there.
+- **The prompt says what the button does**: `A TALK`, `A LOOK`, `A USE`, with
+  Z on a desktop. It goes under its target when the kid stands above it.
+
+There is no status line. The ticket allowed one only for something true, and
+the objective and items are one press away in the bag.
+
+The touch check of the prompt used to read every text object in the scene. It
+passed on a prompt that was never shown. It now stands the kid in front of
+someone and reads the prompt that appears.
 
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
