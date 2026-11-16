@@ -368,8 +368,8 @@ cleanly; it is 8 with a shadow now.
 rework (#160 to #165).** #160 changed the canvas and left the art alone, as
 #155 did for Pocket Dungeon. The art has since been redrawn at 24 (#161,
 #162) and `BootScene.enlarge` is gone. One thing is still temporary: the
-menu, level select and HUD are laid out for 160×144 and shown through
-`legacyCamera`. The screen is still ten tiles by nine, so the
+menu and level select are laid out for 160×144 and shown through
+`legacyCamera`, until #165. The screen is still ten tiles by nine, so the
 six levels larger than that scroll exactly as they did. A check that taps an
 object in a scene behind that camera must multiply by the camera's zoom:
 `tapObject` in `qa/touch/sound.mjs` takes it from the game. And a key sent
@@ -414,6 +414,18 @@ was only its hoops; the wood is lifted clear of the floor. On the green
 screen the surround is the darkest tone with pale edges on things. Two levels
 fill the screen and get nothing. `levelView` is the one place a level's
 framing is worked out; the camera and the surround both read it.
+
+**Cart & Crate's HUD is placed by `hud.ts`, and its bottom line is written
+for the controls in the player's hands (#164).** Solid bars in the warehouse's
+dark, text at 8 pixels, the stage on the left, moves against par on the right
+and the level's best between them when there is one. `hud_test.ts` holds it
+clear at a three-digit stage and four-digit moves, with the old screen as its
+control. The bottom line named Z, H and R, which a phone does not have. It
+reads `B:UNDO SEL:RESET START:MENU` there and names the keys on a desktop.
+Writing it found that the hint had no phone control at all: it was the H key
+and nothing else. It is the pause panel's seventh row now, and
+`BoardScene.toggleHint` is the one path both use. The pause and help panels
+are in the same scene and take the same colours, on both palettes.
 
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle

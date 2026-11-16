@@ -1,7 +1,8 @@
 // The warehouse stays outside the puzzle, on every level (#163).
 //
 //   npx tsx cart-crate/decor_test.ts
-import { GBC_HEIGHT, GBC_WIDTH, PAL, sx } from './constants'
+import { GBC_HEIGHT, GBC_WIDTH, PAL } from './constants'
+import { BAR_HEIGHT } from './hud'
 import { CAMPAIGN_LEVELS } from './levels'
 import {
   DECOR, DMG_DECOR, decorPalette, drawDecor, drawDecorFloor, isOutside, levelView, placeDecor, surround,
@@ -14,7 +15,7 @@ const check = (name: string, ok: boolean, detail = '') => {
   if (!ok) failed++
 }
 const screen = { width: GBC_WIDTH, height: GBC_HEIGHT }
-const hud = { top: sx(14), bottom: sx(12) }
+const hud = { top: BAR_HEIGHT, bottom: BAR_HEIGHT }
 
 /** A cell that is part of the level: floor, a drawn wall, a target, a crate, the fox. */
 const playable = (grid: string[], x: number, y: number) => !isOutside(grid, x, y)
