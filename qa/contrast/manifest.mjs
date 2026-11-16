@@ -107,10 +107,11 @@ export const GAMES = [
     advance: 3,
     scene: 'world',
     surfaces: {
-      // Static's tileset is fed to a Phaser tilemap, which indexes the image
-      // directly and registers no frames — hence the rect. Tile 0 is GRASS,
-      // drawn in PAL.lightest, which is what most of the game is walked on.
-      floor: { texture: 'tiles_dmg', rect: [0, 0, 24, 24] },
+      // The village as it is drawn (#178). The strip is fed to a Phaser
+      // tilemap, which indexes the image directly and registers no frames —
+      // hence the rect. Its first picture is plain grass, in PAL.lightest,
+      // which is what most of the game is walked on.
+      floor: { texture: 'village_dmg', rect: [0, 0, 24, 24] },
     },
     on: {
       floor: [
@@ -129,7 +130,10 @@ export const GAMES = [
     },
     floorVariants: ['prop_rug_dmg'],
     exclude: {
-      tiles_dmg: 'the tileset is the surface',
+      village_dmg: 'the drawn village is the surface',
+      // The twelve tiles the maps are written in. They still collide, and
+      // are no longer drawn (#178).
+      tiles_dmg: 'the maps\' own tiles, hidden under the drawn village',
       // The NPC side and back frames are the same art as their `_down` frame
       // with a different face; checking one per NPC is enough to catch a tone
       // mistake, and listing 16 near-identical keys would be noise.

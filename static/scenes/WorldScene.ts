@@ -17,6 +17,7 @@ import { NPCS, currentTarget } from '../dialogue'
 import { Darkness, type Light } from '../../shared/lighting'
 import { showRunSummary } from '../../shared/runSummary'
 import { enlargeTexture } from '../enlarge'
+import { baseFrame, overFrame } from '../tiles'
 import { ITEMS, TRANSFORMS } from '../items'
 import type { NpcDef } from '../dialogue'
 import {
@@ -66,6 +67,11 @@ interface Structure {
 // Within this many tiles of the objective, the marker stops drawing — you can
 // see the place by then, and a marker on top of you is noise.
 const DESTINATION_NEAR_TILES = 4
+
+/** The first tile number of the drawn village's tileset: clear of the maps' twelve. */
+const VILLAGE_GID = 100
+/** Above the kid and the townsfolk (10), under the darkness (20). */
+const OVER_DEPTH = 12
 
 /**
  * How far the player can see in a dark room (#73).
@@ -151,6 +157,10 @@ export class WorldScene extends Phaser.Scene {
   private interactables: Interactable[] = []
   private npcGroup!: Phaser.Physics.Arcade.StaticGroup
   private groundLayer!: Phaser.Tilemaps.TilemapLayer
+  private villageBase!: Phaser.Tilemaps.TilemapLayer
+  private villageOver!: Phaser.Tilemaps.TilemapLayer
+  private villageStale = false
+  private villageGround!: Phaser.Tilemaps.TilemapLayer
   private lastStepAt = 0
   private facing: Facing = 'down'
   private transitioning = false
@@ -244,6 +254,7 @@ export class WorldScene extends Phaser.Scene {
     const tileset = map.addTilesetImage('tiles', `tiles_${mode}`)!
     const ground = map.createLayer('ground', tileset)!
     ground.setCollision(SOLID_TILES)
+    this.buildVillage(map, ground, mode)
 
     // Spawn: prefer explicit door target, else the map's 'spawn' object.
     let sx = GBC_WIDTH / 2
@@ -1357,6 +1368,67 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * What the player sees of the ground (#178).
+   *
+   * `ground` holds the twelve tile kinds the maps are written in. It still
+   * collides, and the story still rewrites it, but it is hidden: two more
+   * layers are drawn from it. One under everything, a picture for each cell
+   * chosen from its kind and its neighbours; one over the kid, for the top of
+   * a tree and a chimney. So nothing that blocks the kid has changed.
+   */
+  private buildVillage(map: Phaser.Tilemaps.Tilemap, ground: Phaser.Tilemaps.TilemapLayer, mode: 'dmg' | 'gbc') {
+    ground.setVisible(false)
+    this.villageGround = ground
+    // A tileset the map files know nothing of, numbered clear of theirs.
+    // Made by hand: `addTilesetImage` only attaches an image to a tileset a
+    // Tiled map already declares, and returns null for a name it does not.
+    const tiles = new Phaser.Tilemaps.Tileset('village', VILLAGE_GID, TILE, TILE)
+    tiles.setImage(this.textures.get(`village_${mode}`))
+    map.tilesets.push(tiles)
+    map.tiles = Phaser.Tilemaps.Parsers.Tiled.BuildTilesetIndex(map)
+    this.villageBase = map.createBlankLayer('village', tiles)!.setDepth(ground.depth)
+    this.villageOver = map.createBlankLayer('village_over', tiles)!.setDepth(OVER_DEPTH)
+    this.paintVillage()
+    // And once more when the scene has finished building, so the cells that
+    // signs and people stand in are known.
+    this.villageStale = true
+
+    // The story rewrites the ground as it goes: a house rebuilt, a hedge
+    // cleared. Whatever does, the picture follows on the next frame.
+    const put = ground.putTileAt.bind(ground)
+    ground.putTileAt = ((...args: Parameters<typeof put>) => {
+      this.villageStale = true
+      return put(...args)
+    }) as typeof ground.putTileAt
+  }
+
+  private paintVillage() {
+    this.villageStale = false
+    const ground = this.villageGround
+    const map = ground.tilemap
+    const kinds = Array.from({ length: map.height }, (_, y) =>
+      Array.from({ length: map.width }, (_, x) => ground.getTileAt(x, y)?.index ?? 0),
+    )
+    // Nothing is drawn over a cell something stands in: a sign under the
+    // leaves of the tree below it would be a sign nobody can read.
+    const taken = new Set<string>()
+    for (const child of this.children.list) {
+      const o = child as Phaser.GameObjects.GameObject & { x?: number; y?: number; type: string }
+      if (o === this.player || o.type === 'TilemapLayer' || o.type === 'Graphics' || o.type === 'Container') continue
+      if (typeof o.x !== 'number' || typeof o.y !== 'number') continue
+      taken.add(`${Math.floor(o.x / TILE)},${Math.floor(o.y / TILE)}`)
+    }
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        this.villageBase.putTileAt(VILLAGE_GID + baseFrame(kinds, x, y), x, y)
+        const over = taken.has(`${x},${y}`) ? null : overFrame(kinds, x, y)
+        if (over === null) this.villageOver.removeTileAt(x, y)
+        else this.villageOver.putTileAt(VILLAGE_GID + over, x, y)
+      }
+    }
+  }
+
   public reloadPalette() {
     this.scene.restart({
       mapKey: this.mapKey,
@@ -1578,6 +1650,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update() {
+    if (this.villageStale) this.paintVillage()
     // Finale: once the entity choice is made, play the ending.
     if (
       this.mapKey === 'core' &&

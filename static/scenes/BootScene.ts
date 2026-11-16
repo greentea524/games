@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 // Drawn on the old 16-pixel grid and enlarged afterwards; see `enlargeTextures`.
 import { LEGACY_TILE as TILE, TILE as NEW_TILE, PAL, GBC_PAL } from '../constants'
 import { enlargeTextures } from '../enlarge'
+import { PROPS, propKey } from '../props'
+import { DMG_VILLAGE, FRAME_COUNT, TILE_PX, VILLAGE, drawTileset } from '../tiles'
 import { scaleTiledMap, type TiledMap } from '../maps'
 import { NPCS } from '../dialogue'
 import townUrl from '../assets/town.json?url'
@@ -43,6 +45,11 @@ export class BootScene extends Phaser.Scene {
     })
     enlargeTextures(this)
     ;(['dmg', 'gbc'] as const).forEach((mode) => this.buildWalks(mode))
+    // After the enlarging, not before: these are drawn at 24 already.
+    ;(['dmg', 'gbc'] as const).forEach((mode) => {
+      this.buildVillage(mode)
+      this.buildProps24(mode)
+    })
     // The maps declare 16-pixel tiles; see `maps.ts`.
     for (const key of this.cache.tilemap.getKeys()) {
       scaleTiledMap(this.cache.tilemap.get(key).data as TiledMap, NEW_TILE)
@@ -315,6 +322,49 @@ export class BootScene extends Phaser.Scene {
     tex(`prop_flower_${mode}`, 16, 16)
 
     g.destroy()
+  }
+
+  /**
+   * The street furniture and the furniture, from `props.ts` (#178). Each takes
+   * the place of the enlarged 16-pixel drawing `buildProps` made under the
+   * same key, before anything has been given the old one.
+   */
+  private buildProps24(mode: 'dmg' | 'gbc') {
+    const pal = mode === 'dmg' ? DMG_VILLAGE : VILLAGE
+    for (const [name, prop] of Object.entries(PROPS)) {
+      const key = propKey(name, mode)
+      const canvas = document.createElement('canvas')
+      canvas.width = prop.w * TILE_PX
+      canvas.height = prop.h * TILE_PX
+      const ctx = canvas.getContext('2d')
+      if (!ctx) continue
+      prop.draw((x, y, w, h, colour) => {
+        ctx.fillStyle = `#${colour.toString(16).padStart(6, '0')}`
+        ctx.fillRect(x, y, w, h)
+      }, pal)
+      if (this.textures.exists(key)) this.textures.remove(key)
+      this.textures.addCanvas(key, canvas)
+    }
+  }
+
+  /**
+   * The village as it is drawn, from `tiles.ts` (#178): a strip of frames the
+   * world scene chooses from, cell by cell. `buildTileset` below still makes
+   * the twelve tiles the maps are written in, which is what collides.
+   */
+  private buildVillage(mode: 'dmg' | 'gbc') {
+    const key = `village_${mode}`
+    if (this.textures.exists(key)) return
+    const canvas = document.createElement('canvas')
+    canvas.width = FRAME_COUNT * TILE_PX
+    canvas.height = TILE_PX
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    drawTileset((x, y, w, h, colour) => {
+      ctx.fillStyle = `#${colour.toString(16).padStart(6, '0')}`
+      ctx.fillRect(x, y, w, h)
+    }, mode === 'dmg' ? DMG_VILLAGE : VILLAGE)
+    this.textures.addCanvas(key, canvas)
   }
 
   private buildTileset(mode: 'dmg' | 'gbc') {

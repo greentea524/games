@@ -449,6 +449,29 @@ The title, dialogue and menus are still laid out for 160×144 behind a zoomed
 camera. `qa/touch/static.mjs` taps them through a literal 160, which is right
 for exactly as long as that is true.
 
+**Static's village is drawn over its maps, not in them (#178).** The maps
+still hold twelve tile kinds, and that layer still collides and is still what
+the story rewrites, but it is hidden. `tiles.ts` chooses a picture for each
+cell from its kind and its neighbours: which sides of a path meet a lawn,
+where a roof's edge is, whether a wall is a cottage's front or a room's. So
+nothing that blocks the kid changed, and `qa:static` passes untouched. Two
+layers are drawn: one under everything, and one over the kid for the top of a
+tree and a chimney. A cell something stands in gets nothing drawn over it, so
+a sign is never under leaves, and a door never is either.
+
+Three things to know before touching it. `map.addTilesetImage` returns null
+for a tileset a Tiled map does not declare, so the village's is made by hand.
+The ground's `putTileAt` is wrapped, so a house the story rebuilds is redrawn
+on the next frame without each beat having to ask. And the layer is painted
+twice at start: once at once, and again when the scene has finished building
+and the cells that signs and people stand in are known.
+
+The street furniture and the furniture are in `props.ts`, drawn through the
+same painter in the village's own colours: a barrel's wood is a door's wood.
+Each replaces the enlarged drawing `buildProps` made under the same key, at
+boot, before anything holds the old one. The items, the tear, the entity and
+the kid are still the old art: that is #179.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183
