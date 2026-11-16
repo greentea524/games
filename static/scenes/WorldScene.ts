@@ -4,6 +4,7 @@ import {
   GBC_HEIGHT,
   TILE,
   PLAYER_SPEED,
+  scaled,
   SOLID_TILES,
   TILES,
   PAL,
@@ -15,6 +16,7 @@ import { sfx, music } from '../audio'
 import { NPCS, currentTarget } from '../dialogue'
 import { Darkness, type Light } from '../../shared/lighting'
 import { showRunSummary } from '../../shared/runSummary'
+import { enlargeTexture } from '../enlarge'
 import { ITEMS, TRANSFORMS } from '../items'
 import type { NpcDef } from '../dialogue'
 import {
@@ -72,7 +74,7 @@ const DESTINATION_NEAR_TILES = 4
  * barely more than arm's reach. Deliberately the same for 'dead' and 'absent':
  * a broken light and no light should look identical, which is the joke.
  */
-const LIGHT_RADIUS = { lit: 44, dim: 18 } as const
+const LIGHT_RADIUS = { lit: scaled(44), dim: scaled(18) } as const
 
 /**
  * The TV lights itself in a dark room (#89).
@@ -83,7 +85,7 @@ const LIGHT_RADIUS = { lit: 44, dim: 18 } as const
  * static is a light source anyway; the radius breathes so it reads as a
  * signal rather than a lamp.
  */
-const TV_GLOW = { radius: 30, flicker: 4, periodMs: 140 } as const
+const TV_GLOW = { radius: scaled(30), flicker: scaled(4), periodMs: 140 } as const
 
 /**
  * How many items a run can actually collect.
@@ -274,7 +276,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.setDepth(10)
     this.player.setCollideWorldBounds(true)
     // A slightly slimmer body than the sprite so movement feels roomy.
-    this.player.body.setSize(10, 10).setOffset(3, 5)
+    this.player.body.setSize(scaled(10), scaled(10)).setOffset(scaled(3), scaled(5))
     this.physics.add.collider(this.player, ground)
 
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
@@ -320,7 +322,7 @@ export class WorldScene extends Phaser.Scene {
         `npc_${mode}_${def.id}_down`,
       ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
       sprite.setDepth(10)
-      sprite.body.setSize(12, 12).setOffset(2, 3)
+      sprite.body.setSize(scaled(12), scaled(12)).setOffset(scaled(2), scaled(3))
       this.npcs.push({ sprite, def, facing: 'down' })
     }
     this.physics.add.collider(this.player, npcGroup)
@@ -358,7 +360,7 @@ export class WorldScene extends Phaser.Scene {
       const ex = 5 * TILE + TILE / 2
       const ey = 2 * TILE + TILE / 2
       const entity = this.physics.add.staticImage(ex, ey, 'entity')
-      entity.body.setSize(14, 12).setOffset(1, 4)
+      entity.body.setSize(scaled(14), scaled(12)).setOffset(scaled(1), scaled(4))
       this.physics.add.collider(this.player, entity)
       this.interactables.push({
         x: ex,
@@ -384,11 +386,11 @@ export class WorldScene extends Phaser.Scene {
 
     const boxGfx = this.add.graphics()
     boxGfx.fillStyle(PAL.lightest, 1)
-    boxGfx.fillRoundedRect(-6, -11, 12, 11, 2)
+    boxGfx.fillRoundedRect(-6, -11 - scaled(2), 12, 11, 2)
     boxGfx.lineStyle(1, PAL.darkest, 1)
-    boxGfx.strokeRoundedRect(-6, -11, 12, 11, 2)
+    boxGfx.strokeRoundedRect(-6, -11 - scaled(2), 12, 11, 2)
 
-    const labelTxt = this.add.text(0, -6, promptLabel, {
+    const labelTxt = this.add.text(0, -6 - scaled(2), promptLabel, {
       fontFamily: 'monospace',
       fontSize: '8px',
       fontStyle: 'bold',
@@ -463,6 +465,9 @@ export class WorldScene extends Phaser.Scene {
         }
       g.generateTexture('noise', 32, 32); g.destroy()
     }
+    // By name: see `enlargeTextures`. The noise is stretched over the screen,
+    // so its own size does not matter.
+    enlargeTexture(this, 'tv')
   }
 
   private facingInteractable(): Interactable | undefined {
@@ -597,19 +602,19 @@ export class WorldScene extends Phaser.Scene {
         fy,
         drained ? `fountain_drained_${mode}` : `fountain_full_${mode}`,
       )
-      fountain.body.setSize(28, 26)
+      fountain.body.setSize(scaled(28), scaled(26))
       this.physics.add.collider(this.player, fountain)
 
       if (world === 'static') {
         this.interactables.push({
-          x: fx + 8,
-          y: fy + 8,
+          x: fx + scaled(8),
+          y: fy + scaled(8),
           action: () => this.openNarration(VALVE_DEF),
         })
       } else {
         this.interactables.push({
-          x: fx + 8,
-          y: fy + 8,
+          x: fx + scaled(8),
+          y: fy + scaled(8),
           action: () => this.openNarration(FOUNTAIN_DEF),
         })
       }
@@ -687,7 +692,7 @@ export class WorldScene extends Phaser.Scene {
           GUS_STATIC_TILE.ty * TILE + TILE / 2,
           `npc_${mode}_gus_down`,
         ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
-        sprite.body.setSize(12, 12).setOffset(2, 3)
+        sprite.body.setSize(scaled(12), scaled(12)).setOffset(scaled(2), scaled(3))
         this.npcs.push({ sprite, def: GUS_STATIC_DEF, facing: 'down' })
       }
       // Chapter 4 (#19): Ren's house half-written on the static side, with the
@@ -715,7 +720,7 @@ export class WorldScene extends Phaser.Scene {
         20 * TILE + TILE / 2,
         `npc_${mode}_baker_down`,
       ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
-      sprite.body.setSize(12, 12).setOffset(2, 3)
+      sprite.body.setSize(scaled(12), scaled(12)).setOffset(scaled(2), scaled(3))
       this.npcs.push({ sprite, def: BAKER_NORMAL_DEF, facing: 'down' })
     }
 
@@ -1255,6 +1260,7 @@ export class WorldScene extends Phaser.Scene {
         this.tweens.killTweensOf(prompt)
         prompt.destroy()
         showRunSummary(this, {
+          screen: { width: GBC_WIDTH, height: GBC_HEIGHT },
           title: 'THE RECORD',
           subtitle: empathy ? 'You stayed' : 'You cut it loose',
           palette: PAL,
@@ -1455,12 +1461,12 @@ export class WorldScene extends Phaser.Scene {
     const mapH = map.height
     if (mapW * TILE <= GBC_WIDTH && mapH * TILE <= GBC_HEIGHT) return
 
-    const pad = 2
-    const scale = 40 / Math.max(mapW, mapH)
+    const pad = scaled(2)
+    const scale = scaled(40) / Math.max(mapW, mapH)
     const panelW = mapW * scale + pad * 2
     const panelH = mapH * scale + pad * 2
-    const ox = GBC_WIDTH - panelW - 3
-    const oy = 3
+    const ox = GBC_WIDTH - panelW - scaled(3)
+    const oy = scaled(3)
     this.miniScale = scale
     this.miniOX = ox + pad
     this.miniOY = oy + pad

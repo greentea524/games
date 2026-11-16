@@ -2,7 +2,7 @@
   "static": {
     "note": "A painted village with a HUD and a score line the game does not have. The drift is known, recorded in qa/thumbnails.mjs, and accepted — this baseline exists so the NEXT drift is not.",
     "art": "12687b5955b3a48e6053e6e68dafa137ac405064f5f60636b0ba2b4ff488f930",
-    "textures": "f507231b785a33c881ec3a386011bbfd296b6237446d55dcdcea83dc16bf1b34",
+    "textures": "f08f93b95e22e3ea0fa440c16926b6727110c7e2936cab4c659f6cb5df3c95c9",
     "keys": 101,
     "nondeterministic": [
       "entity"
