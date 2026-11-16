@@ -427,6 +427,34 @@ and nothing else. It is the pause panel's seventh row now, and
 `BoardScene.toggleHint` is the one path both use. The pause and help panels
 are in the same scene and take the same colours, on both palettes.
 
+**Static is 240×216 with 24-pixel tiles, at the start of the same rework
+(#177 to #181).** #177 changed the canvas and left the art alone. Three things
+are specific to this game.
+
+- **The maps are scaled as they load.** The seven Tiled files still declare
+  16-pixel tiles, and open in Tiled as they always did. `maps.ts` multiplies
+  the tile size and every object's position on the way in, and `maps_test.ts`
+  holds each object to the cell it was in.
+- **Every length goes through `scaled`.** The kid moves by velocity, so the
+  speed, collision boxes, reach and light radii are all lengths. Nothing was
+  retuned by feel, and `qa:static`'s playthrough passes untouched but for its
+  own literal 16, which it reads from the game now.
+- **Enlarging a texture destroys the old one.** `enlargeTextures` runs once at
+  boot, before anything holds a texture. The walk animations were made first
+  and lost their frames, which stopped the game at boot. Called again from the
+  world scene, it took the darkness overlay's canvas out from under it in the
+  middle of the playthrough. A texture made later is enlarged by name.
+
+The title, dialogue and menus are still laid out for 160×144 behind a zoomed
+camera. `qa/touch/static.mjs` taps them through a literal 160, which is right
+for exactly as long as that is true.
+
+**The band between the bezel and the picture is gone (#177).** `#game` had 15
+pixels of dark green padding. Three games' canvases used to overflow and cover
+it, so it showed only in Static and Lantern Keeper, as an inner frame. #183
+made every canvas the right size and gave all five the band. The padding is
+removed in `shared/shell.css`; the picture goes up to the bezel in every game.
+
 **Tube Runner's steering moves the runner, not the tube (#145).** The camera
 used to sit at the runner's angle every frame, which pinned them to the middle
 of the screen, so steering showed only as the tube turning. It trails now: the

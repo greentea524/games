@@ -1,6 +1,34 @@
-export const GBC_WIDTH = 160
-export const GBC_HEIGHT = 144
-export const TILE = 16
+/**
+ * The screen, in game pixels (#177).
+ *
+ * It was the Game Boy's own 160×144 with 16-pixel tiles. The hub card's
+ * village has pitched roofs, round trees and a crackling television, and none
+ * of that fits in 16 pixels, so the screen is 240×216 with 24-pixel tiles, as
+ * Pocket Dungeon's and Cart & Crate's are. That is still ten tiles by nine.
+ */
+export const GBC_WIDTH = 240
+export const GBC_HEIGHT = 216
+export const TILE = 24
+
+/**
+ * The size everything was first drawn, laid out and tuned at.
+ *
+ * #177 changes the canvas and nothing about the art. `BootScene` still draws
+ * on a 16-pixel grid and enlarges each texture once; the title, dialogue and
+ * menus are still laid out for 160×144 and shown through a camera zoomed by
+ * `SCALE`. #178 to #181 replace each with art and layout made at the new
+ * size; when the last goes, so do these.
+ *
+ * The kid moves by velocity, not tile by tile, so every speed, collision box,
+ * reach and radius is a length, and each goes through `scaled`. Nothing is
+ * retuned by feel: a walk across the town takes exactly as long as it did.
+ */
+export const LEGACY_WIDTH = 160
+export const LEGACY_HEIGHT = 144
+export const LEGACY_TILE = 16
+export const SCALE = TILE / LEGACY_TILE
+/** A length measured on the old 16-pixel grid, at the new size. */
+export const scaled = (n: number): number => Math.round(n * SCALE)
 
 // Classic DMG/GBC 4-shade green palette (Normal world).
 // The Static-side (later phases) will desaturate these + one accent.
@@ -60,7 +88,8 @@ export const GBC_PAL = {
   flowerStem: 0x488828,
 } as const
 
-export const PLAYER_SPEED = 60
+/** Pixels a second. 60 on the old grid: three and three-quarter tiles. */
+export const PLAYER_SPEED = 60 * SCALE
 
 // Tile GIDs (firstgid = 1) shared by BootScene's generated tileset and
 // the Tiled map JSONs.

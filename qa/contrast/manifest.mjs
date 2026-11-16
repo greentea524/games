@@ -110,7 +110,7 @@ export const GAMES = [
       // Static's tileset is fed to a Phaser tilemap, which indexes the image
       // directly and registers no frames — hence the rect. Tile 0 is GRASS,
       // drawn in PAL.lightest, which is what most of the game is walked on.
-      floor: { texture: 'tiles_dmg', rect: [0, 0, 16, 16] },
+      floor: { texture: 'tiles_dmg', rect: [0, 0, 24, 24] },
     },
     on: {
       floor: [

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, SCALE } from '../constants'
 import { GameState } from '../state'
 import { sfx, music } from '../audio'
 
@@ -15,6 +15,9 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144 (#177): shown through a camera zoomed from
+    // the top-left, so a point at (x, y) lands at (x, y) times SCALE.
+    this.cameras.main.setOrigin(0, 0).setZoom(SCALE)
     this.cameras.main.setBackgroundColor('#0f380f')
     music.stop() // silence at the menu (resumes in-world after a keypress)
 
@@ -50,8 +53,8 @@ export class TitleScene extends Phaser.Scene {
 
     // Sprite preview: the kid, with the static-side entity flickering nearby
     const mode = GameState.paletteMode
-    this.add.sprite(GBC_WIDTH / 2 - 18, 76, `kid_${mode}_down_0`).setScale(2).play(`walk_${mode}_down`)
-    const entityPreview = this.add.sprite(GBC_WIDTH / 2 + 18, 75, 'entity').setScale(1.6)
+    this.add.sprite(GBC_WIDTH / 2 - 18, 76, `kid_${mode}_down_0`).setScale(2 / SCALE).play(`walk_${mode}_down`)
+    const entityPreview = this.add.sprite(GBC_WIDTH / 2 + 18, 75, 'entity').setScale(1.6 / SCALE)
     this.time.addEvent({
       delay: 180,
       loop: true,

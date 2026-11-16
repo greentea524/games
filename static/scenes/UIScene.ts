@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, PAL } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, LEGACY_HEIGHT as GBC_HEIGHT, PAL, SCALE } from '../constants'
 import { GameState } from '../state'
 import { ITEMS, resolveDialogue, currentObjective, openThreads } from '../dialogue'
 import { sfx } from '../audio'
@@ -55,6 +55,9 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144 (#177): shown through a camera zoomed from
+    // the top-left, so a point at (x, y) lands at (x, y) times SCALE.
+    this.cameras.main.setOrigin(0, 0).setZoom(SCALE)
     // 58, not 50. Press Start 2P is a bitmap face on an 8px grid: at 7px it
     // renders at 0.875x and the glyph strokes land between pixels, which is
     // what made this text mushy. At its native 8px it is crisp, but wraps
@@ -205,7 +208,7 @@ export class UIScene extends Phaser.Scene {
     bg.lineStyle(1, PAL.light, 1)
     bg.strokeRoundedRect(-w / 2, 0, w, h, 3)
 
-    const icon = this.add.image(-w / 2 + 12, h / 2, iconKey).setOrigin(0.5)
+    const icon = this.add.image(-w / 2 + 12, h / 2, iconKey).setOrigin(0.5).setScale(1 / SCALE)
     const text = this.add.text(-w / 2 + 24, 5, message, {
       fontFamily: FONT,
       fontSize: '8px',
@@ -501,7 +504,7 @@ export class UIScene extends Phaser.Scene {
       const y = itemsTop + i * spacing
       const mode = GameState.paletteMode
       const iconKey = def ? `item_${mode}_${def.id}` : ''
-      const icon = this.add.image(20, y + 4, iconKey).setOrigin(0.5)
+      const icon = this.add.image(20, y + 4, iconKey).setOrigin(0.5).setScale(1 / SCALE)
       const label = this.add.text(34, y, def ? def.name : id, {
         fontFamily: FONT,
         fontSize: '8px',

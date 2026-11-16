@@ -149,29 +149,31 @@ export class Driver {
     return this.page.evaluate(() => {
       const g = window.__game
       const w = g.scene.getScene('world')
+      // The tile size is read from the game: it was a literal 16 here until #177.
+      const T = w?.groundLayer?.tilemap?.tileWidth ?? 16
       const ui = g.scene.getScene('ui')
       return {
         mapKey: w.mapKey,
         active: w.scene.isActive(),
         transitioning: w.transitioning,
-        tx: Math.floor(w.player.x / 16),
-        ty: Math.floor(w.player.y / 16),
+        tx: Math.floor(w.player.x / T),
+        ty: Math.floor(w.player.y / T),
         facing: w.facing,
         dark: !!w.darkness,
         npcs: w.npcs.map((n) => ({
           id: n.def.id,
-          tx: Math.floor(n.sprite.x / 16),
-          ty: Math.floor(n.sprite.y / 16),
+          tx: Math.floor(n.sprite.x / T),
+          ty: Math.floor(n.sprite.y / T),
         })),
         interactables: w.interactables.map((i) => ({
-          tx: Math.floor(i.x / 16),
-          ty: Math.floor(i.y / 16),
+          tx: Math.floor(i.x / T),
+          ty: Math.floor(i.y / T),
         })),
         worldGates: (w.worldGates ?? []).map((g) => ({ tx: g.tx, ty: g.ty })),
         doors: w.doors.map((d) => ({
           target: d.target,
-          tx: Math.floor(d.zone.x / 16),
-          ty: Math.floor(d.zone.y / 16),
+          tx: Math.floor(d.zone.x / T),
+          ty: Math.floor(d.zone.y / T),
         })),
         dialogue: ui?.scene.isActive() ? ui.box.visible : false,
         speaker: ui?.scene.isActive() ? ui.nameText.text : '',
@@ -191,6 +193,8 @@ export class Driver {
   async grid() {
     return this.page.evaluate(() => {
       const w = window.__game.scene.getScene('world')
+      // The tile size is read from the game: it was a literal 16 here until #177.
+      const T = w?.groundLayer?.tilemap?.tileWidth ?? 16
       const layer = w.groundLayer
       const W = layer.tilemap.width
       const H = layer.tilemap.height
@@ -208,10 +212,10 @@ export class Driver {
         if (body.gameObject === w.player) continue
         // Door/pickup trigger zones are overlap-only; they do not block.
         if (body.gameObject instanceof Phaser.GameObjects.Zone) continue
-        const x0 = Math.floor(body.left / 16)
-        const x1 = Math.floor((body.right - 1) / 16)
-        const y0 = Math.floor(body.top / 16)
-        const y1 = Math.floor((body.bottom - 1) / 16)
+        const x0 = Math.floor(body.left / T)
+        const x1 = Math.floor((body.right - 1) / T)
+        const y0 = Math.floor(body.top / T)
+        const y1 = Math.floor((body.bottom - 1) / T)
         for (let y = y0; y <= y1; y++) {
           for (let x = x0; x <= x1; x++) {
             if (g[y] && g[y][x] !== undefined) g[y][x] = 0
@@ -307,11 +311,13 @@ export class Driver {
       .waitForFunction(
         ([tx, ty, from, axis]) => {
           const w = window.__game.scene.getScene('world')
+          // The tile size is read from the game: it was a literal 16 here until #177.
+          const T = w?.groundLayer?.tilemap?.tileWidth ?? 16
           if (!w?.player) return true
           if (w.mapKey !== from) return true // walked through a door
           const pos = axis === 'x' ? w.player.x : w.player.y
-          const target = (axis === 'x' ? tx : ty) * 16 + 8
-          return Math.abs(pos - target) <= 3
+          const target = (axis === 'x' ? tx : ty) * T + T / 2
+          return Math.abs(pos - target) <= (T * 3) / 16
         },
         [tx, ty, from, axis],
         { timeout: budgetMs, polling: 20 },
@@ -344,10 +350,12 @@ export class Driver {
   async snapToTile() {
     return this.page.evaluate(() => {
       const w = window.__game.scene.getScene('world')
+      // The tile size is read from the game: it was a literal 16 here until #177.
+      const T = w?.groundLayer?.tilemap?.tileWidth ?? 16
       if (!w?.player) return false
-      const cx = Math.floor(w.player.x / 16) * 16 + 8
-      const cy = Math.floor(w.player.y / 16) * 16 + 8
-      if (Math.abs(cx - w.player.x) > 8 || Math.abs(cy - w.player.y) > 8) return false
+      const cx = Math.floor(w.player.x / T) * T + T / 2
+      const cy = Math.floor(w.player.y / T) * T + T / 2
+      if (Math.abs(cx - w.player.x) > T / 2 || Math.abs(cy - w.player.y) > T / 2) return false
       w.player.x = cx
       w.player.y = cy
       w.player.body.reset(cx, cy)

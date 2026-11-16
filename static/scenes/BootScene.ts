@@ -1,5 +1,8 @@
 import Phaser from 'phaser'
-import { TILE, PAL, GBC_PAL } from '../constants'
+// Drawn on the old 16-pixel grid and enlarged afterwards; see `enlargeTextures`.
+import { LEGACY_TILE as TILE, TILE as NEW_TILE, PAL, GBC_PAL } from '../constants'
+import { enlargeTextures } from '../enlarge'
+import { scaleTiledMap, type TiledMap } from '../maps'
 import { NPCS } from '../dialogue'
 import townUrl from '../assets/town.json?url'
 import houseUrl from '../assets/house.json?url'
@@ -38,6 +41,12 @@ export class BootScene extends Phaser.Scene {
       this.buildItems(mode)
       this.buildProps(mode)
     })
+    enlargeTextures(this)
+    ;(['dmg', 'gbc'] as const).forEach((mode) => this.buildWalks(mode))
+    // The maps declare 16-pixel tiles; see `maps.ts`.
+    for (const key of this.cache.tilemap.getKeys()) {
+      scaleTiledMap(this.cache.tilemap.get(key).data as TiledMap, NEW_TILE)
+    }
     this.scene.start('title')
   }
 
@@ -515,6 +524,15 @@ export class BootScene extends Phaser.Scene {
       this.drawCharacter(g, `kid_${mode}_${f}_1`, f, 1, shirt, pants, hair, skin, outline)
     })
     g.destroy()
+  }
+
+  /**
+   * The walk cycles. Made after the textures are enlarged, not with them: an
+   * animation holds the frames it was given, and enlarging replaces each
+   * texture, which left every walk pointing at a frame that no longer existed
+   * and stopped the game at boot.
+   */
+  private buildWalks(mode: 'dmg' | 'gbc') {
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
       const animKey = `walk_${mode}_${f}`
       if (!this.anims.exists(animKey)) {

@@ -12,18 +12,28 @@ import { exposeForQA, exposeSoundForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
 import '../shared/shell.css'
 
+/**
+ * How much the canvas is enlarged, in CSS pixels to the game pixel.
+ *
+ * Must match the #game box sizing in index.html's pre-init script, or the
+ * canvas and its container disagree. Counted in device pixels since #177:
+ * at 240 wide a whole CSS multiple gives a phone a 1x box, where the 160-wide
+ * screen got 2x. A phone has two or three device pixels to each CSS one, so a
+ * whole number of *those* keeps the screen as large as it was and every game
+ * pixel the same width.
+ */
 function integerZoom(): number {
-  // Must match the #game box sizing in index.html's pre-init script, or
-  // the canvas is rendered larger than its container and overflow:hidden
-  // crops the edges (which was clipping the top-right minimap on desktop).
   const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches
   const availableHeight = window.innerHeight - (isDesktop ? 250 : 380)
-  return Math.max(
-    1,
-    Math.min(
-      Math.floor((window.innerWidth - 40) / GBC_WIDTH),
-      Math.floor(availableHeight / GBC_HEIGHT),
-    ),
+  const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 4))
+  return (
+    Math.max(
+      1,
+      Math.min(
+        Math.floor(((window.innerWidth - 40) * dpr) / GBC_WIDTH),
+        Math.floor((availableHeight * dpr) / GBC_HEIGHT),
+      ),
+    ) / dpr
   )
 }
 

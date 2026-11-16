@@ -23,7 +23,12 @@ body { display: flex; align-items: center; justify-content: center; }
    than the space inside and `overflow: hidden` cut 15px off each side and 7
    off the top and bottom, on every device. Nobody saw it while HUDs sat well
    inside; a line of text nine pixels from the edge lost its first letter. */
-#game canvas { image-rendering: pixelated; max-width: 100%; max-height: 100%; }
+#game canvas { image-rendering: pixelated; max-width: 100%; max-height: 100%; margin: 0 !important; }
+/* The margin (#177): Phaser's FIT mode also centres the canvas, by writing a
+   margin worked out from the size it believes the canvas is, which is the
+   size this rule has just overridden. #game centres it already, as a flex
+   box, and the two together left the picture 7.5px down and to the right
+   once the padding that hid it was gone. `qa/touch/fit.mjs` caught it. */
 
 .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 15, 12, 0.9); display: flex; align-items: center; justify-content: center; z-index: 10; color: #e0f8cf; font-family: "Press Start 2P", monospace; text-align: center; padding: 15px; box-sizing: border-box; flex-direction: column; font-size: 10px; border-radius: 10px 10px 40px 10px; }
 .overlay.hidden { display: none; }
@@ -37,7 +42,13 @@ body { flex-direction: column; background: #e0e0e0; justify-content: center; gap
 .gb-shell { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; padding: 20px 10px; box-sizing: border-box; }
 .gb-logo { font-family: sans-serif; font-style: italic; font-weight: bold; color: #888; margin-bottom: 15px; font-size: 1.2rem; letter-spacing: 2px; }
 
-#game { flex-shrink: 0; border: 15px solid #222; border-radius: 10px 10px 40px 10px; background: #0f1a12; padding: 15px 15px 25px 15px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; min-width: 160px; min-height: 144px; aspect-ratio: 160 / 144; }
+/* No padding (#177). There was a dark green band, 15px and 25px at the foot,
+   between the bezel and the picture. It was there because three games' canvas
+   overflowed #game and covered it, so it never showed — except in Static and
+   Lantern Keeper, whose canvas was the right size, where it read as an inner
+   frame. #183 made every canvas the right size, which gave all five the band.
+   The bezel is the frame; the picture goes up to it. */
+#game { flex-shrink: 0; border: 15px solid #222; border-radius: 10px 10px 40px 10px; background: #0f1a12; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; min-width: 160px; min-height: 144px; aspect-ratio: 160 / 144; }
 
 .gb-controls { display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 400px; padding: 10px; margin-bottom: 15px; }
 
