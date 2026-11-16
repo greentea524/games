@@ -16,7 +16,8 @@ import { sfx, music } from '../audio'
 import { NPCS, currentTarget } from '../dialogue'
 import { Darkness, type Light } from '../../shared/lighting'
 import { showRunSummary } from '../../shared/runSummary'
-import { enlargeTexture } from '../enlarge'
+import { crackleMs } from '../sprites'
+import { prefersReducedMotion } from '../../shared/motion'
 import { baseFrame, overFrame } from '../tiles'
 import { ITEMS, TRANSFORMS } from '../items'
 import type { NpcDef } from '../dialogue'
@@ -186,6 +187,8 @@ export class WorldScene extends Phaser.Scene {
    */
   worldGates: { tx: number; ty: number }[] = []
   private tvPos?: { x: number; y: number }
+  /** Everything showing static, and its two frames; see `crackle`. */
+  private crackling: { image: Phaser.GameObjects.Image; keys: [string, string] }[] = []
 
   // Minimap (only on maps larger than one screen)
   private blip?: Phaser.GameObjects.Graphics
@@ -361,8 +364,10 @@ export class WorldScene extends Phaser.Scene {
     // Interactables (face + press Z/A): the TV portal, and the Phase 3
     // props (fountain valve, cellar hatch, pickups).
     this.interactables = []
+    this.crackling = []
     if (this.mapKey === 'house') {
-      const tv = this.add.image(7 * TILE + TILE / 2, 1 * TILE + TILE / 2, 'tv')
+      const tv = this.add.image(7 * TILE + TILE / 2, 1 * TILE + TILE / 2, `tv_${mode}`)
+      this.crackle(tv, `tv_${mode}`)
       this.interactables.push({ x: tv.x, y: tv.y, action: () => this.useTV() })
       this.tvPos = { x: tv.x, y: tv.y }
     }
@@ -370,7 +375,8 @@ export class WorldScene extends Phaser.Scene {
     if (this.mapKey === 'core') {
       const ex = 5 * TILE + TILE / 2
       const ey = 2 * TILE + TILE / 2
-      const entity = this.physics.add.staticImage(ex, ey, 'entity')
+      const entity = this.physics.add.staticImage(ex, ey, `entity_${mode}`)
+      this.crackle(entity, `entity_${mode}`)
       entity.body.setSize(scaled(14), scaled(12)).setOffset(scaled(1), scaled(4))
       this.physics.add.collider(this.player, entity)
       this.interactables.push({
@@ -383,6 +389,7 @@ export class WorldScene extends Phaser.Scene {
     this.placeDecorations(mode)
     this.groundLayer = ground
     this.applyStoryState(ground, mode)
+    this.startCrackle()
 
     // Background music (#21): town theme in the normal world, the same
     // melody detuned/degraded on the Static-side + in the finale room.
@@ -459,14 +466,6 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private ensureExtraTextures() {
-    if (!this.textures.exists('tv')) {
-      const g = this.make.graphics({}, false)
-      g.fillStyle(PAL.darkest, 1); g.fillRect(1, 3, 14, 11)
-      g.fillStyle(PAL.light, 1); g.fillRect(3, 5, 8, 7)
-      g.fillStyle(PAL.lightest, 1); g.fillRect(3, 5, 8, 3)
-      g.fillStyle(PAL.darkest, 1); g.fillRect(12, 6, 2, 5)
-      g.generateTexture('tv', 16, 16); g.destroy()
-    }
     if (!this.textures.exists('noise')) {
       const g = this.make.graphics({}, false)
       for (let y = 0; y < 32; y++)
@@ -476,9 +475,7 @@ export class WorldScene extends Phaser.Scene {
         }
       g.generateTexture('noise', 32, 32); g.destroy()
     }
-    // By name: see `enlargeTextures`. The noise is stretched over the screen,
-    // so its own size does not matter.
-    enlargeTexture(this, 'tv')
+    // The noise is stretched over the screen, so its own size does not matter.
   }
 
   private facingInteractable(): Interactable | undefined {
@@ -781,7 +778,7 @@ export class WorldScene extends Phaser.Scene {
     this.groundLayer.setCollision(SOLID_TILES)
     const bx = REN_HOUSE.doorX * TILE + TILE / 2
     const by = REN_HOUSE.wallRow * TILE + TILE / 2
-    this.add.image(bx, by - 4, 'beacon')
+    this.add.image(bx, by - scaled(4), `beacon_${GameState.paletteMode}`)
     this.interactables.push({
       x: bx,
       y: by,
@@ -1047,11 +1044,17 @@ export class WorldScene extends Phaser.Scene {
     ]
     this.worldGates = patches.map(([tx, ty]) => ({ tx, ty }))
     for (const [tx, ty] of patches) {
-      if (open) {
-        this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, key)
-      } else {
-        this.solidProp(tx, ty, 1, 1, key)
+      // A halo, so the patch is lit as well as loud: on a street of warm
+      // brick and green it is the one cold light. Colour mode only; the
+      // green screen has four tones and a blend would be a fifth.
+      if (mode === 'gbc') {
+        this.add.circle(tx * TILE + TILE / 2, ty * TILE + TILE / 2, TILE * 0.8, 0xaaf0ff, open ? 0.14 : 0.24)
+        this.add.circle(tx * TILE + TILE / 2, ty * TILE + TILE / 2, TILE * 0.58, 0xaaf0ff, open ? 0.1 : 0.2)
       }
+      const patch = open
+        ? this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, key)
+        : this.solidProp(tx, ty, 1, 1, key)
+      this.crackle(patch, key)
       this.examine(tx, ty, CORRUPTION_DEF)
     }
 
@@ -1084,7 +1087,39 @@ export class WorldScene extends Phaser.Scene {
     ground.putTileAt(TILES.DOOR, s.doorX, s.wallRow)
   }
 
+  /**
+   * Static crackles: the picture swaps between two scatters of the same
+   * noise (#179). One timer for everything on the map, so the patches flicker
+   * together and a patch never holds a frame the others have left.
+   *
+   * Under reduced motion it still changes, because a still patch is a grey
+   * rock and the game is named for this, but slowly: about a frame and a half
+   * a second, well under the three flashes a second that is the line for
+   * flicker, and over a tile, not the screen.
+   */
+  private crackle(image: Phaser.GameObjects.Image, key: string) {
+    this.crackling.push({ image, keys: [key, `${key}_b`] })
+  }
+
+  private startCrackle() {
+    let frame = 0
+    this.time.addEvent({
+      delay: crackleMs(prefersReducedMotion()),
+      loop: true,
+      callback: () => {
+        frame = 1 - frame
+        for (const { image, keys } of this.crackling) if (image.active) image.setTexture(keys[frame])
+      },
+    })
+  }
+
+  /**
+   * Noise over the whole screen, three times in a third of a second. Not shown
+   * under reduced motion: it is a full-screen flash, which is the thing that
+   * preference is for. The sound and the change of world still say it happened.
+   */
   private flashStatic() {
+    if (prefersReducedMotion()) return
     const noise = this.add
       .image(0, 0, 'noise')
       .setOrigin(0)
@@ -1302,13 +1337,15 @@ export class WorldScene extends Phaser.Scene {
     sfx.switchWorld()
     this.player.setVelocity(0, 0)
     if (this.prompt) this.prompt.setVisible(false)
-    const noise = this.add
-      .image(0, 0, 'noise')
-      .setOrigin(0)
-      .setScrollFactor(0)
-      .setDepth(2000)
-      .setDisplaySize(GBC_WIDTH, GBC_HEIGHT)
-    this.tweens.add({ targets: noise, alpha: 0.5, duration: 120, yoyo: true, repeat: 1 })
+    if (!prefersReducedMotion()) {
+      const noise = this.add
+        .image(0, 0, 'noise')
+        .setOrigin(0)
+        .setScrollFactor(0)
+        .setDepth(2000)
+        .setDisplaySize(GBC_WIDTH, GBC_HEIGHT)
+      this.tweens.add({ targets: noise, alpha: 0.5, duration: 120, yoyo: true, repeat: 1 })
+    }
     this.time.delayedCall(260, () => {
       const changed = GameState.toggleWorld()
       // UIScene is a separate scene and survives this one's restart, so the

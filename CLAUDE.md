@@ -172,7 +172,7 @@ return a *second copy* of it under Vite (`?t=`), so a game hands the check its
 own `effect` via `exposeSoundForQA`; and a short listen can land in a tune's
 rest, so the window is a whole musical cycle.
 
-**Reduced motion is honoured in four games, and the check is a *pair* (#138).**
+**Reduced motion is honoured in five games, and the check is a *pair* (#138).**
 `shared/motion.ts` is read at six sites and nothing measured any of them until
 `qa:motion`, which loads each game twice — once plain, once with the preference
 emulated — and asserts the motion is there by default and gone under it, plus a
@@ -471,6 +471,26 @@ same painter in the village's own colours: a barrel's wood is a door's wood.
 Each replaces the enlarged drawing `buildProps` made under the same key, at
 boot, before anything holds the old one. The items, the tear, the entity and
 the kid are still the old art: that is #179.
+
+**Static's people are built, not typed, and its static crackles (#179).**
+`sprites.ts` holds the kid, the four townsfolk, the patches, the television,
+the entity, the beacon and the ten items, with the same inks and automatic
+outline as the other two games. A person is made by `person()` from a
+description: hat, hair, beard, apron, pack, build. That gives six people four
+facings each without twenty-four drawings that have to agree. Everyone used to
+be one body in a different shirt; `sprites_test.ts` holds every pair of
+outlines apart, and the first run found Gus and the baker two pixels apart.
+
+Three things to know. The outline is drawn only from the outside in: an open
+patch is a ring with ground showing through, and outlining every clear pixel
+put a dark cross round each spark and filled it in. Each thing that shows
+static has a second picture under `<key>_b`, and one timer in the world scene
+swaps them all. And the television, entity and beacon take the palette in
+their key now, as `tv_gbc`; they were single textures drawn in one palette.
+
+Static reads `shared/motion.ts` now. Under reduced motion the full-screen
+noise at a crossing is not shown, and the patches change every 640 ms instead
+of every 110. `qa:motion` holds both, each as a pair.
 
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover

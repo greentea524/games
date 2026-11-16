@@ -2,7 +2,8 @@
 //
 //   npm run qa:motion
 //
-// `shared/motion.ts` is read at six sites across four games, and until this
+// `shared/motion.ts` is read at six sites across four games (five since #179,
+// which added Static), and until this
 // file nothing checked any of them. The call being present in the source is a
 // data structure; whether the motion stops is the effect, and the effect was
 // unmeasured — the same shape as #134 and #136.
@@ -195,6 +196,63 @@ const GAMES = [
       })
     },
   },
+  {
+    // #179. Static's namesake is noise, and it had two kinds: patches that
+    // crackle on a tile, and noise thrown over the whole screen at a crossing.
+    // The second is a full-screen flash and is not shown under the preference.
+    // The first is kept, slowed — `also` holds it to that.
+    game: 'static',
+    what: 'noise flashes over the whole screen at a crossing',
+    advance: 3,
+    async measure({ page }) {
+      return page.evaluate(async () => {
+        const world = () => window.__game.scene.getScene('world')
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+        world().enterDoor('town', 18, 15)
+        await wait(1500)
+        // How often a patch changes its picture, counted over two seconds.
+        const patch = world().children.list.find((o) => o.texture?.key?.startsWith('corruption_'))
+        if (!patch) return { value: 0, note: 'no patch of static in the town', busy: 0 }
+        let swaps = 0
+        let last = patch.texture.key
+        const until = performance.now() + 2000
+        while (performance.now() < until) {
+          await new Promise((r) => requestAnimationFrame(r))
+          if (patch.texture.key !== last) { swaps++; last = patch.texture.key }
+        }
+        const sealed = last.includes('sealed')
+        // The crossing. The overlay lives for a few hundred milliseconds, so
+        // it is looked for every frame from the moment it is asked for.
+        world().switchWorld()
+        let frames = 0
+        const end = performance.now() + 240
+        while (performance.now() < end) {
+          if (world().children.list.some((o) => o.texture?.key === 'noise' && o.visible)) frames++
+          await new Promise((r) => requestAnimationFrame(r))
+        }
+        await wait(1500)
+        const now = world().children.list.find((o) => o.texture?.key?.startsWith('corruption_'))
+        const crossed = sealed && !!now && now.texture.key.includes('open')
+        return {
+          value: frames,
+          note: `the overlay was up for ${frames} frames`,
+          // The crossing itself must still happen, or nothing was measured.
+          busy: crossed ? 1 : 0,
+          swaps,
+        }
+      })
+    },
+    also(moving, still) {
+      return [
+        ['static: a patch crackles', moving.swaps >= 8, `${moving.swaps} changes in two seconds`],
+        [
+          'static: and still changes under reduced motion, under three times a second',
+          still.swaps >= 1 && still.swaps <= 5,
+          `${still.swaps} changes in two seconds`,
+        ],
+      ]
+    },
+  },
 ]
 
 const server = await startDevServer({ port: process.env.QA_PORT ?? '5178' })
@@ -244,6 +302,8 @@ for (const entry of GAMES) {
     still.value === 0,
     `${still.note} — under prefers-reduced-motion: reduce`,
   )
+  // Motion a game keeps under the preference, but changes: both halves again.
+  for (const [name, ok, detail] of entry.also?.(moving, still) ?? []) check(name, ok, detail)
 }
 
 server.stop()
