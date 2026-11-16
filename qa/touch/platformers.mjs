@@ -147,6 +147,40 @@ async function lanternKeeper() {
       }
     })
 
+  // #171: the forest is drawn at twice the size by the camera, and nothing
+  // under the camera changed. Three things that design can get wrong without
+  // anything throwing: the overlay of darkness no longer reaching the edges
+  // of the screen, the HUD being magnified along with the forest, and the
+  // world being scaled as well as the view.
+  const view = await page.evaluate(() => {
+    const g = window.__game
+    const s = g.scene.getScene('play')
+    const cam = s.cameras.main
+    const rt = s.darkness.gameObject
+    const drawn = (p, c) => (p - c) * cam.zoom + c
+    const hud = g.scene.getScene('hud')
+    return {
+      zoom: cam.zoom,
+      screen: [g.scale.width, g.scale.height],
+      overlay: [drawn(rt.x, cam.width / 2), drawn(rt.y, cam.height / 2), drawn(rt.x + rt.width, cam.width / 2), drawn(rt.y + rt.height, cam.height / 2)],
+      hudActive: hud.scene.isActive(),
+      hudZoom: hud.cameras.main.zoom,
+      hudText: hud.text?.text ?? '',
+      tile: s.groundLayer.tilemap.tileWidth,
+      keeper: s.player.height * cam.zoom,
+      keeperUnits: s.player.height,
+    }
+  })
+  check('the screen is 240 by 216', view.screen[0] === 240 && view.screen[1] === 216, view.screen.join(' by '))
+  check('the darkness reaches all four edges of it', view.overlay.join() === [0, 0, view.screen[0], view.screen[1]].join(), `drawn from ${view.overlay.slice(0, 2)} to ${view.overlay.slice(2)}`)
+  check('the HUD is its own scene, and is not magnified', view.hudActive && view.hudZoom === 1 && view.hudText.includes('Stage'), `zoom ${view.hudZoom}, "${view.hudText.split('\n')[0]}"`)
+  check('the world under the camera is the size it was', view.tile === 8, `a tile is ${view.tile} units`)
+  // As a share of the screen: it was six of 144. The control is the other
+  // factor on offer, 1.5, at which the share is exactly what it was.
+  const share = (zoom) => (view.keeperUnits * zoom) / view.screen[1]
+  check('the keeper is a larger share of the screen than it was', view.zoom === 2 && share(view.zoom) > 6 / 144, `${view.keeper} of ${view.screen[1]} pixels, from 6 of 144`)
+  check('and the check can fail: at 1.5 it would be the same share', share(1.5) === 6 / 144)
+
   const start = await st()
   check('A starts the level', start.active, `player at x=${start.x | 0}`)
 

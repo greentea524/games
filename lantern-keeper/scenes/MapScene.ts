@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, PAL } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, LEGACY_HEIGHT as GBC_HEIGHT, PAL, LEGACY_ZOOM } from '../constants'
 import { STAGES, stageIndex } from '../stages'
 import { sfx } from '../audio'
 
@@ -61,6 +61,8 @@ export class MapScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144 (#171): see `LEGACY_ZOOM`.
+    this.cameras.main.setOrigin(0, 0).setZoom(LEGACY_ZOOM)
     this.cameras.main.setBackgroundColor('#0f1a12')
 
     const target = stageIndex(this.payload.levelKey)

@@ -3,6 +3,9 @@ import { sfx, music, isMuted, setMuted } from '../audio'
 import {
   GBC_WIDTH,
   GBC_HEIGHT,
+  VIEW_ZOOM,
+  VIEW_WIDTH,
+  VIEW_HEIGHT,
   GLOW,
   FUEL,
   DASH,
@@ -19,6 +22,7 @@ import { STAGE_KEYS, stageFor } from '../stages'
 import { prefersReducedMotion } from '../../shared/motion'
 import { loadProgress, saveProgress } from '../progress'
 import { showRunSummary, formatRunTime } from '../../shared/runSummary'
+import type { HudScene, HudToast } from './HudScene'
 
 // Tuned to the KAN-110 movement budget: single jump ~2.8 tiles,
 // double jump ~5.6 tiles, so the 5-tile cliff gate needs the Ember lantern.
@@ -94,7 +98,6 @@ export class PlayScene extends Phaser.Scene {
   private fuelMs: number = FUEL.maxMs
   /** So the low-fuel cue sounds once per tank, not once per frame. */
   private lowFuelCued = false
-  private fuelGfx!: Phaser.GameObjects.Graphics
   private flasks: { sprite: Phaser.GameObjects.Image; taken: boolean }[] = []
   /** Wall-clock start of this level's play segment, banked by persist() (#66). */
   private segmentStartedAt = 0
@@ -105,7 +108,8 @@ export class PlayScene extends Phaser.Scene {
   private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter
   private groundLayer!: Phaser.Tilemaps.TilemapLayer
   private crumbleGroup!: Phaser.Physics.Arcade.StaticGroup
-  private hudText!: Phaser.GameObjects.Text
+  /** The count, the gauge and the messages: a scene of their own (#171). */
+  private hud!: HudScene
   private guidanceArrow!: Phaser.GameObjects.Image
 
   constructor() {
@@ -119,7 +123,15 @@ export class PlayScene extends Phaser.Scene {
     this.segmentStartedAt = Date.now()
     this.persist()
     music.play('adventure')
+    // The forest is drawn at `VIEW_ZOOM`; nothing under the camera changes.
+    this.cameras.main.setZoom(VIEW_ZOOM)
     this.cameras.main.fadeIn(500, 0, 0, 0)
+    // The HUD is not magnified with it. `prepare` first: on a level that
+    // follows another, the last level's HUD is still up for one more frame.
+    this.hud = this.scene.get('hud') as HudScene
+    this.hud.prepare()
+    this.scene.launch('hud')
+    this.events.once('shutdown', () => this.scene.stop('hud'))
     
     this.won = false
     this.jumpsLeft = 0
@@ -266,37 +278,24 @@ export class PlayScene extends Phaser.Scene {
       this.justResumed = true
     })
 
-    this.hudText = this.add.text(4, 8, '', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 1,
-      shadow: {
-        offsetX: 1,
-        offsetY: 1,
-        color: '#0f1a12',
-        fill: true
-      }
-    })
-    this.hudText.setScrollFactor(0).setDepth(30)
-
-    // Fuel gauge (#70). A gauge rather than the carried-lantern-dimming the
-    // issue preferred: the player sprite is drawn procedurally with no lantern
-    // in hand to dim, and inventing one would change the character silhouette
-    // in every frame of the walk cycle to serve a HUD readout.
+    // Fuel gauge (#70), on the HUD. A gauge rather than the
+    // carried-lantern-dimming the issue preferred: the player sprite is drawn
+    // procedurally with no lantern in hand to dim, and inventing one would
+    // change the character silhouette in every frame of the walk cycle to
+    // serve a HUD readout.
     //
     // The shrinking light radius is the real feedback; this only answers "how
     // much is left", which the radius alone cannot at a glance.
-    this.fuelGfx = this.add.graphics().setScrollFactor(0).setDepth(30)
-    
+
     this.guidanceArrow = this.add.image(0, 0, 'guidance_arrow')
     this.guidanceArrow.setOrigin(0.5, 0.5).setDepth(15).setVisible(false)
 
     this.updateHud()
 
     this.darkness = new Darkness(this, {
-      width: GBC_WIDTH,
-      height: GBC_HEIGHT,
+      // What the camera sees, which is less than the screen: see `Darkness`.
+      width: VIEW_WIDTH,
+      height: VIEW_HEIGHT,
       depth: 10,
       alpha: initialDarkness,
     })
@@ -311,7 +310,9 @@ export class PlayScene extends Phaser.Scene {
     this.dashCooldownUntil = 0
     this.dashBufferedUntil = 0
 
-    this.toast(title, 3000)
+    // At the top whatever the keeper is doing: they are dropped in from
+    // above the ground, so where they will stand is not yet where they are.
+    this.toast(title, 3000, true)
   }
 
   private createBackground(map: Phaser.Tilemaps.Tilemap) {
@@ -717,13 +718,16 @@ export class PlayScene extends Phaser.Scene {
       })
       
       this.time.delayedCall(5000, () => {
-        if (treeToast) treeToast.destroy()
-        this.hudText.setVisible(false)
+        treeToast.destroy()
+        this.hud.setCountsVisible(false)
 
         // Replaces a static GAME CLEARED card that reported nothing about the
         // run it had just ended (#66).
         const total = this.countAllLanterns()
-        showRunSummary(this, {
+        // On the HUD's scene, so the panel is the screen's size and not the
+        // camera's.
+        showRunSummary(this.hud, {
+          screen: { width: GBC_WIDTH, height: GBC_HEIGHT },
           title: 'GAME CLEARED',
           palette: PAL,
           subtitle: 'The tree burns',
@@ -825,11 +829,11 @@ export class PlayScene extends Phaser.Scene {
   private updateHud() {
     const regularLanterns = this.lanterns.filter(l => l.name !== 'heart_tree')
     if (regularLanterns.length === 0) {
-      this.hudText.setText('') // no regular lanterns to collect
+      this.hud.setCounts('') // no regular lanterns to collect
       return
     }
     const litCount = regularLanterns.filter(l => l.lit).length
-    this.hudText.setText(`Stage: ${litCount}/${regularLanterns.length}\nTotal: ${this.totalLanternsLit}`)
+    this.hud.setCounts(`Stage: ${litCount}/${regularLanterns.length}\nTotal: ${this.totalLanternsLit}`)
   }
 
   private onCrumbleTouch(player: any, platform: any) {
@@ -860,33 +864,18 @@ export class PlayScene extends Phaser.Scene {
     }
   }
 
-  private toast(message: string, duration = 2000): Phaser.GameObjects.Text {
-    const text = this.add
-      .text(GBC_WIDTH / 2, GBC_HEIGHT - 32, message, {
-        fontFamily: '"Press Start 2P", monospace',
-        fontSize: '8px',
-        color: '#e0f8cf',
-        backgroundColor: '#0f1a12',
-        padding: { x: 3, y: 3 },
-        resolution: 1,
-        align: 'center',
-        lineSpacing: 4,
-        wordWrap: { width: GBC_WIDTH - 16 },
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(20)
-    if (duration > 0) {
-      this.time.delayedCall(duration, () => {
-        this.tweens.add({
-          targets: text,
-          alpha: 0,
-          duration: 500,
-          onComplete: () => text.destroy(),
-        })
-      })
-    }
-    return text
+  private toast(message: string, duration = 2000, atTop = false): HudToast {
+    // Away from the keeper: on the ground floor of a level they stand in the
+    // bottom of the screen, which is where the message used to go over them.
+    // Worked out from where the camera settles and not where it is, which
+    // lags the keeper.
+    const top = Phaser.Math.Clamp(
+      this.player.y - VIEW_HEIGHT / 2,
+      0,
+      Math.max(0, this.groundLayer.tilemap.heightInPixels - VIEW_HEIGHT),
+    )
+    const below = this.player.y - top > VIEW_HEIGHT / 2
+    return this.hud.toast(message, duration, atTop || below)
   }
 
   private respawn() {
@@ -1154,27 +1143,12 @@ export class PlayScene extends Phaser.Scene {
     this.lowFuelCued = false
   }
 
-  /**
-   * Draws the fuel gauge, top-right so it does not collide with the two lines
-   * of lantern-count text at the top-left.
-   */
+  /** Sends the tank's level to the gauge on the HUD. */
   private drawFuelGauge(): void {
     const ratio = this.fuelRatio()
-    const w = 30
-    const h = 4
-    const x = GBC_WIDTH - w - 4
-    const y = 9
-    this.fuelGfx.clear()
-    this.fuelGfx.fillStyle(PAL.darkest, 0.7)
-    this.fuelGfx.fillRect(x - 1, y - 1, w + 2, h + 2)
-    this.fuelGfx.lineStyle(1, PAL.light, 1)
-    this.fuelGfx.strokeRect(x - 1, y - 1, w + 2, h + 2)
-    if (ratio > 0) {
-      // Warm while there is fuel, pale once it is nearly out — the palette has
-      // no red, so the warning has to be a shift in value rather than in hue.
-      this.fuelGfx.fillStyle(ratio <= FUEL.lowRatio ? PAL.lightest : PAL.warm, 1)
-      this.fuelGfx.fillRect(x, y, Math.max(1, Math.round(w * ratio)), h)
-    }
+    // Rounded to the gauge's own pixels, so the HUD redraws when it changes
+    // and not every frame.
+    this.hud.setFuel(Math.round(ratio * 44) / 44, ratio <= FUEL.lowRatio)
   }
 
   /** Oil flasks top the tank up between lanterns. */

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH } from '../constants'
+import { LEGACY_WIDTH as GBC_WIDTH, LEGACY_ZOOM } from '../constants'
 import { music, isMuted, setMuted } from '../audio'
 import { clearProgress, hasProgress, loadProgress } from '../progress'
 
@@ -20,6 +20,8 @@ export class MenuScene extends Phaser.Scene {
 
   create() {
     this.inputCooldownUntil = this.time.now + 200
+    // Still laid out for 160×144 (#171): see `LEGACY_ZOOM`.
+    this.cameras.main.setOrigin(0, 0).setZoom(LEGACY_ZOOM)
     this.cameras.main.setBackgroundColor('#0f1a12')
     music.play('adventure')
 

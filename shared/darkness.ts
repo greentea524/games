@@ -49,3 +49,20 @@ export function reachesScreen(
 ): boolean {
   return !(x + r < 0 || y + r < 0 || x - r > width || y - r > height)
 }
+
+/**
+ * Where something fixed to a magnifying camera must be put to land on the
+ * screen's corner (#171).
+ *
+ * A camera magnifies about the middle of its view. An object with a scroll
+ * factor of 0 at `p` is drawn at `(p - c) * zoom + c`, with `c` the middle,
+ * so the point drawn at 0 is `c - c / zoom`. That is also how far the corner
+ * of what the camera sees is from its scroll, which is the other thing the
+ * overlay needs: a light's place on the overlay is its world position, less
+ * the scroll, less this.
+ *
+ * At zoom 1 both are 0, and the overlay is where it always was.
+ */
+export function zoomInset(width: number, height: number, zoom: number): [number, number] {
+  return [(width / 2) * (1 - 1 / zoom), (height / 2) * (1 - 1 / zoom)]
+}
