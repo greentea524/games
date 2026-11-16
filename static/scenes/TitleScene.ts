@@ -1,80 +1,91 @@
 import Phaser from 'phaser'
-import { LEGACY_WIDTH as GBC_WIDTH, SCALE } from '../constants'
+import { GBC_WIDTH, TILE } from '../constants'
 import { GameState } from '../state'
-import { crackleMs } from '../sprites'
+import { ENTITY_ROWS, crackleMs } from '../sprites'
+import { SUBTITLE, TITLE, TITLE_SCALE, TITLE_THEME, css, titleLayout, type ScreenTheme } from '../screens'
 import { prefersReducedMotion } from '../../shared/motion'
 import { sfx, music } from '../audio'
 
+const FONT = '"Press Start 2P", monospace'
+
 // Minimal title screen (#16): Continue restores the autosave; New Game
 // clears it. Keyboard (arrows + Z/Enter) and tap both work.
+//
+// Laid out on the real screen by `screens.ts`, in the palette chosen (#181).
+// The palette switch restarts this scene, so `create` is the whole of it.
 export class TitleScene extends Phaser.Scene {
   private options: Phaser.GameObjects.Text[] = []
   private labels: string[] = []
   private selected = 0
+  private theme!: ScreenTheme
 
   constructor() {
     super('title')
   }
 
   create() {
-    // Still laid out for 160×144 (#177): shown through a camera zoomed from
-    // the top-left, so a point at (x, y) lands at (x, y) times SCALE.
-    this.cameras.main.setOrigin(0, 0).setZoom(SCALE)
-    this.cameras.main.setBackgroundColor('#0f380f')
+    const mode = GameState.paletteMode
+    const theme = (this.theme = TITLE_THEME[mode])
+    this.cameras.main.setBackgroundColor(css(theme.background))
     music.stop() // silence at the menu (resumes in-world after a keypress)
 
-    const title = this.add
-      .text(GBC_WIDTH / 2, 36, 'STATIC', {
-        fontFamily: '"Press Start 2P", monospace',
-        fontSize: '16px',
-        color: '#9bbc0f',
-        resolution: 1,
+    this.labels = GameState.hasSave() ? ['Continue', 'New Game'] : ['New Game']
+    const at = titleLayout(GBC_WIDTH, this.labels, TILE, ENTITY_ROWS)
+    const still = prefersReducedMotion()
+
+    // The title twice: once in a second colour a pixel off, like a picture
+    // out of register, and once on top.
+    const size = `${8 * TITLE_SCALE}px`
+    const ghost = this.add.text(at.title.x + 2, at.title.y + 1, TITLE, { fontFamily: FONT, fontSize: size, color: css(theme.ghost), resolution: 1 })
+    const title = this.add.text(at.title.x, at.title.y, TITLE, { fontFamily: FONT, fontSize: size, color: css(theme.title), resolution: 1 })
+    // A nervous horizontal jitter, like a bad signal. Decoration, so not
+    // under reduced motion.
+    if (!still) {
+      this.time.addEvent({
+        delay: 1400,
+        loop: true,
+        callback: () => {
+          title.setX(at.title.x + 2)
+          ghost.setX(at.title.x - 1)
+          this.time.delayedCall(70, () => title.setX(at.title.x - 1))
+          this.time.delayedCall(140, () => {
+            title.setX(at.title.x)
+            ghost.setX(at.title.x + 2)
+          })
+        },
       })
-      .setOrigin(0.5)
-    // A nervous horizontal jitter, like a bad signal.
+    }
+    this.add.text(at.subtitle.x, at.subtitle.y, SUBTITLE, { fontFamily: FONT, fontSize: '8px', color: css(theme.subtitle), resolution: 1 })
+
+    // A patch of lawn for them to stand on: see `TitleLayout.stage`.
+    const g = this.add.graphics()
+    g.fillStyle(theme.stageEdge, 1)
+    g.fillRect(at.stage.x, at.stage.y, at.stage.width, at.stage.height)
+    g.fillStyle(theme.stage, 1)
+    g.fillRect(at.stage.x + 2, at.stage.y + 2, at.stage.width - 4, at.stage.height - 4)
+
+    // The kid, and the thing at the heart of the static, its face crackling.
+    this.add
+      .sprite(at.kid.x, at.kid.y, `kid_${mode}_down_0`)
+      .setOrigin(0)
+      .setScale(at.kid.width / TILE)
+      .play(`walk_${mode}_down`)
+    const entity = this.add.image(at.entity.x, at.entity.y, `entity_${mode}`).setOrigin(0).setScale(at.entity.width / TILE)
+    let frame = 0
     this.time.addEvent({
-      delay: 1400,
+      delay: crackleMs(still),
       loop: true,
       callback: () => {
-        title.setX(GBC_WIDTH / 2 + 2)
-        this.time.delayedCall(70, () => title.setX(GBC_WIDTH / 2 - 1))
-        this.time.delayedCall(140, () => title.setX(GBC_WIDTH / 2))
+        frame = 1 - frame
+        entity.setTexture(frame ? `entity_${mode}_b` : `entity_${mode}`)
       },
     })
-    this.add
-      // 'a small town is fading' is 22 characters — 176px at the font's
-      // native 8px, wider than the screen. Wrapping it to two lines ran the
-      // second line into the sprites below, so the line is shortened instead.
-      .text(GBC_WIDTH / 2, 58, 'a small town fades', {
-        fontFamily: '"Press Start 2P", monospace',
-        fontSize: '8px',
-        color: '#306230',
-        resolution: 1,
-      })
-      .setOrigin(0.5)
 
-    // Sprite preview: the kid, with the static-side entity flickering nearby
-    const mode = GameState.paletteMode
-    this.add.sprite(GBC_WIDTH / 2 - 18, 76, `kid_${mode}_down_0`).setScale(2 / SCALE).play(`walk_${mode}_down`)
-    const entityPreview = this.add.sprite(GBC_WIDTH / 2 + 18, 75, `entity_${mode}`).setScale(1.6 / SCALE)
-    this.time.addEvent({
-      // Slowed with the rest of the static under reduced motion (#179).
-      delay: crackleMs(prefersReducedMotion()) + 70,
-      loop: true,
-      callback: () => entityPreview.setAlpha(Phaser.Math.FloatBetween(0.4, 1)),
-    })
-
-    this.labels = GameState.hasSave() ? ['Continue', 'New Game'] : ['New Game']
     this.selected = 0
     this.options = this.labels.map((label, i) =>
       this.add
-        .text(GBC_WIDTH / 2, 94 + i * 16, label, {
-          fontFamily: '"Press Start 2P", monospace',
-          fontSize: '8px',
-          color: '#8bac0f',
-          resolution: 1,
-        })
-        .setOrigin(0.5)
+        .text(GBC_WIDTH / 2, at.options[i].y, label, { fontFamily: FONT, fontSize: '8px', color: css(theme.option), resolution: 1 })
+        .setOrigin(0.5, 0)
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => {
           this.selected = i
@@ -83,15 +94,15 @@ export class TitleScene extends Phaser.Scene {
     )
     this.refresh()
     this.input.keyboard!.on('keydown', this.onKey, this)
+    this.events.once('shutdown', () => this.input.keyboard?.off('keydown', this.onKey, this))
   }
 
   private refresh() {
     this.options.forEach((o, i) => {
-      o.setColor(i === this.selected ? '#e0f8cf' : '#8bac0f')
+      o.setColor(css(i === this.selected ? this.theme.selected : this.theme.option))
       o.setText((i === this.selected ? '> ' : '') + this.labels[i])
     })
   }
-
   private onKey(e: KeyboardEvent) {
     if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
       const dir = e.code === 'ArrowDown' ? 1 : this.options.length - 1
