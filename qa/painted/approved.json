@@ -1,6 +1,6 @@
 {
   "static": {
-    "note": "A painted village with a HUD and a score line the game does not have. The drift is known, recorded in qa/thumbnails.mjs, and accepted — this baseline exists so the NEXT drift is not.",
+    "note": "A painted village with a HUD and a score line the game does not have. The drift is known, recorded in qa/thumbnails.mjs, and accepted \u2014 this baseline exists so the NEXT drift is not.",
     "art": "12687b5955b3a48e6053e6e68dafa137ac405064f5f60636b0ba2b4ff488f930",
     "textures": "8d569edfa9c46b6b846ee91a4b986b60f8d812c52c493c610c36d33b3a4a3338",
     "keys": 116,
@@ -14,10 +14,10 @@
     "nondeterministic": []
   },
   "lantern-keeper": {
-    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
+    "note": "Looked at beside the game at #172. Same place: a layered forest, mossy stone with a grass cap, warm light round a lit lantern. Accepted drift: the game is darker overall; the card's score, lives, stage and health line are not in the game; and the keeper, lanterns, ladder and sign are still the old art until #173.",
     "art": "9b92ea28dcc6406278824a6074115d0c983232a537902446ade6313d366018e9",
-    "textures": "3af891575aac788aaa802d0f73ba97e3296f39fe729183481832d284aa134ff1",
-    "keys": 25,
+    "textures": "fcd4e535b36eda1e98e49c6935fc457071b7b157b69e719632ad9d8e4c0ec64a",
+    "keys": 35,
     "nondeterministic": []
   },
   "pocket-dungeon": {

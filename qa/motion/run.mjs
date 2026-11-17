@@ -184,16 +184,29 @@ const GAMES = [
         const scene = window.__game.scene.scenes.find((s) => s.scene.isActive() && s.fireflies)
         if (!scene) return { value: 0, note: 'no scene with fireflies is running', busy: 0 }
         const at = () => scene.fireflies.map((f) => `${f.sprite.x.toFixed(3)},${f.sprite.y.toFixed(3)}`)
+        // The hanging vines sway (#172): each is a chain turned about where
+        // it is rooted, so its angle is the thing to watch.
+        const lean = () => scene.vines.map((v) => v.angle.toFixed(3))
         const before = at()
+        const leanBefore = lean()
         await new Promise((r) => setTimeout(r, 900))
         const after = at()
+        const leanAfter = lean()
+        const swayed = leanBefore.filter((a, i) => a !== leanAfter[i]).length
         let moved = 0
         for (let i = 0; i < before.length; i++) if (before[i] !== after[i]) moved++
         // Their alpha still tracks whether a lantern is lit either way — the
         // scene's own comment is explicit that only the movement is decoration,
         // so the fireflies must still be *there* under the preference.
-        return { value: moved, note: `${moved} of ${before.length} moved`, busy: before.length }
+        return { value: moved, note: `${moved} of ${before.length} moved`, busy: before.length, swayed, vines: leanBefore.length }
       })
+    },
+    also(moving, still) {
+      return [
+        ['lantern-keeper: the vines sway', moving.swayed > 0, `${moving.swayed} of ${moving.vines} turned`],
+        // The vines must still be hanging there, or nothing was measured.
+        ['lantern-keeper: and hang still under the preference', still.vines > 0 && still.swayed === 0, `${still.swayed} of ${still.vines} turned`],
+      ]
     },
   },
   {

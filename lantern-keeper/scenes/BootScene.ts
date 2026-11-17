@@ -1,5 +1,8 @@
 import Phaser from 'phaser'
 import { TILE_SIZE, PAL, LEGACY_WIDTH as GBC_WIDTH, LEGACY_ZOOM } from '../constants'
+import {
+  BACKDROP_PX, BIOMES, FRAME_COUNT, TILE_PX, WARM_GLOW, drawBackdrop, drawTileset, glowRows, type Biome, type Layer, type Painter,
+} from '../forest'
 import level1Url from '../assets/level1.json?url'
 import level2Url from '../assets/level2.json?url'
 import level3Url from '../assets/level3.json?url'
@@ -99,7 +102,50 @@ export class BootScene extends Phaser.Scene {
     })
   }
 
+  /**
+   * The forest (#172): for each kind of place, the mossy stone as a strip of
+   * pieces and the three layers of trees behind it; and the glow a light
+   * throws. Drawn by `forest.ts` at the screen's resolution, on canvases,
+   * since each is hundreds of rectangles.
+   */
+  private buildForest() {
+    const canvas = (key: string, w: number, h: number, draw: (p: Painter, ctx: CanvasRenderingContext2D) => void) => {
+      if (this.textures.exists(key)) return
+      const el = document.createElement('canvas')
+      el.width = w
+      el.height = h
+      const ctx = el.getContext('2d')
+      if (!ctx) return
+      draw((x, y, rw, rh, colour) => {
+        ctx.fillStyle = `#${colour.toString(16).padStart(6, '0')}`
+        ctx.fillRect(x, y, rw, rh)
+      }, ctx)
+      this.textures.addCanvas(key, el)
+    }
+    for (const biome of Object.keys(BIOMES) as Biome[]) {
+      const pal = BIOMES[biome]
+      canvas(`stone_${biome}`, FRAME_COUNT * TILE_PX, TILE_PX, (p) => drawTileset(p, pal))
+      for (const layer of ['far', 'mid', 'near'] as Layer[]) {
+        canvas(`forest_${biome}_${layer}`, BACKDROP_PX, BACKDROP_PX, (p) => drawBackdrop(p, pal, layer, biome))
+      }
+    }
+    const size = 64
+    canvas('warm_glow', size, size, (_p, ctx) => {
+      const r = (WARM_GLOW.colour >> 16) & 255
+      const g = (WARM_GLOW.colour >> 8) & 255
+      const b = WARM_GLOW.colour & 255
+      glowRows(size).forEach((row, y) =>
+        row.forEach((a, x) => {
+          if (!a) return
+          ctx.fillStyle = `rgba(${r},${g},${b},${a})`
+          ctx.fillRect(x, y, 1, 1)
+        }),
+      )
+    })
+  }
+
   private generateProceduralTextures() {
+    this.buildForest()
     const g = this.make.graphics({}, false)
 
     // Tileset texture: 6 tiles (Glade, Mossy Hollows, Rootspire)
@@ -285,82 +331,6 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(4, 1, 1, 2)
     g.fillRect(4, 4, 1, 1)
     g.generateTexture('signpost', 8, 12)
-    g.clear()
-
-    // Parallax background textures
-    // Background Tree Trunk (8x24)
-    g.fillStyle(PAL.darkest)
-    g.fillRect(3, 0, 2, 24) // trunk
-    g.fillStyle(PAL.dark) // texture highlights
-    g.fillRect(3, 4, 1, 3)
-    g.fillRect(4, 12, 1, 5)
-    g.generateTexture('bg_tree_trunk', 8, 24)
-    g.clear()
-
-    // Background Tree Canopy (24x24)
-    g.fillStyle(PAL.dark) // round canopy shape
-    g.fillCircle(12, 12, 11)
-    g.fillStyle(PAL.darkest)
-    g.fillCircle(10, 10, 8)
-    g.fillStyle(PAL.light) // highlight top leaf layers
-    g.fillRect(8, 2, 8, 2)
-    g.fillRect(6, 4, 12, 2)
-    g.generateTexture('bg_tree_canopy', 24, 24)
-    g.clear()
-
-    // Background Swamp Trunk (12x24) - Level 2
-    g.fillStyle(PAL.darkest)
-    g.fillRect(4, 0, 4, 24)
-    g.fillRect(3, 8, 6, 4) // gnarled knot
-    g.fillRect(2, 20, 8, 4) // flared base
-    g.fillStyle(PAL.dark)
-    g.fillRect(5, 2, 1, 6)
-    g.fillRect(4, 14, 1, 4)
-    g.generateTexture('bg_swamp_trunk', 12, 24)
-    g.clear()
-
-    // Background Spanish Moss (8x16) - Level 2
-    g.fillStyle(PAL.dark)
-    g.fillRect(3, 0, 2, 8)
-    g.fillRect(2, 6, 4, 2)
-    g.fillRect(2, 8, 2, 6)
-    g.fillRect(3, 14, 1, 2)
-    g.generateTexture('bg_moss', 8, 16)
-    g.clear()
-
-    // Background Leaf Cloud (32x32) - Level 3
-    g.fillStyle(PAL.darkest) // bottom layers
-    g.fillCircle(16, 18, 12)
-    g.fillCircle(8, 16, 8)
-    g.fillCircle(24, 16, 8)
-    g.fillStyle(PAL.dark) // middle layer
-    g.fillCircle(16, 14, 10)
-    g.fillCircle(10, 12, 6)
-    g.fillCircle(22, 12, 6)
-    g.fillStyle(PAL.light) // highlight top layers
-    g.fillCircle(16, 8, 6)
-    g.generateTexture('bg_leaf_cloud', 32, 32)
-    g.clear()
-
-    // Background Stalactite (8x16) - Level 4
-    g.fillStyle(PAL.darkest)
-    g.fillRect(2, 0, 4, 2)
-    g.fillRect(2, 2, 3, 3)
-    g.fillRect(3, 5, 2, 4)
-    g.fillRect(3, 9, 1, 7)
-    g.generateTexture('bg_stalactite', 8, 16)
-    g.clear()
-
-    // Background Hollow Root (16x24) - Level 4
-    g.fillStyle(PAL.darkest)
-    g.fillRect(4, 0, 4, 6)
-    g.fillRect(6, 6, 4, 8) // curves right
-    g.fillRect(4, 14, 4, 10) // curves left
-    g.fillStyle(PAL.dark)
-    g.fillRect(5, 1, 1, 4)
-    g.fillRect(7, 7, 1, 6)
-    g.fillRect(5, 15, 1, 8)
-    g.generateTexture('bg_hollow_root', 16, 24)
     g.clear()
 
     // Particles

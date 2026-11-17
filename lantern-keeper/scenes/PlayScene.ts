@@ -11,7 +11,6 @@ import {
   DASH,
   JUMP_ASSIST,
   WALL,
-  DARKNESS_ALPHA,
   DECO,
   FIREFLY,
   SIGNPOST,
@@ -19,6 +18,11 @@ import {
 } from '../constants'
 import { Darkness, type Light } from '../../shared/lighting'
 import { STAGE_KEYS, stageFor } from '../stages'
+import {
+  ART_SCALE, BIOMES, GLOOM_ALPHA, LIGHT_RINGS, PARALLAX, TILE_PX, WARM_GLOW, biomeFor, frameFor, neighbourMask,
+  type ForestPalette, type Layer,
+} from '../forest'
+import { zoomInset } from '../../shared/darkness'
 import { prefersReducedMotion } from '../../shared/motion'
 import { loadProgress, saveProgress } from '../progress'
 import { showRunSummary, formatRunTime } from '../../shared/runSummary'
@@ -45,6 +49,13 @@ export class PlayScene extends Phaser.Scene {
   private darkness!: Darkness
   private lanterns: Lantern[] = []
   /** Ambient fireflies (#65); rebuilt with each level. */
+  /** The three layers of forest behind the level, and how far each follows. */
+  private backdrop: { sprite: Phaser.GameObjects.TileSprite; follow: number }[] = []
+  /** Hanging vines, each a chain that sways from where it is rooted (#172). */
+  private vines: Phaser.GameObjects.Container[] = []
+  /** The warm light the keeper carries; see `addGlow`. */
+  private keeperGlow!: Phaser.GameObjects.Image
+  private forest!: ForestPalette
   private fireflies: {
     sprite: Phaser.GameObjects.Image
     homeX: number
@@ -144,6 +155,13 @@ export class PlayScene extends Phaser.Scene {
     const ground = map.createLayer('ground', tileset)!
     ground.setCollisionBetween(1, 8)
     this.groundLayer = ground
+    // The map's own layer is what the keeper stands on and is not what is
+    // drawn (#172): `drawStone` paints the level over it, piece by piece.
+    ground.setVisible(false)
+    const biome = biomeFor(this.levelKey)
+    this.forest = BIOMES[biome]
+    this.cameras.main.setBackgroundColor(this.forest.void)
+    this.drawStone(map, ground, biome)
 
     // Title and spawn come from the shared stage list (#88); they used to be
     // an if-chain here, which is one of the five places a new stage had to be
@@ -153,7 +171,8 @@ export class PlayScene extends Phaser.Scene {
     const spawnY = stage.spawnY
     const title = stage.title
 
-    const initialDarkness = DARKNESS_ALPHA[this.levelKey] ?? 0.85
+    // Dim, not black (#172): see `GLOOM_ALPHA`.
+    const initialDarkness = GLOOM_ALPHA[this.levelKey] ?? 0.6
 
     this.createBackground(map)
     this.decorate(map, ground)
@@ -298,7 +317,11 @@ export class PlayScene extends Phaser.Scene {
       height: VIEW_HEIGHT,
       depth: 10,
       alpha: initialDarkness,
+      // The forest's own dark, and a light with a soft edge.
+      color: this.forest.gloom,
+      rings: LIGHT_RINGS,
     })
+    this.keeperGlow = this.addGlow(spawnX, spawnY, GLOW.maxRadius, WARM_GLOW.keeperAlpha)
 
     this.respawnPoint = { x: spawnX, y: spawnY }
     // Every level starts on a full tank. `create()` runs on level advance and
@@ -315,89 +338,84 @@ export class PlayScene extends Phaser.Scene {
     this.toast(title, 3000, true)
   }
 
-  private createBackground(map: Phaser.Tilemaps.Tilemap) {
-    const levelWidth = map.widthInPixels
-    const levelHeight = map.heightInPixels
-    const rng = new Phaser.Math.RandomDataGenerator([this.levelKey + '_bg'])
+  /**
+   * The forest behind the level, in three layers that follow the camera by
+   * different amounts (#172).
+   *
+   * Each is one picture that repeats both ways, fixed to the camera and slid
+   * under it, so a level of any size has forest behind all of it. The camera
+   * magnifies what is fixed to it about its middle, so each is the size of
+   * the view and inset, as the darkness is.
+   */
+  private createBackground(_map: Phaser.Tilemaps.Tilemap) {
+    const cam = this.cameras.main
+    const [ox, oy] = zoomInset(cam.width, cam.height, cam.zoom)
+    const biome = biomeFor(this.levelKey)
+    const depth: Record<Layer, number> = { far: -3, mid: -2.5, near: -2 }
+    this.backdrop = (['far', 'mid', 'near'] as Layer[]).map((layer) => ({
+      sprite: this.add
+        .tileSprite(ox, oy, VIEW_WIDTH, VIEW_HEIGHT, `forest_${biome}_${layer}`)
+        .setOrigin(0)
+        .setScrollFactor(0)
+        .setTileScale(1 / ART_SCALE)
+        .setDepth(depth[layer]),
+      follow: PARALLAX[layer],
+    }))
+    this.slideBackdrop()
+  }
 
-    if (this.levelKey === 'level1') {
-      const treeCount = 18
-      for (let i = 0; i < treeCount; i++) {
-        const x = rng.between(20, levelWidth - 40)
-        const canopyY = rng.between(20, 60)
-        const canopy = this.add.image(x, canopyY, 'bg_tree_canopy')
-        canopy.setDepth(-2)
-        canopy.setScrollFactor(0.7, 1)
-        
-        let trunkY = canopyY + 12
-        while (trunkY < levelHeight) {
-          const trunk = this.add.image(x, trunkY + 12, 'bg_tree_trunk')
-          trunk.setDepth(-1)
-          trunk.setScrollFactor(0.7, 1)
-          trunkY += 24
-        }
-      }
-    } else if (this.levelKey === 'level2') {
-      const treeCount = 15
-      for (let i = 0; i < treeCount; i++) {
-        const x = rng.between(20, levelWidth - 40)
-        const treeY = levelHeight - 16
-        let trunkY = treeY - 12
-        while (trunkY > 40) {
-          const trunk = this.add.image(x, trunkY, 'bg_swamp_trunk')
-          trunk.setDepth(-1)
-          trunk.setScrollFactor(0.6, 1)
-          trunkY -= 24
-        }
-        
-        if (rng.frac() < 0.5) {
-          const mossX = x + rng.between(-10, 10)
-          const mossY = rng.between(10, 30)
-          const moss = this.add.image(mossX, mossY, 'bg_moss')
-          moss.setDepth(-1.5)
-          moss.setScrollFactor(0.6, 1)
-          if (rng.frac() < 0.3) {
-            const moss2 = this.add.image(mossX, mossY + 16, 'bg_moss')
-            moss2.setDepth(-1.5)
-            moss2.setScrollFactor(0.6, 1)
-          }
-        }
-      }
-    } else if (this.levelKey === 'level3') {
-      const cloudCount = 20
-      for (let i = 0; i < cloudCount; i++) {
-        const x = rng.between(20, levelWidth - 40)
-        const y = rng.between(40, levelHeight - 40)
-        const scale = rng.between(7, 13) / 10
-        
-        const cloud = this.add.image(x, y, 'bg_leaf_cloud')
-        cloud.setDepth(-1)
-        cloud.setScale(scale)
-        cloud.setScrollFactor(0.5, 0.7)
-      }
-    } else if (this.levelKey === 'level4') {
-      const rootCount = 12
-      for (let i = 0; i < rootCount; i++) {
-        const x = rng.between(20, levelWidth - 40)
-        let rootY = rng.between(10, 50)
-        while (rootY < levelHeight) {
-          const root = this.add.image(x, rootY, 'bg_hollow_root')
-          root.setDepth(-1)
-          root.setScrollFactor(0.4, 0.4)
-          rootY += 24
-        }
-      }
-      
-      const stalactiteCount = 20
-      for (let i = 0; i < stalactiteCount; i++) {
-        const x = rng.between(10, levelWidth - 10)
-        const y = rng.between(10, 40)
-        
-        const stalactite = this.add.image(x, y, 'bg_stalactite')
-        stalactite.setDepth(-1.5)
-        stalactite.setScrollFactor(0.4, 0.4)
+  /** Slides each layer by its share of where the camera is. */
+  private slideBackdrop() {
+    const cam = this.cameras.main
+    const [ox, oy] = zoomInset(cam.width, cam.height, cam.zoom)
+    for (const { sprite, follow } of this.backdrop) {
+      // In the picture's own pixels, and whole ones, so it never shimmers.
+      sprite.tilePositionX = Math.round((cam.scrollX + ox) * follow * ART_SCALE)
+      sprite.tilePositionY = Math.round((cam.scrollY + oy) * follow * ART_SCALE)
+    }
+  }
+
+  /**
+   * The level as it is drawn: mossy stone, each piece chosen from which of
+   * its neighbours are stone too (#172).
+   *
+   * A map of its own, with tiles of sixteen pixels shown at half size, laid
+   * exactly over the map the keeper collides with. That one is unchanged, so
+   * nothing about where the keeper can stand has moved.
+   */
+  private drawStone(map: Phaser.Tilemaps.Tilemap, ground: Phaser.Tilemaps.TilemapLayer, biome: string) {
+    const solid = (x: number, y: number) => {
+      // Past the edge of the map is more of the same: a floor does not get
+      // a mossy end where the level stops.
+      const cx = Phaser.Math.Clamp(x, 0, map.width - 1)
+      const cy = Phaser.Math.Clamp(y, 0, map.height - 1)
+      const t = ground.getTileAt(cx, cy)
+      return !!t && t.index >= 1
+    }
+    const drawn = this.make.tilemap({ tileWidth: TILE_PX, tileHeight: TILE_PX, width: map.width, height: map.height })
+    const tiles = drawn.addTilesetImage(`stone_${biome}`, `stone_${biome}`, TILE_PX, TILE_PX)!
+    const layer = drawn.createBlankLayer('stone', tiles)!
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        if (!solid(x, y)) continue
+        layer.putTileAt(frameFor(neighbourMask(solid, x, y), (x * 7 + y * 3) % 2), x, y)
       }
     }
+    layer.setScale(1 / ART_SCALE).setDepth(0)
+  }
+
+  /**
+   * A pool of warm light, over the darkness: what a lit lantern throws and
+   * what the keeper carries. Added to what is under it, so it warms the
+   * stone and the leaves and does not cover them.
+   */
+  private addGlow(x: number, y: number, radius: number, alpha: number): Phaser.GameObjects.Image {
+    return this.add
+      .image(x, y, 'warm_glow')
+      .setDisplaySize(radius * 2, radius * 2)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(alpha)
+      .setDepth(11)
   }
 
   // Stage decorations (issue #7): derived from the tilemap itself, so
@@ -407,6 +425,7 @@ export class PlayScene extends Phaser.Scene {
     map: Phaser.Tilemaps.Tilemap,
     ground: Phaser.Tilemaps.TilemapLayer,
   ) {
+    this.vines = []
     const rng = new Phaser.Math.RandomDataGenerator([this.levelKey])
     const solid = (x: number, y: number) => {
       if (x < 0 || y < 0 || x >= map.width || y >= map.height) return false
@@ -427,9 +446,23 @@ export class PlayScene extends Phaser.Scene {
         }
         // exposed underside: hang a vine (1-2 segments)
         if (!solid(x, y + 1) && rng.frac() < DECO.vineDensity) {
-          this.add.image(px, y * 8 + 12, 'deco_vine')
-          if (rng.frac() < 0.4 && !solid(x, y + 2)) {
-            this.add.image(px, y * 8 + 20, 'deco_vine')
+          // A chain hung from where it is rooted, so it can sway from there.
+          const vine = this.add.container(px, y * 8 + 8, [this.add.image(0, 4, 'deco_vine')])
+          if (rng.frac() < 0.4 && !solid(x, y + 2)) vine.add(this.add.image(0, 12, 'deco_vine'))
+          this.vines.push(vine)
+          // Decoration, so not under reduced motion (#172).
+          if (!prefersReducedMotion()) {
+            const lean = rng.between(3, 6)
+            vine.setAngle(-lean)
+            this.tweens.add({
+              targets: vine,
+              angle: lean,
+              yoyo: true,
+              repeat: -1,
+              duration: rng.between(2200, 3400),
+              delay: rng.between(0, 1500),
+              ease: 'Sine.easeInOut',
+            })
           }
         }
       }
@@ -563,6 +596,8 @@ export class PlayScene extends Phaser.Scene {
       lantern.sprite.setTexture('lanternLit')
       this.totalLanternsLit++
     }
+    // A lit lantern throws warm light, as far as it clears the dark (#172).
+    this.addGlow(lantern.sprite.x, lantern.sprite.y, LANTERN_GLOW_RADIUS * 1.15, WARM_GLOW.alpha)
     this.respawnPoint = { x: lantern.sprite.x, y: lantern.sprite.y - 6 }
     // Lanterns are already the checkpoints; #70 makes them the supply too, so
     // running for the next one is a real decision rather than a guess.
@@ -1121,6 +1156,10 @@ export class PlayScene extends Phaser.Scene {
       this.guidanceArrow.setVisible(false)
     }
 
+    this.slideBackdrop()
+    this.keeperGlow.setPosition(this.player.x, this.player.y)
+    const reach = this.playerLightRadius() * 2
+    this.keeperGlow.setDisplaySize(reach, reach)
     this.redrawDarkness()
   }
 
