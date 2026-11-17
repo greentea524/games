@@ -3,6 +3,7 @@ import { TILE_SIZE, PAL, LEGACY_WIDTH as GBC_WIDTH, LEGACY_ZOOM } from '../const
 import {
   BACKDROP_PX, BIOMES, FRAME_COUNT, TILE_PX, WARM_GLOW, drawBackdrop, drawTileset, glowRows, type Biome, type Layer, type Painter,
 } from '../forest'
+import { HEART_TREE_PX, SPRITES, drawHeartTree, pixels } from '../sprites'
 import level1Url from '../assets/level1.json?url'
 import level2Url from '../assets/level2.json?url'
 import level3Url from '../assets/level3.json?url'
@@ -50,7 +51,8 @@ export class BootScene extends Phaser.Scene {
     }).setOrigin(0.5)
 
     // Animated glowing lantern preview icon
-    const icon = this.add.sprite(GBC_WIDTH / 2, 62, 'lanternLit').setScale(3)
+    // The picture's own pixels, two to a screen pixel.
+    const icon = this.add.sprite(GBC_WIDTH / 2, 62, 'lanternLit').setScale(2 / LEGACY_ZOOM)
     this.tweens.add({
       targets: icon,
       alpha: { from: 0.6, to: 1 },
@@ -144,8 +146,46 @@ export class BootScene extends Phaser.Scene {
     })
   }
 
+  /**
+   * The keeper, the lanterns and the props, from `sprites.ts` (#173), and
+   * the Heart Tree. All at two pixels to a world unit: whatever places one
+   * shows it at half size.
+   */
+  private buildSprites() {
+    const canvas = (key: string, w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void) => {
+      if (this.textures.exists(key)) return
+      const el = document.createElement('canvas')
+      el.width = w
+      el.height = h
+      const ctx = el.getContext('2d')
+      if (!ctx) return
+      draw(ctx)
+      this.textures.addCanvas(key, el)
+    }
+    const css = (colour: number) => `#${colour.toString(16).padStart(6, '0')}`
+    for (const name of Object.keys(SPRITES)) {
+      const grid = pixels(name)
+      canvas(name, grid[0].length, grid.length, (ctx) =>
+        grid.forEach((row, y) =>
+          row.forEach((colour, x) => {
+            if (colour === null) return
+            ctx.fillStyle = css(colour)
+            ctx.fillRect(x, y, 1, 1)
+          }),
+        ),
+      )
+    }
+    canvas('heart_tree_graphic', HEART_TREE_PX, HEART_TREE_PX, (ctx) =>
+      drawHeartTree((x, y, w, h, colour) => {
+        ctx.fillStyle = css(colour)
+        ctx.fillRect(x, y, w, h)
+      }),
+    )
+  }
+
   private generateProceduralTextures() {
     this.buildForest()
+    this.buildSprites()
     const g = this.make.graphics({}, false)
 
     // Tileset texture: 6 tiles (Glade, Mossy Hollows, Rootspire)
@@ -203,136 +243,6 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('tiles', TILE_SIZE * 8, TILE_SIZE)
     g.clear()
 
-    // Player Textures (Idle, Walk1, Walk2, Cling)
-    const drawPlayer = (key: string, drawFn: () => void) => {
-      drawFn()
-      g.generateTexture(key, 6, 6)
-      g.clear()
-    }
-    
-    drawPlayer('player_idle', () => {
-      g.fillStyle(PAL.lightest)
-      g.fillRect(1, 0, 4, 6)
-      g.fillStyle(PAL.darkest)
-      g.fillRect(2, 1, 1, 1)
-      g.fillRect(4, 1, 1, 1)
-    })
-    
-    drawPlayer('player_walk1', () => {
-      g.fillStyle(PAL.lightest)
-      g.fillRect(1, 1, 4, 5)
-      g.fillStyle(PAL.darkest)
-      g.fillRect(2, 2, 1, 1)
-      g.fillRect(4, 2, 1, 1)
-    })
-    
-    drawPlayer('player_walk2', () => {
-      g.fillStyle(PAL.lightest)
-      g.fillRect(2, 0, 4, 6)
-      g.fillStyle(PAL.darkest)
-      g.fillRect(3, 1, 1, 1)
-      g.fillRect(5, 1, 1, 1)
-    })
-    
-    drawPlayer('player_cling', () => {
-      g.fillStyle(PAL.lightest)
-      g.fillRect(0, 0, 3, 6)
-      g.fillStyle(PAL.darkest)
-      g.fillRect(1, 1, 1, 1)
-      g.fillRect(1, 4, 1, 1)
-    })
-
-    // Stage decorations (issue #7)
-    g.fillStyle(PAL.light) // grass tuft: three blades
-    g.fillRect(1, 1, 1, 3)
-    g.fillRect(3, 0, 1, 4)
-    g.fillRect(5, 2, 1, 2)
-    g.generateTexture('deco_grass', 8, 4)
-    g.clear()
-
-    g.fillStyle(PAL.dark) // fern: stem + fronds
-    g.fillRect(3, 0, 1, 5)
-    g.fillStyle(PAL.light)
-    g.fillRect(1, 1, 2, 1)
-    g.fillRect(4, 2, 2, 1)
-    g.fillRect(1, 3, 2, 1)
-    g.generateTexture('deco_fern', 7, 5)
-    g.clear()
-
-    g.fillStyle(PAL.lightest) // tiny mushroom
-    g.fillRect(1, 0, 3, 2)
-    g.fillStyle(PAL.light)
-    g.fillRect(2, 2, 1, 2)
-    g.generateTexture('deco_shroom', 5, 4)
-    g.clear()
-
-    g.fillStyle(PAL.dark) // hanging vine segment with a leaf
-    g.fillRect(1, 0, 1, 8)
-    g.fillStyle(PAL.light)
-    g.fillRect(0, 3, 1, 1)
-    g.fillRect(2, 6, 1, 1)
-    g.generateTexture('deco_vine', 3, 8)
-    g.clear()
-
-    // Bouncy Mushroom (12x8)
-    g.fillStyle(PAL.darkest) // cap outline
-    g.fillRect(1, 2, 10, 4)
-    g.fillRect(2, 1, 8, 5)
-    g.fillStyle(PAL.warm) // cap top
-    g.fillRect(3, 1, 6, 4)
-    g.fillRect(2, 2, 8, 3)
-    g.fillStyle(PAL.lightest) // cap spots
-    g.fillRect(4, 2, 1, 1)
-    g.fillRect(7, 2, 2, 1)
-    g.fillStyle(PAL.lightest) // stem
-    g.fillRect(5, 4, 2, 4)
-    g.generateTexture('bouncy_shroom', 12, 8)
-    g.clear()
-
-    // Heart Tree (64x64)
-    g.fillStyle(PAL.darkest) // trunk outline
-    g.fillRect(28, 30, 8, 34)
-    g.fillStyle(PAL.dark) // trunk inner
-    g.fillRect(30, 30, 4, 34)
-    // Heart canopy
-    g.fillStyle(PAL.warm) 
-    g.fillCircle(20, 20, 16) // Left lobe
-    g.fillCircle(44, 20, 16) // Right lobe
-    g.fillTriangle(4, 20, 60, 20, 32, 45) // Bottom point
-    // Some bright glowing spots
-    g.fillStyle(PAL.lightest)
-    g.fillCircle(18, 14, 3)
-    g.fillCircle(46, 14, 3)
-    g.fillCircle(32, 28, 3)
-    g.fillCircle(24, 22, 2)
-    g.fillCircle(40, 22, 2)
-    g.generateTexture('heart_tree_graphic', 64, 64)
-    g.clear()
-
-    // Guidance Arrow (8x8)
-    g.fillStyle(PAL.warm)
-    g.fillTriangle(0, 0, 8, 4, 0, 8)
-    g.fillStyle(PAL.lightest)
-    g.fillTriangle(2, 2, 6, 4, 2, 6)
-    g.generateTexture('guidance_arrow', 8, 8)
-    g.clear()
-
-    // DANGER signpost (#65), 8x12. Deliberately not in PAL.warm: warm is the
-    // language of the guidance arrow and the lanterns, and a signpost that
-    // glows like a lantern is a signpost the player walks toward. This one is
-    // wood and a pale board — it reads as authored furniture, not as a pickup.
-    g.fillStyle(PAL.dark) // post
-    g.fillRect(3, 5, 2, 7)
-    g.fillStyle(PAL.darkest) // board shadow
-    g.fillRect(0, 1, 8, 5)
-    g.fillStyle(PAL.light) // board face
-    g.fillRect(0, 0, 8, 5)
-    g.fillStyle(PAL.darkest) // an exclamation, the only mark legible at 8px
-    g.fillRect(4, 1, 1, 2)
-    g.fillRect(4, 4, 1, 1)
-    g.generateTexture('signpost', 8, 12)
-    g.clear()
-
     // Particles
     g.fillStyle(PAL.lightest)
     g.fillRect(0, 0, 2, 2)
@@ -342,34 +252,6 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(PAL.warm)
     g.fillRect(0, 0, 1, 1)
     g.generateTexture('spark', 1, 1)
-    g.clear()
-
-    // Lanterns (unlit / lit)
-    g.fillStyle(PAL.light)
-    g.fillRect(2, 0, 2, 2)
-    g.fillStyle(PAL.dark)
-    g.fillRect(1, 2, 4, 4)
-    g.fillStyle(PAL.darkest)
-    g.fillRect(2, 3, 2, 2)
-    g.generateTexture('lanternUnlit', 6, 6)
-    g.clear()
-    g.fillStyle(PAL.light)
-    g.fillRect(2, 0, 2, 2)
-    g.fillStyle(PAL.warm)
-    g.fillRect(1, 2, 4, 4)
-    g.generateTexture('lanternLit', 6, 6)
-    g.clear()
-
-    // Oil flask (#70). Deliberately not lantern-shaped: a lantern is a fixed
-    // checkpoint and a flask is a one-shot pickup, and at 6px the only thing
-    // that separates them legibly is silhouette. Squat body, narrow neck.
-    g.fillStyle(PAL.dark)
-    g.fillRect(2, 0, 2, 2) // neck
-    g.fillStyle(PAL.warm)
-    g.fillRect(1, 2, 4, 4) // body
-    g.fillStyle(PAL.lightest)
-    g.fillRect(2, 3, 1, 1) // highlight, so it reads as glass not stone
-    g.generateTexture('oil_flask', 6, 6)
     g.clear()
 
     // The light brushes for the darkness overlay (KAN-109) used to be built

@@ -34,8 +34,8 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5)
 
     // Player and Lantern Sneak Peek
-    const playerPreview = this.add.sprite(GBC_WIDTH / 2 - 16, 44, 'player_idle').setScale(2);
-    const lanternPreview = this.add.sprite(GBC_WIDTH / 2 + 16, 44, 'lanternLit').setScale(2);
+    const playerPreview = this.add.sprite(GBC_WIDTH / 2 - 16, 44, 'player_idle').setScale(2 / LEGACY_ZOOM);
+    const lanternPreview = this.add.sprite(GBC_WIDTH / 2 + 16, 44, 'lanternLit').setScale(2 / LEGACY_ZOOM);
 
     this.headerContainer = this.add.container(0, 0, [titleText, playerPreview, lanternPreview]);
 

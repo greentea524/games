@@ -23,6 +23,7 @@ import {
   type ForestPalette, type Layer,
 } from '../forest'
 import { zoomInset } from '../../shared/darkness'
+import { KEEPER_BODY, worldSize } from '../sprites'
 import { prefersReducedMotion } from '../../shared/motion'
 import { loadProgress, saveProgress } from '../progress'
 import { showRunSummary, formatRunTime } from '../../shared/runSummary'
@@ -36,6 +37,8 @@ const LIGHT_TOUCH_DISTANCE = 10
 const SPAWN_POINT = { x: 16, y: 120 }
 // Was the size of the 'brushBig' texture, which lanterns stamped unscaled.
 const LANTERN_GLOW_RADIUS = 28
+/** What a picture is shown at: they are drawn at two pixels to a unit. */
+const ART = 1 / ART_SCALE
 
 interface Lantern {
   name: string
@@ -179,6 +182,17 @@ export class PlayScene extends Phaser.Scene {
     this.placeSignposts(map, ground)
 
     this.player = this.physics.add.sprite(spawnX, spawnY, 'player_idle')
+    // The keeper is drawn taller and wider than they are (#173). The box is
+    // the six units square it always was, at the picture's foot; the picture
+    // is at two pixels to a unit, as all the art is.
+    this.player.setScale(ART)
+    this.player.body.setSize(KEEPER_BODY.width, KEEPER_BODY.height).setOffset(KEEPER_BODY.offsetX, KEEPER_BODY.offsetY)
+    // Placed by the box's middle, which is where the old picture's was: every
+    // spawn and respawn point in the game is written for that.
+    this.player.setOrigin(
+      (KEEPER_BODY.offsetX + KEEPER_BODY.width / 2) / this.player.width,
+      (KEEPER_BODY.offsetY + KEEPER_BODY.height / 2) / this.player.height,
+    )
     this.player.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, ground)
 
@@ -224,15 +238,20 @@ export class PlayScene extends Phaser.Scene {
     
     for (const obj of mapObjects) {
       if (obj.name === 'mushroom') {
-        const m = this.add.image(obj.x! + 6, obj.y! - 4, 'bouncy_shroom')
+        const m = this.add.image(obj.x! + 6, obj.y! - 4, 'bouncy_shroom').setScale(ART)
         m.setDepth(-0.1) // drawn as decoration behind player but in front of background
       } else if (obj.name === 'crumble') {
-        const c = this.add.rectangle(obj.x!, obj.y!, obj.width!, obj.height!, 0x553311).setOrigin(0, 1)
+        // Planks, end to end, the size of the box the map gives: it was a
+        // brown rectangle.
+        const c = this.add
+          .tileSprite(obj.x!, obj.y!, obj.width!, obj.height!, 'crumble_plank')
+          .setOrigin(0, 1)
+          .setTileScale(ART)
         this.crumbleGroup.add(c)
       } else {
         const isHeartTree = obj.name === 'heart_tree'
         const texture = isHeartTree ? 'heart_tree_graphic' : 'lanternUnlit'
-        const sprite = this.add.image(obj.x!, obj.y!, texture)
+        const sprite = this.add.image(obj.x!, obj.y!, texture).setScale(ART)
         if (isHeartTree) {
           sprite.setOrigin(0.5, 1)
           sprite.setDepth(-0.5)
@@ -265,7 +284,7 @@ export class PlayScene extends Phaser.Scene {
     // and the "all lanterns lit" gate.
     this.flasks = []
     for (const obj of map.getObjectLayer('flasks')?.objects ?? []) {
-      const sprite = this.add.image(obj.x!, obj.y!, 'oil_flask')
+      const sprite = this.add.image(obj.x!, obj.y!, 'oil_flask').setScale(ART)
       this.tweens.add({
         targets: sprite,
         y: sprite.y - 2,
@@ -306,7 +325,7 @@ export class PlayScene extends Phaser.Scene {
     // The shrinking light radius is the real feedback; this only answers "how
     // much is left", which the radius alone cannot at a glance.
 
-    this.guidanceArrow = this.add.image(0, 0, 'guidance_arrow')
+    this.guidanceArrow = this.add.image(0, 0, 'guidance_arrow').setScale(ART)
     this.guidanceArrow.setOrigin(0.5, 0.5).setDepth(15).setVisible(false)
 
     this.updateHud()
@@ -441,14 +460,15 @@ export class PlayScene extends Phaser.Scene {
           const r = rng.frac()
           const key =
             r < 0.5 ? 'deco_grass' : r < 0.8 ? 'deco_fern' : 'deco_shroom'
-          const h = key === 'deco_fern' ? 5 : 4
-          this.add.image(px + rng.between(-2, 2), y * 8 - h / 2, key)
+          // Standing on the tile: its foot on the top of the stone.
+          const h = worldSize(key)[1]
+          this.add.image(px + rng.between(-2, 2), y * 8 - h / 2, key).setScale(ART)
         }
         // exposed underside: hang a vine (1-2 segments)
         if (!solid(x, y + 1) && rng.frac() < DECO.vineDensity) {
           // A chain hung from where it is rooted, so it can sway from there.
-          const vine = this.add.container(px, y * 8 + 8, [this.add.image(0, 4, 'deco_vine')])
-          if (rng.frac() < 0.4 && !solid(x, y + 2)) vine.add(this.add.image(0, 12, 'deco_vine'))
+          const vine = this.add.container(px, y * 8 + 8, [this.add.image(0, 4, 'deco_vine').setScale(ART)])
+          if (rng.frac() < 0.4 && !solid(x, y + 2)) vine.add(this.add.image(0, 12, 'deco_vine').setScale(ART))
           this.vines.push(vine)
           // Decoration, so not under reduced motion (#172).
           if (!prefersReducedMotion()) {
@@ -520,8 +540,9 @@ export class PlayScene extends Phaser.Scene {
         if (x - lastX < SIGNPOST.minSpacing) continue
         lastX = x
         // Stand it a little back from the lip, on the solid side.
-        const sign = this.add.image(x * 8 + 4, y * 8 - 6, 'signpost')
-        sign.setFlipX(leftEdge && !rightEdge)
+        const sign = this.add.image(x * 8 + 4, y * 8 - 6, 'signpost').setScale(ART)
+        // Not turned to face the drop, as the old one was: it has a word on
+        // it now, and a mirrored word is no warning.
         // Behind the player, in front of the parallax — the same band the
         // other world decorations use. No physics body: it is scenery, and a
         // sign you can stand on is a platform.
@@ -734,7 +755,7 @@ export class PlayScene extends Phaser.Scene {
       for (let i = 0; i < this.totalLanternsLit; i++) {
         const lx = lantern.sprite.x + Phaser.Math.Between(-26, 26)
         const ly = lantern.sprite.y + Phaser.Math.Between(-28, 4)
-        const l = this.add.image(lx, ly, 'lanternLit').setDepth(lantern.sprite.depth + 1)
+        const l = this.add.image(lx, ly, 'lanternLit').setScale(ART).setDepth(lantern.sprite.depth + 1)
         this.tweens.add({
           targets: l,
           y: ly - 2,

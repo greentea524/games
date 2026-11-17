@@ -14,10 +14,10 @@
     "nondeterministic": []
   },
   "lantern-keeper": {
-    "note": "Looked at beside the game at #172. Same place: a layered forest, mossy stone with a grass cap, warm light round a lit lantern. Accepted drift: the game is darker overall; the card's score, lives, stage and health line are not in the game; and the keeper, lanterns, ladder and sign are still the old art until #173.",
+    "note": "Looked at beside the game at #173. Same place and the same figure: a layered forest, mossy stone with a grass cap, a hooded keeper with a pack holding a lantern out in front, iron-and-glass lanterns that glow when lit, a wooden DANGER sign. Accepted drift: the game is darker overall and its keeper smaller; the card's lanterns hang on chains and the game's float; the card's rope ladder is not in the game, which has no ladders; and the card's score, lives, stage and health line are not in the game.",
     "art": "9b92ea28dcc6406278824a6074115d0c983232a537902446ade6313d366018e9",
-    "textures": "fcd4e535b36eda1e98e49c6935fc457071b7b157b69e719632ad9d8e4c0ec64a",
-    "keys": 35,
+    "textures": "fcd8495b8c0d96cb14f38f3b14948165eb28e526fba38c61ed09cd6910b839cc",
+    "keys": 36,
     "nondeterministic": []
   },
   "pocket-dungeon": {
