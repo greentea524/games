@@ -4,6 +4,8 @@ import {
   GBC_WIDTH,
   GBC_HEIGHT,
   VIEW_ZOOM,
+  PLAY_TOP,
+  PLAY_HEIGHT,
   VIEW_WIDTH,
   VIEW_HEIGHT,
   GLOW,
@@ -17,7 +19,7 @@ import {
   PAL,
 } from '../constants'
 import { Darkness, type Light } from '../../shared/lighting'
-import { STAGE_KEYS, stageFor } from '../stages'
+import { STAGE_KEYS, stageFor, stageIndex } from '../stages'
 import {
   ART_SCALE, BIOMES, GLOOM_ALPHA, LIGHT_RINGS, PARALLAX, TILE_PX, WARM_GLOW, biomeFor, frameFor, neighbourMask,
   type ForestPalette, type Layer,
@@ -138,7 +140,8 @@ export class PlayScene extends Phaser.Scene {
     this.persist()
     music.play('adventure')
     // The forest is drawn at `VIEW_ZOOM`; nothing under the camera changes.
-    this.cameras.main.setZoom(VIEW_ZOOM)
+    // And between the HUD's two bars (#174), so nothing is laid over it.
+    this.cameras.main.setViewport(0, PLAY_TOP, GBC_WIDTH, PLAY_HEIGHT).setZoom(VIEW_ZOOM)
     this.cameras.main.fadeIn(500, 0, 0, 0)
     // The HUD is not magnified with it. `prepare` first: on a level that
     // follows another, the last level's HUD is still up for one more frame.
@@ -884,12 +887,14 @@ export class PlayScene extends Phaser.Scene {
 
   private updateHud() {
     const regularLanterns = this.lanterns.filter(l => l.name !== 'heart_tree')
-    if (regularLanterns.length === 0) {
-      this.hud.setCounts('') // no regular lanterns to collect
-      return
-    }
-    const litCount = regularLanterns.filter(l => l.lit).length
-    this.hud.setCounts(`Stage: ${litCount}/${regularLanterns.length}\nTotal: ${this.totalLanternsLit}`)
+    // What the stage holds, not the run's total: that is on the run's
+    // summary, and two lantern counts on one bar was one too many (#174).
+    this.hud.setValues({
+      lit: regularLanterns.filter(l => l.lit).length,
+      lanterns: regularLanterns.length,
+      stage: stageIndex(this.levelKey) + 1,
+      stages: STAGE_KEYS.length,
+    })
   }
 
   private onCrumbleTouch(player: any, platform: any) {

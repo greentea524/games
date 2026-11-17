@@ -624,6 +624,24 @@ unlit lantern is dark on purpose and is found by its iron.
 The plank art is for crumbling platforms, which only `world.json` has, and no
 stage loads that map.
 
+**Lantern Keeper's HUD is two solid bars, and the forest is drawn between
+them (#174).** `hud.ts` lays out the card's arrangement: lanterns lit on the
+left of the top bar and the stage on its right, in amber, and the oil gauge
+along the bottom. The play camera's viewport is the screen less a bar at each
+end, so nothing is laid over the forest; `VIEW_HEIGHT` follows from
+`PLAY_HEIGHT`, and the darkness and backdrop are sized from it. The touch
+suite holds the viewport to the space between the bars and the darkness to
+the viewport's four edges.
+
+Only what the game counts is shown. The card's score, lives and health are
+not, and the run's total of lanterns moved to the end-of-run summary: two
+lantern counts on one bar was one too many. The gauge is labelled OIL, the
+game's own word for what a flask fills. `hud_test.ts` holds the bars clear
+at two-digit counts and the text to 7:1 against its strip.
+
+This game has one palette, so `qa:contrast` has no entry to measure the HUD
+against; `hud_test.ts`'s contrast ratios do that here.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183
