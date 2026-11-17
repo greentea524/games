@@ -167,8 +167,12 @@ async function lanternKeeper() {
       hudZoom: hud.cameras.main.zoom,
       hudText: hud.text?.text ?? '',
       tile: s.groundLayer.tilemap.tileWidth,
-      keeper: s.player.height * cam.zoom,
-      keeperUnits: s.player.height,
+      keeper: s.player.displayHeight * cam.zoom,
+      // The box is what was six units, and must still be (#173): the keeper
+      // is drawn taller than it, and the box is what fits a gap.
+      keeperUnits: s.player.body.height,
+      box: [s.player.body.width, s.player.body.height],
+      boxMiddle: [s.player.body.center.x - s.player.x, s.player.body.center.y - s.player.y],
     }
   })
   check('the screen is 240 by 216', view.screen[0] === 240 && view.screen[1] === 216, view.screen.join(' by '))
@@ -178,7 +182,10 @@ async function lanternKeeper() {
   // As a share of the screen: it was six of 144. The control is the other
   // factor on offer, 1.5, at which the share is exactly what it was.
   const share = (zoom) => (view.keeperUnits * zoom) / view.screen[1]
-  check('the keeper is a larger share of the screen than it was', view.zoom === 2 && share(view.zoom) > 6 / 144, `${view.keeper} of ${view.screen[1]} pixels, from 6 of 144`)
+  check('the keeper is a larger share of the screen than it was', view.zoom === 2 && share(view.zoom) > 6 / 144, `a box of ${view.keeperUnits * view.zoom} of ${view.screen[1]} pixels, from 6 of 144`)
+  check('the keeper\'s box is six units square', view.box[0] === 6 && view.box[1] === 6, view.box.join(' by '))
+  check('and the keeper is placed by its middle', Math.abs(view.boxMiddle[0]) < 0.01 && Math.abs(view.boxMiddle[1]) < 0.01, view.boxMiddle.map((n) => n.toFixed(2)).join(', '))
+  check('the keeper is drawn taller than the box', view.keeper > view.keeperUnits * view.zoom, `${view.keeper} pixels tall on screen`)
   check('and the check can fail: at 1.5 it would be the same share', share(1.5) === 6 / 144)
 
   const start = await st()

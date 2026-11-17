@@ -95,6 +95,8 @@ export class MapScene extends Phaser.Scene {
       const reached = i <= target
       this.add
         .image(p.x, p.y, reached && i < target ? 'lanternLit' : 'lanternUnlit')
+        // One of the picture's pixels to one of the screen's.
+        .setScale(1 / LEGACY_ZOOM)
         .setDepth(1)
     })
 
@@ -110,7 +112,7 @@ export class MapScene extends Phaser.Scene {
 
     // The marker: the player's own lantern, walking the path.
     const start = this.nodeAt(from)
-    const marker = this.add.image(start.x, start.y - 10, 'lanternLit').setDepth(2)
+    const marker = this.add.image(start.x, start.y - 12, 'lanternLit').setScale(1 / LEGACY_ZOOM).setDepth(2)
 
     const finish = () => {
       label.setText(STAGES[target].title)

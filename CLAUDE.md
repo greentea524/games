@@ -598,8 +598,31 @@ drawn pixel to one screen pixel. Everything new is made that way.
 
 `forest_test.ts` holds the order of brightness: the forest behind is darker
 than any stone, the near leaves darker than the far trunks, moss brighter
-than stone and the light brighter than moss. The props, the keeper and the
-lanterns are still the old art, at one drawn pixel to two on screen: #173.
+than stone and the light brighter than moss.
+
+**Lantern Keeper's keeper is drawn larger than its box (#173).** `sprites.ts`
+holds the keeper, the lanterns and the props as pictures in letters with an
+automatic outline, at two pixels to a world unit like the forest. The keeper
+is 16 by 20 pixels, 8 by 10 units: a hooded figure with a pack and a lantern
+held out in front. Its hitbox is still the 6 units square it always was, at
+the picture's foot, and the sprite's origin is the middle of that box, so
+every spawn and respawn point means what it meant. The touch suite holds the
+box to 6 by 6 and the keeper's place to its middle.
+
+Three things from the work. The sign has the word DANGER on it now and is no
+longer flipped to face the drop, since a mirrored word is no warning. A
+picture that joins end to end, a vine or a plank, gets no outline, or there
+is a dark line at every join. And `sprites_test.ts` first failed seven
+pictures for being drawn up to the edge, where there is no room for the
+outline: the keeper's pack was in the first column.
+
+This game has one palette and no entry in `qa:contrast`. `sprites_test.ts`
+does that job here: the outline darker than anything in any stage's forest,
+and every sprite carrying something brighter than the brightest stone. The
+unlit lantern is dark on purpose and is found by its iron.
+
+The plank art is for crumbling platforms, which only `world.json` has, and no
+stage loads that map.
 
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
