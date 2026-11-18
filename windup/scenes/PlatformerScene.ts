@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, PAL, FONT, CSS_MID } from '../constants'
+import { WORLD_WIDTH, WORLD_HEIGHT, VIEW_ZOOM, PAL, FONT, CSS_MID } from '../constants'
 import { GameState } from '../state'
 import { LEVELS } from '../levels'
 import { sfx, music } from '../audio'
@@ -146,8 +146,16 @@ export class PlatformerScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor('#0b0f0c')
-    this.cameras.main.setBounds(0, 0, GBC_WIDTH, GBC_HEIGHT)
-    this.physics.world.setBounds(0, 0, GBC_WIDTH, GBC_HEIGHT)
+    // The world is drawn at `VIEW_ZOOM`, from the top left, and nothing
+    // under the camera changes (#166). A level fills the view exactly, so the
+    // camera never scrolls: a thing fixed to it, as the backdrop's layers
+    // are, lands where it would in the world.
+    //
+    // No bounds. Phaser clamps a bounded camera's scroll as if its origin
+    // were the middle, and with the origin at the top left that clamp moved
+    // the whole level a quarter of the screen down and right.
+    this.cameras.main.setOrigin(0, 0).setZoom(VIEW_ZOOM).setScroll(0, 0)
+    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
     this.isTransitioning = false
 
     this.renderBackdrop()
@@ -555,14 +563,14 @@ export class PlatformerScene extends Phaser.Scene {
 
     // Near: pipework and structure, at the edges so the middle stays clear.
     const near: Phaser.GameObjects.GameObject[] = []
-    for (let y = 0; y < GBC_HEIGHT; y += 16) {
+    for (let y = 0; y < WORLD_HEIGHT; y += 16) {
       near.push(this.add.image(9, y + 8, `bg_pipe_${mode}`))
-      near.push(this.add.image(GBC_WIDTH - 9, y + 8, `bg_pipe_${mode}`))
+      near.push(this.add.image(WORLD_WIDTH - 9, y + 8, `bg_pipe_${mode}`))
     }
     // y is kept below the HUD: the PWR bar and the run clock own the top ~24px,
     // and the first layout put the girders and the lamp straight behind them.
     near.push(this.add.image(26, 40, `bg_girder_${mode}`))
-    near.push(this.add.image(GBC_WIDTH - 26, 64, `bg_girder_${mode}`))
+    near.push(this.add.image(WORLD_WIDTH - 26, 64, `bg_girder_${mode}`))
     near.push(this.add.image(80, 30, `bg_lamp_${mode}`))
     this.backdropNear.add(near)
 
@@ -588,8 +596,8 @@ export class PlatformerScene extends Phaser.Scene {
 
     const level = LEVELS[GameState.levelIndex] || LEVELS[1]
     const points = level.vents.length > 0 ? level.vents : [
-      { x: 9, y: GBC_HEIGHT - 34 },
-      { x: GBC_WIDTH - 9, y: GBC_HEIGHT - 58 },
+      { x: 9, y: WORLD_HEIGHT - 34 },
+      { x: WORLD_WIDTH - 9, y: WORLD_HEIGHT - 58 },
     ]
 
     for (const p of points) {
@@ -616,8 +624,8 @@ export class PlatformerScene extends Phaser.Scene {
     }
     if (!this.player) return
     // -0.5 at the left wall, +0.5 at the right.
-    const across = this.player.x / GBC_WIDTH - 0.5
-    const rise = this.player.y / GBC_HEIGHT - 0.5
+    const across = this.player.x / WORLD_WIDTH - 0.5
+    const rise = this.player.y / WORLD_HEIGHT - 0.5
     this.backdropFar.setPosition(-across * BACKDROP.farShiftPx, -rise * BACKDROP.farShiftPx)
     this.backdropNear.setPosition(-across * BACKDROP.nearShiftPx, -rise * BACKDROP.nearShiftPx)
   }

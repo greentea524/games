@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST } from '../constants'
+import { WORLD_WIDTH as GBC_WIDTH, WORLD_HEIGHT as GBC_HEIGHT, FONT, CSS_LIGHTEST, VIEW_ZOOM } from '../constants'
 import { GameState } from '../state'
 
 // The HUD portrait (#56).
@@ -32,6 +32,9 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144, and shown enlarged from the top left by
+    // the play camera's factor (#166). The later tickets lay it out anew.
+    this.cameras.main.setOrigin(0, 0).setZoom(VIEW_ZOOM)
     // Static label; nothing updates it, so it needs no field.
     this.add.text(6, 4, 'PWR', {
       fontFamily: FONT,
