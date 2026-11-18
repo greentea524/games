@@ -157,15 +157,18 @@ async function lanternKeeper() {
     const s = g.scene.getScene('play')
     const cam = s.cameras.main
     const rt = s.darkness.gameObject
-    const drawn = (p, c) => (p - c) * cam.zoom + c
+    // In the camera's own space, which starts at its viewport's corner.
+    const drawn = (p, c, at) => (p - c) * cam.zoom + c + at
     const hud = g.scene.getScene('hud')
     return {
       zoom: cam.zoom,
       screen: [g.scale.width, g.scale.height],
-      overlay: [drawn(rt.x, cam.width / 2), drawn(rt.y, cam.height / 2), drawn(rt.x + rt.width, cam.width / 2), drawn(rt.y + rt.height, cam.height / 2)],
+      overlay: [drawn(rt.x, cam.width / 2, cam.x), drawn(rt.y, cam.height / 2, cam.y), drawn(rt.x + rt.width, cam.width / 2, cam.x), drawn(rt.y + rt.height, cam.height / 2, cam.y)],
+      viewport: [cam.x, cam.y, cam.x + cam.width, cam.y + cam.height],
       hudActive: hud.scene.isActive(),
       hudZoom: hud.cameras.main.zoom,
-      hudText: hud.text?.text ?? '',
+      hudText: hud.lanternText?.text ?? '',
+      hudStage: hud.stageText?.text ?? '',
       tile: s.groundLayer.tilemap.tileWidth,
       keeper: s.player.displayHeight * cam.zoom,
       // The box is what was six units, and must still be (#173): the keeper
@@ -176,8 +179,11 @@ async function lanternKeeper() {
     }
   })
   check('the screen is 240 by 216', view.screen[0] === 240 && view.screen[1] === 216, view.screen.join(' by '))
-  check('the darkness reaches all four edges of it', view.overlay.join() === [0, 0, view.screen[0], view.screen[1]].join(), `drawn from ${view.overlay.slice(0, 2)} to ${view.overlay.slice(2)}`)
-  check('the HUD is its own scene, and is not magnified', view.hudActive && view.hudZoom === 1 && view.hudText.includes('Stage'), `zoom ${view.hudZoom}, "${view.hudText.split('\n')[0]}"`)
+  // #174: the forest is drawn between the HUD's bars, so the camera's
+  // viewport is the screen less a bar at each end, and the darkness fills it.
+  check('the forest is drawn between the bars', view.viewport.join() === [0, 18, view.screen[0], view.screen[1] - 18].join(), `from ${view.viewport.slice(0, 2)} to ${view.viewport.slice(2)}`)
+  check('the darkness reaches all four edges of it', view.overlay.join() === view.viewport.join(), `drawn from ${view.overlay.slice(0, 2)} to ${view.overlay.slice(2)}`)
+  check('the HUD is its own scene, and is not magnified', view.hudActive && view.hudZoom === 1 && view.hudText.startsWith('LANTERNS') && view.hudStage.startsWith('STAGE'), `zoom ${view.hudZoom}, "${view.hudText}" and "${view.hudStage}"`)
   check('the world under the camera is the size it was', view.tile === 8, `a tile is ${view.tile} units`)
   // As a share of the screen: it was six of 144. The control is the other
   // factor on offer, 1.5, at which the share is exactly what it was.
@@ -675,17 +681,22 @@ async function lanternKeeper() {
     if (!s.scene.isActive()) return null
     const nodes = []
     for (let i = 0; i < 7; i++) nodes.push(s.nodeAt(i))
+    // Bounds read from the game: this had the old screen's 156 and 112
+    // written into it, the next thing to break when the map moved (#175).
+    const { title, label } = s.layout
+    const w = window.__game.scale.width
     return {
-      onScreen: nodes.every((n) => n.x >= 4 && n.x <= 156 && n.y >= 20 && n.y <= 112),
+      onScreen: nodes.every((n) => n.x >= 12 && n.x <= w - 12 && n.y - 20 > title.y + title.height && n.y + 12 < label.y),
       nodes: nodes.length,
-      markers: s.children.list.filter((o) => o.texture && /lantern/.test(o.texture.key)).length,
+      markers: s.children.list.filter((o) => o.texture && /^lantern/.test(o.texture.key)).length,
+      keeper: s.children.list.some((o) => o.texture && /^player_/.test(o.texture.key)),
     }
   })
   check('the world map opens between stages', map !== null)
   check('every node fits between the title and the label', map?.onScreen,
     JSON.stringify(map?.nodes))
-  check('a node is drawn per stage, plus the travelling marker',
-    map?.markers === registry.keys.length + 1, `${map?.markers} sprites`)
+  check('a lantern is drawn per stage', map?.markers === registry.keys.length, `${map?.markers} lanterns`)
+  check('and the keeper walks the path', map?.keeper === true)
 
   // The map must hand over rather than becoming a dead end.
   let handedOver = false

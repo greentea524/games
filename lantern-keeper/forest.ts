@@ -252,16 +252,45 @@ export function drawBackdrop(p: Painter, pal: ForestPalette, layer: Layer, biome
   }
   const salt = { forest: 1, marsh: 2, canopy: 3, hollow: 4 }[biome]
 
+  // A checker of one colour over a band: half its pixels. Mist and shafts of
+  // light are drawn this way, so what is behind them still shows.
+  const dither = (x: number, y: number, w: number, h: number, c: number) => {
+    for (let j = 0; j < h; j++) for (let i = (x + y + j) % 2; i < w; i += 2) wrap(x + i, y + j, 1, 1, c)
+  }
+
   if (layer === 'far') {
-    // Trunks, the full height of the picture, so they join at the seam.
     let x = 6
     for (let i = 0; x < S - 24; i++) {
       const w = 12 + (hash(i, 0, salt) % 12)
-      wrap(x, 0, w, S, pal.far)
-      wrap(x + 2, 0, 2, S, pal.farLit)
-      // Bark: short strokes down the trunk.
-      for (let y = 0; y < S; y += 9) if (hash(i, y, salt) < 55) wrap(x + 5 + (hash(i, y, salt + 1) % (w - 7)), y, 1, 5, pal.farLit)
+      if (biome === 'hollow') {
+        // No trees in the hollow: great roots come down through the dark,
+        // leaning one way and the other as they go.
+        for (let y = 0; y < S; y += 4) {
+          const lean = Math.round(Math.sin(((y + i * 40) / S) * Math.PI * 2) * 6)
+          wrap(x + lean, y, w - 4, 4, pal.far)
+          wrap(x + lean + 1, y, 2, 4, pal.farLit)
+        }
+      } else {
+        // Trunks, the full height of the picture, so they join at the seam.
+        wrap(x, 0, w, S, pal.far)
+        wrap(x + 2, 0, 2, S, pal.farLit)
+        // Bark: short strokes down the trunk.
+        for (let y = 0; y < S; y += 9) if (hash(i, y, salt) < 55) wrap(x + 5 + (hash(i, y, salt + 1) % (w - 7)), y, 1, 5, pal.farLit)
+      }
       x += w + 22 + (hash(i, 1, salt) % 30)
+    }
+    if (biome === 'canopy') {
+      // High in the trees the sun gets in: shafts of light, slanting down.
+      // Four, a quarter of the picture apart, at a slope of one in four: by
+      // the foot of the picture each has moved to where the next began, so
+      // the picture still joins itself top to bottom.
+      for (let i = 0; i < 4; i++) {
+        for (let y = 0; y < S; y += 2) dither(30 + i * 64 + Math.floor(y / 4), y, 6, 2, pal.midLit)
+      }
+    }
+    if (biome === 'marsh') {
+      // Mist lying in bands across the water.
+      for (let i = 0; i < 3; i++) dither(0, 40 + i * 84 + (hash(i, 21, salt) % 16), S, 6 + (i % 2) * 4, pal.farLit)
     }
     return
   }
@@ -276,8 +305,9 @@ export function drawBackdrop(p: Painter, pal: ForestPalette, layer: Layer, biome
       for (let y = 20; y < S; y += 46) if (hash(i, y, salt + 2) < 50) wrap(x + w, y + (hash(i, y, salt) % 20), 6, 2, pal.mid)
       x += w + 34 + (hash(i, 3, salt) % 44)
     }
-    // Clumps of leaves, in rows down the picture.
-    const clumps = biome === 'hollow' ? 5 : biome === 'canopy' ? 16 : 10
+    // Clumps of leaves, in rows down the picture: crowded in the canopy, few
+    // in the marsh and none in the hollow, where nothing green grows.
+    const clumps = biome === 'hollow' ? 0 : biome === 'canopy' ? 16 : biome === 'marsh' ? 6 : 10
     for (let i = 0; i < clumps; i++) {
       const cx = hash(i, 5, salt) * 2.56
       const cy = hash(i, 6, salt) * 2.56
@@ -285,19 +315,45 @@ export function drawBackdrop(p: Painter, pal: ForestPalette, layer: Layer, biome
       blob(Math.round(cx), Math.round(cy), r, pal.mid)
       blob(Math.round(cx) - 2, Math.round(cy) - 3, Math.max(2, r - 5), pal.midLit)
     }
-    // Vines: a line down, with a leaf either side now and then.
-    for (let i = 0; i < 9; i++) {
-      const vx = Math.round(hash(i, 8, salt) * 2.56)
-      const top = Math.round(hash(i, 9, salt) * 2.56)
-      const len = 30 + (hash(i, 10, salt) % 70)
-      wrap(vx, top, 1, len, pal.midLit)
-      for (let y = 6; y < len; y += 11) wrap(vx + (hash(i, y, salt) < 50 ? 1 : -2), top + y, 2, 1, pal.midLit)
+    if (biome === 'marsh') {
+      // Moss hanging from the branches in beards: a fringe of strands, each
+      // a different length.
+      for (let i = 0; i < 8; i++) {
+        const mx = Math.round(hash(i, 22, salt) * 2.56)
+        const top = Math.round(hash(i, 23, salt) * 2.56)
+        const width = 8 + (hash(i, 24, salt) % 8)
+        wrap(mx, top, width, 2, pal.mid)
+        for (let k = 0; k < width; k += 2) wrap(mx + k, top + 2, 1, 6 + (hash(i, k, salt) % 22), pal.midLit)
+      }
+    } else if (biome === 'hollow') {
+      // Roots hanging into the hollow, kinking as they come down.
+      for (let i = 0; i < 10; i++) {
+        let rx = Math.round(hash(i, 25, salt) * 2.56)
+        const top = Math.round(hash(i, 26, salt) * 2.56)
+        const len = 40 + (hash(i, 27, salt) % 80)
+        for (let y = 0; y < len; y += 6) {
+          wrap(rx, top + y, 2, 6, pal.mid)
+          wrap(rx, top + y, 1, 6, pal.midLit)
+          if (hash(i, y, salt + 4) < 30) rx += hash(i, y, salt + 5) < 50 ? 1 : -1
+          if (hash(i, y, salt + 6) < 12) wrap(rx + 2, top + y + 3, 5, 1, pal.mid)
+        }
+      }
+    } else {
+      // Vines: a line down, with a leaf either side now and then.
+      for (let i = 0; i < 9; i++) {
+        const vx = Math.round(hash(i, 8, salt) * 2.56)
+        const top = Math.round(hash(i, 9, salt) * 2.56)
+        const len = 30 + (hash(i, 10, salt) % 70)
+        wrap(vx, top, 1, len, pal.midLit)
+        for (let y = 6; y < len; y += 11) wrap(vx + (hash(i, y, salt) < 50 ? 1 : -2), top + y, 2, 1, pal.midLit)
+      }
     }
     return
   }
 
-  // Near: silhouettes. Big leaves in from the edges, and heavy vines.
-  const leaves = biome === 'hollow' ? 4 : 7
+  // Near: silhouettes. Big leaves in from the edges, and heavy vines; in the
+  // hollow, only the vines, as roots.
+  const leaves = biome === 'hollow' ? 0 : biome === 'canopy' ? 9 : 7
   for (let i = 0; i < leaves; i++) {
     const cx = Math.round(hash(i, 12, salt) * 2.56)
     const cy = Math.round(hash(i, 13, salt) * 2.56)
@@ -306,7 +362,7 @@ export function drawBackdrop(p: Painter, pal: ForestPalette, layer: Layer, biome
     blob(cx + r - 4, cy + 5, Math.round(r * 0.6), pal.near)
     blob(cx - r + 3, cy + 7, Math.round(r * 0.5), pal.near)
   }
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < (biome === 'hollow' ? 14 : 5); i++) {
     const vx = Math.round(hash(i, 15, salt) * 2.56)
     const top = Math.round(hash(i, 16, salt) * 2.56)
     const len = 60 + (hash(i, 17, salt) % 90)

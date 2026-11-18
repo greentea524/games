@@ -106,8 +106,36 @@ for (const biome of biomes) {
   drawBackdrop(far.p, BIOMES[biome], 'far', biome)
   const top = far.px[0].map((v) => v >= 0)
   const bottom = far.px[BACKDROP_PX - 1].map((v) => v >= 0)
-  check(`${biome}: the far trunks join at the seam`, top.every((v, i) => v === bottom[i]) && top.includes(true))
+  // The seam is no worse a step than any two rows next to each other inside
+  // the picture: a root leans and a shaft of light slants, so rows differ,
+  // but a trunk cut off at the seam would differ by its whole width.
+  const rowDiff = (a: boolean[], b: boolean[]) => a.filter((v, k) => v !== b[k]).length
+  const rows = far.px.map((row) => row.map((v) => v >= 0))
+  let widest = 0
+  for (let y = 0; y + 1 < BACKDROP_PX; y++) widest = Math.max(widest, rowDiff(rows[y], rows[y + 1]))
+  const seam = rowDiff(bottom, top)
+  check(`${biome}: the far layer joins at the seam`, seam <= widest && top.includes(true), `${seam} pixels step there, ${widest} at most inside`)
 }
+// Each kind of place has a backdrop of its own, not one forest in four
+// colours (#175). Measured on shape alone: which pixels are painted.
+const shape = (biome: Biome, layer: Layer) => {
+  const c = canvas(BACKDROP_PX, BACKDROP_PX)
+  drawBackdrop(c.p, BIOMES.forest, layer, biome)
+  return c.px.flat().map((v) => v >= 0)
+}
+for (const layer of ['far', 'mid'] as Layer[]) {
+  const shapes = biomes.map((b) => [b, shape(b, layer)] as const)
+  let closest = Infinity
+  let pair = ''
+  shapes.forEach(([a, sa], i) => shapes.slice(i + 1).forEach(([b, sb]) => {
+    const differ = sa.filter((v, k) => v !== sb[k]).length / sa.length
+    if (differ < closest) { closest = differ; pair = `${a} and ${b}` }
+  }))
+  check(`the ${layer} layers of the four kinds of place differ in shape`, closest > 0.05, `the closest are ${pair}, ${(closest * 100).toFixed(1)}% apart`)
+}
+const marshA = shape('marsh', 'far')
+const marshB = shape('marsh', 'far')
+check('and the check can fail: one place against itself does not', marshA.every((v, k) => v === marshB[k]))
 check('the further a layer, the less it moves', PARALLAX.far < PARALLAX.mid && PARALLAX.mid < PARALLAX.near && PARALLAX.near < 1)
 
 // --- light
