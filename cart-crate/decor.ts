@@ -148,13 +148,23 @@ export const dim = (c: Rgb): Rgb => {
 /** The surround in colour: the world's own floor and wood, dimmed. */
 export function decorPalette(world: number): DecorPalette {
   const pal = worldPalette(world)
+  // The outside's floor is the world's own, dimmed, and held at most as bright
+  // as the warehouse's: a pale world's floor dimmed is still light enough that
+  // the wood lifted clear of it was as bright as a crate (#165).
+  const floor = (c: number) => {
+    let d = dim(c)
+    while (luma(d) > 60) d = shade(d, 0.94)
+    return d
+  }
+  const floorA = floor(pal.floorA)
+  const floorB = floor(pal.floorB)
   // Dim wood on a dim floor can be the same grey: in the ice and ruin worlds
   // it was, and the barrels were only their hoops. Lift it clear of the floor.
   let wood = dim(0xb8783c)
-  while (luma(wood) < luma(dim(pal.floorA)) + 16) wood = shade(wood, 1.08)
+  while (luma(wood) < luma(floorA) + 16) wood = shade(wood, 1.08)
   return {
-    floorA: dim(pal.floorA),
-    floorB: dim(pal.floorB),
+    floorA,
+    floorB,
     wood,
     woodDark: dim(0x6a3c18),
     metal: dim(0xa8b4c4),

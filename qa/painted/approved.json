@@ -28,9 +28,9 @@
     "nondeterministic": []
   },
   "cart-crate": {
-    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
+    "note": "Looked at beside the finished game at #165: all five worlds in both palettes, the title and the level select. The warehouse is the card's: grey-blue checkered floor, dark red-brown walls with a brick face, wooden crates, bright crosses in lit squares, the courier fox, and shelves and boxes round the room. Accepted drift: the card's room is larger than any one level's and fills its frame, where a level sits in a band of dark warehouse; the other four worlds are their own places in their own colours; and the game has a HUD bar top and bottom that the card does not.",
     "art": "d1ad5e0233bc6b14706d70928fd41270cc800ad6ef9292a7a23f64938daa0c3a",
-    "textures": "07f53d819cea824fae76fec7e7872737f086e6b4a6dfe6f5272cc4ba445c0740",
+    "textures": "4398b7251f8f0509788015b63ae22d0a710abf6681cd24cd5bdde6bc8c1e4a69",
     "keys": 96,
     "nondeterministic": []
   }

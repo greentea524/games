@@ -1,11 +1,25 @@
 import Phaser from 'phaser'
-import { LEGACY_WIDTH as GBC_WIDTH, FONT, SCALE } from '../constants'
-import { legacyCamera } from '../legacy'
+import { GBC_WIDTH, GBC_HEIGHT, FONT, TILE } from '../constants'
 import { GameState } from '../state'
 import { music, isMuted, setMuted } from '../audio'
+import { HUD_THEME, css } from '../hud'
+import { SUBTITLE, TITLE, TITLE_SCALE, startPrompt, titleLayout } from '../screens'
+import { OPEN, floorFrame } from '../tiles'
+import { playerKey, textureKey } from '../sprites'
+import { prefersReducedMotion } from '../../shared/motion'
 
+const isDesktop = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
+/**
+ * The title, on the real screen and in the palette chosen (#165).
+ *
+ * It was 160×144 behind a zoomed camera, on a navy that is none of the
+ * green screen's tones, with the fox, the crate and the target drawn over
+ * each other. Now the name is on one line, and under it is a strip of the
+ * warehouse: a wall with its brick face, and the fox pushing a crate along
+ * the floor toward a target. The palette switch restarts the scene.
+ */
 export class MainMenuScene extends Phaser.Scene {
-  private blinkText!: Phaser.GameObjects.Text
   private canStart = false
 
   constructor() {
@@ -13,67 +27,49 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   create() {
-    // Still laid out for 160×144 (#160).
-    legacyCamera(this)
-    this.cameras.main.setBackgroundColor('#081820')
-
-    // Two lines: 'CART CRATE' on one is 163px at 16px, wider than the screen.
-    // Dropping to 8px would keep it on one line but no longer read as a title.
-    this.add.text(GBC_WIDTH / 2, 34, 'CART\nCRATE', {
-      fontFamily: FONT,
-      fontSize: '16px',
-      color: '#e0f8cf',
-      stroke: '#0f380f',
-      strokeThickness: 2,
-      align: 'center',
-      lineSpacing: 2,
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    // Between the two-line title (ends y=51) and the sprite row (starts y=65).
-    this.add.text(GBC_WIDTH / 2, 58, 'Sokoban Puzzle', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#8bac0f',
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    // Sprite preview: the courier fox pushing a crate onto its target
+    this.canStart = false
     const mode = GameState.paletteMode
-    const keyPrefix = mode === 'gbc' ? '_w1' : ''
-    const targetPreview = this.add.sprite(GBC_WIDTH / 2 + 20, 80, `target_${mode}${keyPrefix}`).setScale(1.8 / SCALE)
-    const cratePreview = this.add.sprite(GBC_WIDTH / 2, 80, `crate_${mode}${keyPrefix}`).setScale(1.8 / SCALE)
-    this.add.sprite(GBC_WIDTH / 2 - 22, 80, `player_${mode}_right`).setScale(1.8 / SCALE)
-    this.tweens.add({
-      targets: cratePreview,
-      x: '+=4',
-      duration: 600,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    })
-    this.tweens.add({
-      targets: targetPreview,
-      alpha: { from: 0.5, to: 1 },
-      duration: 600,
-      yoyo: true,
-      repeat: -1,
-    })
+    const theme = HUD_THEME[mode]
+    this.cameras.main.setBackgroundColor(css(theme.bar))
+    const desktop = isDesktop()
+    const at = titleLayout(GBC_WIDTH, GBC_HEIGHT, TILE, desktop)
+    const still = prefersReducedMotion()
 
-    this.blinkText = this.add.text(GBC_WIDTH / 2, 100, 'PRESS START', {
+    this.add.text(at.title.x, at.title.y, TITLE, {
+      fontFamily: FONT,
+      fontSize: `${8 * TITLE_SCALE}px`,
+      color: css(theme.accent),
+      resolution: 1,
+      shadow: { offsetX: 2, offsetY: 2, color: css(theme.edge), fill: true },
+    })
+    this.add.text(at.subtitle.x, at.subtitle.y, SUBTITLE, { fontFamily: FONT, fontSize: '8px', color: css(theme.dim), resolution: 1 })
+
+    // The warehouse: a run of wall with its face to the floor, over a row of
+    // flagstones in the shade of it.
+    const across = Math.ceil(GBC_WIDTH / TILE)
+    for (let i = 0; i < across; i++) {
+      const x = i * TILE + TILE / 2
+      this.add.image(x, at.wallRow + TILE / 2, textureKey('wall', mode, 1), OPEN.s)
+      this.add.image(x, at.floorRow + TILE / 2, textureKey('floor', mode, 1), floorFrame(i, 1, true))
+    }
+    const on = (tile: number) => tile * TILE + TILE / 2
+    const y = at.floorRow + TILE / 2
+    this.add.image(on(at.target), y, textureKey('target', mode, 1))
+    const crate = this.add.image(on(at.crate), y, textureKey('crate', mode, 1))
+    const fox = this.add.image(on(at.fox), y, playerKey(mode, 'right', 'push'))
+    // The fox leans in, and the crate gives a little. Decoration, so not
+    // under reduced motion.
+    if (!still) {
+      this.tweens.add({ targets: [crate, fox], x: '+=4', duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+    }
+
+    const prompt = this.add.text(at.prompt.x, at.prompt.y, startPrompt(desktop), {
       fontFamily: FONT,
       fontSize: '8px',
-      color: '#ffcc00',
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    this.tweens.add({
-      targets: this.blinkText,
-      alpha: 0,
-      duration: 500,
-      yoyo: true,
-      repeat: -1,
+      color: css(theme.accent),
+      resolution: 1,
     })
+    if (!still) this.tweens.add({ targets: prompt, alpha: 0.25, duration: 500, yoyo: true, repeat: -1 })
 
     this.time.delayedCall(500, () => {
       this.canStart = true
@@ -82,7 +78,7 @@ export class MainMenuScene extends Phaser.Scene {
     music.play('puzzle')
 
     this.input.on('pointerdown', () => this.startGame())
-    
+
     const mKey = this.input.keyboard!.addKey('M')
     mKey.on('down', () => setMuted(!isMuted()))
   }

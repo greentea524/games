@@ -6,7 +6,7 @@ import { PAL } from './constants'
 import { CAMPAIGN_LEVELS } from './levels'
 import {
   CORNER, DMG, FLOOR, LIT_PX, OPEN, TILE_PX, WALL_FRAMES, cornerFrames, drawCorners, drawCracked, drawFloor,
-  drawHole, drawIce, drawTarget, drawTargetLit, drawWalls, floorFrame, isVoid, luma, wallFrame, worldPalette,
+  drawHole, drawIce, drawTarget, drawTargetLit, drawWalls, floorFrame, isVoid, luma, sealUnreachable, wallFrame, worldPalette,
   type Painter, type TilePalette,
 } from './tiles'
 
@@ -95,6 +95,62 @@ for (const [name, pal, dmg] of sets) {
   const glowing = ring.filter((c) => c >= 0 && Math.abs(luma(c) - mean(a)) > 60).length
   check(`${name}: a filled target shows past the crate on it`, glowing > 120, `${glowing} glow pixels outside the tile`)
 }
+
+// --- the five worlds are five places (#165)
+// Each was the warehouse tinted toward an old ground colour. Held apart by
+// floor colour, wall colour and what the floor is made of.
+const dist = (x: number, y: number) => Math.hypot(((x >> 16) & 255) - ((y >> 16) & 255), ((x >> 8) & 255) - ((y >> 8) & 255), (x & 255) - (y & 255))
+const worlds = [1, 2, 3, 4, 5].map((w) => worldPalette(w))
+let nearFloor = Infinity
+let nearWall = Infinity
+worlds.forEach((a, i) => worlds.slice(i + 1).forEach((b) => {
+  nearFloor = Math.min(nearFloor, dist(a.floorA, b.floorA))
+  nearWall = Math.min(nearWall, dist(a.rim, b.rim))
+}))
+check('no two worlds share a floor colour', nearFloor > 30, `the closest are ${nearFloor.toFixed(0)} apart`)
+check('or a wall colour', nearWall > 30, `the closest are ${nearWall.toFixed(0)} apart`)
+check('and each floor is made of something different', new Set(worlds.map((w) => w.style)).size === worlds.length)
+const squares = worlds.map((w) => flat(frame(raster(FLOOR.count * TILE_PX, TILE_PX, (p) => drawFloor(p, w)), FLOOR.b)).map((c) => (c === w.floorB ? 0 : 1)).join(''))
+check('which can be seen: no two floors have the same marks', new Set(squares).size === worlds.length)
+// The control: the old tinted worlds had one floor's marks between them.
+check('and the check can fail: one world against itself has the same', squares[0] === flat(frame(raster(FLOOR.count * TILE_PX, TILE_PX, (p) => drawFloor(p, worlds[0])), FLOOR.b)).map((c) => (c === worlds[0].floorB ? 0 : 1)).join(''))
+
+// A crate must stand out on every floor: its slats are the wood the crate is
+// made of, and the floor is never that colour.
+const slats = 0xa8682c
+for (const [w, pal] of worlds.entries()) {
+  check(`world ${w + 1}: a crate is not the floor's colour`, dist(slats, pal.floorA) > 60 && dist(slats, pal.floorB) > 60, `${dist(slats, pal.floorA).toFixed(0)} apart`)
+  check(`world ${w + 1}: ice is not floor`, Math.abs(luma(pal.ice) - luma(pal.floorA)) > 40)
+}
+
+// --- floor nobody can reach is the outside
+const levels = CAMPAIGN_LEVELS.map((l) => {
+  const grid = l.grid.map((r) => r.split(''))
+  let sx = 0
+  let sy = 0
+  grid.forEach((r, y) => r.forEach((c, x) => { if (c === 'P' || c === '+') { sx = x; sy = y } }))
+  return { id: l.id, grid, sx, sy }
+})
+const before = levels.filter((l) => l.grid.flat().length > 0)
+let sealed = 0
+let threw = ''
+for (const l of before) {
+  try {
+    sealed += sealUnreachable(l.grid, l.sx, l.sy)
+  } catch (e) {
+    threw = `${l.id}: ${(e as Error).message}`
+  }
+}
+check('every level\'s unreachable cells are plain floor, so sealing them changes no puzzle', threw === '', threw)
+check('and there were some', sealed > 100, `${sealed} cells in ${CAMPAIGN_LEVELS.length} levels`)
+const twice = levels.reduce((n, l) => n + sealUnreachable(l.grid, l.sx, l.sy), 0)
+check('after which none are left', twice === 0)
+const cratesKept = levels.every((l, i) => l.grid.flat().filter((c) => c === 'C' || c === '*').length === CAMPAIGN_LEVELS[i].grid.join('').split('').filter((c) => c === 'C' || c === '*').length)
+check('and every crate and target is where it was', cratesKept)
+// The control: a target outside the walls is a level nobody can finish.
+let caught = false
+try { sealUnreachable([['#', '#', '#', '.', 'T'], ['#', '.', '#', '.', '.'], ['#', '#', '#', '.', '.']], 1, 1) } catch { caught = true }
+check('and the check can fail: a target nobody can reach is refused', caught)
 
 // The control for the rim: Pocket Dungeon's mistake, staged.
 const pale = { ...worldPalette(1), rim: 0xd0d8e0, cap: 0xb0b8c0 }

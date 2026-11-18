@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { playerKey, type Facing } from '../sprites'
 import { BAR_HEIGHT } from '../hud'
 import { DECOR, levelView, placeDecor, surround } from '../decor'
-import { cornerFrames, floorFrame, isVoid, wallFrame } from '../tiles'
+import { cornerFrames, floorFrame, isVoid, sealUnreachable, wallFrame } from '../tiles'
 import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, PAL, sx } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
@@ -153,6 +153,8 @@ export class BoardScene extends Phaser.Scene {
         }
       }
     }
+    // Floor outside the walls that nothing can reach is the outside (#165).
+    sealUnreachable(this.floorGrid, this.playerTX, this.playerTY)
   }
 
   getTextureKey(base: string) {
