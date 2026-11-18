@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
-import { TILE_SIZE, PAL, LEGACY_WIDTH as GBC_WIDTH, LEGACY_ZOOM } from '../constants'
+import { TILE_SIZE, PAL, GBC_WIDTH, GBC_HEIGHT } from '../constants'
+import { GROUND, SCREEN_COLOURS, TITLE } from '../screens'
+import { FONT, css, heading, screenForest } from './screenForest'
 import {
   BACKDROP_PX, BIOMES, FRAME_COUNT, TILE_PX, WARM_GLOW, drawBackdrop, drawTileset, glowRows, type Biome, type Layer, type Painter,
 } from '../forest'
@@ -28,72 +30,46 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
-    // Still laid out for 160×144 (#171): see `LEGACY_ZOOM`.
-    this.cameras.main.setOrigin(0, 0).setZoom(LEGACY_ZOOM)
-    this.cameras.main.setBackgroundColor('#0f1a12')
-
     // Generate procedural textures first so preview sprites can be used
     this.generateProceduralTextures()
 
-    // Title / Header
-    this.add.text(GBC_WIDTH / 2, 24, 'RETRO PAD', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 1,
-    }).setOrigin(0.5)
+    // On the real screen (#175): the name, a lantern being lit, and the
+    // progress. It said RETRO PAD over the game's name, in pale green.
+    const W = GBC_WIDTH
+    const H = GBC_HEIGHT
+    screenForest(this, 'forest', 0.55)
+    const titleW = TITLE.length * 16
+    heading(this, { x: Math.round((W - titleW) / 2), y: 36, width: titleW, height: 16 }, TITLE)
 
-    this.add.text(GBC_WIDTH / 2, 38, 'LANTERN KEEPER', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '8px',
-      color: '#86b06a',
-      resolution: 1,
-    }).setOrigin(0.5)
+    const cx = W / 2
+    const cy = 104
+    const glow = this.add.image(cx, cy, 'warm_glow').setDisplaySize(120, 120).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
+    // The picture's own pixels, three to a screen pixel.
+    const icon = this.add.image(cx, cy, 'lanternUnlit').setScale(3)
 
-    // Animated glowing lantern preview icon
-    // The picture's own pixels, two to a screen pixel.
-    const icon = this.add.sprite(GBC_WIDTH / 2, 62, 'lanternLit').setScale(2 / LEGACY_ZOOM)
-    this.tweens.add({
-      targets: icon,
-      alpha: { from: 0.6, to: 1 },
-      scale: { from: 2.8, to: 3.2 },
-      duration: 400,
-      yoyo: true,
-      repeat: -1,
-    })
-
-    // Progress Bar Border
-    const barBox = this.add.graphics()
-    barBox.fillStyle(0x0f1a12, 1)
-    barBox.fillRect(28, 90, 104, 10)
-    barBox.lineStyle(1, 0x86b06a, 1)
-    barBox.strokeRect(28, 90, 104, 10)
-
-    // Progress Fill
+    const barW = 144
+    const barX = Math.round((W - barW) / 2)
+    const barY = H - GROUND - 34
+    const bar = this.add.graphics()
+    bar.fillStyle(SCREEN_COLOURS.panel, 1).fillRect(barX - 2, barY - 2, barW + 4, 10)
+    bar.lineStyle(1, SCREEN_COLOURS.panelEdge, 1).strokeRect(barX - 1.5, barY - 1.5, barW + 3, 9)
     const barFill = this.add.graphics()
+    const progressText = this.add
+      .text(cx, barY + 14, '', { fontFamily: FONT, fontSize: '8px', color: css(SCREEN_COLOURS.title), resolution: 1 })
+      .setOrigin(0.5, 0)
 
-    // Progress Text
-    const progressText = this.add.text(GBC_WIDTH / 2, 112, 'SYSTEM INIT... 0%', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '8px',
-      color: '#86b06a',
-      resolution: 1,
-    }).setOrigin(0.5)
-
-    // Smooth Progress Bar Animation
     this.tweens.addCounter({
       from: 0,
       to: 100,
       duration: 1000,
       onUpdate: (tween) => {
         const val = tween.getValue() ?? 0
-        const fillW = Math.floor((100 * val) / 100)
         barFill.clear()
-        if (fillW > 0) {
-          barFill.fillStyle(0xe0f8cf, 1)
-          barFill.fillRect(30, 92, fillW, 6)
-        }
-        progressText.setText(`SYSTEM INIT... ${Math.floor(val)}%`)
+        barFill.fillStyle(SCREEN_COLOURS.title, 1).fillRect(barX, barY, Math.floor((barW * val) / 100), 6)
+        progressText.setText(`LIGHTING THE WAY ${Math.floor(val)}%`)
+        // The lantern catches as the bar fills.
+        if (val >= 60 && icon.texture.key !== 'lanternLit') icon.setTexture('lanternLit')
+        glow.setAlpha(Math.max(0, (val - 60) / 40) * WARM_GLOW.alpha * 1.5)
       },
       onComplete: () => {
         this.cameras.main.fadeOut(300, 0, 0, 0)
@@ -174,6 +150,15 @@ export class BootScene extends Phaser.Scene {
           }),
         ),
       )
+    }
+    // The keeper's walk: the play scene and the forest path both use it.
+    if (!this.anims.exists('walk')) {
+      this.anims.create({
+        key: 'walk',
+        frames: [{ key: 'player_walk1' }, { key: 'player_idle' }, { key: 'player_walk2' }, { key: 'player_idle' }],
+        frameRate: 10,
+        repeat: -1,
+      })
     }
     canvas('heart_tree_graphic', HEART_TREE_PX, HEART_TREE_PX, (ctx) =>
       drawHeartTree((x, y, w, h, colour) => {

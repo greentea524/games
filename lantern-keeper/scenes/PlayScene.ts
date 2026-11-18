@@ -199,7 +199,7 @@ export class PlayScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, ground)
 
-    this.anims.create({
+    if (!this.anims.exists('walk')) this.anims.create({
       key: 'walk',
       frames: [
         { key: 'player_walk1' },

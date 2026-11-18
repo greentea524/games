@@ -37,14 +37,11 @@ export const VIEW_WIDTH = GBC_WIDTH / VIEW_ZOOM
 export const VIEW_HEIGHT = PLAY_HEIGHT / VIEW_ZOOM
 
 /**
- * The menu, the map and the boot screen are still laid out for 160×144, and
- * are shown through a camera zoomed from the top left by `LEGACY_ZOOM`, as
- * the other games' were while their art was redrawn. A later ticket lays
- * them out on the real screen.
+ * The screen this game had until #171. Every screen is laid out on the real
+ * one since #175; this is kept for the layout tests, which must fail on it.
  */
 export const LEGACY_WIDTH = 160
 export const LEGACY_HEIGHT = 144
-export const LEGACY_ZOOM = GBC_WIDTH / LEGACY_WIDTH
 
 // Fading firefly glow (KAN-113) — all tunable
 export const GLOW = {

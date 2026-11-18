@@ -14,9 +14,9 @@
     "nondeterministic": []
   },
   "lantern-keeper": {
-    "note": "Looked at beside the game at #173. Same place and the same figure: a layered forest, mossy stone with a grass cap, a hooded keeper with a pack holding a lantern out in front, iron-and-glass lanterns that glow when lit, a wooden DANGER sign. Accepted drift: the game is darker overall and its keeper smaller; the card's lanterns hang on chains and the game's float; the card's rope ladder is not in the game, which has no ladders; and the card's score, lives, stage and health line are not in the game.",
+    "note": "Looked at beside the finished game at #175: every stage, the title and the forest path. Same place and the same figure: a layered forest with vines and leaves, mossy stone with a grass cap, a hooded keeper with a pack and a lantern held out, iron-and-glass lanterns glowing warm, a wooden DANGER sign, amber text on solid bars top and bottom. Accepted drift: the game is darker and its keeper smaller; its lanterns float rather than hang on chains; it has no rope ladder and no ruined stone pillars; and its bars show lanterns lit, the stage and the oil, where the card shows score, lives and health, which the game does not count.",
     "art": "9b92ea28dcc6406278824a6074115d0c983232a537902446ade6313d366018e9",
-    "textures": "fcd8495b8c0d96cb14f38f3b14948165eb28e526fba38c61ed09cd6910b839cc",
+    "textures": "bc3860369595167c284d1ece4663c6e2d0edc487b4a9b1474a340c4eb47b8703",
     "keys": 36,
     "nondeterministic": []
   },

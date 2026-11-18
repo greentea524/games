@@ -681,17 +681,22 @@ async function lanternKeeper() {
     if (!s.scene.isActive()) return null
     const nodes = []
     for (let i = 0; i < 7; i++) nodes.push(s.nodeAt(i))
+    // Bounds read from the game: this had the old screen's 156 and 112
+    // written into it, the next thing to break when the map moved (#175).
+    const { title, label } = s.layout
+    const w = window.__game.scale.width
     return {
-      onScreen: nodes.every((n) => n.x >= 4 && n.x <= 156 && n.y >= 20 && n.y <= 112),
+      onScreen: nodes.every((n) => n.x >= 12 && n.x <= w - 12 && n.y - 20 > title.y + title.height && n.y + 12 < label.y),
       nodes: nodes.length,
-      markers: s.children.list.filter((o) => o.texture && /lantern/.test(o.texture.key)).length,
+      markers: s.children.list.filter((o) => o.texture && /^lantern/.test(o.texture.key)).length,
+      keeper: s.children.list.some((o) => o.texture && /^player_/.test(o.texture.key)),
     }
   })
   check('the world map opens between stages', map !== null)
   check('every node fits between the title and the label', map?.onScreen,
     JSON.stringify(map?.nodes))
-  check('a node is drawn per stage, plus the travelling marker',
-    map?.markers === registry.keys.length + 1, `${map?.markers} sprites`)
+  check('a lantern is drawn per stage', map?.markers === registry.keys.length, `${map?.markers} lanterns`)
+  check('and the keeper walks the path', map?.keeper === true)
 
   // The map must hand over rather than becoming a dead end.
   let handedOver = false

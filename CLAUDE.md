@@ -572,9 +572,8 @@ Three things a magnifying camera does that are easy to miss:
   the stage's name goes at the top, and later messages go wherever the
   keeper is not.
 
-The menu, map and boot screen are still laid out for 160×144 behind a camera
-zoomed from the top left. The inner green frame the ticket asked about was
-the shell's padding, already removed in #177.
+Every screen is on the real one since #175. The inner green frame the ticket
+asked about was the shell's padding, already removed in #177.
 
 **Lantern Keeper's forest is drawn by `forest.ts`, at the screen's
 resolution (#172).** The world is 8 units to a tile and the camera magnifies
@@ -641,6 +640,26 @@ at two-digit counts and the text to 7:1 against its strip.
 
 This game has one palette, so `qa:contrast` has no entry to measure the HUD
 against; `hud_test.ts`'s contrast ratios do that here.
+
+**Lantern Keeper's other screens stand in the forest, and its four kinds of
+place differ in shape (#175).** `screens.ts` lays out the boot screen, the
+title, the controls, the story and the forest path at 240×216, and
+`screenForest()` puts the backdrop and a strip of mossy stone behind each.
+The boot screen said RETRO PAD over the game's name; it lights a lantern now.
+The controls page names the pad and buttons on a phone and the keys on a
+desktop. The path's marker is the keeper walking, over the forest of the
+stage about to start. The map's touch check had the old screen's 156 and 112
+written into it; it reads the layout from the game.
+
+The four kinds of place were one forest in four colours. The canopy has
+shafts of light, the marsh mist and hanging moss, and the hollow roots where
+the others have trees. `forest_test.ts` holds every pair of backdrops apart
+by shape, and a backdrop's seam to no bigger a step than any two rows inside
+it: a root leans and a shaft slants, so exact equality was the wrong test.
+A shaft of light slopes one in four and the four are a quarter apart, so each
+reaches the next one's start at the foot of the picture.
+
+The game has one palette, so the ticket's green-screen pass does not apply.
 
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
