@@ -688,6 +688,21 @@ reaches the next one's start at the foot of the picture.
 
 The game has one palette, so the ticket's green-screen pass does not apply.
 
+**Windup is 240×216 by its camera, like Lantern Keeper (#166).** The world
+is untouched: a tile is 16 units, a level is 160 by 144 of them, and the toy
+runs at 80. `VIEW_ZOOM` is 1.5, the tile ratio and also what the screen grew
+by, so the view is the same ten tiles by nine and a tile is 24 pixels on the
+screen (`DRAWN_TILE`, what the art tickets draw to). Every camera, the menu's,
+the HUD's and the pause panel's too, is zoomed from the top left, so anything
+still laid out at 160×144 lands where it did; the later tickets lay those out
+natively. The play camera has no bounds: Phaser clamps a bounded camera's
+scroll as if its origin were the middle, and with the origin at the top left
+the clamp moved the level a quarter of the screen down and right, with every
+functional check still green. The camera never scrolls, so a bound had nothing
+to do. Phaser's `worldView` ignores the origin as well, and reports 40,36 for
+the right picture; the touch check reads where the camera's matrix puts the
+level's corners, and goes red with the bound put back.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183

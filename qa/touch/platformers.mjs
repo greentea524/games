@@ -38,6 +38,29 @@ async function windup() {
   const start = await st()
   check('A starts the game', start.active, `player at x=${start.x | 0}`)
 
+  // #166: the screen grew to 240×216 by zooming the cameras, the world left
+  // as it was. The view must still be the whole level from its top left. A
+  // bounded camera with its origin at the top left is clamped as if centred,
+  // which moved the level a quarter of the screen down and right while every
+  // other check here stayed green.
+  // Read from the matrix the camera renders with: Phaser's `worldView`
+  // ignores the camera's origin and says 40,36 for a picture that is right.
+  const view = await page.evaluate(() => {
+    const cam = window.__game.scene.getScene('platformer').cameras.main
+    const m = cam.matrix
+    // The matrix carries origin and zoom; scroll is applied per object.
+    const at = (x, y) => {
+      const [sx, sy] = [x - cam.scrollX, y - cam.scrollY]
+      return [m.getX(sx, sy), m.getY(sx, sy)].map((n) => Math.round(n))
+    }
+    return { zoom: cam.zoom, from: at(0, 0), to: at(160, 144), screen: [window.__game.scale.width, window.__game.scale.height] }
+  })
+  check(
+    'the play camera shows the 160×144 level edge to edge on 240×216',
+    view.screen.join() === '240,216' && view.from.join() === '0,0' && view.to.join() === '240,216',
+    JSON.stringify(view),
+  )
+
   await hand.down(PAD, c.arm('ArrowRight').x, c.arm('ArrowRight').y)
   await page.waitForTimeout(600)
   const moved = await st()

@@ -30,7 +30,7 @@
            is generated at runtime through canvas, not loaded as a file.
          - frame-ancestors and report-uri are deliberately absent: a meta CSP
            ignores both, and including them only logs a console warning. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-tocenARxLNCLCKQwarBZsx3C+qtxhI395CjnNaqefDg='; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-FYuAYgXpJIjUUztVLu2PaPtywRHWFojdKa4bICyOUHM='; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <title>Windup - GBC Energy Platformer</title>
@@ -49,13 +49,16 @@
     </style>
     <script>
       (function() {
-        var gbcW = 160, gbcH = 144;
+        var gbcW = 240, gbcH = 216;
         var isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
         var availH = window.innerHeight - (isDesktop ? 250 : 380);
+        // Sized in device pixels, not CSS pixels (#166), as the other games
+        // are: at 240 wide a whole CSS multiple gives a phone a 1x box.
+        var dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 4));
         var zoom = Math.max(1, Math.min(
-          Math.floor((window.innerWidth - 40) / gbcW),
-          Math.floor(availH / gbcH)
-        ));
+          Math.floor((window.innerWidth - 40) * dpr / gbcW),
+          Math.floor(availH * dpr / gbcH)
+        )) / dpr;
         var style = document.createElement('style');
         style.id = 'pre-init-game-style';
         style.innerHTML = '#game { width: ' + (gbcW * zoom) + 'px; height: ' + (gbcH * zoom) + 'px; }';
