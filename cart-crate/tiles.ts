@@ -8,7 +8,7 @@
 // Everything here is drawn through a `Painter`, one filled rectangle at a
 // time, so it has no Phaser and no canvas in it: `BootScene` hands it a canvas
 // and `tiles_test.ts` hands it an array, and both get the same pixels.
-import { PAL, WORLD_PALS, GBC_PAL } from './constants'
+import { PAL } from './constants'
 
 export const TILE_PX = 24
 /** The lit target is drawn larger than its tile, so its glow shows round a crate. */
@@ -44,7 +44,15 @@ export interface TilePalette {
   crack: Rgb
   pit: Rgb
   pitEdge: Rgb
+  /**
+   * What the floor is made of, drawn over the checker (#165): flagstones,
+   * frosted, sandstone, gravel or polished. Only the colour of the floor is a
+   * palette; this is what makes a world a different place and not a tint.
+   */
+  style?: FloorStyle
 }
+
+export type FloorStyle = 'flag' | 'frost' | 'sand' | 'gravel' | 'polish'
 
 const channels = (c: Rgb): [number, number, number] => [(c >> 16) & 255, (c >> 8) & 255, c & 255]
 const pack = (r: number, g: number, b: number): Rgb =>
@@ -91,41 +99,57 @@ const WAREHOUSE: TilePalette = {
 }
 
 /**
- * A world's tiles, in colour.
- *
- * World 1 is the card. The other four keep the wall colours they had and a
- * floor leaning toward their old ground colour, so each is still its own
- * place; #165 gives them palettes of their own.
- *
- * A wall's rim is held darker than the floor beside it. Pocket Dungeon's rim
- * was first drawn lighter than its floor and read as more floor (#156), and a
- * derived palette can land there by accident — the ice world's wall colour is
- * as light as its floor.
+ * Builds a world from the colours that make it one: a floor, a wall and how
+ * the floor is surfaced. Everything else is worked out from those the way the
+ * warehouse's was, so a wall's top, rim, face and outline keep the same
+ * relation in every world.
  */
-export function worldPalette(world: number): TilePalette {
-  if (world <= 1) return WAREHOUSE
-  const old = WORLD_PALS[world - 1] ?? GBC_PAL
-  const floorA = mix(WAREHOUSE.floorA, old.bgGrass, 0.3)
-  const floorB = shade(floorA, 0.85)
-  let rim = old.wallBg
-  while (luma(rim) > luma(floorB) - 24) rim = shade(rim, 0.92)
-  const cap = shade(rim, 0.62)
+function world(floorA: Rgb, wall: Rgb, style: FloorStyle, extra: Partial<TilePalette> = {}): TilePalette {
+  const floorB = shade(floorA, 0.86)
+  const cap = shade(wall, 0.7)
   return {
     ...WAREHOUSE,
     floorA,
     floorB,
-    seam: shade(floorB, 0.85),
+    seam: shade(floorB, 0.86),
     shadeA: shade(floorA, 0.76),
     shadeB: shade(floorB, 0.76),
     cap,
-    rim,
-    line: shade(cap, 0.42),
-    brick: shade(rim, 0.8),
-    mortar: shade(cap, 0.6),
-    pad: mix(floorA, 0xffffff, 0.3),
+    rim: wall,
+    line: shade(cap, 0.4),
+    brick: shade(wall, 0.86),
+    mortar: shade(cap, 0.58),
+    pad: mix(floorA, 0xffffff, 0.32),
     crack: shade(floorB, 0.55),
     pitEdge: shade(floorB, 0.45),
+    style,
+    ...extra,
   }
+}
+
+/**
+ * Each world's colours (#165). World 1 is the card. The others were the
+ * warehouse tinted toward their old ground colour, which made four tints of
+ * one room. Each is now a place: a frozen depot of blue stone and ice, ruins
+ * of sandstone and crumbling brick, a labyrinth of hedges on gravel, and a
+ * master's hall of polished marble and crimson walls.
+ *
+ * The targets' glow and cross are the same everywhere, so a target is the
+ * same thing in every world. `tiles_test.ts` holds the five apart, holds each
+ * wall's rim darker than its floor (#156), and holds a crate clear of every
+ * floor.
+ */
+export const WORLDS: TilePalette[] = [
+  { ...WAREHOUSE, style: 'flag' },
+  world(0x88a8c0, 0x3c5c7c, 'frost', { ice: 0xd8f2fc, iceMark: 0x6ab0d4 }),
+  world(0xbaa880, 0x4e5a3a, 'sand', { ice: 0xe8f8ff, iceMark: 0x8ac0d8 }),
+  world(0x806090, 0x285a34, 'gravel'),
+  world(0x8c8898, 0x7a2226, 'polish'),
+]
+
+/** A world's tiles, in colour. */
+export function worldPalette(world: number): TilePalette {
+  return WORLDS[Math.min(Math.max(world, 1), WORLDS.length) - 1]
 }
 
 /**
@@ -185,15 +209,51 @@ function drawFloorTile(p: Painter, ox: number, pal: TilePalette, b: boolean, sha
   }
   p(ox, T - 1, T, 1, pal.seam)
   p(ox + T - 1, 0, 1, T, pal.seam)
-  // Wear: two flecks a shade off, in different places on the two squares.
-  const fleck = shade(base, b ? 1.1 : 0.92)
-  p(ox + (b ? 15 : 5), b ? 6 : 8, 2, 1, fleck)
-  p(ox + (b ? 6 : 16), b ? 16 : 17, 1, 1, fleck)
+  surface(p, ox, base, b, pal.style ?? 'flag')
   if (shaded) {
     p(ox, 0, T - 1, SHADOW - 2, b ? pal.shadeB : pal.shadeA)
     // The shadow's edge is broken up, so it reads as shade and not a stripe.
     const soft = mix(base, b ? pal.shadeB : pal.shadeA, 0.5)
     p(ox, SHADOW - 2, T - 1, 2, soft)
+  }
+}
+
+/**
+ * What a floor square is made of, over its colour. Each is a handful of
+ * pixels a shade either side of the floor, so a crate and a target stay the
+ * loudest things on it.
+ */
+function surface(p: Painter, ox: number, base: Rgb, b: boolean, style: FloorStyle) {
+  const lo = shade(base, 0.88)
+  const hi = shade(base, 1.12)
+  switch (style) {
+    case 'flag':
+      // Wear: two flecks a shade off, in different places on the two squares.
+      p(ox + (b ? 15 : 5), b ? 6 : 8, 2, 1, b ? hi : lo)
+      p(ox + (b ? 6 : 16), b ? 16 : 17, 1, 1, b ? hi : lo)
+      return
+    case 'frost':
+      // Rime: a scatter of pale points, and a frost line across one corner.
+      for (const [x, y] of b ? [[4, 5], [17, 9], [9, 18], [19, 19]] : [[6, 14], [15, 4], [20, 15]]) p(ox + x, y, 1, 1, mix(base, 0xffffff, 0.45))
+      p(ox + (b ? 2 : 14), b ? 11 : 20, 5, 1, mix(base, 0xffffff, 0.25))
+      return
+    case 'sand':
+      // Sandstone: courses of grain, and a worn chip out of one edge.
+      p(ox + 2, b ? 7 : 5, 9, 1, lo)
+      p(ox + 12, b ? 15 : 17, 8, 1, lo)
+      p(ox + 4, b ? 18 : 12, 5, 1, hi)
+      p(ox + (b ? 18 : 3), 0, 3, 2, lo)
+      return
+    case 'gravel':
+      // Gravel: stones of three sizes, light and dark.
+      for (const [x, y, w] of [[3, 4, 2], [12, 3, 1], [18, 8, 2], [7, 11, 1], [14, 14, 2], [4, 18, 2], [19, 18, 1], [10, 20, 1]]) {
+        p(ox + (b ? 22 - x - w : x), y, w, 1, (x + y) % 3 ? lo : hi)
+      }
+      return
+    case 'polish':
+      // Polished stone: a sheen across each square, top left to bottom right.
+      for (let i = 0; i < 6; i++) p(ox + 3 + i * 2, 3 + i * 2, 3, 1, mix(base, 0xffffff, b ? 0.12 : 0.18))
+      return
   }
 }
 
@@ -431,6 +491,40 @@ export function drawHole(p: Painter, pal: TilePalette, dmg = false): void {
 }
 
 // --- framing -----------------------------------------------------------------
+
+/**
+ * Floor that nothing can ever stand on, made wall (#165).
+ *
+ * 37 of the 50 levels mark cells outside their walls as floor: the files
+ * were written that way, and the board drew them as floor, so a room sat
+ * among pieces of floor nobody could reach. They are found by walking from
+ * where the player starts through everything that is not wall, and are all
+ * plain floor, so making them wall changes nothing about the puzzle; it
+ * makes them the outside, which is drawn as the warehouse round the room.
+ *
+ * Returns how many cells were sealed.
+ */
+export function sealUnreachable(grid: string[][], startX: number, startY: number): number {
+  const h = grid.length
+  const seen = grid.map((row) => row.map(() => false))
+  const stack: [number, number][] = [[startX, startY]]
+  while (stack.length) {
+    const [x, y] = stack.pop()!
+    if (y < 0 || y >= h || x < 0 || x >= grid[y].length || seen[y][x] || grid[y][x] === '#') continue
+    seen[y][x] = true
+    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1])
+  }
+  let sealed = 0
+  grid.forEach((row, y) =>
+    row.forEach((c, x) => {
+      if (c === '#' || seen[y][x]) return
+      if (c !== '.') throw new Error(`an unreachable "${c}" at ${x}, ${y}: this level cannot be solved`)
+      row[x] = '#'
+      sealed++
+    }),
+  )
+  return sealed
+}
 
 /**
  * The part of a level that is drawn: the box round every cell that is not

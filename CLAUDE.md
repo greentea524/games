@@ -367,10 +367,9 @@ cleanly; it is 8 with a shadow now.
 **Cart & Crate is 240×216 with 24-pixel tiles, part-way through the same
 rework (#160 to #165).** #160 changed the canvas and left the art alone, as
 #155 did for Pocket Dungeon. The art has since been redrawn at 24 (#161,
-#162) and `BootScene.enlarge` is gone. One thing is still temporary: the
-menu and level select are laid out for 160×144 and shown through
-`legacyCamera`, until #165. The screen is still ten tiles by nine, so the
-six levels larger than that scroll exactly as they did. A check that taps an
+#162) and `BootScene.enlarge` is gone, and since #165 every screen is laid
+out at 240×216 and `legacyCamera` is gone too. The screen is still ten tiles
+by nine, so the six levels larger than that scroll exactly as they did. A check that taps an
 object in a scene behind that camera must multiply by the camera's zoom:
 `tapObject` in `qa/touch/sound.mjs` takes it from the game. And a key sent
 with no hold falls between frames on the menu, which polls `JustDown`; hold
@@ -426,6 +425,34 @@ Writing it found that the hint had no phone control at all: it was the H key
 and nothing else. It is the pause panel's seventh row now, and
 `BoardScene.toggleHint` is the one path both use. The pause and help panels
 are in the same scene and take the same colours, on both palettes.
+
+**Cart & Crate's five worlds are five places, and floor nobody can reach is
+the outside (#165).** The worlds after the first were the warehouse tinted
+toward their old ground colour. `WORLDS` in `tiles.ts` gives each a floor, a
+wall and what the floor is made of: the warehouse's flagstones, an ice
+depot's frosted blue stone, ruins of pale sandstone and mossy walls, a
+labyrinth of hedges on purple gravel, and a master's hall of marble and
+crimson. The rest of each palette is worked out from those. `tiles_test.ts`
+holds the five apart by floor colour, wall colour and floor marks, and a
+crate's wood clear of every floor. Two of the first choices failed the
+existing rule that a wall's rim is darker than its floor; the hedge and the
+master's floor were changed, not the rule.
+
+37 of the 50 levels mark cells outside their walls as floor, and the board
+drew them as floor, so a room sat among patches nobody could stand on.
+`sealUnreachable` walks from the player's start and makes the rest wall, so
+they are drawn as the warehouse round the room. Every such cell is plain
+floor, and it throws on anything else, so it changes no puzzle;
+`tiles_test.ts` runs it on all 50, with a level whose target is outside the
+walls as the control. A pale world's surround, dimmed, was bright enough
+that its lifted wood matched a crate's: `decorPalette` holds the outside's
+floor at the warehouse's brightness at most.
+
+The title and level select are at 240×216 in the HUD's colours, from
+`screens.ts`, where they had a navy that is none of the green screen's four
+tones. The level select has a page per world, where pages of twelve cut
+across them. The palette switch only reloaded the board, so the menus kept
+the old palette until the next screen; they restart now.
 
 **Static is 240×216 with 24-pixel tiles, at the start of the same rework
 (#177 to #181).** #177 changed the canvas and left the art alone. Three things

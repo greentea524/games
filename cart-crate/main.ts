@@ -148,8 +148,13 @@ if (paletteBtn) {
     GameState.setPaletteMode(nextMode)
     updatePaletteBtn()
 
+    // Whichever screen is up redraws in the new palette. Only the board did,
+    // so the title and level select stayed in the old one (#165).
+    for (const key of ['mainmenu', 'levelselect']) {
+      if (game.scene.isActive(key)) game.scene.getScene(key).scene.restart()
+    }
     const boardScene = game.scene.getScene('board') as BoardScene
-    if (boardScene) {
+    if (boardScene && game.scene.isActive('board')) {
       boardScene.reloadPalette()
     }
   })
