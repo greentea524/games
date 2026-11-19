@@ -1,10 +1,11 @@
 import Phaser from 'phaser'
-import { WORLD_WIDTH, WORLD_HEIGHT, VIEW_ZOOM, PAL, FONT, CSS_MID } from '../constants'
+import { TILE, WORLD_WIDTH, WORLD_HEIGHT, VIEW_ZOOM, PAL } from '../constants'
 import { GameState } from '../state'
 import { LEVELS } from '../levels'
 import { sfx, music } from '../audio'
 import { showRunSummary, formatRunTime } from '../../shared/runSummary'
 import { prefersReducedMotion } from '../../shared/motion'
+import { BLEED, MID, LAVA_FRAMES, PALETTES, UP, RIGHT, DOWN, LEFT, stoneFrame } from '../factory'
 
 type Facing = 'left' | 'right'
 
@@ -24,10 +25,18 @@ type Facing = 'left' | 'right'
 const BACKDROP = {
   /** How far the far layer slides across the full width of the room. */
   farShiftPx: 3,
+  /** The middle layer, the gears, pipes and banner, between the two (#167). */
+  midShiftPx: 5,
   /** The near layer moves further, which is what sells the depth. */
   nearShiftPx: 7,
-  /** Seconds for a full turn of the large gear. The small one runs faster. */
-  gearPeriodMs: 9000,
+  /**
+   * ms between two frames of the gears. The big one turns `GEAR_STEP`
+   * degrees a frame, a full turn in 9 s as before; the small one, with half
+   * the teeth, turns twice as far the other way.
+   */
+  gearFrameMs: 125,
+  /** ms between two frames of the lava's surface. */
+  lavaFrameMs: 220,
 } as const
 
 // Hazards (#54).
@@ -117,10 +126,14 @@ export class PlatformerScene extends Phaser.Scene {
   private coyoteTimer = 0
   private wallJumpTimer = 0
   private isTransitioning = false
-  /** Backdrop layers (#52); the far one slides less than the near one. */
+  /** Backdrop layers (#52, #167); the far one slides least, the near one most. */
   private backdropFar!: Phaser.GameObjects.Container
+  private backdropMid!: Phaser.GameObjects.Container
   private backdropNear!: Phaser.GameObjects.Container
-  private gears: { sprite: Phaser.GameObjects.Image; periodMs: number; dir: number }[] = []
+  /** The two gears, and how many frames each steps per tick. */
+  private gears: { sprite: Phaser.GameObjects.Image; step: number }[] = []
+  /** Frames the gears have turned through; held still under reduced motion. */
+  gearTick = 0
   /** Hazards (#54). */
   private spikes!: Phaser.Physics.Arcade.StaticGroup
   private lava!: Phaser.Physics.Arcade.StaticGroup
@@ -145,7 +158,7 @@ export class PlatformerScene extends Phaser.Scene {
   }
 
   create() {
-    this.cameras.main.setBackgroundColor('#0b0f0c')
+    this.cameras.main.setBackgroundColor(PALETTES[GameState.paletteMode].void)
     // The world is drawn at `VIEW_ZOOM`, from the top left, and nothing
     // under the camera changes (#166). A level fills the view exactly, so the
     // camera never scrolls: a thing fixed to it, as the backdrop's layers
@@ -213,8 +226,25 @@ export class PlatformerScene extends Phaser.Scene {
     GameState.speedrunResume()
     GameState.saveGame()
 
-    level.platforms.forEach(p => this.platforms.create(p.x, p.y, `tiles_${mode}`, 1))
-    level.springs.forEach(p => this.springs.create(p.x, p.y, `tiles_${mode}`, 2))
+    // Every body is made from its old 16-unit frame of `tiles_<mode>`, exactly
+    // as before, and then the sprite is given its picture from `factory.ts`,
+    // drawn at 24 and shown at two thirds (#167). A static body does not
+    // follow its sprite unless asked to, so no hitbox moves.
+    const art = (o: Phaser.GameObjects.Sprite, key: string, frame?: number) =>
+      o.setTexture(`${key}_${mode}`, frame).setScale(1 / VIEW_ZOOM)
+
+    // A block's picture follows from which of its neighbours are stone.
+    const cell = (x: number, y: number) => `${Math.floor(x / TILE)},${Math.floor(y / TILE)}`
+    const stone = new Set(level.platforms.map((p) => cell(p.x, p.y)))
+    const solid = (cx: number, cy: number) => stone.has(`${cx},${cy}`)
+    level.platforms.forEach(p => {
+      const cx = Math.floor(p.x / TILE)
+      const cy = Math.floor(p.y / TILE)
+      const mask = (solid(cx, cy - 1) ? UP : 0) | (solid(cx + 1, cy) ? RIGHT : 0) |
+        (solid(cx, cy + 1) ? DOWN : 0) | (solid(cx - 1, cy) ? LEFT : 0)
+      art(this.platforms.create(p.x, p.y, `tiles_${mode}`, 1), 'stone', stoneFrame(mask, cx, cy))
+    })
+    level.springs.forEach(p => art(this.springs.create(p.x, p.y, `tiles_${mode}`, 2), 'spring'))
     level.pickups.forEach(p => this.pickups.create(p.x, p.y, `energy_${mode}`))
     
     level.stations.forEach(p => {
@@ -224,6 +254,10 @@ export class PlatformerScene extends Phaser.Scene {
 
     level.movingPlatforms.forEach(p => {
       const mp = this.movingPlatforms.create(p.x, p.y, `tiles_${mode}`, 3) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+      // A moving body does follow its sprite's scale, so it is given the
+      // whole new frame, which at two thirds is the old tile again.
+      art(mp, 'mover')
+      mp.body.setSize(TILE * VIEW_ZOOM, TILE * VIEW_ZOOM)
       this.tweens.add({
         targets: mp,
         x: p.x + p.dx,
@@ -238,8 +272,10 @@ export class PlatformerScene extends Phaser.Scene {
     // Conveyors (#55). Solid like a platform — the belt is something you
     // stand on — with the direction carried on the sprite.
     level.conveyors.forEach(p => {
-      const frame = p.dir > 0 ? 6 : 8
-      const belt = this.conveyors.create(p.x, p.y, `tiles_${mode}`, frame) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      // Frames 0-1 of `belt_<mode>` run right and 2-3 run left (#167).
+      const frame = p.dir > 0 ? 0 : 2
+      const belt = this.conveyors.create(p.x, p.y, `tiles_${mode}`, 6) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      art(belt, 'belt', frame)
       belt.setData('dir', p.dir)
       belt.setData('baseFrame', frame)
     })
@@ -270,18 +306,35 @@ export class PlatformerScene extends Phaser.Scene {
       const sp = this.spikes.create(p.x, p.y, `tiles_${mode}`, 4) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
       sp.body.setSize(14, 10).setOffset(1, 6)
       sp.body.updateFromGameObject()
+      art(sp, 'spike')
     })
     level.lava.forEach(p => {
       const lv = this.lava.create(p.x, p.y, `tiles_${mode}`, 5) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
       lv.body.setSize(16, 12).setOffset(0, 4)
       lv.body.updateFromGameObject()
+      art(lv, 'lava', 0)
     })
+    // The surface rolls. Decoration: the pool is a hazard whether or not it
+    // moves, so it holds still under reduced motion.
+    if (level.lava.length > 0 && !prefersReducedMotion()) {
+      let f = 0
+      this.time.addEvent({
+        delay: BACKDROP.lavaFrameMs,
+        loop: true,
+        callback: () => {
+          f = (f + 1) % LAVA_FRAMES
+          this.lava.getChildren().forEach((l) => (l as Phaser.GameObjects.Sprite).setFrame(f))
+        },
+      })
+    }
     // Emitters pair off in reading order; the bolt runs between each pair.
     this.arcs = []
     for (let i = 0; i + 1 < level.arcs.length; i += 2) {
       this.arcs.push({ a: level.arcs[i], b: level.arcs[i + 1] })
     }
     this.arcGfx = this.add.graphics().setDepth(5)
+    // Each end of a bolt has an emitter to come from (#167).
+    level.arcs.forEach((p) => this.add.image(p.x, p.y, `pylon_${mode}`).setScale(1 / VIEW_ZOOM).setDepth(4))
     this.invulnUntil = 0
 
     this.goals.create(level.goal.x, level.goal.y, `goal_${mode}`)
@@ -389,46 +442,46 @@ export class PlatformerScene extends Phaser.Scene {
     })
   }
 
+  /**
+   * Starts level `n` from its spawn. For the QA scripts, which need to stand
+   * in a level with spikes, lava or belts without playing up to it (#167).
+   */
+  goToLevel(n: number) {
+    if (!LEVELS[n]) return
+    GameState.levelIndex = n
+    GameState.checkpointX = LEVELS[n].spawn.x
+    GameState.checkpointY = LEVELS[n].spawn.y
+    GameState.refillEnergy()
+    this.scene.restart()
+  }
+
   reloadPalette() {
     const mode = GameState.paletteMode
+    this.cameras.main.setBackgroundColor(PALETTES[mode].void)
     this.player.setTexture(`windup_${mode}_${this.facing}`)
 
-    this.stations.getChildren().forEach((s: any) => {
-      s.setTexture(s.getData('used') ? `station_empty_${mode}` : `station_${mode}`)
-    })
-
-    const swapGroup = (group: Phaser.Physics.Arcade.Group | Phaser.Physics.Arcade.StaticGroup, key: string) => {
-      group.getChildren().forEach((c: any) => {
-        const frameName = c.frame.name === '__BASE' ? 0 : c.frame.name
-        c.setTexture(key, frameName)
-      })
+    // Everything on the display list, by rewriting the palette in its key and
+    // keeping its frame. This was a list of groups until #167, and the list
+    // had missed the spikes, the lava and the belts since #54 and #55; the
+    // backdrop was missed the same way until #134. A list is what happens
+    // when a new kind arrives: every entry is one somebody had to remember.
+    const repalette = (o: Phaser.GameObjects.GameObject) => {
+      const s = o as Phaser.GameObjects.Sprite
+      const key = s.texture?.key
+      if (typeof key !== 'string' || typeof s.setTexture !== 'function') return
+      const next = key.replace(/_(dmg|gbc)(?=_|$)/, `_${mode}`)
+      if (next === key) return
+      const frame = s.frame?.name
+      s.setTexture(next, frame === undefined || frame === '__BASE' ? undefined : frame)
     }
-
-    swapGroup(this.platforms, `tiles_${mode}`)
-    swapGroup(this.springs, `tiles_${mode}`)
-    swapGroup(this.movingPlatforms, `tiles_${mode}`)
-    
-    this.pickups.getChildren().forEach((p: any) => p.setTexture(`energy_${mode}`))
-    this.goals.getChildren().forEach((g: any) => g.setTexture(`goal_${mode}`))
-
-    // The backdrop and the steam puffs, which the list above missed until
-    // #134's reachability check caught it: 25 `*_gbc` objects stayed on screen
-    // in DMG mode — more than the 14 that had switched — so the five `bg_*_dmg`
-    // sprites this game's contrast rule exists for, #52's own defect, guarded
-    // art the player could not see in that mode.
-    //
-    // Swapped by rewriting the suffix rather than by naming each sprite. The
-    // backdrop is five kinds today and the list above is what happens when a
-    // sixth arrives: every entry there is a kind somebody had to remember.
-    const repalette = (o: { texture?: { key?: string }; setTexture?: (k: string) => unknown }) => {
-      const key = o.texture?.key
-      if (typeof key !== 'string' || !o.setTexture) return
-      const base = key.replace(/_(dmg|gbc)$/, '')
-      if (base !== key) o.setTexture(`${base}_${mode}`)
+    const walk = (list: Phaser.GameObjects.GameObject[]) => {
+      for (const o of list) {
+        repalette(o)
+        const inner = (o as Phaser.GameObjects.Container).list
+        if (Array.isArray(inner)) walk(inner as Phaser.GameObjects.GameObject[])
+      }
     }
-    for (const container of [this.backdropFar, this.backdropNear]) {
-      container?.list.forEach((child) => repalette(child as never))
-    }
+    walk(this.children.list)
   }
 
   update(time: number, delta: number) {
@@ -437,7 +490,7 @@ export class PlatformerScene extends Phaser.Scene {
       return
     }
 
-    this.updateBackdrop(time)
+    this.updateBackdrop()
     this.updateArcs(time)
 
     const mode = GameState.paletteMode
@@ -526,53 +579,46 @@ export class PlatformerScene extends Phaser.Scene {
   }
 
   /**
-   * Builds the factory behind the platforms (#52).
+   * Builds the factory behind the platforms (#52, #167).
    *
-   * Laid out by hand rather than scattered randomly: at 160x144 there is only
-   * room for a handful of pieces, and where they sit decides whether the room
-   * reads as a place or as noise. Everything is deliberately kept away from
-   * the lower middle, which is where the levels put their platforms.
+   * Three layers, each one picture from `factory.ts` the size of the screen
+   * and a bleed: the far wall of sheds and chimneys, the middle distance of
+   * pipes, the banner, the lamp and the two gears, and the near steelwork
+   * with the pipes the steam comes from. They slide against the toy by
+   * different amounts, which is the depth on a camera that never scrolls.
    */
   private renderBackdrop() {
     const mode = GameState.paletteMode
-    this.gears = []
-
-    this.backdropFar = this.add.container(0, 0).setDepth(-20)
-    this.backdropNear = this.add.container(0, 0).setDepth(-10)
-
-    // Far: the big machinery and the painted wall sign.
-    const bigGear = this.add.image(30, 34, `bg_gear_lg_${mode}`)
-    const smallGear = this.add.image(56, 22, `bg_gear_sm_${mode}`)
-    this.gears.push({ sprite: bigGear, periodMs: BACKDROP.gearPeriodMs, dir: 1 })
-    // Counter-rotating, because two gears turning the same way reads as two
-    // wheels rather than as a mechanism.
-    this.gears.push({ sprite: smallGear, periodMs: BACKDROP.gearPeriodMs * 0.62, dir: -1 })
-
-    const sign = this.add
-      .text(110, 46, 'WINDUP', {
-        fontFamily: FONT,
-        fontSize: '8px',
-        color: mode === 'dmg' ? CSS_MID : '#2e3a52',
-        resolution: 1,
-      })
-      .setOrigin(0.5)
-    // Faded and slightly askew, like paint on brick rather than a UI label.
-    sign.setAlpha(0.75).setRotation(-0.04)
-
-    this.backdropFar.add([bigGear, smallGear, sign])
-
-    // Near: pipework and structure, at the edges so the middle stays clear.
-    const near: Phaser.GameObjects.GameObject[] = []
-    for (let y = 0; y < WORLD_HEIGHT; y += 16) {
-      near.push(this.add.image(9, y + 8, `bg_pipe_${mode}`))
-      near.push(this.add.image(WORLD_WIDTH - 9, y + 8, `bg_pipe_${mode}`))
+    const layer = (key: string, depth: number) => {
+      const c = this.add.container(0, 0).setDepth(depth)
+      c.add(this.add.image(-BLEED / VIEW_ZOOM, -BLEED / VIEW_ZOOM, `${key}_${mode}`).setOrigin(0).setScale(1 / VIEW_ZOOM))
+      return c
     }
-    // y is kept below the HUD: the PWR bar and the run clock own the top ~24px,
-    // and the first layout put the girders and the lamp straight behind them.
-    near.push(this.add.image(26, 40, `bg_girder_${mode}`))
-    near.push(this.add.image(WORLD_WIDTH - 26, 64, `bg_girder_${mode}`))
-    near.push(this.add.image(80, 30, `bg_lamp_${mode}`))
-    this.backdropNear.add(near)
+    this.backdropFar = layer('bgfar', -30)
+    this.backdropMid = layer('bgmid', -20)
+    this.backdropNear = layer('bgnear', -10)
+
+    const big = this.add.image(MID.bigGear.x / VIEW_ZOOM, MID.bigGear.y / VIEW_ZOOM, `gearbig_${mode}`, 0).setScale(1 / VIEW_ZOOM)
+    const small = this.add.image(MID.smallGear.x / VIEW_ZOOM, MID.smallGear.y / VIEW_ZOOM, `gearsmall_${mode}`, 0).setScale(1 / VIEW_ZOOM)
+    this.backdropMid.add([big, small])
+    // The small gear has half the teeth, so it turns twice as far a tick.
+    this.gears = [{ sprite: big, step: 1 }, { sprite: small, step: 2 }]
+    this.gearTick = 0
+    // Decoration, so it stops under reduced motion (#167; the gears turned
+    // regardless before, and only the steam was measured).
+    if (!prefersReducedMotion()) {
+      this.time.addEvent({
+        delay: BACKDROP.gearFrameMs,
+        loop: true,
+        callback: () => {
+          this.gearTick++
+          for (const g of this.gears) {
+            const frames = g.sprite.texture.frameTotal - 1
+            g.sprite.setFrame((this.gearTick * g.step) % frames)
+          }
+        },
+      })
+    }
 
     this.renderVents(mode)
   }
@@ -617,16 +663,14 @@ export class PlatformerScene extends Phaser.Scene {
     }
   }
 
-  /** Slides the backdrop against the player, and turns the gears. */
-  private updateBackdrop(time: number) {
-    for (const gear of this.gears) {
-      gear.sprite.setRotation(((time % gear.periodMs) / gear.periodMs) * Math.PI * 2 * gear.dir)
-    }
+  /** Slides the backdrop against the player. */
+  private updateBackdrop() {
     if (!this.player) return
     // -0.5 at the left wall, +0.5 at the right.
     const across = this.player.x / WORLD_WIDTH - 0.5
     const rise = this.player.y / WORLD_HEIGHT - 0.5
     this.backdropFar.setPosition(-across * BACKDROP.farShiftPx, -rise * BACKDROP.farShiftPx)
+    this.backdropMid.setPosition(-across * BACKDROP.midShiftPx, -rise * BACKDROP.midShiftPx)
     this.backdropNear.setPosition(-across * BACKDROP.nearShiftPx, -rise * BACKDROP.nearShiftPx)
   }
 
@@ -679,18 +723,32 @@ export class PlatformerScene extends Phaser.Scene {
 
     const mode = GameState.paletteMode
     const colour = mode === 'dmg' ? PAL.lightest : 0x8fd8ff
-    this.arcGfx.lineStyle(live ? 2 : 1, colour, live ? 1 : 0.4)
+    // A jagged bolt in a glow (#167), so it reads as electricity and not a
+    // rod. The kinks move with the clock; the telegraph is faint and still.
+    const kinks = 6
+    const jitter = live ? 3 : 1
     for (const arc of this.arcs) {
-      this.arcGfx.beginPath()
-      this.arcGfx.moveTo(arc.a.x, arc.a.y)
-      // A couple of kinks, so it reads as electricity rather than a rod.
-      const midX = (arc.a.x + arc.b.x) / 2
-      const midY = (arc.a.y + arc.b.y) / 2
-      const jitter = live ? 3 : 1
-      this.arcGfx.lineTo(midX - 4, midY + Math.sin(time / 40) * jitter)
-      this.arcGfx.lineTo(midX + 4, midY - Math.sin(time / 40) * jitter)
-      this.arcGfx.lineTo(arc.b.x, arc.b.y)
-      this.arcGfx.strokePath()
+      const dx = arc.b.x - arc.a.x
+      const dy = arc.b.y - arc.a.y
+      const len = Math.hypot(dx, dy) || 1
+      // Across the bolt, at right angles to it.
+      const nx = -dy / len
+      const ny = dx / len
+      const points = Array.from({ length: kinks + 1 }, (_, i) => {
+        const t = i / kinks
+        const off = i === 0 || i === kinks ? 0 : Math.sin(time / 40 + i * 2.3) * jitter * (i % 2 ? 1 : -1)
+        return { x: arc.a.x + dx * t + nx * off, y: arc.a.y + dy * t + ny * off }
+      })
+      const stroke = (width: number, c: number, alpha: number) => {
+        this.arcGfx.lineStyle(width, c, alpha)
+        this.arcGfx.beginPath()
+        this.arcGfx.moveTo(points[0].x, points[0].y)
+        for (const p of points.slice(1)) this.arcGfx.lineTo(p.x, p.y)
+        this.arcGfx.strokePath()
+      }
+      if (live && mode === 'gbc') stroke(4, 0x3a78d8, 0.45)
+      stroke(live ? 2 : 1, colour, live ? 1 : 0.4)
+      if (live && mode === 'gbc') stroke(1, 0xffffff, 1)
     }
 
     if (!live) return

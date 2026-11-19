@@ -168,6 +168,14 @@ for (const entry of GAMES) {
       )
       continue
     }
+    // A surface that changes with the palette is read with the game in DMG,
+    // as the overlay above is: Windup's camera took each palette's own dark
+    // in #167, and the sprites scored against it are the green screen's.
+    const flip = surface.inDmg && entry.paletteToggle ? await page.$(entry.paletteToggle) : null
+    if (flip) {
+      await flip.click()
+      await page.waitForTimeout(300)
+    }
     tones[name] = await page.evaluate(
       ({ surface }) => {
         if (surface.cameraBackground) {
@@ -179,6 +187,10 @@ for (const entry of GAMES) {
       },
       { surface },
     )
+    if (flip) {
+      await flip.click()
+      await page.waitForTimeout(300)
+    }
   }
   for (const [name, tone] of Object.entries(tones)) {
     console.log(`  surface ${name}: rgb(${tone.join(',')})`)

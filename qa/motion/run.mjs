@@ -176,6 +176,32 @@ const GAMES = [
     },
   },
   {
+    // #167. The gears turned under reduced motion for the life of #52's
+    // backdrop: only the steam was measured, and the gears were a rotation in
+    // `update()` that nothing read. They step through drawn frames now.
+    game: 'windup',
+    what: 'the backdrop gears turn',
+    advance: 2,
+    async measure({ page }) {
+      return page.evaluate(async () => {
+        const scene = window.__game.scene.getScene('platformer')
+        if (!scene?.scene?.isActive()) return { value: 0, note: 'the platformer is not running', busy: 0 }
+        const frames = () => scene.children.list
+          .flatMap((o) => o.list ?? [])
+          .filter((o) => /^gear(big|small)_/.test(o.texture?.key ?? ''))
+          .map((o) => String(o.frame.name))
+        const before = frames()
+        const changed = new Set()
+        const t0 = performance.now()
+        while (performance.now() - t0 < 1500) {
+          await new Promise((r) => setTimeout(r, 50))
+          frames().forEach((f, i) => { if (f !== before[i]) changed.add(i) })
+        }
+        return { value: changed.size, note: `${changed.size} of ${before.length} gear(s) turned`, busy: before.length }
+      })
+    },
+  },
+  {
     game: 'lantern-keeper',
     what: 'the fireflies drift',
     advance: 3,

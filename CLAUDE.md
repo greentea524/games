@@ -703,6 +703,32 @@ to do. Phaser's `worldView` ignores the origin as well, and reports 40,36 for
 the right picture; the touch check reads where the camera's matrix puts the
 level's corners, and goes red with the bound put back.
 
+**Windup's factory is drawn by `factory.ts`, over bodies that did not move
+(#167).** Mossy stone with a grass cap that runs across a ledge's joints,
+steel spikes, a rolling lava pool, belts with an arrow that points the way they
+carry, springs, striped moving plates, an insulator at each end of an arc, and
+three backdrop layers with two gears. All of it is drawn at 24 pixels a tile
+and shown at two thirds. Every sprite is still created from its 16-unit frame
+of `tiles_<mode>` and only then given its picture: a static body ignores its
+sprite's scale, so no hitbox changed; a moving platform's body follows its
+sprite's scale and is given the new frame's size instead.
+
+- **The rules are colours.** `factory_test.ts` holds the backdrop below a
+  stone face's brightness, gives every hazard a colour brighter than anything
+  that is not one, and on the green screen keeps the backdrop to the two dark
+  tones. Each rule has a control that must fail.
+- **The gears step through drawn frames.** Rotating a sprite smears pixel art
+  at this size. A loop is as long as the gear's symmetry, which is set by its
+  holes as well as its teeth. Looping on the tooth pitch alone jumps the holes.
+  The gears turned under reduced motion from #52 until now. Only the steam was
+  measured, and `qa:motion` has a gear pair now.
+- **The palette swap walks the display list.** It was a list of groups, and
+  the spikes, lava and belts had been missing from it since they were added.
+- **The DMG sky is still not one of the four tones.** It is the near-black it
+  always was. On `darkest`, every sprite's dark edge vanished, and
+  `qa:contrast` failed eleven of fourteen. That check reads the sky in DMG now
+  (`inDmg`), because each palette has its own camera colour.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183

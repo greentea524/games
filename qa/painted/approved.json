@@ -7,10 +7,10 @@
     "nondeterministic": []
   },
   "windup": {
-    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
+    "note": "Looked at beside the game at #167, level 1 and the levels with spikes, lava, belts, springs, a moving plate and an arc, in both palettes. Same place: mossy stone blocks with a grass cap, a green factory behind of big gears, pipes with flanges, lattice towers, a hanging lamp and a WINDUP banner, steel spikes, a glowing lava pool, electricity between two emitters, and belts with bright arrows. Accepted drift: the game's backdrop is darker and less saturated than the card's, so it stays behind the stone; its spikes, pool and arc are separate hazards in separate levels rather than one pit; and the robot, pickups, station, goal and HUD are still the old art, which #168 to #170 redraw.",
     "art": "f792231667471f974d05b6656d67d6a1b413573f8e36280d9f7543943659b941",
-    "textures": "f15797ad49818730bb862cd5cc1a09f09eec0eb6062e70a5a01ae7d1aa7ce0d2",
-    "keys": 28,
+    "textures": "f5e25751fb9fe5e3bc997e0852114b91d7268719cababfc09aca4cb4c3f95a80",
+    "keys": 42,
     "nondeterministic": []
   },
   "lantern-keeper": {

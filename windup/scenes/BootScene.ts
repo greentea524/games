@@ -2,6 +2,10 @@ import Phaser from 'phaser'
 import { TILE, PAL, GBC_PAL } from '../constants'
 
 import { GameState } from '../state'
+import {
+  PALETTES, stoneSheet, spikes, lava, LAVA_FRAMES, belt, BELT_FRAMES, spring, mover, pylon,
+  farLayer, midLayer, nearLayer, gear, gearFrames, BIG_GEAR, SMALL_GEAR, GEAR_STEP, type Picture,
+} from '../factory'
 
 type Facing = 'left' | 'right'
 
@@ -19,7 +23,7 @@ export class BootScene extends Phaser.Scene {
       this.buildStation(mode)
       this.buildEnergy(mode)
       this.buildGoal(mode)
-      this.buildBackdrop(mode)
+      this.buildFactory(mode)
       this.buildPuff(mode)
     })
     this.scene.start('mainmenu')
@@ -298,75 +302,57 @@ export class BootScene extends Phaser.Scene {
   }
 
   /**
-   * The factory behind the platforms (#52).
+   * The factory (#167): stone, hazards, machines and the hall behind, drawn
+   * by `factory.ts` at 24 pixels to a tile and shown at two thirds.
    *
-   * Windup was the only one of the five games with nothing at all behind its
-   * tilemap — just `setBackgroundColor('#0b0f0c')`.
-   *
-   * Everything here is drawn in the two darkest tones available, and never in
-   * the tones the tileset uses for solid ground. On a 160x144 screen a
-   * backdrop that competes with the platforms is worse than no backdrop: the
-   * player has to be able to tell in one glance what they can stand on.
+   * `tiles_<mode>` is still built and still what every body is made from, so
+   * no hitbox moved: each sprite is created from its old 16-unit frame and
+   * then given its picture.
    */
-  private buildBackdrop(mode: 'dmg' | 'gbc') {
-    if (this.textures.exists(`bg_gear_lg_${mode}`)) return
-    const g = this.make.graphics({}, false)
+  private buildFactory(mode: 'dmg' | 'gbc') {
+    if (this.textures.exists(`stone_${mode}`)) return
+    const pal = PALETTES[mode]
+    this.sheet(`stone_${mode}`, stoneSheet(pal))
+    this.sheet(`spike_${mode}`, [spikes(pal)])
+    this.sheet(`lava_${mode}`, Array.from({ length: LAVA_FRAMES }, (_, f) => lava(f, pal)))
+    this.sheet(`belt_${mode}`, Array.from({ length: BELT_FRAMES }, (_, f) => belt(f, pal)))
+    this.sheet(`spring_${mode}`, [spring(pal)])
+    this.sheet(`mover_${mode}`, [mover(pal)])
+    this.sheet(`pylon_${mode}`, [pylon(pal)])
+    this.sheet(`bgfar_${mode}`, [farLayer(pal)])
+    this.sheet(`bgmid_${mode}`, [midLayer(pal)])
+    this.sheet(`bgnear_${mode}`, [nearLayer(pal)])
+    // The small gear meshes with the big one, which has twice its teeth, so
+    // it turns the other way and twice as far: its frames step backwards.
+    this.sheet(`gearbig_${mode}`, Array.from({ length: gearFrames(BIG_GEAR) }, (_, f) => gear(BIG_GEAR, f * GEAR_STEP, pal)))
+    this.sheet(`gearsmall_${mode}`, Array.from({ length: gearFrames(SMALL_GEAR) }, (_, f) => gear(SMALL_GEAR, -f * GEAR_STEP, pal)))
+  }
 
-    // Two tones, and in DMG the accent is the *background* colour rather than
-    // a lighter green. The obvious choice there was PAL.dark — but that is
-    // exactly the tone the tileset paints brick in, so pipe collars and rivets
-    // came out the same shade as a platform and the backdrop started reading
-    // as something you could stand on. Cutting the detail out in the camera's
-    // own background colour keeps every backdrop pixel at or below `darkest`.
-    const mass = mode === 'dmg' ? PAL.darkest : 0x1c2436
-    const edge = mode === 'dmg' ? 0x0b0f0c : 0x2e3a52
-
-    const gear = (size: number, teeth: number, key: string) => {
-      const r = size / 2
-      const c = r
-      g.fillStyle(mass)
-      g.fillCircle(c, c, r - 3)
-      // Teeth as blocks around the rim, so the silhouette reads at this size
-      // where a drawn cog outline would just alias into a circle.
-      for (let i = 0; i < teeth; i++) {
-        const a = (i / teeth) * Math.PI * 2
-        g.fillRect(c + Math.cos(a) * (r - 3) - 2, c + Math.sin(a) * (r - 3) - 2, 4, 4)
+  /**
+   * One texture from pictures of one size, side by side, a numbered frame
+   * each. A single picture gets no numbered frame: Phaser gives the first
+   * frame added to every sprite that names none (see `buildPlayer`).
+   */
+  private sheet(key: string, pics: Picture[]) {
+    const { w, h } = pics[0]
+    const tex = this.textures.createCanvas(key, w * pics.length, h)!
+    const img = tex.context.createImageData(w * pics.length, h)
+    pics.forEach((pic, f) => {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const c = pic.px[y * w + x]
+          if (c < 0) continue
+          const i = (y * w * pics.length + f * w + x) * 4
+          img.data[i] = (c >> 16) & 255
+          img.data[i + 1] = (c >> 8) & 255
+          img.data[i + 2] = c & 255
+          img.data[i + 3] = 255
+        }
       }
-      g.fillStyle(edge)
-      g.fillCircle(c, c, 2) // hub
-      g.generateTexture(key, size, size)
-      g.clear()
-    }
-    gear(28, 8, `bg_gear_lg_${mode}`)
-    gear(18, 6, `bg_gear_sm_${mode}`)
-
-    // Vertical pipe run, tiled down a wall.
-    g.fillStyle(mass)
-    g.fillRect(0, 0, 6, 16)
-    g.fillStyle(edge)
-    g.fillRect(0, 6, 6, 2) // collar
-    g.generateTexture(`bg_pipe_${mode}`, 6, 16)
-    g.clear()
-
-    // Horizontal girder with rivets.
-    g.fillStyle(mass)
-    g.fillRect(0, 0, 32, 6)
-    g.fillStyle(edge)
-    for (let x = 3; x < 32; x += 7) g.fillRect(x, 2, 2, 2)
-    g.generateTexture(`bg_girder_${mode}`, 32, 6)
-    g.clear()
-
-    // Hanging lamp: a stem and a shade. Unlit — it is scenery, and a glowing
-    // lamp at this depth would pull the eye off the player.
-    g.fillStyle(edge)
-    g.fillRect(4, 0, 1, 5)
-    g.fillStyle(mass)
-    g.fillRect(1, 5, 8, 4)
-    g.fillRect(3, 9, 4, 2)
-    g.generateTexture(`bg_lamp_${mode}`, 10, 12)
-    g.clear()
-
-    g.destroy()
+    })
+    tex.context.putImageData(img, 0, 0)
+    if (pics.length > 1) pics.forEach((_, f) => tex.add(f, 0, f * w, 0, w, h))
+    tex.refresh()
   }
 
   /**
