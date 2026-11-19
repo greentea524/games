@@ -150,11 +150,14 @@ export const GAMES = [
     surfaces: {
       // A platformer's gameplay sprites sit against the camera background,
       // not against the floor — the player is in the air as often as not.
-      sky: { cameraBackground: true },
-      // Frame 1 is the brick wall, not frame 0 — frame 0 is grass ground.
-      // The brick is what #52's backdrop was accidentally painted to match,
-      // so the brick is the tone the separation check has to measure against.
-      platform: { texture: 'tiles_dmg', frame: 1 },
+      // Read in DMG: the camera takes each palette's own colour since #167,
+      // and the sprites scored against it are the green screen's.
+      sky: { cameraBackground: true, inDmg: true },
+      // A block of stone with stone on every side (#167): its face, which
+      // is what most of a wall is. The brick it replaced is what #52's
+      // backdrop was accidentally painted to match, so this is the tone the
+      // separation check has to measure against.
+      platform: { texture: 'stone_dmg', frame: 15 * 2 },
     },
     on: {
       sky: [
@@ -166,17 +169,24 @@ export const GAMES = [
         // behind any of them. The portrait sits on the camera background like
         // every other sprite in this list (#131).
         'windup_dmg_head',
+        // #167's hazards and machines. Spikes and springs stand in the open,
+        // the arc's emitters hang in it, and a moving platform crosses it.
+        // A belt and a pool are set in the floor, but their tops are open to
+        // the room like everything else's.
+        'spike_dmg', 'spring_dmg', 'mover_dmg', 'pylon_dmg', 'belt_dmg', 'lava_dmg',
       ],
     },
     // #52's defect, and it is the opposite relation. The backdrop must NOT be
     // confusable with the platform tile: it shipped drawn in the brick tone,
     // so background scenery read as something you could stand on. Here a high
-    // score is the failure.
+    // score is the failure. Since #167 the backdrop is three layers and two
+    // gears, all drawn in the two dark tones.
     backdropVsPlatform: [
-      'bg_gear_lg_dmg', 'bg_gear_sm_dmg', 'bg_pipe_dmg', 'bg_girder_dmg', 'bg_lamp_dmg',
+      'bgfar_dmg', 'bgmid_dmg', 'bgnear_dmg', 'gearbig_dmg', 'gearsmall_dmg',
     ],
     exclude: {
-      tiles_dmg: 'the tileset is the surface',
+      tiles_dmg: 'no longer drawn: every body is still made from it, then given its picture (#167)',
+      stone_dmg: 'the platforms are the surface',
     },
   },
 ]
