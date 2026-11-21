@@ -729,6 +729,28 @@ sprite's scale and is given the new frame's size instead.
   `qa:contrast` failed eleven of fourteen. That check reads the sky in DMG now
   (`inDmg`), because each palette has its own camera colour.
 
+**Windup's toy, key, orb, station and goal are pictures in `sprites.ts`
+(#168).** They use the same inks and automatic outline as the other three
+games, drawn at 24 and shown at two thirds. The toy has six poses: idle, two
+run frames, jump, fall and wall-slide. It faces left by flipping.
+
+- **The key is a sprite of its own.** It turns at `keyRate(charge)`: brisk
+  when full, slowing as the toy runs down, and still when it is empty. That
+  is how much energy is left, so it turns under reduced motion too.
+- **The toy's body follows its sprite's scale,** unlike a static body. So
+  `ROBOT_BODY` gives the old 10 by 12 at 3, 4 in the picture's pixels, times
+  1.5. The touch suite holds the box to 10 by 12, five left of the middle and
+  four above. Sized the old way, after the scale, it came out 6.7 by 8, and
+  that check fails it.
+- **The pickups, station and goal are made from their new pictures and
+  refreshed after the scale.** A static body takes its size only then.
+- **`sprites_test.ts` checks colours and shape.** The toy must stand out on
+  every backdrop and stone colour in both palettes; a toy in the gear's green
+  is the control. Its feet must meet the floor in every grounded pose, and
+  the key's bow must narrow to edge-on and open again. On the green screen
+  the toy is three tones, head to legs. The body's shadow is the body's own
+  tone there: one tone darker, it was too close to the backdrop's line art.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183

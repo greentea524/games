@@ -43,7 +43,8 @@ export class UIScene extends Phaser.Scene {
       resolution: 2,
     })
 
-    this.portrait = this.add.image(PORTRAIT.x, PORTRAIT.y, `windup_${GameState.paletteMode}_head`)
+    // Cut from the toy's picture at 24 (#168), so shown at two thirds.
+    this.portrait = this.add.image(PORTRAIT.x, PORTRAIT.y, `windup_${GameState.paletteMode}_head`).setScale(1 / VIEW_ZOOM)
     this.portraitMode = GameState.paletteMode
 
     this.energyBarGfx = this.add.graphics()

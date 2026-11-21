@@ -38,6 +38,31 @@ async function windup() {
   const start = await st()
   check('A starts the game', start.active, `player at x=${start.x | 0}`)
 
+  // #168 drew the toy at 24 and shows it at two thirds. Its body follows its
+  // sprite's scale, so the box is given in the picture's pixels; it must
+  // come out as the old 10 by 12, five left of the sprite's middle and four
+  // above it, or every jump in 32 levels changes.
+  const box = await page.evaluate(() => {
+    const p = window.__game.scene.getScene('platformer').player
+    return { w: p.body.width, h: p.body.height, dx: p.body.x - p.x, dy: p.body.y - p.y }
+  })
+  check(
+    'the toy\'s hitbox is the old 10×12, where it always was',
+    box.w === 10 && box.h === 12 && box.dx === -5 && box.dy === -4,
+    JSON.stringify(box),
+  )
+  // And its key turns while it has energy (#168): read twice, half a second apart.
+  const keyFrames = await page.evaluate(async () => {
+    const s = window.__game.scene.getScene('platformer')
+    const seen = new Set()
+    for (let i = 0; i < 10; i++) {
+      seen.add(String(s.key.frame.name))
+      await new Promise((r) => setTimeout(r, 60))
+    }
+    return seen.size
+  })
+  check('the toy\'s key turns while it has energy', keyFrames > 1, `${keyFrames} pictures in 0.6 s`)
+
   // #166: the screen grew to 240×216 by zooming the cameras, the world left
   // as it was. The view must still be the whole level from its top left. A
   // bounded camera with its origin at the top left is clamped as if centred,

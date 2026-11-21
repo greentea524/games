@@ -161,7 +161,9 @@ export const GAMES = [
     },
     on: {
       sky: [
-        'windup_dmg_left', 'windup_dmg_right',
+        // The toy in all six poses and its key, the orb, the station and the
+        // goal, all redrawn at 24 in #168.
+        'robot_dmg', 'key_dmg',
         'station_dmg', 'station_empty_dmg', 'energy_dmg', 'goal_dmg', 'puff_dmg',
         // The HUD portrait (#56). It was excluded as "drawn on the HUD panel
         // rather than in the world", and there is no HUD panel — `UIScene`
@@ -175,6 +177,9 @@ export const GAMES = [
         // the room like everything else's.
         'spike_dmg', 'spring_dmg', 'mover_dmg', 'pylon_dmg', 'belt_dmg', 'lava_dmg',
       ],
+      // The toy stands on the stone as often as it is in the air, and the
+      // ticket asks that it read against every platform (#168).
+      platform: ['robot_dmg', 'key_dmg'],
     },
     // #52's defect, and it is the opposite relation. The backdrop must NOT be
     // confusable with the platform tile: it shipped drawn in the brick tone,

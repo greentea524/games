@@ -3,11 +3,13 @@ import { TILE, PAL, GBC_PAL } from '../constants'
 
 import { GameState } from '../state'
 import {
-  PALETTES, stoneSheet, spikes, lava, LAVA_FRAMES, belt, BELT_FRAMES, spring, mover, pylon,
+  SPRITE_PX, POSES, POSE_ROWS, KEY_FRAMES, KEY_W, KEY_H, PICTURES, HEAD_BOX, pixels,
+} from '../sprites'
+import {
+  picture, PALETTES, stoneSheet, spikes, lava, LAVA_FRAMES, belt, BELT_FRAMES, spring, mover, pylon,
   farLayer, midLayer, nearLayer, gear, gearFrames, BIG_GEAR, SMALL_GEAR, GEAR_STEP, type Picture,
 } from '../factory'
 
-type Facing = 'left' | 'right'
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -19,11 +21,8 @@ export class BootScene extends Phaser.Scene {
 
     ;(['dmg', 'gbc'] as const).forEach((mode) => {
       this.buildTileset(mode)
-      this.buildPlayer(mode)
-      this.buildStation(mode)
-      this.buildEnergy(mode)
-      this.buildGoal(mode)
       this.buildFactory(mode)
+      this.buildSprites(mode)
       this.buildPuff(mode)
     })
     this.scene.start('mainmenu')
@@ -165,140 +164,32 @@ export class BootScene extends Phaser.Scene {
     }
   }
 
-  private drawWindupToy(
-    g: Phaser.GameObjects.Graphics,
-    key: string,
-    facing: Facing,
-    mode: 'dmg' | 'gbc',
-  ) {
-    if (this.textures.exists(key)) return
-    g.clear()
-    const cx = 8
-    const bodyColor = mode === 'dmg' ? PAL.dark : GBC_PAL.robotBody
-    const darkColor = mode === 'dmg' ? PAL.darkest : GBC_PAL.robotDark
-    const keyColor = mode === 'dmg' ? PAL.lightest : GBC_PAL.windupKey
-    const eyeColor = mode === 'dmg' ? PAL.lightest : GBC_PAL.eyeGlow
-
-    // Brass Winding Key on back
-    g.fillStyle(keyColor)
-    if (facing === 'right') {
-      g.fillRect(cx - 7, 5, 3, 4)
-      g.fillRect(cx - 8, 4, 1, 6)
-    } else {
-      g.fillRect(cx + 4, 5, 3, 4)
-      g.fillRect(cx + 7, 4, 1, 6)
+  /**
+   * The toy, its key, the orb, the station and the goal (#168), from the
+   * letter pictures in `sprites.ts`, at 24 pixels and shown at two thirds.
+   */
+  private buildSprites(mode: 'dmg' | 'gbc') {
+    if (this.textures.exists(`robot_${mode}`)) return
+    const pic = (rows: string[], w = SPRITE_PX, h = SPRITE_PX): Picture => {
+      const p = picture(w, h)
+      pixels(rows, mode, w, h).forEach((row, y) => row.forEach((c, x) => { if (c !== null) p.px[y * w + x] = c }))
+      return p
     }
+    this.sheet(`robot_${mode}`, POSES.map((pose) => pic(POSE_ROWS[pose])))
+    this.sheet(`key_${mode}`, KEY_FRAMES.map((rows) => pic(rows, KEY_W, KEY_H)))
+    for (const [name, rows] of Object.entries(PICTURES)) this.sheet(`${name}_${mode}`, [pic(rows)])
 
-    // Robot Head & Body
-    g.fillStyle(bodyColor); g.fillRect(cx - 4, 2, 8, 11)
-    g.fillStyle(darkColor); g.strokeRect(cx - 4, 2, 8, 11)
-
-    // Eye Slit & Eye
-    g.fillStyle(darkColor); g.fillRect(cx - 3, 4, 6, 3)
-    g.fillStyle(eyeColor)
-    if (facing === 'right') {
-      g.fillRect(cx, 5, 2, 1)
-    } else {
-      g.fillRect(cx - 2, 5, 2, 1)
-    }
-
-    // Feet / Tread
-    g.fillStyle(darkColor)
-    g.fillRect(cx - 4, 13, 3, 3)
-    g.fillRect(cx + 1, 13, 3, 3)
-
-    g.generateTexture(key, 16, 16)
-  }
-
-  private buildPlayer(mode: 'dmg' | 'gbc') {
-    const g = this.make.graphics({}, false)
-    ;(['left', 'right'] as const).forEach((f) => {
-      this.drawWindupToy(g, `windup_${mode}_${f}`, f, mode)
-    })
-    g.destroy()
-
-    // HUD portrait (#56): the head, copied out of the toy's own pixels.
-    //
-    // The issue asks for it to be derived from the player texture rather than
-    // separately maintained, so this reads the generated sprite back and
-    // blits its head region — one drawing, two uses. `drawWindupToy` puts the
-    // head at x 4-12, y 2-10 of the 16x16 sprite; body and treads sit below.
-    //
-    // Deliberately a new texture, not a named frame on the player's own.
-    // Phaser sets `firstFrame` to the first frame added after __BASE, and
-    // every sprite created from that texture without naming a frame then gets
-    // it — adding a 'head' frame made the *player in the world* render as a
-    // floating head.
+    // The HUD's portrait (#56): the head, cut out of the toy's own picture
+    // rather than drawn twice. A texture of its own, not a frame on the toy's:
+    // see the note on `sheet` about the first frame added.
     const headKey = `windup_${mode}_head`
-    if (!this.textures.exists(headKey)) {
-      const src = this.textures.get(`windup_${mode}_right`).getSourceImage() as CanvasImageSource
-      const canvas = this.textures.createCanvas(headKey, 8, 8)
-      canvas?.context.drawImage(src, 4, 2, 8, 8, 0, 0, 8, 8)
-      canvas?.refresh()
+    const b = HEAD_BOX
+    const head = picture(b.width, b.height)
+    const idle = pic(POSE_ROWS.idle)
+    for (let y = 0; y < b.height; y++) for (let x = 0; x < b.width; x++) {
+      head.px[y * b.width + x] = idle.px[(b.y + y) * SPRITE_PX + b.x + x]
     }
-  }
-
-  private buildStation(mode: 'dmg' | 'gbc') {
-    const key = `station_${mode}`
-    if (this.textures.exists(key)) return
-    const g = this.make.graphics({}, false)
-
-    const body = mode === 'dmg' ? PAL.dark : GBC_PAL.stationBody
-    const glow = mode === 'dmg' ? PAL.lightest : GBC_PAL.stationGlow
-    const dark = mode === 'dmg' ? PAL.darkest : 0x303030
-
-    g.fillStyle(dark); g.fillRect(2, 4, 12, 12)
-    g.fillStyle(body); g.fillRect(3, 5, 10, 10)
-    g.fillStyle(glow); g.fillCircle(8, 9, 3)
-
-    g.generateTexture(key, 16, 16)
-    g.clear()
-
-    // Empty (Used) Station
-    const emptyKey = `station_empty_${mode}`
-    g.fillStyle(dark); g.fillRect(2, 4, 12, 12)
-    g.fillStyle(body); g.fillRect(3, 5, 10, 10)
-    // No glow in center, just a dark hole or dim color
-    g.fillStyle(dark); g.fillCircle(8, 9, 3)
-
-    g.generateTexture(emptyKey, 16, 16)
-    g.destroy()
-  }
-
-  private buildEnergy(mode: 'dmg' | 'gbc') {
-    const key = `energy_${mode}`
-    if (this.textures.exists(key)) return
-    const g = this.make.graphics({}, false)
-
-    const base = mode === 'dmg' ? PAL.dark : GBC_PAL.energyBase
-    const glow = mode === 'dmg' ? PAL.light : GBC_PAL.energyGlow
-
-    g.fillStyle(glow); g.fillCircle(8, 8, 6)
-    g.fillStyle(base); g.fillRect(6, 4, 4, 8)
-    g.fillStyle(base); g.fillRect(4, 6, 8, 4)
-
-    g.generateTexture(key, 16, 16)
-    g.destroy()
-  }
-
-  private buildGoal(mode: 'dmg' | 'gbc') {
-    const key = `goal_${mode}`
-    if (this.textures.exists(key)) return
-    const g = this.make.graphics({}, false)
-
-    const dark = mode === 'dmg' ? PAL.darkest : 0x000000
-    const light = mode === 'dmg' ? PAL.lightest : 0xffffff
-    const pole = mode === 'dmg' ? PAL.dark : 0x888888
-
-    // Pole
-    g.fillStyle(pole); g.fillRect(2, 0, 2, 16)
-    // Checkered Flag
-    g.fillStyle(light); g.fillRect(4, 0, 10, 8)
-    g.fillStyle(dark)
-    g.fillRect(4, 0, 5, 4); g.fillRect(9, 4, 5, 4)
-
-    g.generateTexture(key, 16, 16)
-    g.destroy()
+    this.sheet(headKey, [head])
   }
 
   /**
