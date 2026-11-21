@@ -63,6 +63,27 @@ async function windup() {
   })
   check('the toy\'s key turns while it has energy', keyFrames > 1, `${keyFrames} pictures in 0.6 s`)
 
+  // #169: the HUD is two panels laid on the level where it is empty. Read
+  // from what the HUD scene draws, not from the layout it was given: both
+  // shown, on the screen, and clear of the toy, which is drawn a tile square
+  // about its middle at 1.5 to the unit.
+  const hud = await page.evaluate(() => {
+    const ui = window.__game.scene.getScene('ui')
+    const p = window.__game.scene.getScene('platformer').player
+    const panels = ui.children.list
+      .filter((o) => o.type === 'Rectangle' && o.visible && o.width > 80)
+      .map((o) => ({ x: o.x, y: o.y, w: o.width, h: o.height }))
+    const toy = { x: p.x * 1.5 - 15, y: p.y * 1.5 - 12, w: 30, h: 24 }
+    const hits = panels.filter((b) => b.x < toy.x + toy.w && toy.x < b.x + b.w && b.y < toy.y + toy.h && toy.y < b.y + b.h)
+    return { panels, hits: hits.length, zoom: ui.cameras.main.zoom }
+  })
+  check(
+    'the HUD draws two panels on the real screen, clear of the toy',
+    hud.panels.length === 2 && hud.hits === 0 && hud.zoom === 1 &&
+      hud.panels.every((b) => b.x >= 0 && b.y >= 0 && b.x + b.w <= 240 && b.y + b.h <= 216),
+    JSON.stringify(hud.panels),
+  )
+
   // #166: the screen grew to 240×216 by zooming the cameras, the world left
   // as it was. The view must still be the whole level from its top left. A
   // bounded camera with its origin at the top left is clamped as if centred,

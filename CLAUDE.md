@@ -751,6 +751,32 @@ run frames, jump, fall and wall-slide. It faces left by flipping.
   the toy is three tones, head to legs. The body's shadow is the body's own
   tone there: one tone darker, it was too close to the backdrop's line art.
 
+**Windup's HUD is two panels laid where the level is empty, and they step
+aside for the toy (#169).** A level is the whole screen, ten tiles by nine at
+24, and level 2 has walls, its goal and its spawn in the top row. A bar would
+have meant shrinking the view to a tile the art is not drawn at. So `hud.ts`
+places a framed ENERGY panel and a clock panel, with the level number under
+the time. Each is four tiles by one, in the top three rows, anywhere along a
+row to the pixel. Per level they go to the places nearest their homes, top
+left and top right, that cover no tile the level uses, including a bolt's
+path and a moving platform's sweep. Every frame, a panel the toy comes under
+moves to the next clear place, as Static's minimap does.
+
+- **Placement is to the pixel because level 2 needs it.** Whole tiles, then
+  steps of three, left its clock nowhere at the start: the one gap is 93
+  pixels for a panel of 92.
+- **`hud_test.ts` holds all 32 levels.** Both panels must be placed at every
+  start, and none may be over the level, the toy or the other panel at any
+  of 36,224 places the toy can be. The energy panel has nowhere at 33 of them,
+  all brief. The old LVL text, which was over the floor in all 32 levels, is
+  the control.
+- **Low is a colour and an alarm, not a number.** The bar runs yellow, orange,
+  red, and at low the label turns to the alarm colour. On the green screen the
+  label inverts.
+- **The portrait has no outline now.** It sits on the panel, which on the
+  green screen is the outline's own tone. `qa:contrast` scores the HUD as a
+  named surface and counted 37 pixels of the head lost into it.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183

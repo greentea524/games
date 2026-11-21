@@ -182,11 +182,16 @@ export class BootScene extends Phaser.Scene {
     // The HUD's portrait (#56): the head, cut out of the toy's own picture
     // rather than drawn twice. A texture of its own, not a frame on the toy's:
     // see the note on `sheet` about the first frame added.
+    //
+    // Without the outline (#169). It sits on the HUD's panel now, which on
+    // the green screen is the outline's own tone, so the outline only melted
+    // into it; `qa:contrast` counted 37 pixels of the head lost to the panel.
     const headKey = `windup_${mode}_head`
     const b = HEAD_BOX
     const head = picture(b.width, b.height)
     const idle = pic(POSE_ROWS.idle)
     for (let y = 0; y < b.height; y++) for (let x = 0; x < b.width; x++) {
+      if (POSE_ROWS.idle[b.y + y][b.x + x] === '.') continue
       head.px[y * b.width + x] = idle.px[(b.y + y) * SPRITE_PX + b.x + x]
     }
     this.sheet(headKey, [head])
