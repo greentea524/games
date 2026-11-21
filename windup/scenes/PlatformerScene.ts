@@ -5,6 +5,7 @@ import { LEVELS } from '../levels'
 import { sfx, music } from '../audio'
 import { showRunSummary, formatRunTime } from '../../shared/runSummary'
 import { prefersReducedMotion } from '../../shared/motion'
+import { POSES, ROBOT_BODY, keyRate, type Pose } from '../sprites'
 import { BLEED, MID, LAVA_FRAMES, PALETTES, UP, RIGHT, DOWN, LEFT, stoneFrame } from '../factory'
 
 type Facing = 'left' | 'right'
@@ -90,6 +91,12 @@ const CONVEYOR = {
   frameMs: 140,
 } as const
 
+/** The toy's look (#168). */
+const TOY = {
+  /** ms a stride lasts: one picture of the run, then the other. */
+  strideMs: 130,
+} as const
+
 /** Ground speed, px/s, at a full spring. */
 const MOVE_SPEED = 80
 /** Jump impulse, px/s, at a full spring. */
@@ -123,6 +130,9 @@ export class PlatformerScene extends Phaser.Scene {
   private stations!: Phaser.Physics.Arcade.StaticGroup
   private goals!: Phaser.Physics.Arcade.StaticGroup
   private facing: Facing = 'right'
+  /** The key on the toy's back, and how far it has turned, in pictures (#168). */
+  private key!: Phaser.GameObjects.Image
+  private keyTurn = 0
   private coyoteTimer = 0
   private wallJumpTimer = 0
   private isTransitioning = false
@@ -245,10 +255,17 @@ export class PlatformerScene extends Phaser.Scene {
       art(this.platforms.create(p.x, p.y, `tiles_${mode}`, 1), 'stone', stoneFrame(mask, cx, cy))
     })
     level.springs.forEach(p => art(this.springs.create(p.x, p.y, `tiles_${mode}`, 2), 'spring'))
-    level.pickups.forEach(p => this.pickups.create(p.x, p.y, `energy_${mode}`))
+    // Drawn at 24 and shown at two thirds (#168). Made from the new picture,
+    // so the static body is refreshed after the scale: at two thirds it is
+    // the 16-unit square every one of these always had.
+    const sized = <T extends Phaser.Physics.Arcade.Sprite>(o: T) => {
+      o.setScale(1 / VIEW_ZOOM).refreshBody()
+      return o
+    }
+    level.pickups.forEach(p => sized(this.pickups.create(p.x, p.y, `energy_${mode}`)))
     
     level.stations.forEach(p => {
-      const s = this.stations.create(p.x, p.y, `station_${mode}`) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
+      const s = sized(this.stations.create(p.x, p.y, `station_${mode}`)) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
       s.setData('used', false)
     })
 
@@ -337,17 +354,28 @@ export class PlatformerScene extends Phaser.Scene {
     level.arcs.forEach((p) => this.add.image(p.x, p.y, `pylon_${mode}`).setScale(1 / VIEW_ZOOM).setDepth(4))
     this.invulnUntil = 0
 
-    this.goals.create(level.goal.x, level.goal.y, `goal_${mode}`)
+    sized(this.goals.create(level.goal.x, level.goal.y, `goal_${mode}`))
 
-    // Player
+    // The key on the toy's back, behind it (#168). A sprite of its own: it
+    // turns at a rate set by the energy left, whatever the toy is doing.
+    this.key = this.add.image(0, 0, `key_${mode}`, 0).setScale(1 / VIEW_ZOOM)
+    this.keyTurn = 0
+
+    // Player. Drawn at 24 and shown at two thirds (#168). A moving body
+    // follows its sprite's scale, so its size and offset are given in the
+    // picture's pixels: `ROBOT_BODY` is the old 10 by 12 at 3, 4, times 1.5,
+    // and at two thirds it is that box exactly.
     this.player = this.physics.add.sprite(
       GameState.checkpointX,
       GameState.checkpointY,
-      `windup_${mode}_${this.facing}`,
+      `robot_${mode}`,
+      0,
     ) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+    this.player.setScale(1 / VIEW_ZOOM)
     this.player.setCollideWorldBounds(true)
     this.player.body.setGravityY(400)
-    this.player.body.setSize(10, 12).setOffset(3, 4)
+    this.player.body.setSize(ROBOT_BODY.width, ROBOT_BODY.height, false).setOffset(ROBOT_BODY.x, ROBOT_BODY.y)
+    this.drawToy(0, 0, true, false, 0)
 
     this.physics.add.collider(this.player, this.platforms)
     this.physics.add.collider(this.player, this.movingPlatforms)
@@ -458,7 +486,6 @@ export class PlatformerScene extends Phaser.Scene {
   reloadPalette() {
     const mode = GameState.paletteMode
     this.cameras.main.setBackgroundColor(PALETTES[mode].void)
-    this.player.setTexture(`windup_${mode}_${this.facing}`)
 
     // Everything on the display list, by rewriting the palette in its key and
     // keeping its frame. This was a list of groups until #167, and the list
@@ -493,7 +520,6 @@ export class PlatformerScene extends Phaser.Scene {
     this.updateBackdrop()
     this.updateArcs(time)
 
-    const mode = GameState.paletteMode
     const isGrounded = this.player.body.blocked.down
     const isWalledLeft = this.player.body.blocked.left
     const isWalledRight = this.player.body.blocked.right
@@ -540,7 +566,7 @@ export class PlatformerScene extends Phaser.Scene {
       // Added to the input, not substituted for it (#55).
       this.player.setVelocityX(moveX + this.conveyorPush())
     }
-    this.player.setTexture(`windup_${mode}_${this.facing}`)
+    this.drawToy(time, delta, isGrounded, isWalled && isMovingTowardsWall && this.player.body.velocity.y > 0, moveX)
 
     // Energy drain on movement
     if (moveX !== 0 && GameState.energy > 0) {
@@ -783,6 +809,33 @@ export class PlatformerScene extends Phaser.Scene {
       return (belt.getData('dir') as number) * CONVEYOR.speed
     }
     return 0
+  }
+
+  /**
+   * Picks the toy's pose, faces it, and turns its key (#168).
+   *
+   * The key turns at `keyRate` of the charge: brisk when wound, slowing as
+   * it runs down, still at empty. It is how much is left, so it turns under
+   * reduced motion too; the run cycle is how the toy moves, and does as well.
+   */
+  private drawToy(time: number, delta: number, grounded: boolean, sliding: boolean, moveX: number) {
+    const vy = this.player.body.velocity.y
+    let pose: Pose = 'idle'
+    if (sliding) pose = 'slide'
+    else if (!grounded) pose = vy < 0 ? 'jump' : 'fall'
+    else if (moveX !== 0) pose = Math.floor(time / TOY.strideMs) % 2 ? 'runB' : 'runA'
+    this.player.setFrame(POSES.indexOf(pose))
+    const left = this.facing === 'left'
+    this.player.setFlipX(left)
+
+    this.keyTurn += (delta / 1000) * keyRate(this.chargeRatio())
+    this.key.setFrame(Math.floor(this.keyTurn) % 4)
+    this.key.setFlipX(left)
+    // The shaft meets the toy's back: nine drawn pixels behind its middle,
+    // three below, which is where the torso's back edge is.
+    const behind = (9 / VIEW_ZOOM) * (left ? 1 : -1)
+    this.key.setPosition(this.player.x + behind, this.player.y + 3 / VIEW_ZOOM)
+    this.key.setAlpha(this.player.alpha)
   }
 
   /** Spring charge, 1 at full and 0 at empty. */

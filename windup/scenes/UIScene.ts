@@ -1,117 +1,138 @@
 import Phaser from 'phaser'
-import { WORLD_WIDTH as GBC_WIDTH, WORLD_HEIGHT as GBC_HEIGHT, FONT, CSS_LIGHTEST, VIEW_ZOOM } from '../constants'
+import { FONT } from '../constants'
 import { GameState } from '../state'
+import { LEVELS } from '../levels'
+import {
+  clearSlots, place, toyBox, energyLayout, clockLayout, energyLevel, litSegments, clockText, levelText,
+  PANEL, SEGMENTS, HUD_THEME, type Box, type Placement,
+} from '../hud'
 
-// The HUD portrait (#56).
-//
-// The bar moved right to make room. It could not go *inside* the bar's frame
-// as the thumbnail suggests: that frame is 7px tall and the toy's head is 8,
-// and 'PWR' already occupies x 6-30, so there was no gap to tuck it into.
-const PORTRAIT = {
-  x: 36,
-  y: 7,
-  /** Bar frame starts here now, was 32. Its right edge lands at 108 of 160. */
-  barX: 44,
-  /**
-   * Below this fraction the portrait dims, matching the threshold the bar
-   * already uses to turn red. The issue suggests ~0.25; using the bar's own
-   * 0.3 keeps the two halves of the same readout from disagreeing.
-   */
-  lowRatio: 0.3,
-} as const
+const css = (c: number) => `#${c.toString(16).padStart(6, '0')}`
+
+/** One panel: a framed box and what is drawn in it, moved as a whole. */
+interface Panel {
+  box: Phaser.GameObjects.Rectangle
+  parts: Phaser.GameObjects.GameObject[]
+  at: Box | null
+}
 
 export class UIScene extends Phaser.Scene {
-  private energyBarGfx!: Phaser.GameObjects.Graphics
-  private portrait!: Phaser.GameObjects.Image
-  private portraitMode: 'dmg' | 'gbc' | null = null
-  private speedrunText!: Phaser.GameObjects.Text
-  private levelText!: Phaser.GameObjects.Text
+  private energy!: Panel
+  private clock!: Panel
+  private face!: Phaser.GameObjects.Image
+  private label!: Phaser.GameObjects.Text
+  private labelBack!: Phaser.GameObjects.Rectangle
+  private bar!: Phaser.GameObjects.Graphics
+  private timeText!: Phaser.GameObjects.Text
+  private level!: Phaser.GameObjects.Text
+  private placement: Placement = { energy: null, clock: null }
+  private clearFor = -1
+  private clear: Box[] = []
+  private mode: 'gbc' | 'dmg' | null = null
 
   constructor() {
     super('ui')
   }
 
   create() {
-    // Still laid out for 160×144, and shown enlarged from the top left by
-    // the play camera's factor (#166). The later tickets lay it out anew.
-    this.cameras.main.setOrigin(0, 0).setZoom(VIEW_ZOOM)
-    // Static label; nothing updates it, so it needs no field.
-    this.add.text(6, 4, 'PWR', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: CSS_LIGHTEST,
-      resolution: 2,
-    })
+    // Laid out on the real screen since #169: no zoom, text at its native 8.
+    this.cameras.main.setOrigin(0, 0).setZoom(1)
+    this.placement = { energy: null, clock: null }
+    this.clearFor = -1
+    this.mode = null
 
-    this.portrait = this.add.image(PORTRAIT.x, PORTRAIT.y, `windup_${GameState.paletteMode}_head`)
-    this.portraitMode = GameState.paletteMode
+    const text = (s: string) => this.add.text(0, 0, s, { fontFamily: FONT, fontSize: '8px', resolution: 2 })
+    const panelBox = () => this.add.rectangle(0, 0, PANEL.width, PANEL.height).setOrigin(0, 0)
 
-    this.energyBarGfx = this.add.graphics()
-    this.updateEnergyBar()
+    const eBox = panelBox()
+    this.face = this.add.image(0, 0, `windup_${GameState.paletteMode}_head`).setOrigin(0, 0)
+    this.labelBack = this.add.rectangle(0, 0, 6 * 8 + 2, 10).setOrigin(0, 0)
+    this.label = text('ENERGY')
+    this.bar = this.add.graphics()
+    this.energy = { box: eBox, parts: [this.face, this.labelBack, this.label, this.bar], at: null }
 
-    // Second row, not beside the bar. At the font's native 8px the timer is
-    // 72px wide and 'PWR' plus the 60px bar already reach x=92, so a single
-    // row would need 164px on a 160px screen and the two would overlap.
-    this.speedrunText = this.add.text(GBC_WIDTH - 6, 14, '00:00:000', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: CSS_LIGHTEST,
-      resolution: 2,
-    }).setOrigin(1, 0)
-    
-    this.levelText = this.add.text(6, GBC_HEIGHT - 12, 'LVL 1', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: CSS_LIGHTEST,
-      resolution: 2,
-    }).setOrigin(0, 0)
+    const cBox = panelBox()
+    this.timeText = text('00:00:000')
+    this.level = text('LVL 1/32')
+    this.clock = { box: cBox, parts: [this.timeText, this.level], at: null }
+
+    this.update()
   }
 
   update() {
-    this.updateEnergyBar()
-    this.updatePortrait()
-    this.levelText.setText(`LVL ${GameState.levelIndex}/32`)
-    
-    const currentMillis = GameState.speedrunDisplayMs
+    const mode = GameState.paletteMode
+    const theme = HUD_THEME[mode]
+    if (mode !== this.mode) {
+      this.mode = mode
+      for (const p of [this.energy, this.clock]) p.box.setFillStyle(theme.panel, 1).setStrokeStyle(1, theme.frame)
+      this.face.setTexture(`windup_${mode}_head`)
+      this.timeText.setColor(css(theme.text))
+      this.level.setColor(css(theme.dim))
+    }
 
-    const mins = Math.floor(currentMillis / 60000)
-    const secs = Math.floor((currentMillis % 60000) / 1000)
-    const ms = currentMillis % 1000
-    this.speedrunText.setText(
-      `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}:${ms.toString().padStart(3, '0')}`
-    )
+    // Where the panels go: clear of everything in this level (worked out
+    // once a level), and clear of the toy (every frame).
+    const n = GameState.levelIndex
+    const lv = LEVELS[n] ?? LEVELS[1]
+    if (this.clearFor !== n) {
+      this.clearFor = n
+      this.clear = clearSlots(lv)
+      this.placement = { energy: null, clock: null }
+    }
+    const play = this.scene.get('platformer') as unknown as { player?: Phaser.GameObjects.Sprite }
+    const toy = play?.player?.active ? toyBox(play.player.x, play.player.y) : null
+    this.placement = place(this.clear, toy, this.placement)
+    this.move(this.energy, this.placement.energy)
+    this.move(this.clock, this.placement.clock)
+
+    this.drawEnergy(theme)
+    this.timeText.setText(clockText(GameState.speedrunDisplayMs))
+    this.level.setText(levelText(n, Object.keys(LEVELS).length))
+  }
+
+  /** Puts a panel and everything in it at a place, or hides it. */
+  private move(panel: Panel, at: Box | null) {
+    const shown = at !== null
+    panel.box.setVisible(shown)
+    panel.parts.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Visible).setVisible(shown))
+    if (!at || (panel.at && panel.at.x === at.x && panel.at.y === at.y)) {
+      panel.at = at
+      return
+    }
+    panel.at = at
+    panel.box.setPosition(at.x, at.y)
+    if (panel === this.energy) {
+      const l = energyLayout(at)
+      this.face.setPosition(l.face.x, l.face.y)
+      this.label.setPosition(l.label.x, l.label.y)
+      this.labelBack.setPosition(l.label.x - 1, l.label.y - 1)
+    } else {
+      const l = clockLayout(at)
+      this.timeText.setPosition(l.time.x, l.time.y)
+      this.level.setPosition(l.level.x, l.level.y)
+    }
   }
 
   /**
-   * Keeps the portrait in the right palette, and dims it when the spring is
-   * nearly out — a second read on a value the player already has to watch.
+   * The bar: ten segments, as many lit as there is spring left, all of them
+   * one colour that runs yellow, orange, red. When it is low the label turns
+   * to the alarm colour as well, so low is plain without counting segments.
    */
-  private updatePortrait() {
-    if (this.portraitMode !== GameState.paletteMode) {
-      this.portraitMode = GameState.paletteMode
-      this.portrait.setTexture(`windup_${this.portraitMode}_head`)
+  private drawEnergy(theme: (typeof HUD_THEME)['gbc' | 'dmg']) {
+    const charge = Math.max(0, Math.min(1, GameState.energy / GameState.maxEnergy))
+    const level = energyLevel(charge)
+    const lit = litSegments(charge)
+    const low = level === 'low'
+    this.labelBack.setFillStyle(theme.alarm, low ? 1 : 0)
+    this.label.setColor(css(low ? theme.alarmText : theme.text))
+
+    this.bar.clear()
+    const at = this.energy.at
+    if (!at) return
+    const b = energyLayout(at).bar
+    for (let i = 0; i < SEGMENTS; i++) {
+      this.bar.fillStyle(i < lit ? theme.seg[level] : theme.empty, 1)
+      this.bar.fillRect(b.x + i * (b.segment + b.gap), b.y, b.segment, b.height)
     }
-    const pct = Math.max(0, GameState.energy / GameState.maxEnergy)
-    if (pct <= PORTRAIT.lowRatio) {
-      this.portrait.setTint(0xff4444)
-    } else {
-      this.portrait.clearTint()
-    }
-  }
-
-  private updateEnergyBar() {
-    this.energyBarGfx.clear()
-    const pct = Math.max(0, GameState.energy / GameState.maxEnergy)
-    const barWidth = 60
-    const fillW = Math.floor(barWidth * pct)
-
-    // Outer frame
-    this.energyBarGfx.lineStyle(1, 0x8bac0f, 1)
-    this.energyBarGfx.strokeRect(PORTRAIT.barX, 4, barWidth, 7)
-
-    // Inner fill
-    const color = pct > PORTRAIT.lowRatio ? 0x9bbc0f : 0xff4444
-    this.energyBarGfx.fillStyle(color, 1)
-    this.energyBarGfx.fillRect(PORTRAIT.barX + 1, 5, fillW, 5)
   }
 }

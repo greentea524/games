@@ -32,8 +32,9 @@ export class MainMenuScene extends Phaser.Scene {
 
     // Sprite preview: the windup toy beside the energy station it recharges at
     const mode = GameState.paletteMode
-    const robotPreview = this.add.sprite(GBC_WIDTH / 2 - 14, 58, `windup_${mode}_right`).setScale(2)
-    const stationPreview = this.add.sprite(GBC_WIDTH / 2 + 14, 58, `station_${mode}`).setScale(2)
+    // Drawn at 24 since #168, and shown at twice the old 16 as before.
+    const robotPreview = this.add.sprite(GBC_WIDTH / 2 - 14, 58, `robot_${mode}`, 0).setScale(4 / 3)
+    const stationPreview = this.add.sprite(GBC_WIDTH / 2 + 14, 58, `station_${mode}`).setScale(4 / 3)
     this.tweens.add({
       targets: robotPreview,
       y: '+=3',

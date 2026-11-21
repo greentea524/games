@@ -7,9 +7,9 @@
     "nondeterministic": []
   },
   "windup": {
-    "note": "Looked at beside the game at #167, level 1 and the levels with spikes, lava, belts, springs, a moving plate and an arc, in both palettes. Same place: mossy stone blocks with a grass cap, a green factory behind of big gears, pipes with flanges, lattice towers, a hanging lamp and a WINDUP banner, steel spikes, a glowing lava pool, electricity between two emitters, and belts with bright arrows. Accepted drift: the game's backdrop is darker and less saturated than the card's, so it stays behind the stone; its spikes, pool and arc are separate hazards in separate levels rather than one pit; and the robot, pickups, station, goal and HUD are still the old art, which #168 to #170 redraw.",
+    "note": "Looked at beside the game at #168, level 1 and the levels with spikes, lava, belts, springs, a moving plate and an arc, in both palettes, and the toy in all six poses. Same place and the same figure: mossy stone blocks with a grass cap, a green factory behind of gears, pipes, lattice towers, a lamp and a WINDUP banner, steel spikes, glowing lava, electricity between two emitters, belts with bright arrows, and a robot with a round head, an antenna, an orange body, teal limbs and a brass wind-up key in its back. Accepted drift: the game's backdrop is darker and less saturated, so it stays behind the stone; its robot is smaller, its head a pale dome with a visor where the card's face shows; its orb is yellow where the card's is white; its hazards are in separate levels rather than one pit. The HUD was looked at again at #169: a dark framed ENERGY panel with the robot's face and a segmented bar running yellow to orange to red, top left, as on the card; top right the game shows its run time and level where the card shows a score the game does not keep, and both panels step aside when the robot comes under them.",
     "art": "f792231667471f974d05b6656d67d6a1b413573f8e36280d9f7543943659b941",
-    "textures": "f5e25751fb9fe5e3bc997e0852114b91d7268719cababfc09aca4cb4c3f95a80",
+    "textures": "32098171acfa70ade4740a4a24ca71e21063fa94b3f6fdb51b968e79f8136ee2",
     "keys": 42,
     "nondeterministic": []
   },

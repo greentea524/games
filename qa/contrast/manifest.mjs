@@ -158,23 +158,28 @@ export const GAMES = [
       // backdrop was accidentally painted to match, so this is the tone the
       // separation check has to measure against.
       platform: { texture: 'stone_dmg', frame: 15 * 2 },
+      // The energy panel (#169), at its home top left, under the toy's face.
+      // Level 1 leaves that corner clear, so this is where the panel is.
+      hud: { overlay: { scene: 'ui', at: [10, 10] }, over: 'sky' },
     },
     on: {
       sky: [
-        'windup_dmg_left', 'windup_dmg_right',
+        // The toy in all six poses and its key, the orb, the station and the
+        // goal, all redrawn at 24 in #168.
+        'robot_dmg', 'key_dmg',
         'station_dmg', 'station_empty_dmg', 'energy_dmg', 'goal_dmg', 'puff_dmg',
-        // The HUD portrait (#56). It was excluded as "drawn on the HUD panel
-        // rather than in the world", and there is no HUD panel — `UIScene`
-        // holds a portrait, a graphics energy bar and two labels, and nothing
-        // behind any of them. The portrait sits on the camera background like
-        // every other sprite in this list (#131).
-        'windup_dmg_head',
         // #167's hazards and machines. Spikes and springs stand in the open,
         // the arc's emitters hang in it, and a moving platform crosses it.
         // A belt and a pool are set in the floor, but their tops are open to
         // the room like everything else's.
         'spike_dmg', 'spring_dmg', 'mover_dmg', 'pylon_dmg', 'belt_dmg', 'lava_dmg',
       ],
+      // The toy stands on the stone as often as it is in the air, and the
+      // ticket asks that it read against every platform (#168).
+      platform: ['robot_dmg', 'key_dmg'],
+      // The HUD portrait (#56). It sat on the camera background until #169
+      // gave the HUD a panel; it is scored against the panel it is drawn on.
+      hud: ['windup_dmg_head'],
     },
     // #52's defect, and it is the opposite relation. The backdrop must NOT be
     // confusable with the platform tile: it shipped drawn in the brick tone,
