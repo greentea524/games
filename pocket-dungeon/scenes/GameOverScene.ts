@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { PAL } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT } from '../constants'
+import { THEME, summaryPalette } from '../theme'
 import { GameState } from '../state'
 import { recordRun, loadMeta, recoverGear } from '../meta'
 import type { RunStats } from '../meta'
@@ -13,7 +14,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(data: { victory: boolean }) {
-    this.cameras.main.setBackgroundColor('#0b0f0c')
+    this.cameras.main.setBackgroundColor(THEME[GameState.paletteMode].bg)
 
     music.stop()
     const victory = data?.victory ?? false
@@ -58,7 +59,9 @@ export class GameOverScene extends Phaser.Scene {
       // into, not that a staircase was reached (#84) — so the line says what
       // was actually done.
       subtitle: victory ? 'You escaped!' : GameState.selectedClass.toUpperCase(),
-      palette: PAL,
+      // The HUD's colours, or the green screen's four tones (#159).
+      palette: summaryPalette(GameState.paletteMode),
+      screen: { width: GBC_WIDTH, height: GBC_HEIGHT },
       stats: [
         { label: 'FLOOR', value: `${GameState.floorDepth}`, highlight: stats.floorsCleared > bestBefore },
         { label: 'KILLS', value: `${GameState.killsCount}` },

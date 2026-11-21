@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST } from '../constants'
+import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, sx } from '../constants'
+import { THEME, css } from '../theme'
 
 /**
  * How many usable items the gear panel shows at once (#105).
@@ -17,15 +18,21 @@ const MAX_VISIBLE_USABLE = 5
 // the 'WALL TORCH / Lighting the way' text described something that was not
 // happening. Giving the player's own light a floor above zero is what lets
 // torchlight read as light.
+//
+// #156 lightened the two the player can see: a room in sight read 30% dark
+// and the card shows it bright. Unseen stays where it was, since hiding the
+// floor plan is the point of it. Torch-lit, explored, in sight and unseen
+// are still four clear steps: 0, 0.42, 0.12 and 0.85 before torchlight.
 const FOG_UNSEEN = 0.85
-const FOG_EXPLORED = 0.55
-const FOG_SIGHTED = 0.3
+const FOG_EXPLORED = 0.42
+const FOG_SIGHTED = 0.12
 const TORCH_RADIUS = 3.5
 const TORCH_LIFT = 0.42
 const TORCH_FLICKER = 0.05
 
 import { GameState, TurnState } from '../state'
 import { MapGenerator } from '../MapGenerator'
+import { FRAME, floorFrame, wallFrame } from '../tiles'
 import { RNG } from '../rng'
 import type { AIType, AIContext } from '../enemies'
 import {
@@ -178,7 +185,7 @@ export class DungeonScene extends Phaser.Scene {
       const dt = Date.now() - touchStartTime
       const dist = Math.hypot(dx, dy)
 
-      if (dist > 25 && dt < 500) {
+      if (dist > sx(25) && dt < 500) {
         if (GameState.turnState !== TurnState.PLAYER_TURN || GameState.uiBlocking) return
         let moveX = 0
         let moveY = 0
@@ -299,6 +306,9 @@ export class DungeonScene extends Phaser.Scene {
 
     const biome = getBiome(GameState.floorDepth)
     const tileKey = mode === 'dmg' ? 'tiles_dmg_v2' : `tiles_gbc_${biome}_v2`
+    const floorSeed = GameState.seed + GameState.floorDepth
+    // Black beyond the rooms (#156): the rock there is not drawn at all.
+    this.cameras.main.setBackgroundColor(mode === 'dmg' ? '#0f380f' : '#07090a')
 
     // Initialize explored grid & fog layer
     this.explored = Array.from({ length: this.mapHeight }, () => Array(this.mapWidth).fill(false))
@@ -311,20 +321,32 @@ export class DungeonScene extends Phaser.Scene {
         const px = x * TILE + TILE / 2
         const py = y * TILE + TILE / 2
 
-        let frameIndex = 0
-        if (char === ' ') frameIndex = -1
-        else if (char === '#') frameIndex = 1
-        else if (char === 'T') frameIndex = 5
-        else if (char === 'B') frameIndex = 6
-        else if (char === 'S') frameIndex = this.modifier?.hideStairs ? 0 : 2
-        else if (char === 'c') frameIndex = 3
-        else if (char === 'r') frameIndex = 7
-        else if (char === 'k') frameIndex = 4
-        else if (char === 'b') frameIndex = 8
-        else frameIndex = 0
+        // Which frame each cell gets is in `tiles.ts` (#156): walls by what
+        // is next to them, floors by a pattern that does not repeat.
+        let frameIndex: number
+        if (char === '#' || char === ' ') frameIndex = wallFrame(this.grid, x, y)
+        else if (char === 'T') frameIndex = FRAME.torch
+        else if (char === 'B') frameIndex = FRAME.banner
+        else if (char === 'S') frameIndex = this.modifier?.hideStairs ? floorFrame(x, y, floorSeed) : FRAME.stairs
+        else if (char === 'c') frameIndex = FRAME.path
+        else if (char === 'r') frameIndex = FRAME.rug
+        else if (char === 'k') frameIndex = FRAME.cracked
+        else if (char === 'b') frameIndex = FRAME.bones
+        else frameIndex = floorFrame(x, y, floorSeed)
 
         if (frameIndex !== -1) {
           this.add.image(px, py, tileKey, frameIndex)
+        }
+        // A warm pool of light under each torch, on the floor in front of it
+        // (#156). Below the fog, so it is hidden wherever the floor is.
+        if (char === 'T' && mode === 'gbc') {
+          this.add
+            .image(px, py + TILE, 'torchglow')
+            .setTint(0xffa040)
+            .setScale(5 / 7)
+            .setAlpha(0.2)
+            .setBlendMode(Phaser.BlendModes.ADD)
+            .setDepth(1)
         }
 
         // Fog layer overlay
@@ -498,7 +520,7 @@ export class DungeonScene extends Phaser.Scene {
     // Due immediately, so the first auto turn does not sit out a full tick
     // after the button press and read as an unresponsive button.
     this.nextAutoTurn = 0
-    this.showDamageText(this.player.x, this.player.y - 12, banner, on ? '#88ffcc' : '#a0a0a0')
+    this.showDamageText(this.player.x, this.player.y - sx(12), banner, on ? '#88ffcc' : '#a0a0a0')
     document.querySelector('#btn-auto')?.classList.toggle('latched', on)
   }
 
@@ -589,7 +611,7 @@ export class DungeonScene extends Phaser.Scene {
         // Costs no turn, the same as walking into a wall. Probing a locked
         // chest to find out it is locked should not hand the floor a free
         // round of attacks.
-        this.showDamageText(this.player.x, this.player.y - 10, 'NEED A KEY', '#ff8888')
+        this.showDamageText(this.player.x, this.player.y - sx(10), 'NEED A KEY', '#ff8888')
         sfx.menuCancel()
         return
       }
@@ -642,7 +664,7 @@ export class DungeonScene extends Phaser.Scene {
           // from, since there is no way back up.
           if (this.bossBlocksStairs()) {
             sfx.menuMove()
-            this.showDamageText(px, py - 8, `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedByBoss}`, '#ff8888')
+            this.showDamageText(px, py - sx(8), `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedByBoss}`, '#ff8888')
             if (GameState.advanceTurn()) this.showRegenTick()
             GameState.drainHunger()
             this.processEnemyTurn()
@@ -657,7 +679,7 @@ export class DungeonScene extends Phaser.Scene {
           // unconditional `floorDepth > 12` win here used to do.
           if (GameState.floorDepth >= FINAL_DEPTH) {
             sfx.menuMove()
-            this.showDamageText(px, py - 8, `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedAtBottom}`, '#ff8888')
+            this.showDamageText(px, py - sx(8), `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedAtBottom}`, '#ff8888')
             return
           }
           sfx.stairs()
@@ -684,7 +706,7 @@ export class DungeonScene extends Phaser.Scene {
     const targetX = enemy.sprite.x
     const targetY = enemy.sprite.y
 
-    this.showDamageText(targetX, targetY - 6, `-${damage}`, '#ff4444')
+    this.showDamageText(targetX, targetY - sx(6), `-${damage}`, '#ff4444')
 
     this.tweens.add({
       targets: this.player,
@@ -700,7 +722,7 @@ export class DungeonScene extends Phaser.Scene {
           enemy.canRevive = false
           enemy.hp = Math.max(1, Math.round(enemy.maxHp * REVIVE_HP_FRACTION))
           sfx.revive()
-          this.showDamageText(targetX, targetY - 6, 'IT RISES', '#d8d8c0')
+          this.showDamageText(targetX, targetY - sx(6), 'IT RISES', '#d8d8c0')
           // Collapse and reassemble, so the player sees what happened rather
           // than just watching the health bar refill.
           this.tweens.add({
@@ -721,7 +743,7 @@ export class DungeonScene extends Phaser.Scene {
           // banked figure is what gets shown — otherwise the float and the
           // counter disagree.
           const banked = GameState.addGold(goldDrop)
-          this.showDamageText(targetX, targetY + 4, `+${banked}g`, '#ffd700')
+          this.showDamageText(targetX, targetY + sx(4), `+${banked}g`, '#ffd700')
           if (enemy.bossDef) {
             this.claimRelic(enemy)
             this.dropBossLoot(enemy)
@@ -826,7 +848,7 @@ export class DungeonScene extends Phaser.Scene {
         enemy.bossState = newState
 
         if (action.type === 'summon') {
-          this.showDamageText(enemy.sprite.x, enemy.sprite.y - 8, 'SUMMON!', '#ff00ff')
+          this.showDamageText(enemy.sprite.x, enemy.sprite.y - sx(8), 'SUMMON!', '#ff00ff')
           this.spawnBossMinion(enemy)
           finishOne()
           return
@@ -838,7 +860,7 @@ export class DungeonScene extends Phaser.Scene {
             enemy.bossState.phase === 'desperate' ? enemy.atk * 2 : enemy.atk,
           )
           GameState.playerHp = Math.max(0, GameState.playerHp - dmg)
-          this.showDamageText(this.player.x, this.player.y - 6, `-${dmg}`, '#ffcc00')
+          this.showDamageText(this.player.x, this.player.y - sx(6), `-${dmg}`, '#ffcc00')
           this.tweens.add({
             targets: enemy.sprite,
             x: enemy.sprite.x + (this.player.x - enemy.sprite.x) * 0.3,
@@ -897,7 +919,7 @@ export class DungeonScene extends Phaser.Scene {
       if (result.action === 'attack') {
         sfx.hit()
         GameState.playerHp = Math.max(0, GameState.playerHp - this.scaleDamage(enemy.atk))
-        this.showDamageText(this.player.x, this.player.y - 6, `-${this.scaleDamage(enemy.atk)}`, '#ffcc00')
+        this.showDamageText(this.player.x, this.player.y - sx(6), `-${this.scaleDamage(enemy.atk)}`, '#ffcc00')
         this.tweens.add({
           targets: enemy.sprite,
           x: enemy.sprite.x + (this.player.x - enemy.sprite.x) * 0.3,
@@ -909,7 +931,7 @@ export class DungeonScene extends Phaser.Scene {
         // Ranged attack: deal damage from distance
         sfx.hit()
         GameState.playerHp = Math.max(0, GameState.playerHp - this.scaleDamage(enemy.atk))
-        this.showDamageText(this.player.x, this.player.y - 6, `-${this.scaleDamage(enemy.atk)}`, '#ff8800')
+        this.showDamageText(this.player.x, this.player.y - sx(6), `-${this.scaleDamage(enemy.atk)}`, '#ff8800')
         // Flash enemy to indicate shot
         this.tweens.add({
           targets: enemy.sprite,
@@ -1063,7 +1085,7 @@ export class DungeonScene extends Phaser.Scene {
    */
   private announceBanner(body: string) {
     const text = this.add
-      .text(TILE * 2, 24, body, {
+      .text(TILE * 2, sx(24), body, {
         fontFamily: '"Press Start 2P", monospace',
         fontSize: '8px',
         color: '#ffd700',
@@ -1088,12 +1110,13 @@ export class DungeonScene extends Phaser.Scene {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '8px',
       color: color,
-      resolution: 2,
+      // A red number over the red rug had nothing to stand on at this size.
+      shadow: { offsetX: 1, offsetY: 1, color: '#000000', fill: true },
     }).setOrigin(0.5).setDepth(20)
 
     this.tweens.add({
       targets: txt,
-      y: y - 10,
+      y: y - sx(10),
       alpha: 0,
       duration: 500,
       onComplete: () => txt.destroy(),
@@ -1143,7 +1166,7 @@ export class DungeonScene extends Phaser.Scene {
       .setDepth(12)
     this.tweens.add({
       targets: risen,
-      y: enemy.sprite.y - 14,
+      y: enemy.sprite.y - sx(14),
       alpha: { from: 1, to: 0 },
       duration: 900,
       ease: 'Sine.easeOut',
@@ -1153,7 +1176,7 @@ export class DungeonScene extends Phaser.Scene {
     const held = GameState.relics.length
     this.showDamageText(
       enemy.sprite.x,
-      enemy.sprite.y - 14,
+      enemy.sprite.y - sx(14),
       `${relic.name}\nRELIC ${held}/${RELIC_TARGET}`,
       '#ffd700',
     )
@@ -1210,7 +1233,7 @@ export class DungeonScene extends Phaser.Scene {
     const sprite = this.add.sprite(px, py - 6, `item_${item.category}_${mode}`).setDepth(4)
     this.floorItems.push({ def: { ...item }, tx: spot.x, ty: spot.y, sprite })
     this.tweens.add({ targets: sprite, y: py, duration: 240, ease: 'Bounce.easeOut' })
-    this.showDamageText(px, py - 16, item.name, '#ffd700')
+    this.showDamageText(px, py - sx(16), item.name, '#ffd700')
   }
 
   /**
@@ -1342,7 +1365,7 @@ export class DungeonScene extends Phaser.Scene {
     const mode = GameState.paletteMode
     if (chest.tier === 'locked') {
       GameState.inventory.remove('key')
-      this.showDamageText(this.player.x, this.player.y - 10, 'UNLOCKED', '#ffd700')
+      this.showDamageText(this.player.x, this.player.y - sx(10), 'UNLOCKED', '#ffd700')
     }
     chest.sprite.setTexture(`chest_${chest.tier}_open_${mode}`)
     sfx.pickup()
@@ -1364,7 +1387,7 @@ export class DungeonScene extends Phaser.Scene {
       // item came from the chest rather than having always been there.
       this.tweens.add({ targets: sprite, x: dx, y: dy, duration: 220, ease: 'Bounce.easeOut' })
     })
-    this.showDamageText(px, py - 14, loot.map((d) => d.name).join(' + '), '#ffd700')
+    this.showDamageText(px, py - sx(14), loot.map((d) => d.name).join(' + '), '#ffd700')
 
     GameState.turnState = TurnState.ANIMATING
     this.time.delayedCall(220, () => {
@@ -1375,7 +1398,7 @@ export class DungeonScene extends Phaser.Scene {
 
   /** The Mending Band's +1, floated like every other HP change (#82). */
   private showRegenTick() {
-    this.showDamageText(this.player.x, this.player.y - 10, '+1 HP', '#88ffcc')
+    this.showDamageText(this.player.x, this.player.y - sx(10), '+1 HP', '#88ffcc')
   }
 
   /**
@@ -1432,12 +1455,8 @@ export class DungeonScene extends Phaser.Scene {
       slot('WPN', inv.equippedWeapon),
       slot('ARM', inv.equippedArmor),
       slot('ACC', inv.equippedAccessory),
-      // Keys (#59) live here rather than in the HUD. Measured, not assumed:
-      // with "STARVING!" and a four-digit gold count on screen, the bottom bar
-      // leaves 18px between the gold readout and ATK, and "K:2" renders at
-      // 20px — so a HUD counter overlaps ATK at values the game actually
-      // reaches. The issue's premise that the HUD already displays keys was
-      // not true; there was no key counter, and there is no room for one.
+      // Keys (#59) were shown only here while the HUD had no room for them.
+      // #158's wider bar has a slot for them too; the panel keeps its line.
       `KEY ${keys > 0 ? `x${keys}` : '--'}`,
     ].join('\n')
 
@@ -1483,16 +1502,15 @@ export class DungeonScene extends Phaser.Scene {
     const backdrop = this.add
       .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, 0x000000, 0.97)
       .setOrigin(0, 0)
-    const text = this.add.text(8, 17, `- GEAR -\n${body}`, {
+    const text = this.add.text(12, 28, `- GEAR -\n${body}`, {
       fontFamily: FONT,
-      fontSize: '7px',
-      color: CSS_LIGHTEST,
+      fontSize: '8px',
+      // The HUD's white, or the green screen's lightest tone (#159).
+      color: css(THEME[GameState.paletteMode].text),
       align: 'left',
-      // Names run past 20 characters at 7px on a 160px screen, and an
-      // unwrapped line just leaves the screen.
-      wordWrap: { width: GBC_WIDTH - 16 },
-      resolution: 2,
-      lineSpacing: 1,
+      // An unwrapped line just leaves the screen.
+      wordWrap: { width: GBC_WIDTH - 24 },
+      lineSpacing: 2,
     })
     panel.add([backdrop, text])
     this.gearPanel = panel
@@ -1524,7 +1542,7 @@ export class DungeonScene extends Phaser.Scene {
       const healed = Math.min(GameState.maxHp - GameState.playerHp, def.healAmount ?? 0)
       GameState.playerHp = Math.min(GameState.maxHp, GameState.playerHp + (def.healAmount ?? 0))
       GameState.inventory.remove(def.id)
-      this.showDamageText(this.player.x, this.player.y - 10, `+${healed} HP`, '#ff88cc')
+      this.showDamageText(this.player.x, this.player.y - sx(10), `+${healed} HP`, '#ff88cc')
     } else if (def.category === 'scroll' && def.scrollEffect) {
       const effect = def.scrollEffect
       GameState.inventory.remove(def.id)
@@ -1549,7 +1567,7 @@ export class DungeonScene extends Phaser.Scene {
   private applyScroll(effect: string) {
     const spec = SCROLL_SPECS[effect]
     if (spec) {
-      this.showDamageText(this.player.x, this.player.y - 18, spec.banner, '#ffff88')
+      this.showDamageText(this.player.x, this.player.y - sx(18), spec.banner, '#ffff88')
     }
 
     if (effect === 'fire') {
@@ -1558,7 +1576,7 @@ export class DungeonScene extends Phaser.Scene {
         const enemy = this.enemies[i]
         const damage = this.scaleDamage(FIRE_DAMAGE)
         enemy.hp -= damage
-        this.showDamageText(enemy.sprite.x, enemy.sprite.y - 6, `-${damage}`, '#ffaa44')
+        this.showDamageText(enemy.sprite.x, enemy.sprite.y - sx(6), `-${damage}`, '#ffaa44')
         if (enemy.hp <= 0) {
           // Same bookkeeping as a melee kill, so a scroll kill still counts
           // and still pays out. Reviving enemies are deliberately not spared
@@ -1567,7 +1585,7 @@ export class DungeonScene extends Phaser.Scene {
           // against exactly the enemy it should struggle with.
           GameState.killsCount++
           const banked = GameState.addGold(enemy.bossDef?.gold ?? (enemy.isSplit ? 1 : 3))
-          this.showDamageText(enemy.sprite.x, enemy.sprite.y + 4, `+${banked}g`, '#ffd700')
+          this.showDamageText(enemy.sprite.x, enemy.sprite.y + sx(4), `+${banked}g`, '#ffd700')
           if (enemy.bossDef) {
             this.claimRelic(enemy)
             this.dropBossLoot(enemy)
@@ -1623,27 +1641,27 @@ export class DungeonScene extends Phaser.Scene {
       // comparison is left on the floor rather than consumed, so the player
       // can come back for it after a swap.
       if (!GameState.isUpgrade(def)) {
-        this.showDamageText(this.player.x, this.player.y - 10, 'KEPT YOURS', '#a0a0a0')
+        this.showDamageText(this.player.x, this.player.y - sx(10), 'KEPT YOURS', '#a0a0a0')
         return
       }
       if (def.category === 'weapon') GameState.equipWeapon(def)
       else if (def.category === 'armor') GameState.equipArmor(def)
       else GameState.equipAccessory(def)
-      this.showDamageText(this.player.x, this.player.y - 10, def.name, '#88ccff')
+      this.showDamageText(this.player.x, this.player.y - sx(10), def.name, '#88ccff')
     } else if (def.category === 'food') {
       GameState.hunger = Math.min(GameState.maxHunger, GameState.hunger + (def.hungerRestore ?? 0))
-      this.showDamageText(this.player.x, this.player.y - 10, `+${def.hungerRestore} FOOD`, '#88ff88')
+      this.showDamageText(this.player.x, this.player.y - sx(10), `+${def.hungerRestore} FOOD`, '#88ff88')
     } else if (def.category === 'potion') {
       GameState.playerHp = Math.min(GameState.maxHp, GameState.playerHp + (def.healAmount ?? 0))
-      this.showDamageText(this.player.x, this.player.y - 10, `+${def.healAmount} HP`, '#ff88cc')
+      this.showDamageText(this.player.x, this.player.y - sx(10), `+${def.healAmount} HP`, '#ff88cc')
     } else if (def.category === 'scroll') {
       // Add to inventory for manual use later
       GameState.inventory.add(def)
       const displayName = GameState.scrollIdentifier.getDisplayName(def)
-      this.showDamageText(this.player.x, this.player.y - 10, displayName, '#ffff88')
+      this.showDamageText(this.player.x, this.player.y - sx(10), displayName, '#ffff88')
     } else if (def.category === 'rewind') {
       GameState.inventory.add(def)
-      this.showDamageText(this.player.x, this.player.y - 10, 'HOURGLASS', '#ffd700')
+      this.showDamageText(this.player.x, this.player.y - sx(10), 'HOURGLASS', '#ffd700')
     } else if (def.category === 'key') {
       GameState.inventory.add(def)
       this.showDamageText(
@@ -1675,7 +1693,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private applyRewind(snap: TurnSnapshot) {
-    this.showDamageText(this.player.x, this.player.y - 10, 'REWIND!', '#ffd700')
+    this.showDamageText(this.player.x, this.player.y - sx(10), 'REWIND!', '#ffd700')
 
     this.playerTX = snap.playerTX
     this.playerTY = snap.playerTY
@@ -1725,7 +1743,7 @@ export class DungeonScene extends Phaser.Scene {
     const enemy = this.enemies.find(e => e.tx === tx && e.ty === ty && e.hp > 0)
     if (enemy) {
       const aiName = typeof enemy.ai === 'string' ? enemy.ai.toUpperCase() : 'BOSS'
-      this.showDamageText(px, py - 8, `${enemy.name}\nHP:${enemy.hp}/${enemy.maxHp} ATK:${enemy.atk}\nAI:${aiName}`, '#a0e0ff')
+      this.showDamageText(px, py - sx(8), `${enemy.name}\nHP:${enemy.hp}/${enemy.maxHp} ATK:${enemy.atk}\nAI:${aiName}`, '#a0e0ff')
       return
     }
 
@@ -1735,13 +1753,13 @@ export class DungeonScene extends Phaser.Scene {
       const name = item.def.category === 'scroll'
         ? GameState.scrollIdentifier.getDisplayName(item.def)
         : item.def.name
-      this.showDamageText(px, py - 8, `${name}\n${item.def.description}`, '#ffffaa')
+      this.showDamageText(px, py - sx(8), `${name}\n${item.def.description}`, '#ffffaa')
       return
     }
 
     // Check stairs / player / tile
     if (tx === this.playerTX && ty === this.playerTY) {
-      this.showDamageText(px, py - 8, `YOU (${GameState.selectedClass.toUpperCase()})\nHP:${GameState.playerHp}/${GameState.maxHp} ATK:${GameState.playerAtk}`, '#88ff88')
+      this.showDamageText(px, py - sx(8), `YOU (${GameState.selectedClass.toUpperCase()})\nHP:${GameState.playerHp}/${GameState.maxHp} ATK:${GameState.playerAtk}`, '#88ff88')
       return
     }
 
@@ -1751,30 +1769,30 @@ export class DungeonScene extends Phaser.Scene {
       // is where a player finds out which — the tile art does not change when
       // a boss seals it.
       if (this.portalOpen) {
-        this.showDamageText(px, py - 8, `${RELIC_COPY.portalTitle}\nThe way home`, '#ffd700')
+        this.showDamageText(px, py - sx(8), `${RELIC_COPY.portalTitle}\nThe way home`, '#ffd700')
       } else if (this.bossBlocksStairs()) {
-        this.showDamageText(px, py - 8, `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedByBoss}`, '#ff8888')
+        this.showDamageText(px, py - sx(8), `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedByBoss}`, '#ff8888')
       } else if (GameState.floorDepth >= FINAL_DEPTH) {
-        this.showDamageText(px, py - 8, `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedAtBottom}`, '#ff8888')
+        this.showDamageText(px, py - sx(8), `${RELIC_COPY.sealedTitle}\n${RELIC_COPY.sealedAtBottom}`, '#ff8888')
       } else {
-        this.showDamageText(px, py - 8, `STAIRS DOWN\nTo Floor ${GameState.floorDepth + 1}`, '#ffd700')
+        this.showDamageText(px, py - sx(8), `STAIRS DOWN\nTo Floor ${GameState.floorDepth + 1}`, '#ffd700')
       }
     } else if (char === 'c') {
-      this.showDamageText(px, py - 8, 'CORRIDOR PATH\nStone walkway', '#aa99bb')
+      this.showDamageText(px, py - sx(8), 'CORRIDOR PATH\nStone walkway', '#aa99bb')
     } else if (char === 'T') {
-      this.showDamageText(px, py - 8, 'WALL TORCH\nLighting the way', '#ffa000')
+      this.showDamageText(px, py - sx(8), 'WALL TORCH\nLighting the way', '#ffa000')
     } else if (char === 'r') {
-      this.showDamageText(px, py - 8, 'ROOM CARPET / RUG', '#ff88aa')
+      this.showDamageText(px, py - sx(8), 'ROOM CARPET / RUG', '#ff88aa')
     } else if (char === 'k') {
-      this.showDamageText(px, py - 8, 'CRACKED FLOOR', '#888888')
+      this.showDamageText(px, py - sx(8), 'CRACKED FLOOR', '#888888')
     } else if (char === 'b') {
-      this.showDamageText(px, py - 8, 'SCATTERED BONES', '#e0d8c0')
+      this.showDamageText(px, py - sx(8), 'SCATTERED BONES', '#e0d8c0')
     } else if (char === '#') {
-      this.showDamageText(px, py - 8, 'DUNGEON WALL', '#aaaaaa')
+      this.showDamageText(px, py - sx(8), 'DUNGEON WALL', '#aaaaaa')
     } else if (char === ' ') {
-      this.showDamageText(px, py - 8, 'THE VOID\nImpassable darkness', '#555555')
+      this.showDamageText(px, py - sx(8), 'THE VOID\nImpassable darkness', '#555555')
     } else {
-      this.showDamageText(px, py - 8, 'DUNGEON FLOOR', '#668866')
+      this.showDamageText(px, py - sx(8), 'DUNGEON FLOOR', '#668866')
     }
   }
 

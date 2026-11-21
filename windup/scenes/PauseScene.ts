@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT, CSS_LIGHTEST, CSS_DARKEST, CSS_MID, CSS_LIGHT } from '../constants'
+import { WORLD_WIDTH as GBC_WIDTH, WORLD_HEIGHT as GBC_HEIGHT, FONT, CSS_LIGHTEST, CSS_DARKEST, CSS_MID, CSS_LIGHT, VIEW_ZOOM } from '../constants'
 import { GameState } from '../state'
 import { sfx, isMuted, setMuted } from '../audio'
 
@@ -16,6 +16,9 @@ export class PauseScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144, and shown enlarged from the top left by
+    // the play camera's factor (#166). The later tickets lay it out anew.
+    this.cameras.main.setOrigin(0, 0).setZoom(VIEW_ZOOM)
     // Semi-transparent overlay
     this.add.rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, 0x000000, 0.7).setOrigin(0, 0)
 

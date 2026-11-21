@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, PAL } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT, PAL, TILE } from '../constants'
+import { BODY_LINES, COLS, TOAST_COLS, banner, choices, dialogue, dialogueOnTop, toast, wrap, type DialogueLayout } from '../hud'
 import { GameState } from '../state'
 import { ITEMS, resolveDialogue, currentObjective, openThreads } from '../dialogue'
 import { sfx } from '../audio'
@@ -9,12 +10,12 @@ import type { TransformEvent } from '../items'
 const FONT = '"Press Start 2P", monospace'
 // Top of the 'A / SELECT: close' hint; item rows must stay above it.
 const HINT_TOP = GBC_HEIGHT - 18
-// Floor for item row spacing: the icons are 16px, so anything tighter
+// Floor for item row spacing: the icons are a tile high, so anything tighter
 // overlaps them. An unreadable list is worse than a cramped one.
-const MIN_ROW = 16
+const MIN_ROW = TILE + 2
 // How far the last item row reaches below its baseline: the icon is centred
-// at y + 4 and is 16px tall, so it bottoms out at y + 12.
-const ROW_OVERHANG = 12
+// at y + 4 and is a tile tall.
+const ROW_OVERHANG = TILE / 2 + 4
 // Space between the objective/notes block and the first item row.
 const ITEMS_GAP = 8
 const CSS_LIGHT = '#9bbc0f'
@@ -54,46 +55,24 @@ export class UIScene extends Phaser.Scene {
     super('ui')
   }
 
+  /** Where the dialogue box is this time: see `placeDialogue`. */
+  private layout!: DialogueLayout
+  private onTop = false
+
   create() {
-    // 58, not 50. Press Start 2P is a bitmap face on an 8px grid: at 7px it
-    // renders at 0.875x and the glyph strokes land between pixels, which is
-    // what made this text mushy. At its native 8px it is crisp, but wraps
-    // wider — and the old box was already too short, overflowing on 10 of the
-    // game's 137 lines at 7px. Measured against all 137, the tallest needs
-    // 38px of body, so the box is sized to that rather than to the average.
-    const boxH = 58
-    const boxY = GBC_HEIGHT - boxH - 2
-
+    // Laid out on the real screen, with the font at its native 8 pixels
+    // (#180). Every position comes from `hud.ts`; the body is wrapped there
+    // too, so Phaser's own wrapping is off and what is drawn is what
+    // `hud_test.ts` measured.
     this.box = this.add.graphics().setDepth(1000)
-    this.box.fillStyle(PAL.darkest, 0.94)
-    this.box.fillRoundedRect(3, boxY, GBC_WIDTH - 6, boxH, 3)
-    this.box.lineStyle(1, PAL.light, 1)
-    this.box.strokeRoundedRect(3, boxY, GBC_WIDTH - 6, boxH, 3)
+    const style = { fontFamily: FONT, fontSize: '8px', resolution: 2 }
+    this.nameText = this.add.text(0, 0, '', { ...style, color: CSS_MID }).setDepth(1001)
+    this.bodyText = this.add.text(0, 0, '', { ...style, color: CSS_LIGHT, lineSpacing: 2 }).setDepth(1001)
+    this.arrow = this.add.text(0, 0, '▼', { ...style, color: CSS_LIGHT }).setOrigin(1, 0).setDepth(1001)
+    this.placeDialogue(false)
 
-    this.nameText = this.add
-      .text(8, boxY + 4, '', { fontFamily: FONT, fontSize: '8px', color: CSS_MID, resolution: 2 })
-      .setDepth(1001)
-    this.bodyText = this.add
-      .text(8, boxY + 16, '', {
-        fontFamily: FONT,
-        fontSize: '8px',
-        color: CSS_LIGHT,
-        resolution: 2,
-        lineSpacing: 2,
-        wordWrap: { width: GBC_WIDTH - 16 },
-      })
-      .setDepth(1001)
-    this.arrow = this.add
-      .text(GBC_WIDTH - 12, GBC_HEIGHT - 10, '▼', {
-        fontFamily: FONT,
-        fontSize: '8px',
-        color: CSS_LIGHT,
-        resolution: 2,
-      })
-      .setDepth(1001)
-
-    // Choices show in their own small box (top-right) so the question text
-    // in the main dialogue box stays visible.
+    // Choices show in their own small box beside the dialogue box, so the
+    // question stays visible.
     this.choiceBox = this.add.graphics().setDepth(1001).setVisible(false)
     this.choiceTexts = [0, 1].map((i) =>
       this.add
@@ -138,8 +117,25 @@ export class UIScene extends Phaser.Scene {
     this.lineIndex = 0
     this.choiceMode = false
     this.inputLockUntil = this.time.now + 140
+    // Along the top when the kid, or who they are talking to, would be under
+    // it at the bottom: a room does not scroll, and its door is the bottom row.
+    const world = this.scene.get('world') as unknown as { dialogueClearYs?: () => number[] }
+    this.placeDialogue(dialogueOnTop(world.dialogueClearYs?.() ?? [], GBC_HEIGHT, TILE))
     this.showDialogueUI(true)
     this.showLine()
+  }
+
+  private placeDialogue(top: boolean) {
+    this.onTop = top
+    const d = (this.layout = dialogue(GBC_WIDTH, GBC_HEIGHT, top))
+    this.box.clear()
+    this.box.fillStyle(PAL.darkest, 0.94)
+    this.box.fillRoundedRect(d.box.x, d.box.y, d.box.width, d.box.height, 3)
+    this.box.lineStyle(1, PAL.light, 1)
+    this.box.strokeRoundedRect(d.box.x + 0.5, d.box.y + 0.5, d.box.width - 1, d.box.height - 1, 3)
+    this.nameText.setPosition(d.name.x, d.name.y)
+    this.bodyText.setPosition(d.body.x, d.body.y)
+    this.arrow.setPosition(d.arrow.x, d.arrow.y)
   }
 
   private toastContainer?: Phaser.GameObjects.Container
@@ -158,7 +154,7 @@ export class UIScene extends Phaser.Scene {
     if (line.setFlag) GameState.setFlag(line.setFlag)
 
     this.nameText.setText(this.activeNpc?.name ?? '')
-    this.bodyText.setText(line.text)
+    this.bodyText.setText(wrap(line.text, COLS).slice(0, BODY_LINES).join('\n'))
 
     if (line.choice) {
       this.enterChoice(line.choice)
@@ -191,37 +187,34 @@ export class UIScene extends Phaser.Scene {
 
     if (this.toastContainer) this.toastContainer.destroy()
 
-    const w = GBC_WIDTH - 16
-    // 30, not 22: at the font's native 8px two lines need 20px plus padding,
-    // and a wrapped message can take two.
-    const h = 30
-    const cx = GBC_WIDTH / 2
-    const startY = -h - 2
-    const endY = 4
+    // Wrapped by `hud.ts`, beside the icon. Along the top, unless the
+    // dialogue box is there, and slid in from that edge.
+    const lines = wrap(message, TOAST_COLS)
+    const top = !(GameState.dialogueActive && this.onTop)
+    const t = toast(lines.length, GBC_WIDTH, GBC_HEIGHT, top)
+    const { width: w, height: h } = t
+    const startY = top ? -h - 2 : GBC_HEIGHT + 2
 
     const bg = this.add.graphics()
     bg.fillStyle(PAL.darkest, 0.96)
-    bg.fillRoundedRect(-w / 2, 0, w, h, 3)
+    bg.fillRoundedRect(0, 0, w, h, 3)
     bg.lineStyle(1, PAL.light, 1)
-    bg.strokeRoundedRect(-w / 2, 0, w, h, 3)
+    bg.strokeRoundedRect(0.5, 0.5, w - 1, h - 1, 3)
 
-    const icon = this.add.image(-w / 2 + 12, h / 2, iconKey).setOrigin(0.5)
-    const text = this.add.text(-w / 2 + 24, 5, message, {
+    const icon = this.add.image(6 + TILE / 2, h / 2, iconKey).setOrigin(0.5)
+    const text = this.add.text(6 + TILE + 6, Math.round((h - lines.length * 10) / 2) + 1, lines.join('\n'), {
       fontFamily: FONT,
       fontSize: '8px',
       color: '#e0f8cf',
       resolution: 2,
       lineSpacing: 2,
-      // The icon eats the left 24px; without a wrap the message ran clean off
-      // the screen — 'The flashlight flickers back on.' measured 210px wide.
-      wordWrap: { width: w - 28 },
     })
 
-    this.toastContainer = this.add.container(cx, startY, [bg, icon, text]).setDepth(2000)
+    this.toastContainer = this.add.container(t.x, startY, [bg, icon, text]).setDepth(2000)
 
     this.tweens.add({
       targets: this.toastContainer,
-      y: endY,
+      y: t.y,
       duration: 300,
       ease: 'Back.easeOut',
       hold: 2400,
@@ -235,36 +228,27 @@ export class UIScene extends Phaser.Scene {
     })
   }
 
-  // Transient location card on entering a new area. Sits top-left and is
-  // sized to its text so it clears the town minimap in the top-right.
+  // The name of a place as you arrive: a small plate in the top left that
+  // slides in, stays a second and a half, and goes. The minimap has the top
+  // right, and `hud_test.ts` holds the two apart.
   private locationBanner?: Phaser.GameObjects.Container
 
   public showLocationBanner(label: string) {
     if (this.locationBanner) this.locationBanner.destroy()
+    const b = banner(label)
 
-    const text = this.add.text(5, 3, label, {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    })
-    const w = Math.ceil(text.width) + 10
-    const h = 15
-
+    const text = this.add.text(6, 4, label, { fontFamily: FONT, fontSize: '8px', color: '#e0f8cf', resolution: 2 })
     const bg = this.add.graphics()
     bg.fillStyle(PAL.darkest, 0.9)
-    bg.fillRoundedRect(0, 0, w, h, 3)
+    bg.fillRoundedRect(0, 0, b.width, b.height, 3)
     bg.lineStyle(1, PAL.light, 1)
-    bg.strokeRoundedRect(0, 0, w, h, 3)
+    bg.strokeRoundedRect(0.5, 0.5, b.width - 1, b.height - 1, 3)
 
-    this.locationBanner = this.add
-      .container(4, -h, [bg, text])
-      .setDepth(1500)
-      .setAlpha(0)
+    this.locationBanner = this.add.container(b.x, -b.height, [bg, text]).setDepth(1500).setAlpha(0)
 
     this.tweens.add({
       targets: this.locationBanner,
-      y: 4,
+      y: b.y,
       alpha: 1,
       duration: 260,
       ease: 'Back.easeOut',
@@ -304,22 +288,18 @@ export class UIScene extends Phaser.Scene {
 
   private renderChoices() {
     const n = this.choices.length
-    const lineH = 11
-    const boxW = 58
-    const boxH = n * lineH + 6
-    const bx = GBC_WIDTH - boxW - 4
-    const by = 4
+    const c = choices(this.choices.map((o) => o.label), this.layout, this.onTop)
     this.choiceBox.clear()
     this.choiceBox.fillStyle(PAL.darkest, 0.95)
-    this.choiceBox.fillRoundedRect(bx, by, boxW, boxH, 3)
+    this.choiceBox.fillRoundedRect(c.box.x, c.box.y, c.box.width, c.box.height, 3)
     this.choiceBox.lineStyle(1, PAL.light, 1)
-    this.choiceBox.strokeRoundedRect(bx, by, boxW, boxH, 3)
+    this.choiceBox.strokeRoundedRect(c.box.x + 0.5, c.box.y + 0.5, c.box.width - 1, c.box.height - 1, 3)
     this.choiceBox.setVisible(true)
 
     this.choiceTexts.forEach((t, i) => {
       if (i < n) {
         t.setVisible(true)
-        t.setPosition(bx + 5, by + 4 + i * lineH)
+        t.setPosition(c.rows[i].x, c.rows[i].y)
         t.setText((i === this.choiceIndex ? '▶ ' : '  ') + this.choices[i].label)
         t.setColor(i === this.choiceIndex ? '#e0f8cf' : CSS_LIGHT)
       } else {
@@ -398,7 +378,7 @@ export class UIScene extends Phaser.Scene {
       // 1, not 3. Three lines of 8px text with generous leading did not leave
       // room for five item rows; tightening the leading buys those lines back
       // without shortening the directives into telegram English.
-      lineSpacing: 1,
+      lineSpacing: 2,
       wordWrap: { width: GBC_WIDTH - 20 },
       // Hard cap, so a longer directive added later cannot silently push item
       // rows off the panel. Every directive today fits inside it — see the
@@ -413,7 +393,7 @@ export class UIScene extends Phaser.Scene {
       fontSize: '8px',
       color: CSS_MID,
       resolution: 2,
-      lineSpacing: 1,
+      lineSpacing: 2,
       wordWrap: { width: GBC_WIDTH - 20 },
     })
 
@@ -480,7 +460,7 @@ export class UIScene extends Phaser.Scene {
 
     if (GameState.inventory.length === 0) {
       this.inv.add(
-        this.add.text(16, itemsTop + 2, '(empty)', {
+        this.add.text(10, itemsTop + 2, '(empty)', {
           fontFamily: FONT,
           fontSize: '8px',
           color: CSS_MID,
@@ -494,15 +474,15 @@ export class UIScene extends Phaser.Scene {
     // The floor is the 16px icon height — below that, rows would overlap, and
     // an unreadable list is worse than a cramped one.
     const rows = GameState.inventory.length
-    const spacing = Math.max(MIN_ROW, Math.min(20, Math.floor((HINT_TOP - itemsTop) / rows)))
+    const spacing = Math.max(MIN_ROW, Math.min(TILE + 6, Math.floor((HINT_TOP - itemsTop) / rows)))
 
     GameState.inventory.forEach((id, i) => {
       const def = ITEMS[id]
       const y = itemsTop + i * spacing
       const mode = GameState.paletteMode
       const iconKey = def ? `item_${mode}_${def.id}` : ''
-      const icon = this.add.image(20, y + 4, iconKey).setOrigin(0.5)
-      const label = this.add.text(34, y, def ? def.name : id, {
+      const icon = this.add.image(10 + TILE / 2, y + 4, iconKey).setOrigin(0.5)
+      const label = this.add.text(10 + TILE + 8, y, def ? def.name : id, {
         fontFamily: FONT,
         fontSize: '8px',
         color: CSS_LIGHT,

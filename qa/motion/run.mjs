@@ -2,7 +2,8 @@
 //
 //   npm run qa:motion
 //
-// `shared/motion.ts` is read at six sites across four games, and until this
+// `shared/motion.ts` is read at six sites across four games (five since #179,
+// which added Static), and until this
 // file nothing checked any of them. The call being present in the source is a
 // data structure; whether the motion stops is the effect, and the effect was
 // unmeasured — the same shape as #134 and #136.
@@ -175,6 +176,32 @@ const GAMES = [
     },
   },
   {
+    // #167. The gears turned under reduced motion for the life of #52's
+    // backdrop: only the steam was measured, and the gears were a rotation in
+    // `update()` that nothing read. They step through drawn frames now.
+    game: 'windup',
+    what: 'the backdrop gears turn',
+    advance: 2,
+    async measure({ page }) {
+      return page.evaluate(async () => {
+        const scene = window.__game.scene.getScene('platformer')
+        if (!scene?.scene?.isActive()) return { value: 0, note: 'the platformer is not running', busy: 0 }
+        const frames = () => scene.children.list
+          .flatMap((o) => o.list ?? [])
+          .filter((o) => /^gear(big|small)_/.test(o.texture?.key ?? ''))
+          .map((o) => String(o.frame.name))
+        const before = frames()
+        const changed = new Set()
+        const t0 = performance.now()
+        while (performance.now() - t0 < 1500) {
+          await new Promise((r) => setTimeout(r, 50))
+          frames().forEach((f, i) => { if (f !== before[i]) changed.add(i) })
+        }
+        return { value: changed.size, note: `${changed.size} of ${before.length} gear(s) turned`, busy: before.length }
+      })
+    },
+  },
+  {
     game: 'lantern-keeper',
     what: 'the fireflies drift',
     advance: 3,
@@ -183,16 +210,86 @@ const GAMES = [
         const scene = window.__game.scene.scenes.find((s) => s.scene.isActive() && s.fireflies)
         if (!scene) return { value: 0, note: 'no scene with fireflies is running', busy: 0 }
         const at = () => scene.fireflies.map((f) => `${f.sprite.x.toFixed(3)},${f.sprite.y.toFixed(3)}`)
+        // The hanging vines sway (#172): each is a chain turned about where
+        // it is rooted, so its angle is the thing to watch.
+        const lean = () => scene.vines.map((v) => v.angle.toFixed(3))
         const before = at()
+        const leanBefore = lean()
         await new Promise((r) => setTimeout(r, 900))
         const after = at()
+        const leanAfter = lean()
+        const swayed = leanBefore.filter((a, i) => a !== leanAfter[i]).length
         let moved = 0
         for (let i = 0; i < before.length; i++) if (before[i] !== after[i]) moved++
         // Their alpha still tracks whether a lantern is lit either way — the
         // scene's own comment is explicit that only the movement is decoration,
         // so the fireflies must still be *there* under the preference.
-        return { value: moved, note: `${moved} of ${before.length} moved`, busy: before.length }
+        return { value: moved, note: `${moved} of ${before.length} moved`, busy: before.length, swayed, vines: leanBefore.length }
       })
+    },
+    also(moving, still) {
+      return [
+        ['lantern-keeper: the vines sway', moving.swayed > 0, `${moving.swayed} of ${moving.vines} turned`],
+        // The vines must still be hanging there, or nothing was measured.
+        ['lantern-keeper: and hang still under the preference', still.vines > 0 && still.swayed === 0, `${still.swayed} of ${still.vines} turned`],
+      ]
+    },
+  },
+  {
+    // #179. Static's namesake is noise, and it had two kinds: patches that
+    // crackle on a tile, and noise thrown over the whole screen at a crossing.
+    // The second is a full-screen flash and is not shown under the preference.
+    // The first is kept, slowed — `also` holds it to that.
+    game: 'static',
+    what: 'noise flashes over the whole screen at a crossing',
+    advance: 3,
+    async measure({ page }) {
+      return page.evaluate(async () => {
+        const world = () => window.__game.scene.getScene('world')
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+        world().enterDoor('town', 18, 15)
+        await wait(1500)
+        // How often a patch changes its picture, counted over two seconds.
+        const patch = world().children.list.find((o) => o.texture?.key?.startsWith('corruption_'))
+        if (!patch) return { value: 0, note: 'no patch of static in the town', busy: 0 }
+        let swaps = 0
+        let last = patch.texture.key
+        const until = performance.now() + 2000
+        while (performance.now() < until) {
+          await new Promise((r) => requestAnimationFrame(r))
+          if (patch.texture.key !== last) { swaps++; last = patch.texture.key }
+        }
+        const sealed = last.includes('sealed')
+        // The crossing. The overlay lives for a few hundred milliseconds, so
+        // it is looked for every frame from the moment it is asked for.
+        world().switchWorld()
+        let frames = 0
+        const end = performance.now() + 240
+        while (performance.now() < end) {
+          if (world().children.list.some((o) => o.texture?.key === 'noise' && o.visible)) frames++
+          await new Promise((r) => requestAnimationFrame(r))
+        }
+        await wait(1500)
+        const now = world().children.list.find((o) => o.texture?.key?.startsWith('corruption_'))
+        const crossed = sealed && !!now && now.texture.key.includes('open')
+        return {
+          value: frames,
+          note: `the overlay was up for ${frames} frames`,
+          // The crossing itself must still happen, or nothing was measured.
+          busy: crossed ? 1 : 0,
+          swaps,
+        }
+      })
+    },
+    also(moving, still) {
+      return [
+        ['static: a patch crackles', moving.swaps >= 8, `${moving.swaps} changes in two seconds`],
+        [
+          'static: and still changes under reduced motion, under three times a second',
+          still.swaps >= 1 && still.swaps <= 5,
+          `${still.swaps} changes in two seconds`,
+        ],
+      ]
     },
   },
 ]
@@ -244,6 +341,8 @@ for (const entry of GAMES) {
     still.value === 0,
     `${still.note} — under prefers-reduced-motion: reduce`,
   )
+  // Motion a game keeps under the preference, but changes: both halves again.
+  for (const [name, ok, detail] of entry.also?.(moving, still) ?? []) check(name, ok, detail)
 }
 
 server.stop()

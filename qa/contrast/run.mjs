@@ -125,6 +125,16 @@ for (const entry of GAMES) {
           `'${surface.over}' is not resolved — declare it above ${name}`)
         continue
       }
+      // Read the overlay with the game in DMG, which is the mode the sprites
+      // scored against it are drawn in (#158). Pocket Dungeon's bar was black
+      // in both modes, so reading it in colour happened to be right; once it
+      // took the palette's own dark tone, the green pips were being measured
+      // against a bar they never sit on.
+      const toDmg = entry.paletteToggle ? await page.$(entry.paletteToggle) : null
+      if (toDmg) {
+        await toDmg.click()
+        await page.waitForTimeout(300)
+      }
       const fill = await page.evaluate(
         ({ scene, at }) => {
           const sc = window.__game.scene.getScene(scene)
@@ -143,6 +153,10 @@ for (const entry of GAMES) {
         },
         { scene: surface.overlay.scene, at: surface.overlay.at },
       )
+      if (toDmg) {
+        await toDmg.click()
+        await page.waitForTimeout(300)
+      }
       if (!fill) {
         check(`surface ${name} finds its overlay`, false,
           `nothing in scene '${surface.overlay.scene}' covers ${JSON.stringify(surface.overlay.at)}`)
@@ -153,6 +167,14 @@ for (const entry of GAMES) {
         Math.round(((fill.fill >> shift) & 255) * fill.alpha + under[i] * (1 - fill.alpha)),
       )
       continue
+    }
+    // A surface that changes with the palette is read with the game in DMG,
+    // as the overlay above is: Windup's camera took each palette's own dark
+    // in #167, and the sprites scored against it are the green screen's.
+    const flip = surface.inDmg && entry.paletteToggle ? await page.$(entry.paletteToggle) : null
+    if (flip) {
+      await flip.click()
+      await page.waitForTimeout(300)
     }
     tones[name] = await page.evaluate(
       ({ surface }) => {
@@ -165,6 +187,10 @@ for (const entry of GAMES) {
       },
       { surface },
     )
+    if (flip) {
+      await flip.click()
+      await page.waitForTimeout(300)
+    }
   }
   for (const [name, tone] of Object.entries(tones)) {
     console.log(`  surface ${name}: rgb(${tone.join(',')})`)

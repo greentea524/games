@@ -145,6 +145,8 @@ if (paletteBtn) {
     if (dungeon?.scene.isActive()) dungeon.reloadPalette()
     const title = game.scene.getScene('title') as TitleScene | null
     if (title?.scene.isActive()) title.reloadPalette()
+    const shop = game.scene.getScene('shop') as ShopScene | null
+    if (shop?.scene.isActive()) shop.reloadPalette()
   })
 
   updatePaletteBtn()

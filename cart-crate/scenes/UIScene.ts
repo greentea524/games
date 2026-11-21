@@ -1,17 +1,39 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, GBC_HEIGHT, FONT, PAL } from '../constants'
+import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem } from '../save'
 import type { BoardScene } from './BoardScene'
 import { isMuted, setMuted } from '../audio'
+import { BAR_HEIGHT, CELL, HUD_THEME, css, layout, type HudValues } from '../hud'
 
 /** The pause panel's sound row, numbered with the rest; its state is live (#143). */
 const soundLabel = () => `6. SOUND: ${isMuted() ? 'OFF' : 'ON'}`
+/**
+ * The pause panel's hint row (#164). The hint was on the H key and nowhere
+ * else, so a phone could not ask for one at all.
+ */
+const hintLabel = (on: boolean) => `7. HINT: ${on ? 'ON' : 'OFF'}`
 
+const ROW_LABELS = ['1. RESUME GAME', '2. HOW TO PLAY', '3. SKIP STAGE', '4. RESTART LVL', '5. QUIT TO MAP']
+const PANEL = { width: 150, height: 114, rowGap: 12 }
+const HELP = { width: 144, height: 130 }
+
+/**
+ * The HUD and the pause panel, laid out for 240×216 (#164).
+ *
+ * Solid bars in the warehouse's dark, text at the font's native 8 pixels with
+ * no stroke, placed by `hud.ts` — the same boxes `hud_test.ts` checks. The
+ * colours follow the palette in use, panels included.
+ */
 export class UIScene extends Phaser.Scene {
-  private levelTitleText!: Phaser.GameObjects.Text
-  private movesText!: Phaser.GameObjects.Text
+  private texts = new Map<string, Phaser.GameObjects.Text>()
+  private bars!: Phaser.GameObjects.Graphics
+  private panelBg!: Phaser.GameObjects.Graphics
+  private helpBg!: Phaser.GameObjects.Graphics
+  private panelTitle!: Phaser.GameObjects.Text
+  private helpTexts: Phaser.GameObjects.Text[] = []
+  private themed: 'gbc' | 'dmg' | null = null
 
   private pauseContainer!: Phaser.GameObjects.Container
   private helpContainer!: Phaser.GameObjects.Container
@@ -25,193 +47,127 @@ export class UIScene extends Phaser.Scene {
     super('ui')
   }
 
+  private label(x: number, y: number, text: string, size = CELL) {
+    return this.add.text(x, y, text, { fontFamily: FONT, fontSize: `${size}px`, color: '#ffffff' })
+  }
+
+  private values(): HudValues {
+    const level = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
+    const best = SaveSystem.getLevelData(level.id).bestMoves
+    return {
+      stage: level.id,
+      moves: GameState.movesCount,
+      par: level.parMoves,
+      // 999 is the save's "never", from before it stored 0 for that.
+      best: best > 0 && best < 999 ? best : 0,
+      desktop: window.matchMedia('(hover: hover) and (pointer: fine)').matches,
+    }
+  }
+
   create() {
-    const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
+    this.pauseOpen = false
+    this.helpOpen = false
+    this.themed = null
+    this.texts.clear()
+    this.bars = this.add.graphics()
+    // Every box the layout can produce, made once; `draw` places and fills them.
+    for (const name of ['stage', 'moves', 'best', 'controls']) this.texts.set(name, this.label(0, 0, ''))
 
-    // Top Bar Pill Background for High Contrast in MONO and COLOR modes
-    const topBarGfx = this.add.graphics()
-    topBarGfx.fillStyle(0x0f380f, 0.85)
-    topBarGfx.fillRect(0, 0, GBC_WIDTH, 14)
-
-    // Top Bar Level Title Text with stroke contour
-    this.levelTitleText = this.add.text(4, 3, `STG ${levelConfig.id}`, {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      stroke: '#0f380f',
-      strokeThickness: 1,
-      resolution: 2,
-    })
-
-    this.movesText = this.add.text(GBC_WIDTH - 4, 3, `0 / ${levelConfig.parMoves}`, {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      stroke: '#0f380f',
-      strokeThickness: 1,
-      resolution: 2,
-    }).setOrigin(1, 0)
-
-    // Bottom Bar Pill Background for Objective
-    const bottomBarGfx = this.add.graphics()
-    bottomBarGfx.fillStyle(0x0f380f, 0.85)
-    bottomBarGfx.fillRect(0, GBC_HEIGHT - 12, GBC_WIDTH, 12)
-
-    // Fixed hint line; never updated after creation.
-    this.add.text(GBC_WIDTH / 2, GBC_HEIGHT - 3, 'Z:UNDO H:HINT R:RST', {
-      fontFamily: FONT,
-      // 8px is the font's native grid; anything else renders between pixels.
-      // The old label was 23 chars, which is 184px at 8px, so it is abbreviated.
-      fontSize: '8px',
-      color: '#9bbc0f',
-      stroke: '#0f380f',
-      strokeThickness: 1,
-      resolution: 2,
-    }).setOrigin(0.5, 1)
-
-    // Build Pause Menu & How-To-Play Overlay
     this.createPauseMenu()
     this.createHelpModal()
+    this.draw()
 
     // Level Intro Flash
-    const bestData = SaveSystem.getLevelData(levelConfig.id)
-    const bestText = bestData.bestMoves > 0 && bestData.bestMoves < 999 ? `BEST: ${bestData.bestMoves}` : `PAR: ${levelConfig.parMoves}`
-    
+    const values = this.values()
+    const theme = HUD_THEME[GameState.paletteMode]
     const introContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2).setDepth(100)
-    
     const introBg = this.add.graphics()
-    introBg.fillStyle(0x0f380f, 0.9)
-    introBg.fillRoundedRect(-50, -15, 100, 30, 4)
-    
-    const stageTitle = this.add.text(0, -5, `STAGE ${levelConfig.id}`, {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#ffcc00',
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    const stageBest = this.add.text(0, 7, bestText, {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    }).setOrigin(0.5)
-
+    introBg.fillStyle(theme.bar, 0.92)
+    introBg.fillRoundedRect(-56, -17, 112, 34, 4)
+    introBg.lineStyle(1, theme.edge, 1)
+    introBg.strokeRoundedRect(-56, -17, 112, 34, 4)
+    const stageTitle = this.label(0, -11, `STAGE ${values.stage}`).setOrigin(0.5, 0).setColor(css(theme.accent))
+    const stageBest = this.label(0, 3, values.best ? `BEST: ${values.best}` : `PAR: ${values.par}`)
+      .setOrigin(0.5, 0)
+      .setColor(css(theme.text))
     introContainer.add([introBg, stageTitle, stageBest])
-
     this.tweens.add({
       targets: introContainer,
       alpha: 0,
       delay: 1500,
       duration: 500,
-      onComplete: () => {
-        introContainer.destroy()
-      }
+      onComplete: () => introContainer.destroy(),
     })
   }
 
+  /** Places the HUD's text, and recolours everything when the palette changes. */
+  private draw() {
+    const mode = GameState.paletteMode
+    const theme = HUD_THEME[mode]
+    const boxes = layout(this.values(), GBC_WIDTH, GBC_HEIGHT)
+    for (const [name, text] of this.texts) {
+      const box = boxes.find((b) => b.name === name)
+      text.setVisible(!!box)
+      if (!box) continue
+      text.setPosition(box.x, box.y)
+      if (text.text !== box.text) text.setText(box.text)
+    }
+    if (this.themed === mode) return
+    this.themed = mode
+
+    this.bars.clear()
+    this.bars.fillStyle(theme.bar, 1)
+    this.bars.fillRect(0, 0, GBC_WIDTH, BAR_HEIGHT)
+    this.bars.fillRect(0, GBC_HEIGHT - BAR_HEIGHT, GBC_WIDTH, BAR_HEIGHT)
+    this.bars.fillStyle(theme.edge, 1)
+    this.bars.fillRect(0, BAR_HEIGHT - 1, GBC_WIDTH, 1)
+    this.bars.fillRect(0, GBC_HEIGHT - BAR_HEIGHT, GBC_WIDTH, 1)
+    this.texts.get('stage')!.setColor(css(theme.text))
+    this.texts.get('moves')!.setColor(css(theme.text))
+    this.texts.get('best')!.setColor(css(theme.accent))
+    this.texts.get('controls')!.setColor(css(theme.dim))
+
+    const panel = (g: Phaser.GameObjects.Graphics, size: { width: number; height: number }) => {
+      g.clear()
+      g.fillStyle(theme.bar, 1)
+      g.fillRoundedRect(-size.width / 2, -size.height / 2, size.width, size.height, 6)
+      g.lineStyle(1, theme.text, 1)
+      g.strokeRoundedRect(-size.width / 2, -size.height / 2, size.width, size.height, 6)
+    }
+    panel(this.panelBg, PANEL)
+    panel(this.helpBg, HELP)
+    this.panelTitle.setColor(css(theme.accent))
+    this.helpTexts.forEach((t, i) => t.setColor(css(i === 0 || i === this.helpTexts.length - 1 ? theme.accent : theme.text)))
+    this.updatePauseSelection()
+  }
+
   private createPauseMenu() {
-    const bgGfx = this.add.graphics()
-    bgGfx.fillStyle(PAL.darkest, 0.96)
-    // Taller by one row for SOUND (#143), and every row moved up six to keep
-    // the stack centred. Wider too: at 130 px, with rows starting 50 px left of
-    // centre, "> 1. RESUME GAME" (16 characters, 128 px at 8 px) ran through
-    // the border and off the 160 px screen. Rows now start at -66, inside a
-    // 150 px panel, and the longest ends at +62.
-    bgGfx.fillRoundedRect(-75, -51, 150, 102, 6)
-    bgGfx.lineStyle(1.5, PAL.lightest, 1)
-    bgGfx.strokeRoundedRect(-75, -51, 150, 102, 6)
+    this.panelBg = this.add.graphics()
+    const top = -PANEL.height / 2
+    this.panelTitle = this.label(0, top + 6, 'PAUSED', CELL * 2).setOrigin(0.5, 0)
 
-    const titleText = this.add.text(0, -38, 'PAUSED', {
-      fontFamily: FONT,
-      fontSize: '16px',
-      color: '#9bbc0f',
-      resolution: 2,
-    }).setOrigin(0.5)
+    // Seven rows. "> 1. RESUME GAME" is 16 characters, 128 pixels, and starts
+    // 66 left of centre, inside the 150-pixel panel.
+    const labels = [...ROW_LABELS, soundLabel(), hintLabel(false)]
+    this.pauseOptionsText = labels.map((text, i) =>
+      this.label(-66, top + 28 + i * PANEL.rowGap, text)
+        .setInteractive({ useHandCursor: true })
+        .setData('label', text)
+        .on('pointerdown', () => this.executePauseAction(i)),
+    )
 
-    const btnResume = this.add.text(-66, -20, '1. RESUME GAME', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '1. RESUME GAME')
-
-    const btnHelp = this.add.text(-66, -8, '2. HOW TO PLAY', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '2. HOW TO PLAY')
-
-    const btnSkip = this.add.text(-66, 4, '3. SKIP STAGE', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '3. SKIP STAGE')
-
-    const btnRestart = this.add.text(-66, 16, '4. RESTART LVL', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '4. RESTART LVL')
-
-    const btnQuit = this.add.text(-66, 28, '5. QUIT TO MAP', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', '5. QUIT TO MAP')
-
-    // The only mute a phone can reach (#143). M was the only one this game
-    // had, and only on the title menu; the label carries the live state.
-    const btnSound = this.add.text(-66, 40, soundLabel(), {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setData('label', soundLabel())
-
-    btnResume.on('pointerdown', () => this.executePauseAction(0))
-    btnHelp.on('pointerdown', () => this.executePauseAction(1))
-    btnSkip.on('pointerdown', () => this.executePauseAction(2))
-    btnRestart.on('pointerdown', () => this.executePauseAction(3))
-    btnQuit.on('pointerdown', () => this.executePauseAction(4))
-    btnSound.on('pointerdown', () => this.executePauseAction(5))
-
-    this.pauseContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2, [
-      bgGfx,
-      titleText,
-      btnResume,
-      btnHelp,
-      btnSkip,
-      btnRestart,
-      btnQuit,
-      btnSound,
-    ])
+    this.pauseContainer = this.add
+      .container(GBC_WIDTH / 2, GBC_HEIGHT / 2, [this.panelBg, this.panelTitle, ...this.pauseOptionsText])
       .setDepth(3000)
       .setVisible(false)
-
-    this.pauseOptionsText = [btnResume, btnHelp, btnSkip, btnRestart, btnQuit, btnSound]
   }
 
   private createHelpModal() {
-    const bgGfx = this.add.graphics()
-    bgGfx.fillStyle(PAL.darkest, 0.98)
-    bgGfx.fillRoundedRect(-72, -65, 144, 130, 6)
-    bgGfx.lineStyle(1.5, PAL.lightest, 1)
-    bgGfx.strokeRoundedRect(-72, -65, 144, 130, 6)
+    this.helpBg = this.add.graphics()
+    const top = -HELP.height / 2
 
-    const titleText = this.add.text(0, -48, 'HOW TO PLAY', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#ffcc00',
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    // Rewritten to 16 characters. At 8px the text column inside this panel
-    // is 134px, and every one of the old lines ran past it.
+    // Sixteen characters a line: the text column inside this panel is 134
+    // pixels. Each control is named for the keyboard and for the shell.
     const rulesLines = [
       'MOVE: D-Pad/WASD',
       'GOAL: Push all',
@@ -219,41 +175,25 @@ export class UIScene extends Phaser.Scene {
       'ICE: Crates fly',
       'UNDO: B or Z',
       'RESET: SELECT/R',
+      'HINT: Pause/H',
       'SOUND: Pause/M',
       'Lvls 11-50 by',
       'D.W. Skinner',
     ]
-
-    const textObjs = rulesLines.map((line, idx) => {
-      return this.add.text(-62, -38 + idx * 10, line, {
-        fontFamily: FONT,
-        fontSize: '8px',
-        color: '#e0f8cf',
-        stroke: '#0f380f',
-        strokeThickness: 1,
-        resolution: 2,
-      }).setOrigin(0, 0.5)
-    })
-
-    const closeBtn = this.add.text(0, 54, '[ BACK TO PAUSE ]', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#9bbc0f',
-      resolution: 2,
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
-
+    const title = this.label(0, top + 8, 'HOW TO PLAY').setOrigin(0.5, 0)
+    const lines = rulesLines.map((line, idx) => this.label(-62, top + 22 + idx * 9, line))
+    const closeBtn = this.label(0, top + HELP.height - 16, '[ BACK TO PAUSE ]')
+      .setOrigin(0.5, 0)
+      .setInteractive({ useHandCursor: true })
     closeBtn.on('pointerdown', () => {
       this.helpContainer.setVisible(false)
       this.helpOpen = false
       this.pauseContainer.setVisible(true)
     })
+    this.helpTexts = [title, ...lines, closeBtn]
 
-    this.helpContainer = this.add.container(GBC_WIDTH / 2, GBC_HEIGHT / 2, [
-      bgGfx,
-      titleText,
-      ...textObjs,
-      closeBtn,
-    ])
+    this.helpContainer = this.add
+      .container(GBC_WIDTH / 2, GBC_HEIGHT / 2, [this.helpBg, ...this.helpTexts])
       .setDepth(3500)
       .setVisible(false)
   }
@@ -275,6 +215,8 @@ export class UIScene extends Phaser.Scene {
       // M on the main menu can change the state while this panel is built and
       // hidden, so the sound row is relabelled each time it opens (#143).
       this.pauseOptionsText[5].setData('label', soundLabel())
+      const board = this.scene.get('board') as BoardScene
+      this.pauseOptionsText[6].setData('label', hintLabel(!!board?.hintOn()))
       this.pauseSelectedIndex = 0
       this.updatePauseSelection()
     }
@@ -284,14 +226,11 @@ export class UIScene extends Phaser.Scene {
     if (playAudio) {
       import('../audio').then(a => a.playMenuSelect())
     }
+    const theme = HUD_THEME[GameState.paletteMode]
     this.pauseOptionsText.forEach((txt, idx) => {
-      if (idx === this.pauseSelectedIndex) {
-        txt.setText('> ' + txt.getData('label'))
-        txt.setColor('#ffcc00')
-      } else {
-        txt.setText('  ' + txt.getData('label'))
-        txt.setColor('#e0f8cf')
-      }
+      const on = idx === this.pauseSelectedIndex
+      txt.setText((on ? '> ' : '  ') + txt.getData('label'))
+      txt.setColor(css(on ? theme.accent : theme.text))
     })
   }
 
@@ -321,13 +260,17 @@ export class UIScene extends Phaser.Scene {
       btn.setData('label', soundLabel())
       this.pauseSelectedIndex = 5
       this.updatePauseSelection()
+    } else if (idx === 6) { // Hint
+      // Closed first: the hint is an arrow on the board, and is not shown
+      // while a panel holds the game.
+      this.togglePauseMenu()
+      const boardScene = this.scene.get('board') as BoardScene
+      if (boardScene) boardScene.toggleHint()
     }
   }
 
   update() {
-    const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
-    this.levelTitleText.setText(`STG ${levelConfig.id}`)
-    this.movesText.setText(`${GameState.movesCount} / ${levelConfig.parMoves}`)
+    this.draw()
 
     if (this.pauseOpen && !this.helpOpen) {
       const kb = this.input.keyboard!

@@ -3,6 +3,7 @@ import { BootScene } from './scenes/BootScene'
 import { MapScene } from './scenes/MapScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PlayScene } from './scenes/PlayScene'
+import { HudScene } from './scenes/HudScene'
 import { GBC_WIDTH, GBC_HEIGHT } from './constants'
 import { ensureCtx, isMuted, music, setMuted, sfx } from './audio'
 import { setupDpad } from '../shared/dpad'
@@ -11,15 +12,25 @@ import { exposeForQA, exposeSoundForQA } from '../shared/devtools'
 import { preventZoomGestures } from '../shared/noZoom'
 import '../shared/shell.css'
 
+/**
+ * How much the canvas is enlarged, in CSS pixels to the game pixel.
+ *
+ * Must match the #game box sizing in index.html's pre-init script. Counted in
+ * device pixels since #171, as the other games are: at 240 wide a whole CSS
+ * multiple gives a phone a 1x box, where the 160-wide screen got 2x.
+ */
 function integerZoom(): number {
-  const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches
   const availableHeight = window.innerHeight - (isDesktop ? 250 : 380)
-  return Math.max(
-    1,
-    Math.min(
-      Math.floor((window.innerWidth - 40) / GBC_WIDTH),
-      Math.floor(availableHeight / GBC_HEIGHT),
-    ),
+  const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 4))
+  return (
+    Math.max(
+      1,
+      Math.min(
+        Math.floor(((window.innerWidth - 40) * dpr) / GBC_WIDTH),
+        Math.floor((availableHeight * dpr) / GBC_HEIGHT),
+      ),
+    ) / dpr
   )
 }
 
@@ -46,7 +57,7 @@ function createGame() {
     // reconciling it. Touches outside the canvas are button presses here, not
     // game input (#97).
     input: { windowEvents: false },
-    scene: [BootScene, MenuScene, MapScene, PlayScene],
+    scene: [BootScene, MenuScene, MapScene, PlayScene, HudScene],
   })
   window.addEventListener('resize', () => {
     const zoom = integerZoom()

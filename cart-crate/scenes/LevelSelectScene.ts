@@ -3,7 +3,20 @@ import { GBC_WIDTH, GBC_HEIGHT, FONT } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem, loadHighestUnlocked } from '../save'
+import { HUD_THEME, css } from '../hud'
+import { COLS, PER_PAGE, TITLE_SCALE, WORLD_NAMES, pageOf, selectHint, selectLayout } from '../screens'
+import { DMG, mix, worldPalette } from '../tiles'
 
+const isDesktop = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
+/**
+ * The level select: a page to each world, in that world's colours (#165).
+ *
+ * It was 160×144 behind a zoomed camera, on a navy that is none of the green
+ * screen's tones, in pages of twelve that cut across the worlds. Each page is
+ * now one world's ten stages, under its name, each stage a square of that
+ * world's floor. The palette switch restarts the scene.
+ */
 export class LevelSelectScene extends Phaser.Scene {
   private pages: Phaser.GameObjects.Container[] = []
   private selectedIndex = 0
@@ -21,94 +34,77 @@ export class LevelSelectScene extends Phaser.Scene {
   create() {
     this.pages = []
     this.levelNodes = []
-    this.cameras.main.setBackgroundColor('#081820')
-
+    const mode = GameState.paletteMode
+    const theme = HUD_THEME[mode]
+    this.cameras.main.setBackgroundColor(css(theme.bar))
+    const desktop = isDesktop()
     this.highestUnlocked = loadHighestUnlocked()
+    this.numPages = Math.ceil(CAMPAIGN_LEVELS.length / PER_PAGE)
 
-    // Header
-    this.add.text(GBC_WIDTH / 2, 8, 'SELECT STAGE', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#e0f8cf',
-      resolution: 2,
-    }).setOrigin(0.5)
-
-    const cols = 4
-    const rows = 3
-    const levelsPerPage = cols * rows
-    this.numPages = Math.ceil(CAMPAIGN_LEVELS.length / levelsPerPage)
-
-    this.leftArrowText = this.add.text(4, GBC_HEIGHT / 2, '<', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#ffcc00',
-      resolution: 2,
-    }).setOrigin(0, 0.5).setScrollFactor(0).setVisible(false)
-
-    this.rightArrowText = this.add.text(GBC_WIDTH - 4, GBC_HEIGHT / 2, '>', {
-      fontFamily: FONT,
-      fontSize: '8px',
-      color: '#ffcc00',
-      resolution: 2,
-    }).setOrigin(1, 0.5).setScrollFactor(0).setVisible(false)
-
-    const startX = 28
-    const startY = 36
-    const spacingX = 34
-    const spacingY = 32
+    const head = selectLayout(GBC_WIDTH, GBC_HEIGHT, '', desktop)
+    // Fixed to the camera, which slides between the pages.
+    this.add
+      .text(head.heading.x, head.heading.y, 'SELECT STAGE', {
+        fontFamily: FONT,
+        fontSize: `${8 * TITLE_SCALE}px`,
+        color: css(theme.accent),
+        resolution: 1,
+        shadow: { offsetX: 2, offsetY: 2, color: css(theme.edge), fill: true },
+      })
+      .setScrollFactor(0)
+    this.add
+      .text(head.hint.x, head.hint.y, selectHint(desktop), { fontFamily: FONT, fontSize: '8px', color: css(theme.dim), resolution: 1 })
+      .setScrollFactor(0)
+    this.leftArrowText = this.add
+      .text(head.left.x, head.left.y, '<', { fontFamily: FONT, fontSize: '8px', color: css(theme.accent), resolution: 1 })
+      .setScrollFactor(0)
+      .setVisible(false)
+    this.rightArrowText = this.add
+      .text(head.right.x, head.right.y, '>', { fontFamily: FONT, fontSize: '8px', color: css(theme.accent), resolution: 1 })
+      .setScrollFactor(0)
+      .setVisible(false)
 
     for (let p = 0; p < this.numPages; p++) {
       const pageContainer = this.add.container(p * GBC_WIDTH, 0)
       this.pages.push(pageContainer)
+      const world = CAMPAIGN_LEVELS[p * PER_PAGE]?.world ?? p + 1
+      const name = WORLD_NAMES[world - 1] ?? `WORLD ${world}`
+      const at = selectLayout(GBC_WIDTH, GBC_HEIGHT, name, desktop)
+      pageContainer.add(this.add.text(at.world.x, at.world.y, name, { fontFamily: FONT, fontSize: '8px', color: css(theme.text), resolution: 1 }))
 
-      for (let i = 0; i < levelsPerPage; i++) {
-        const globalIdx = p * levelsPerPage + i
+      for (let i = 0; i < PER_PAGE; i++) {
+        const globalIdx = p * PER_PAGE + i
         if (globalIdx >= CAMPAIGN_LEVELS.length) break
-
         const levelConfig = CAMPAIGN_LEVELS[globalIdx]
-        const col = i % cols
-        const row = Math.floor(i / cols)
-
-        const nx = startX + col * spacingX
-        const ny = startY + row * spacingY
-
+        const cell = at.cells[i]
         const locked = globalIdx > this.highestUnlocked
 
         const bg = this.add.graphics()
         pageContainer.add(bg)
-
-        const txt = this.add.text(nx, ny - 3, `${levelConfig.id}`, {
-          fontFamily: FONT,
-          fontSize: '8px',
-          color: locked ? '#306230' : '#8bac0f',
-          resolution: 2,
-        }).setOrigin(0.5)
+        const txt = this.add
+          .text(cell.x + cell.width / 2, cell.y + 8, `${levelConfig.id}`, { fontFamily: FONT, fontSize: '8px', color: css(theme.text), resolution: 1 })
+          .setOrigin(0.5, 0)
         pageContainer.add(txt)
 
-        // Draw stars if unlocked and played
         if (!locked) {
           const data = SaveSystem.getLevelData(levelConfig.id)
-          let starStr = ''
-          for (let s = 0; s < data.stars; s++) starStr += '*'
-          if (starStr) {
-            const starsText = this.add.text(nx, ny + 7, starStr, {
-              fontFamily: FONT,
-              fontSize: '8px',
-              color: '#ffcc00',
-              resolution: 2,
-            }).setOrigin(0.5)
-            pageContainer.add(starsText)
+          const stars = '*'.repeat(data.stars)
+          if (stars) {
+            pageContainer.add(
+              this.add
+                .text(cell.x + cell.width / 2, cell.y + 22, stars, { fontFamily: FONT, fontSize: '8px', color: css(theme.accent), resolution: 1 })
+                .setOrigin(0.5, 0),
+            )
           }
         }
-
         this.levelNodes.push({ id: levelConfig.id, text: txt, bg, locked })
       }
     }
 
     // Default select highest unlocked or last played
     this.selectedIndex = GameState.currentLevelIndex
-    this.currentPage = Math.floor(this.selectedIndex / levelsPerPage)
-    
+    this.currentPage = pageOf(this.selectedIndex)
+
     // Jump camera to current page
     this.cameras.main.scrollX = this.currentPage * GBC_WIDTH
     this.updateSelection()
@@ -119,7 +115,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const kb = this.input.keyboard!
     let moved = false
     let newIndex = this.selectedIndex
-    const cols = 4
+    const cols = COLS
 
     if (Phaser.Input.Keyboard.JustDown(kb.addKey('LEFT')) || Phaser.Input.Keyboard.JustDown(kb.addKey('A'))) {
       newIndex--
@@ -142,7 +138,7 @@ export class LevelSelectScene extends Phaser.Scene {
         this.updateSelection()
 
         // Handle pagination
-        const newPage = Math.floor(this.selectedIndex / 12)
+        const newPage = pageOf(this.selectedIndex)
         if (newPage !== this.currentPage) {
           this.currentPage = newPage
           this.tweens.add({
@@ -175,24 +171,27 @@ export class LevelSelectScene extends Phaser.Scene {
   }
 
   private updateSelection() {
+    const mode = GameState.paletteMode
+    const theme = HUD_THEME[mode]
+    const desktop = isDesktop()
     this.levelNodes.forEach((node, i) => {
+      const cell = selectLayout(GBC_WIDTH, GBC_HEIGHT, '', desktop).cells[i % PER_PAGE]
+      const world = CAMPAIGN_LEVELS[i]?.world ?? 1
+      const pal = mode === 'dmg' ? DMG : worldPalette(world)
+      // A square of the world's own floor, its walls' colour round it: dimmed
+      // while the stage is locked. On the green screen, the dark tone.
+      const fill = mode === 'dmg' ? theme.edge : node.locked ? mix(pal.floorB, theme.bar, 0.65) : mix(pal.floorA, theme.bar, 0.25)
       node.bg.clear()
-      const cols = 4
-      const row = Math.floor((i % 12) / cols)
-      const col = (i % 12) % cols
-      const nx = 28 + col * 34
-      const ny = 36 + row * 32
-
+      node.bg.fillStyle(fill, 1)
+      node.bg.fillRect(cell.x, cell.y, cell.width, cell.height)
       if (i === this.selectedIndex) {
-        node.bg.fillStyle(0x0f380f, 1)
-        node.bg.fillRoundedRect(nx - 14, ny - 12, 28, 24, 4)
-        node.bg.lineStyle(2, 0xffcc00, 1)
-        node.bg.strokeRoundedRect(nx - 14, ny - 12, 28, 24, 4)
-        node.text.setColor('#ffcc00')
+        node.bg.lineStyle(2, theme.accent, 1)
+        node.bg.strokeRect(cell.x + 1, cell.y + 1, cell.width - 2, cell.height - 2)
+        node.text.setColor(css(theme.accent))
       } else {
-        node.bg.lineStyle(1, node.locked ? 0x306230 : 0x8bac0f, 1)
-        node.bg.strokeRoundedRect(nx - 14, ny - 12, 28, 24, 4)
-        node.text.setColor(node.locked ? '#8b9bb4' : '#e0f8cf')
+        node.bg.lineStyle(1, mode === 'dmg' ? theme.dim : pal.rim, 1)
+        node.bg.strokeRect(cell.x + 0.5, cell.y + 0.5, cell.width - 1, cell.height - 1)
+        node.text.setColor(css(node.locked ? theme.dim : theme.text))
       }
     })
   }

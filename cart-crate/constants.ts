@@ -1,6 +1,29 @@
-export const GBC_WIDTH = 160
-export const GBC_HEIGHT = 144
-export const TILE = 16
+/**
+ * The screen, in game pixels (#160).
+ *
+ * It was the Game Boy's own 160×144 with 16-pixel tiles. The hub card's
+ * painting has slatted crates, raised brick walls and a fox in uniform, and
+ * none of that fits in 16 pixels, so the screen is 240×216 with 24-pixel
+ * tiles, as Pocket Dungeon's is since #155. That is still ten tiles by nine:
+ * every level shows exactly as much of itself as it did.
+ */
+export const GBC_WIDTH = 240
+export const GBC_HEIGHT = 216
+export const TILE = 24
+
+/**
+ * The size everything was first drawn and laid out at.
+ *
+ * The art is drawn at 24 pixels now (#161, #162) and so is the HUD (#164).
+ * The menu and level select are still laid out for 160×144 and shown
+ * through a camera zoomed by `SCALE`, until #165; when they go, so do these.
+ */
+export const LEGACY_WIDTH = 160
+export const LEGACY_HEIGHT = 144
+export const LEGACY_TILE = 16
+export const SCALE = TILE / LEGACY_TILE
+/** A length measured on the old 16-pixel grid, at the new size. */
+export const sx = (n: number): number => Math.round(n * SCALE)
 
 // Classic Game Boy DMG 4-color palette
 export const PAL = {

@@ -38,6 +38,75 @@ async function windup() {
   const start = await st()
   check('A starts the game', start.active, `player at x=${start.x | 0}`)
 
+  // #168 drew the toy at 24 and shows it at two thirds. Its body follows its
+  // sprite's scale, so the box is given in the picture's pixels; it must
+  // come out as the old 10 by 12, five left of the sprite's middle and four
+  // above it, or every jump in 32 levels changes.
+  const box = await page.evaluate(() => {
+    const p = window.__game.scene.getScene('platformer').player
+    return { w: p.body.width, h: p.body.height, dx: p.body.x - p.x, dy: p.body.y - p.y }
+  })
+  check(
+    'the toy\'s hitbox is the old 10×12, where it always was',
+    box.w === 10 && box.h === 12 && box.dx === -5 && box.dy === -4,
+    JSON.stringify(box),
+  )
+  // And its key turns while it has energy (#168): read twice, half a second apart.
+  const keyFrames = await page.evaluate(async () => {
+    const s = window.__game.scene.getScene('platformer')
+    const seen = new Set()
+    for (let i = 0; i < 10; i++) {
+      seen.add(String(s.key.frame.name))
+      await new Promise((r) => setTimeout(r, 60))
+    }
+    return seen.size
+  })
+  check('the toy\'s key turns while it has energy', keyFrames > 1, `${keyFrames} pictures in 0.6 s`)
+
+  // #169: the HUD is two panels laid on the level where it is empty. Read
+  // from what the HUD scene draws, not from the layout it was given: both
+  // shown, on the screen, and clear of the toy, which is drawn a tile square
+  // about its middle at 1.5 to the unit.
+  const hud = await page.evaluate(() => {
+    const ui = window.__game.scene.getScene('ui')
+    const p = window.__game.scene.getScene('platformer').player
+    const panels = ui.children.list
+      .filter((o) => o.type === 'Rectangle' && o.visible && o.width > 80)
+      .map((o) => ({ x: o.x, y: o.y, w: o.width, h: o.height }))
+    const toy = { x: p.x * 1.5 - 15, y: p.y * 1.5 - 12, w: 30, h: 24 }
+    const hits = panels.filter((b) => b.x < toy.x + toy.w && toy.x < b.x + b.w && b.y < toy.y + toy.h && toy.y < b.y + b.h)
+    return { panels, hits: hits.length, zoom: ui.cameras.main.zoom }
+  })
+  check(
+    'the HUD draws two panels on the real screen, clear of the toy',
+    hud.panels.length === 2 && hud.hits === 0 && hud.zoom === 1 &&
+      hud.panels.every((b) => b.x >= 0 && b.y >= 0 && b.x + b.w <= 240 && b.y + b.h <= 216),
+    JSON.stringify(hud.panels),
+  )
+
+  // #166: the screen grew to 240×216 by zooming the cameras, the world left
+  // as it was. The view must still be the whole level from its top left. A
+  // bounded camera with its origin at the top left is clamped as if centred,
+  // which moved the level a quarter of the screen down and right while every
+  // other check here stayed green.
+  // Read from the matrix the camera renders with: Phaser's `worldView`
+  // ignores the camera's origin and says 40,36 for a picture that is right.
+  const view = await page.evaluate(() => {
+    const cam = window.__game.scene.getScene('platformer').cameras.main
+    const m = cam.matrix
+    // The matrix carries origin and zoom; scroll is applied per object.
+    const at = (x, y) => {
+      const [sx, sy] = [x - cam.scrollX, y - cam.scrollY]
+      return [m.getX(sx, sy), m.getY(sx, sy)].map((n) => Math.round(n))
+    }
+    return { zoom: cam.zoom, from: at(0, 0), to: at(160, 144), screen: [window.__game.scale.width, window.__game.scale.height] }
+  })
+  check(
+    'the play camera shows the 160×144 level edge to edge on 240×216',
+    view.screen.join() === '240,216' && view.from.join() === '0,0' && view.to.join() === '240,216',
+    JSON.stringify(view),
+  )
+
   await hand.down(PAD, c.arm('ArrowRight').x, c.arm('ArrowRight').y)
   await page.waitForTimeout(600)
   const moved = await st()
@@ -146,6 +215,53 @@ async function lanternKeeper() {
         radius: s.playerLightRadius(),
       }
     })
+
+  // #171: the forest is drawn at twice the size by the camera, and nothing
+  // under the camera changed. Three things that design can get wrong without
+  // anything throwing: the overlay of darkness no longer reaching the edges
+  // of the screen, the HUD being magnified along with the forest, and the
+  // world being scaled as well as the view.
+  const view = await page.evaluate(() => {
+    const g = window.__game
+    const s = g.scene.getScene('play')
+    const cam = s.cameras.main
+    const rt = s.darkness.gameObject
+    // In the camera's own space, which starts at its viewport's corner.
+    const drawn = (p, c, at) => (p - c) * cam.zoom + c + at
+    const hud = g.scene.getScene('hud')
+    return {
+      zoom: cam.zoom,
+      screen: [g.scale.width, g.scale.height],
+      overlay: [drawn(rt.x, cam.width / 2, cam.x), drawn(rt.y, cam.height / 2, cam.y), drawn(rt.x + rt.width, cam.width / 2, cam.x), drawn(rt.y + rt.height, cam.height / 2, cam.y)],
+      viewport: [cam.x, cam.y, cam.x + cam.width, cam.y + cam.height],
+      hudActive: hud.scene.isActive(),
+      hudZoom: hud.cameras.main.zoom,
+      hudText: hud.lanternText?.text ?? '',
+      hudStage: hud.stageText?.text ?? '',
+      tile: s.groundLayer.tilemap.tileWidth,
+      keeper: s.player.displayHeight * cam.zoom,
+      // The box is what was six units, and must still be (#173): the keeper
+      // is drawn taller than it, and the box is what fits a gap.
+      keeperUnits: s.player.body.height,
+      box: [s.player.body.width, s.player.body.height],
+      boxMiddle: [s.player.body.center.x - s.player.x, s.player.body.center.y - s.player.y],
+    }
+  })
+  check('the screen is 240 by 216', view.screen[0] === 240 && view.screen[1] === 216, view.screen.join(' by '))
+  // #174: the forest is drawn between the HUD's bars, so the camera's
+  // viewport is the screen less a bar at each end, and the darkness fills it.
+  check('the forest is drawn between the bars', view.viewport.join() === [0, 18, view.screen[0], view.screen[1] - 18].join(), `from ${view.viewport.slice(0, 2)} to ${view.viewport.slice(2)}`)
+  check('the darkness reaches all four edges of it', view.overlay.join() === view.viewport.join(), `drawn from ${view.overlay.slice(0, 2)} to ${view.overlay.slice(2)}`)
+  check('the HUD is its own scene, and is not magnified', view.hudActive && view.hudZoom === 1 && view.hudText.startsWith('LANTERNS') && view.hudStage.startsWith('STAGE'), `zoom ${view.hudZoom}, "${view.hudText}" and "${view.hudStage}"`)
+  check('the world under the camera is the size it was', view.tile === 8, `a tile is ${view.tile} units`)
+  // As a share of the screen: it was six of 144. The control is the other
+  // factor on offer, 1.5, at which the share is exactly what it was.
+  const share = (zoom) => (view.keeperUnits * zoom) / view.screen[1]
+  check('the keeper is a larger share of the screen than it was', view.zoom === 2 && share(view.zoom) > 6 / 144, `a box of ${view.keeperUnits * view.zoom} of ${view.screen[1]} pixels, from 6 of 144`)
+  check('the keeper\'s box is six units square', view.box[0] === 6 && view.box[1] === 6, view.box.join(' by '))
+  check('and the keeper is placed by its middle', Math.abs(view.boxMiddle[0]) < 0.01 && Math.abs(view.boxMiddle[1]) < 0.01, view.boxMiddle.map((n) => n.toFixed(2)).join(', '))
+  check('the keeper is drawn taller than the box', view.keeper > view.keeperUnits * view.zoom, `${view.keeper} pixels tall on screen`)
+  check('and the check can fail: at 1.5 it would be the same share', share(1.5) === 6 / 144)
 
   const start = await st()
   check('A starts the level', start.active, `player at x=${start.x | 0}`)
@@ -634,17 +750,22 @@ async function lanternKeeper() {
     if (!s.scene.isActive()) return null
     const nodes = []
     for (let i = 0; i < 7; i++) nodes.push(s.nodeAt(i))
+    // Bounds read from the game: this had the old screen's 156 and 112
+    // written into it, the next thing to break when the map moved (#175).
+    const { title, label } = s.layout
+    const w = window.__game.scale.width
     return {
-      onScreen: nodes.every((n) => n.x >= 4 && n.x <= 156 && n.y >= 20 && n.y <= 112),
+      onScreen: nodes.every((n) => n.x >= 12 && n.x <= w - 12 && n.y - 20 > title.y + title.height && n.y + 12 < label.y),
       nodes: nodes.length,
-      markers: s.children.list.filter((o) => o.texture && /lantern/.test(o.texture.key)).length,
+      markers: s.children.list.filter((o) => o.texture && /^lantern/.test(o.texture.key)).length,
+      keeper: s.children.list.some((o) => o.texture && /^player_/.test(o.texture.key)),
     }
   })
   check('the world map opens between stages', map !== null)
   check('every node fits between the title and the label', map?.onScreen,
     JSON.stringify(map?.nodes))
-  check('a node is drawn per stage, plus the travelling marker',
-    map?.markers === registry.keys.length + 1, `${map?.markers} sprites`)
+  check('a lantern is drawn per stage', map?.markers === registry.keys.length, `${map?.markers} lanterns`)
+  check('and the keeper walks the path', map?.keeper === true)
 
   // The map must hand over rather than becoming a dead end.
   let handedOver = false

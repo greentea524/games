@@ -12,7 +12,10 @@ let ok = true
 /** Game space is 160x144; the canvas is scaled up to fit the shell. */
 async function canvasSpace(page) {
   const box = (await centreOf(page, 'canvas')).box
-  const scale = box.width / 160
+  // The game's own width in pixels, read from its canvas. This was a literal
+  // 160, which is wrong for any game not on the Game Boy's screen (#155).
+  const gameWidth = await page.evaluate(() => document.querySelector('canvas').width)
+  const scale = box.width / gameWidth
   return {
     box,
     scale,
@@ -285,7 +288,10 @@ async function pocketDungeon() {
     const target = await page.evaluate(
       ([dx, dy]) => {
         const s = window.__game.scene.getScene('dungeon')
-        const TILE = 16
+        // Read from the game, not written here: it was a literal 16 until the
+        // screen went to 24-pixel tiles (#155), and then this tapped the wrong
+        // tile and blamed the game. The fog layer is one rectangle a tile.
+        const TILE = s.fogTiles[0][0].width
         const wx = (s.playerTX + dx) * TILE + TILE / 2
         const wy = (s.playerTY + dy) * TILE + TILE / 2
         // World -> screen, since the camera follows the player.

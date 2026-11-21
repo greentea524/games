@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GBC_WIDTH, FONT, CSS_LIGHTEST, CSS_DARKEST, CSS_MID, PAL } from '../constants'
+import { WORLD_WIDTH as GBC_WIDTH, FONT, CSS_LIGHTEST, CSS_DARKEST, CSS_MID, PAL, VIEW_ZOOM } from '../constants'
 import { GameState } from '../state'
 import { sfx, isMuted, setMuted } from '../audio'
 
@@ -17,6 +17,9 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   create() {
+    // Still laid out for 160×144, and shown enlarged from the top left by
+    // the play camera's factor (#166). The later tickets lay it out anew.
+    this.cameras.main.setOrigin(0, 0).setZoom(VIEW_ZOOM)
     this.cameras.main.setBackgroundColor('#0b0f0c')
     
     // Title
@@ -29,8 +32,9 @@ export class MainMenuScene extends Phaser.Scene {
 
     // Sprite preview: the windup toy beside the energy station it recharges at
     const mode = GameState.paletteMode
-    const robotPreview = this.add.sprite(GBC_WIDTH / 2 - 14, 58, `windup_${mode}_right`).setScale(2)
-    const stationPreview = this.add.sprite(GBC_WIDTH / 2 + 14, 58, `station_${mode}`).setScale(2)
+    // Drawn at 24 since #168, and shown at twice the old 16 as before.
+    const robotPreview = this.add.sprite(GBC_WIDTH / 2 - 14, 58, `robot_${mode}`, 0).setScale(4 / 3)
+    const stationPreview = this.add.sprite(GBC_WIDTH / 2 + 14, 58, `station_${mode}`).setScale(4 / 3)
     this.tweens.add({
       targets: robotPreview,
       y: '+=3',

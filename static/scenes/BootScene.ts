@@ -1,5 +1,11 @@
 import Phaser from 'phaser'
-import { TILE, PAL, GBC_PAL } from '../constants'
+// Drawn on the old 16-pixel grid and enlarged afterwards; see `enlargeTextures`.
+import { LEGACY_TILE as TILE, TILE as NEW_TILE, PAL, GBC_PAL } from '../constants'
+import { enlargeTextures } from '../enlarge'
+import { PROPS, propKey } from '../props'
+import { SPRITES, pixels, textureKey } from '../sprites'
+import { DMG_VILLAGE, FRAME_COUNT, TILE_PX, VILLAGE, drawTileset } from '../tiles'
+import { scaleTiledMap, type TiledMap } from '../maps'
 import { NPCS } from '../dialogue'
 import townUrl from '../assets/town.json?url'
 import houseUrl from '../assets/house.json?url'
@@ -38,6 +44,20 @@ export class BootScene extends Phaser.Scene {
       this.buildItems(mode)
       this.buildProps(mode)
     })
+    enlargeTextures(this)
+    // The people, the static and the items, drawn at 24 (#179). Before the
+    // walks, which hold the kid's frames from the moment they are made.
+    ;(['dmg', 'gbc'] as const).forEach((mode) => this.buildSprites(mode))
+    ;(['dmg', 'gbc'] as const).forEach((mode) => this.buildWalks(mode))
+    // After the enlarging, not before: these are drawn at 24 already.
+    ;(['dmg', 'gbc'] as const).forEach((mode) => {
+      this.buildVillage(mode)
+      this.buildProps24(mode)
+    })
+    // The maps declare 16-pixel tiles; see `maps.ts`.
+    for (const key of this.cache.tilemap.getKeys()) {
+      scaleTiledMap(this.cache.tilemap.get(key).data as TiledMap, NEW_TILE)
+    }
     this.scene.start('title')
   }
 
@@ -197,28 +217,6 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(mode === 'dmg' ? PAL.light : 0x8a6a3a); g.fillRect(6, 5, 4, 1)
     tex(`prop_barrel_${mode}`, 16, 16)
 
-    // the entity: a dark figure with a static-filled screen for a face
-    if (!this.textures.exists('entity')) {
-      g.fillStyle(0x141820); g.fillRect(3, 4, 10, 14)
-      g.fillStyle(0x0a0c10); g.fillRect(2, 2, 12, 4)
-      for (let y = 6; y < 12; y++)
-        for (let x = 5; x < 11; x++) {
-          g.fillStyle(Math.random() < 0.5 ? 0x1a2438 : 0xc0ccdc)
-          g.fillRect(x, y, 1, 1)
-        }
-      g.generateTexture('entity', 16, 18)
-    }
-    g.clear()
-
-    // static beacon: a pale pulsing pillar (mode-agnostic, made once)
-    if (!this.textures.exists('beacon')) {
-      g.fillStyle(0xaab4cc); g.fillRect(6, 2, 4, 14)
-      g.fillStyle(0xe0f0ff); g.fillRect(7, 3, 2, 12)
-      g.fillStyle(0x88a0c0); g.fillRect(5, 6, 1, 1); g.fillRect(10, 10, 1, 1)
-      g.generateTexture('beacon', 16, 18)
-    }
-    g.clear()
-
     // item: Ren's key (old brass key)
     //
     // Drawn in `keyMetal` rather than `p.accent` on DMG (#106). accent is
@@ -306,6 +304,75 @@ export class BootScene extends Phaser.Scene {
     tex(`prop_flower_${mode}`, 16, 16)
 
     g.destroy()
+  }
+
+  /**
+   * The street furniture and the furniture, from `props.ts` (#178). Each takes
+   * the place of the enlarged 16-pixel drawing `buildProps` made under the
+   * same key, before anything has been given the old one.
+   */
+  /**
+   * Every picture in `sprites.ts`, under the key the game has always asked
+   * for. Each replaces the enlarged 16-pixel drawing made above, here at boot,
+   * before anything holds the old one.
+   */
+  private buildSprites(mode: 'dmg' | 'gbc') {
+    for (const name of Object.keys(SPRITES)) {
+      const grid = pixels(name, mode)
+      const canvas = document.createElement('canvas')
+      canvas.width = grid[0].length
+      canvas.height = grid.length
+      const ctx = canvas.getContext('2d')
+      if (!ctx) continue
+      grid.forEach((row, y) =>
+        row.forEach((colour, x) => {
+          if (colour === null) return
+          ctx.fillStyle = `#${colour.toString(16).padStart(6, '0')}`
+          ctx.fillRect(x, y, 1, 1)
+        }),
+      )
+      const key = textureKey(name, mode)
+      if (this.textures.exists(key)) this.textures.remove(key)
+      this.textures.addCanvas(key, canvas)
+    }
+  }
+
+  private buildProps24(mode: 'dmg' | 'gbc') {
+    const pal = mode === 'dmg' ? DMG_VILLAGE : VILLAGE
+    for (const [name, prop] of Object.entries(PROPS)) {
+      const key = propKey(name, mode)
+      const canvas = document.createElement('canvas')
+      canvas.width = prop.w * TILE_PX
+      canvas.height = prop.h * TILE_PX
+      const ctx = canvas.getContext('2d')
+      if (!ctx) continue
+      prop.draw((x, y, w, h, colour) => {
+        ctx.fillStyle = `#${colour.toString(16).padStart(6, '0')}`
+        ctx.fillRect(x, y, w, h)
+      }, pal)
+      if (this.textures.exists(key)) this.textures.remove(key)
+      this.textures.addCanvas(key, canvas)
+    }
+  }
+
+  /**
+   * The village as it is drawn, from `tiles.ts` (#178): a strip of frames the
+   * world scene chooses from, cell by cell. `buildTileset` below still makes
+   * the twelve tiles the maps are written in, which is what collides.
+   */
+  private buildVillage(mode: 'dmg' | 'gbc') {
+    const key = `village_${mode}`
+    if (this.textures.exists(key)) return
+    const canvas = document.createElement('canvas')
+    canvas.width = FRAME_COUNT * TILE_PX
+    canvas.height = TILE_PX
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    drawTileset((x, y, w, h, colour) => {
+      ctx.fillStyle = `#${colour.toString(16).padStart(6, '0')}`
+      ctx.fillRect(x, y, w, h)
+    }, mode === 'dmg' ? DMG_VILLAGE : VILLAGE)
+    this.textures.addCanvas(key, canvas)
   }
 
   private buildTileset(mode: 'dmg' | 'gbc') {
@@ -515,6 +582,15 @@ export class BootScene extends Phaser.Scene {
       this.drawCharacter(g, `kid_${mode}_${f}_1`, f, 1, shirt, pants, hair, skin, outline)
     })
     g.destroy()
+  }
+
+  /**
+   * The walk cycles. Made after the textures are enlarged, not with them: an
+   * animation holds the frames it was given, and enlarging replaces each
+   * texture, which left every walk pointing at a frame that no longer existed
+   * and stopped the game at boot.
+   */
+  private buildWalks(mode: 'dmg' | 'gbc') {
     ;(['down', 'up', 'left', 'right'] as const).forEach((f) => {
       const animKey = `walk_${mode}_${f}`
       if (!this.anims.exists(animKey)) {

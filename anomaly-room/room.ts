@@ -85,7 +85,7 @@ export interface Candidate extends Solid {
  */
 export const SHELL_SOLIDS: Solid[] = [
   { id: 'floor', position: v(0, -SHELL / 2, 0), size: v(ROOM_HALF * 2, SHELL, ROOM_HALF * 2), colour: 0x6d6355 },
-  { id: 'ceiling', position: v(0, ROOM_HEIGHT + SHELL / 2, 0), size: v(ROOM_HALF * 2, SHELL, ROOM_HALF * 2), colour: 0x453f38 },
+  { id: 'ceiling', position: v(0, ROOM_HEIGHT + SHELL / 2, 0), size: v(ROOM_HALF * 2, SHELL, ROOM_HALF * 2), colour: 0x5c554b },
   { id: 'wall-n', position: v(0, ROOM_HEIGHT / 2, -ROOM_HALF - SHELL / 2), size: v(ROOM_HALF * 2, ROOM_HEIGHT, SHELL), colour: 0x7b7264 },
   { id: 'wall-s', position: v(0, ROOM_HEIGHT / 2, ROOM_HALF + SHELL / 2), size: v(ROOM_HALF * 2, ROOM_HEIGHT, SHELL), colour: 0x7b7264 },
   { id: 'wall-w', position: v(-ROOM_HALF - SHELL / 2, ROOM_HEIGHT / 2, 0), size: v(SHELL, ROOM_HEIGHT, ROOM_HALF * 2), colour: 0x6f6759 },
@@ -154,8 +154,10 @@ export const CANDIDATES: Candidate[] = [
   {
     id: 'shelf',
     label: 'the shelf',
-    position: v(-4.75, 1.6, 0.6),
-    size: v(0.5, 0.18, 2.2),
+    // Tall enough to hold books a player can see from across the room (#147).
+    // Its board sits where the old eighteen-centimetre box's bottom was.
+    position: v(-4.75, 1.68, 0.6),
+    size: v(0.5, 0.34, 2.2),
     colour: 0x60533f,
     // Down the wall, and shorter along it. Never out from the wall.
     mutations: [move(0, -0.55, 0), scale(1, 1, 0.6), vanish],

@@ -78,17 +78,18 @@ for (let i = 0; i < 6 && !(await ui()).choice; i++) {
 s = await ui()
 check('A advances dialogue to a choice', s.choice, s.body?.slice(0, 40))
 
-// Pick the second option by tapping the text where it is drawn. Game space is
-// 160px wide, so the canvas box gives the scale.
+// Pick the second option by tapping the text where it is drawn. The game's
+// width is read from the game: it was a literal 160 here, which was right
+// until the UI was laid out on the real screen (#180).
 const opt = await page.evaluate(() => {
   const o = window.__game.scene.getScene('ui').choiceTexts[1]
-  return o?.visible ? { x: o.x, y: o.y } : null
+  return o?.visible ? { x: o.x + 20, y: o.y + 4, width: window.__game.scale.width } : null
 })
 if (!opt) {
   check('a choice can be picked by tapping it', false, 'choice texts not visible')
 } else {
   const cb = (await centreOf(page, 'canvas')).box
-  const scale = cb.width / 160
+  const scale = cb.width / opt.width
   await hand.tap(ACT, cb.x + opt.x * scale, cb.y + opt.y * scale, 140)
   await page.waitForTimeout(700)
   const flags = await page.evaluate(() => JSON.parse(localStorage.getItem('static_save')).d.flags)
@@ -119,25 +120,32 @@ check(
   await page.evaluate(() => !document.getElementById('overlay').classList.contains('hidden')),
 )
 
-// The interact prompt over an NPC's head is labelled off
-// `(hover: hover) and (pointer: fine)` — 'Z' on a desktop, 'A' on a phone,
-// matching the button the player can actually see. This is the only one of
-// the hover-dependent strings that is drawn into the game rather than into
-// the DOM, so nothing else would catch it flipping.
+// The interact prompt names the button and what it does (#180): 'A TALK' on a
+// phone, 'Z TALK' on a desktop, off `(hover: hover) and (pointer: fine)`. It is
+// the only one of the hover-dependent strings drawn into the game rather than
+// into the DOM, so nothing else would catch it flipping.
+//
+// It shows only while the kid faces something, so the kid is stood in front
+// of someone first. The old check read whatever text the scene held, which
+// passed on a prompt that was never on screen.
+// The pause overlay is still up from the check above, and stops the game.
+await hand.tap(ACT, START.x, START.y, 140)
+await page.waitForTimeout(700)
+const shown = await page.evaluate(async () => {
+  const w = window.__game.scene.getScene('world')
+  const npc = w.npcs[0]
+  if (!npc) return { text: '', visible: false, why: 'no one on this map' }
+  // One tile below them, facing up.
+  w.player.setPosition(npc.sprite.x, npc.sprite.y + w.groundLayer.tilemap.tileHeight)
+  w.facing = 'up'
+  await new Promise((r) => setTimeout(r, 400))
+  return { text: w.promptTxt.text, visible: w.prompt.visible }
+})
+check('standing in front of someone shows the prompt', shown.visible, shown.why ?? shown.text)
 check(
-  'the interact prompt is labelled for the on-screen button',
-  await page.evaluate(() => {
-    const w = window.__game.scene.getScene('world')
-    const labels = []
-    w.children.list.forEach((o) => {
-      if (o.type === 'Container') o.list?.forEach((k) => k.type === 'Text' && labels.push(k.text))
-      if (o.type === 'Text') labels.push(o.text)
-    })
-    // Positive *and* negative: asserting only the absence of 'Z' would pass
-    // just as happily if the traversal never found the prompt at all.
-    return { labels, ok: labels.includes('A') && !labels.includes('Z') }
-  }).then((r) => r.ok),
-  "a phone has no Z key, so the prompt reads 'A'",
+  'and it names the on-screen button and what it does',
+  shown.text === 'A TALK',
+  `"${shown.text}" — a phone has no Z key`,
 )
 
 const ok = finish(t.log)

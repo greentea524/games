@@ -1,5 +1,9 @@
 import Phaser from 'phaser'
-import { TILE, FONT, PAL, GBC_PAL, WORLD_PALS } from '../constants'
+import { playerKey, type Facing } from '../sprites'
+import { BAR_HEIGHT } from '../hud'
+import { DECOR, levelView, placeDecor, surround } from '../decor'
+import { cornerFrames, floorFrame, isVoid, sealUnreachable, wallFrame } from '../tiles'
+import { TILE, GBC_WIDTH, GBC_HEIGHT, FONT, PAL, sx } from '../constants'
 import { GameState } from '../state'
 import { CAMPAIGN_LEVELS } from '../levels'
 import { SaveSystem, recordHighestUnlocked } from '../save'
@@ -8,7 +12,6 @@ import type { StepRecord } from '../commands'
 import type { UIScene } from './UIScene'
 import { showRunSummary } from '../../shared/runSummary'
 
-type Facing = 'down' | 'up' | 'left' | 'right'
 
 export interface CrateInstance {
   id: number
@@ -18,6 +21,10 @@ export interface CrateInstance {
   docked: boolean
   destroyed?: boolean
 }
+
+/** How much of the screen the HUD's two bars cover. */
+const HUD_TOP = BAR_HEIGHT
+const HUD_BOTTOM = BAR_HEIGHT
 
 export class BoardScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite
@@ -146,6 +153,8 @@ export class BoardScene extends Phaser.Scene {
         }
       }
     }
+    // Floor outside the walls that nothing can reach is the outside (#165).
+    sealUnreachable(this.floorGrid, this.playerTX, this.playerTY)
   }
 
   getTextureKey(base: string) {
@@ -170,17 +179,23 @@ export class BoardScene extends Phaser.Scene {
         const px = x * TILE + TILE / 2
         const py = y * TILE + TILE / 2
 
+        // A wall above puts the floor under it in shade.
+        const floor = floorFrame(x, y, y > 0 && this.floorGrid[y - 1][x] === '#')
+
         if (char === '#') {
-          let texKey = 'wall'
-          if (y === 0) {
-            texKey = (x % 2 === 0) ? 'shelf' : 'pegboard'
-          } else if (y === this.mapHeight - 1 || x === 0 || x === this.mapWidth - 1) {
-            texKey = 'barrel'
+          // A wall with no floor beside it is not the edge of anything: left
+          // undrawn, so the room sits in the dark instead of in a slab of wall.
+          if (!isVoid(this.floorGrid, x, y)) {
+            this.floorSprites[y][x] = this.add.image(px, py, tKey('wall'), wallFrame(this.floorGrid, x, y))
+            for (const corner of cornerFrames(this.floorGrid, x, y)) {
+              this.add.image(px, py, tKey('wallcorner'), corner)
+            }
           }
-          this.floorSprites[y][x] = this.add.image(px, py, tKey(texKey))
         } else if (char === 'T') {
-          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'))
-          const targetSprite = this.add.image(px, py, tKey('target'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'), floor)
+          // Above the floor of the cells round it: a filled target's glow
+          // reaches past its own tile.
+          const targetSprite = this.add.image(px, py, tKey('target')).setDepth(1)
           this.targetSprites[y][x] = targetSprite
           this.setTargetEmpty(x, y)
         } else if (char === 'I') {
@@ -190,7 +205,7 @@ export class BoardScene extends Phaser.Scene {
         } else if (char === 'O') {
           this.floorSprites[y][x] = this.add.image(px, py, tKey('hole'))
         } else {
-          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'))
+          this.floorSprites[y][x] = this.add.image(px, py, tKey('floor'), floor)
         }
 
         if (char === 'C' || char === '*') {
@@ -198,13 +213,12 @@ export class BoardScene extends Phaser.Scene {
           this.floorGrid[y][x] = isTarget ? 'T' : '.'
           
           if (isTarget) {
-            this.add.image(px, py, tKey('floor'))
-            const targetSprite = this.add.image(px, py, tKey('target'))
+            const targetSprite = this.add.image(px, py, tKey('target')).setDepth(1)
             this.targetSprites[y][x] = targetSprite
             this.setTargetLit(x, y, false, false)
           }
           
-          const crateSprite = this.add.sprite(px, py, tKey('crate')).setDepth(5)
+          const crateSprite = this.add.sprite(px, py, tKey(isTarget ? 'crate_on' : 'crate')).setDepth(5)
           this.crates.push({
             tx: x,
             ty: y,
@@ -220,9 +234,10 @@ export class BoardScene extends Phaser.Scene {
     this.player = this.add.sprite(
       this.playerTX * TILE + TILE / 2,
       this.playerTY * TILE + TILE / 2,
-      `player_${mode}_` + this.facing
+      playerKey(mode, this.facing)
     ).setDepth(10)
 
+    this.renderSurround()
     this.updateCamera()
   }
 
@@ -232,7 +247,9 @@ export class BoardScene extends Phaser.Scene {
     if (img) {
       if (char === 'O') img.setTexture(this.getTextureKey('hole'))
       else if (char === 'X') img.setTexture(this.getTextureKey('cracked'))
-      else if (char === '.') img.setTexture(this.getTextureKey('floor'))
+      else if (char === '.') {
+        img.setTexture(this.getTextureKey('floor'), floorFrame(tx, ty, ty > 0 && this.floorGrid[ty - 1][tx] === '#'))
+      }
     }
   }
 
@@ -249,30 +266,19 @@ export class BoardScene extends Phaser.Scene {
     const mode = GameState.paletteMode
     const tKey = this.getTextureKey.bind(this)
 
+    // Every texture here is `<kind>_dmg` or `<kind>_gbc_w<world>`, so the
+    // kind is read off the key and the same frame is kept. A kind added later
+    // switches without being named here, which is how the decor was missed
+    // (#134).
     this.children.each((child: Phaser.GameObjects.GameObject) => {
-      if (child instanceof Phaser.GameObjects.Image) {
-        const key = child.texture.key
-        if (key.startsWith('floor_')) child.setTexture(tKey('floor'))
-        else if (key.startsWith('wall_')) child.setTexture(tKey('wall'))
-        else if (key.startsWith('ice_')) child.setTexture(tKey('ice'))
-        else if (key.startsWith('cracked_')) child.setTexture(tKey('cracked'))
-        else if (key.startsWith('hole_')) child.setTexture(tKey('hole'))
-        // The decor, which this list missed until #134's reachability check
-        // caught it: 34 `*_gbc_w1` sprites stayed on screen in DMG mode, so
-        // the DMG shelf, pegboard and barrel art `qa:contrast` scores could
-        // not be seen. Every entry in this chain is a sprite kind somebody
-        // had to remember — see the note on `reloadPalette` above.
-        else if (key.startsWith('shelf_')) child.setTexture(tKey('shelf'))
-        else if (key.startsWith('pegboard_')) child.setTexture(tKey('pegboard'))
-        else if (key.startsWith('barrel_')) child.setTexture(tKey('barrel'))
-      } else if (child instanceof Phaser.GameObjects.Sprite) {
-        const key = child.texture.key
-        if (key.startsWith('crate_')) {
-          child.setTexture(tKey('crate'))
-        } else if (key.startsWith('player_')) {
-          child.setTexture(`player_${mode}_${this.facing}`)
-        }
+      if (!(child instanceof Phaser.GameObjects.Image) && !(child instanceof Phaser.GameObjects.Sprite)) return
+      const key = child.texture.key
+      if (key.startsWith('player_')) {
+        child.setTexture(playerKey(mode, this.facing))
+        return
       }
+      const kind = key.match(/^(.+?)_(?:dmg|gbc_w\d+)$/)?.[1]
+      if (kind) child.setTexture(tKey(kind), child.frame.name)
     })
 
     // Re-apply each pad's glow state (empty pulse vs. satisfied lit).
@@ -282,17 +288,6 @@ export class BoardScene extends Phaser.Scene {
         const docked = this.crates.some((c) => !c.destroyed && c.docked && c.tx === x && c.ty === y)
         this.refreshTargetState(x, y, docked)
       })
-    })
-
-    const world = CAMPAIGN_LEVELS[GameState.currentLevelIndex]?.world || 1
-    const pal = mode === 'gbc' ? (WORLD_PALS[world - 1] || GBC_PAL) : GBC_PAL
-
-    this.crates.forEach((c) => {
-      if (c.docked && !c.destroyed) {
-        c.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : pal.crateLight)
-      } else {
-        c.sprite.clearTint()
-      }
     })
 
     this.updateCamera()
@@ -437,8 +432,8 @@ export class BoardScene extends Phaser.Scene {
     if (!this.textures.exists(texKey)) {
       const g = this.make.graphics({ x: 0, y: 0 }, false)
       g.fillStyle(0xffffff, 1)
-      g.fillRect(0, 0, 2, 2)
-      g.generateTexture(texKey, 2, 2)
+      g.fillRect(0, 0, 3, 3)
+      g.generateTexture(texKey, 3, 3)
       g.destroy()
     }
 
@@ -453,9 +448,9 @@ export class BoardScene extends Phaser.Scene {
         const cx = c.tx * TILE + TILE / 2
         const cy = c.ty * TILE + TILE / 2
         const emitter = this.add.particles(cx, cy, texKey, {
-          speed: { min: 60, max: 150 },
+          speed: { min: sx(60), max: sx(150) },
           angle: { min: 0, max: 360 },
-          gravityY: 260,
+          gravityY: sx(260),
           lifespan: { min: 500, max: 900 },
           quantity: 16,
           scale: { start: 1, end: 0.3 },
@@ -470,20 +465,66 @@ export class BoardScene extends Phaser.Scene {
     })
   }
 
+  /**
+   * Frames the level.
+   *
+   * What is framed is the part that is drawn, not the whole grid (#161):
+   * levels are padded with rows of wall that are no longer drawn, and a room
+   * centred as if they were sits against the top of the screen with its upper
+   * wall under the HUD.
+   *
+   * A level that fits between the HUD's two bars is centred there. One that
+   * fits the screen but not that gap is centred on the screen, its outer wall
+   * under the bars as before: counting the bars against it would make eleven
+   * more levels scroll. One larger than the screen scrolls with the fox, as
+   * it always did.
+   */
   private updateCamera() {
-    const mapPixelWidth = this.mapWidth * TILE
-    const mapPixelHeight = this.mapHeight * TILE
-
-    if (mapPixelWidth > 160 || mapPixelHeight > 144) {
-      this.cameras.main.setBounds(0, 0, Math.max(160, mapPixelWidth), Math.max(144, mapPixelHeight))
+    const view = this.view()
+    if (view.follows) {
+      const mapPixelWidth = this.mapWidth * TILE
+      const mapPixelHeight = this.mapHeight * TILE
+      this.cameras.main.setBounds(0, 0, Math.max(GBC_WIDTH, mapPixelWidth), Math.max(GBC_HEIGHT, mapPixelHeight))
       this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
-    } else {
-      const offsetX = (160 - mapPixelWidth) / 2
-      const offsetY = (144 - mapPixelHeight) / 2
-      this.cameras.main.setBounds(-offsetX, -offsetY, 160, 144)
-      this.cameras.main.stopFollow()
-      this.cameras.main.setScroll(-offsetX, -offsetY)
+      return
     }
+    this.cameras.main.setBounds(view.scrollX, view.scrollY, GBC_WIDTH, GBC_HEIGHT)
+    this.cameras.main.stopFollow()
+    this.cameras.main.setScroll(view.scrollX, view.scrollY)
+  }
+
+  private view() {
+    return levelView(this.floorGrid, { width: GBC_WIDTH, height: GBC_HEIGHT }, { top: HUD_TOP, bottom: HUD_BOTTOM })
+  }
+
+  /**
+   * The warehouse outside the level (#163): a dim floor under every cell the
+   * camera can show that is not part of the level, and shelves, a tool rack,
+   * barrels and boxes on some of them. Chosen from the level's number, so a
+   * level always looks the same. Below everything in the level.
+   */
+  private renderSurround() {
+    const level = CAMPAIGN_LEVELS[GameState.currentLevelIndex] || CAMPAIGN_LEVELS[0]
+    const cells = surround(this.floorGrid, this.view(), { width: GBC_WIDTH, height: GBC_HEIGHT })
+    for (const { x, y } of cells) {
+      this.add
+        .image(x * TILE + TILE / 2, y * TILE + TILE / 2, this.getTextureKey('decorfloor'), (((x + y) % 2) + 2) % 2)
+        .setDepth(-2)
+    }
+    for (const { x, y, kind } of placeDecor(this.floorGrid, cells, level.id)) {
+      this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, this.getTextureKey('decor'), DECOR[kind]).setDepth(-1)
+    }
+  }
+
+  /**
+   * Gives a crate the picture for where it stands (#162).
+   *
+   * A crate on its target used to be the same crate with a tint over it. It
+   * is its own picture now — brass frame, green slats, a tick on the label —
+   * so it differs in shape as well as colour, on the green screen too.
+   */
+  showCrateHome(crate: { sprite: Phaser.GameObjects.Sprite; docked: boolean }) {
+    crate.sprite.setTexture(this.getTextureKey(crate.docked ? 'crate_on' : 'crate'))
   }
 
   setPlayerPos(tx: number, ty: number, facing: Facing) {
@@ -492,7 +533,7 @@ export class BoardScene extends Phaser.Scene {
     this.playerTY = ty
     this.facing = facing
     this.player.setPosition(tx * TILE + TILE / 2, ty * TILE + TILE / 2)
-    this.player.setTexture(`player_${mode}_${facing}`)
+    this.player.setTexture(playerKey(mode, facing))
   }
 
   undoMove() {
@@ -571,12 +612,7 @@ export class BoardScene extends Phaser.Scene {
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.hintKey)) {
-      this.isHintMode = !this.isHintMode
-      if (this.isHintMode) {
-        this.showHint()
-      } else {
-        this.showToast('HINT MODE OFF')
-      }
+      this.toggleHint()
       return
     }
 
@@ -618,13 +654,13 @@ export class BoardScene extends Phaser.Scene {
     const mode = GameState.paletteMode
 
     if (finalPlayerTX < 0 || finalPlayerTX >= this.mapWidth || finalPlayerTY < 0 || finalPlayerTY >= this.mapHeight) {
-      this.player.setTexture(`player_${mode}_${this.facing}`)
+      this.player.setTexture(playerKey(mode, this.facing))
       return
     }
 
     const destTile = this.floorGrid[finalPlayerTY][finalPlayerTX]
     if (destTile === '#' || destTile === 'O') {
-      this.player.setTexture(`player_${mode}_${this.facing}`)
+      this.player.setTexture(playerKey(mode, this.facing))
       return
     }
 
@@ -639,13 +675,13 @@ export class BoardScene extends Phaser.Scene {
       pushTY = finalPlayerTY + dy
 
       if (pushTX < 0 || pushTX >= this.mapWidth || pushTY < 0 || pushTY >= this.mapHeight) {
-        this.player.setTexture(`player_${mode}_${this.facing}`)
+        this.player.setTexture(playerKey(mode, this.facing))
         return
       }
 
       let pushTile = this.floorGrid[pushTY][pushTX]
       if (pushTile === '#') {
-        this.player.setTexture(`player_${mode}_${this.facing}`)
+        this.player.setTexture(playerKey(mode, this.facing))
         return
       }
 
@@ -663,7 +699,7 @@ export class BoardScene extends Phaser.Scene {
 
       const crateAtPush = this.crates.find((c) => !c.destroyed && c.tx === pushTX && c.ty === pushTY)
       if (crateAtPush) {
-        this.player.setTexture(`player_${mode}_${this.facing}`)
+        this.player.setTexture(playerKey(mode, this.facing))
         return
       }
 
@@ -723,11 +759,7 @@ export class BoardScene extends Phaser.Scene {
       if (!crateFell) {
         const isTarget = this.floorGrid[pushTY][pushTX] === 'T'
         crateAtTarget.docked = isTarget
-        if (isTarget) {
-          crateAtTarget.sprite.setTint(mode === 'dmg' ? 0x9bbc0f : 0xffff44)
-        } else {
-          crateAtTarget.sprite.clearTint()
-        }
+        this.showCrateHome(crateAtTarget)
       }
 
       // If the crate was docked and is now pushed off, the pad reverts to pulsing.
@@ -736,7 +768,9 @@ export class BoardScene extends Phaser.Scene {
       }
     }
 
-    this.player.setTexture(`player_${mode}_${this.facing}`)
+    // Leaning into the crate while it moves, mid-stride otherwise; `finishMove`
+    // stands the fox up again.
+    this.player.setTexture(playerKey(mode, this.facing, crateAtTarget ? 'push' : 'step'))
 
     const playerPX = finalPlayerTX * TILE + TILE / 2
     const playerPY = finalPlayerTY * TILE + TILE / 2
@@ -805,6 +839,7 @@ export class BoardScene extends Phaser.Scene {
 
   private finishMove(record: StepRecord) {
     this.isMoving = false
+    this.player.setTexture(playerKey(GameState.paletteMode, this.facing))
     GameState.movesCount++
     if (record.crate) GameState.pushesCount++
     this.undoStack.push(new MoveCommand(this, record))
@@ -844,7 +879,7 @@ export class BoardScene extends Phaser.Scene {
       // 3 bouncy jumps for joy
       this.tweens.add({
         targets: this.player,
-        y: this.player.y - 8,
+        y: this.player.y - sx(8),
         yoyo: true,
         repeat: 2,
         duration: 150,
@@ -860,6 +895,7 @@ export class BoardScene extends Phaser.Scene {
           showRunSummary(this, {
             title: `LEVEL ${levelConfig.id} CLEAR`,
             palette: PAL,
+            screen: { width: GBC_WIDTH, height: GBC_HEIGHT },
             stats: [
               { label: 'MOVES', value: `${moves}`, highlight: isBest },
               { label: 'PAR', value: `${levelConfig.parMoves}` },
@@ -916,6 +952,17 @@ export class BoardScene extends Phaser.Scene {
     })
   }
 
+  hintOn() {
+    return this.isHintMode
+  }
+
+  /** H on a keyboard; the pause panel's HINT row on a phone (#164). */
+  toggleHint() {
+    this.isHintMode = !this.isHintMode
+    if (this.isHintMode) this.showHint()
+    else this.showToast('HINT MODE OFF')
+  }
+
   showHint() {
     if (this.isMoving || GameState.uiBlocking) return
     const levelConfig = CAMPAIGN_LEVELS[GameState.currentLevelIndex]
@@ -956,9 +1003,9 @@ export class BoardScene extends Phaser.Scene {
     
     // Draw a simple triangle arrow
     arrow.beginPath()
-    arrow.moveTo(-4, -4)
-    arrow.lineTo(4, 0)
-    arrow.lineTo(-4, 4)
+    arrow.moveTo(-6, -6)
+    arrow.lineTo(6, 0)
+    arrow.lineTo(-6, 6)
     arrow.closePath()
     arrow.fillPath()
 
@@ -972,8 +1019,8 @@ export class BoardScene extends Phaser.Scene {
     this.tweens.add({
       targets: arrow,
       alpha: 0,
-      y: arrow.y + (nextMove === 'U' ? -6 : nextMove === 'D' ? 6 : 0),
-      x: arrow.x + (nextMove === 'L' ? -6 : nextMove === 'R' ? 6 : 0),
+      y: arrow.y + (nextMove === 'U' ? -9 : nextMove === 'D' ? 9 : 0),
+      x: arrow.x + (nextMove === 'L' ? -9 : nextMove === 'R' ? 9 : 0),
       duration: 1000,
       ease: 'Quad.easeOut',
       onComplete: () => arrow.destroy()
@@ -981,7 +1028,7 @@ export class BoardScene extends Phaser.Scene {
   }
 
   showToast(msg: string) {
-    const toast = this.add.text(this.cameras.main.worldView.centerX, this.cameras.main.worldView.centerY - 20, msg, {
+    const toast = this.add.text(this.cameras.main.worldView.centerX, this.cameras.main.worldView.centerY - sx(20), msg, {
       fontFamily: FONT,
       fontSize: '8px',
       color: '#ffcc00',
@@ -993,7 +1040,7 @@ export class BoardScene extends Phaser.Scene {
     this.tweens.add({
       targets: toast,
       alpha: 0,
-      y: toast.y - 10,
+      y: toast.y - sx(10),
       delay: 1000,
       duration: 500,
       onComplete: () => toast.destroy()

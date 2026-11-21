@@ -50,6 +50,11 @@ export interface RunSummaryOptions {
    * closes in the same frame.
    */
   inputLockMs?: number
+  /**
+   * The game's screen, when it is not 160×144. Pocket Dungeon is 240×216
+   * (#159); the panel keeps its 8px text and is centred on the larger screen.
+   */
+  screen?: { width: number; height: number }
 }
 
 const DEFAULT_PALETTE: RunSummaryPalette = {
@@ -59,8 +64,8 @@ const DEFAULT_PALETTE: RunSummaryPalette = {
   lightest: 0x9bbc0f,
 }
 
-const WIDTH = 160
-const HEIGHT = 144
+const DEFAULT_WIDTH = 160
+const DEFAULT_HEIGHT = 144
 const FONT = '"Press Start 2P", monospace'
 // Press Start 2P is a bitmap face on an 8px grid: at any other size the glyph
 // strokes land between pixels and go mushy. Static learned this the hard way
@@ -96,6 +101,8 @@ function warnIfTooWide(text: string, budget: number, what: string) {
  */
 export function showRunSummary(scene: Phaser.Scene, opts: RunSummaryOptions): void {
   const pal = opts.palette ?? DEFAULT_PALETTE
+  const WIDTH = opts.screen?.width ?? DEFAULT_WIDTH
+  const HEIGHT = opts.screen?.height ?? DEFAULT_HEIGHT
   const stats = opts.stats
   const depth = 5000
 
@@ -106,7 +113,9 @@ export function showRunSummary(scene: Phaser.Scene, opts: RunSummaryOptions): vo
   const padding = 7
   const bodyH = titleH + subtitleH + 5 + stats.length * rowH + promptH
   const panelH = Math.min(HEIGHT - 8, bodyH + padding * 2)
-  const panelW = WIDTH - 16
+  // Capped: the rows are a label and a number, and stretched across a wide
+  // screen they drift apart.
+  const panelW = Math.min(WIDTH - 16, 192)
   const panelX = (WIDTH - panelW) / 2
   const panelY = (HEIGHT - panelH) / 2
 

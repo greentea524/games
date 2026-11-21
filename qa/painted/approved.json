@@ -2,38 +2,36 @@
   "static": {
     "note": "A painted village with a HUD and a score line the game does not have. The drift is known, recorded in qa/thumbnails.mjs, and accepted \u2014 this baseline exists so the NEXT drift is not.",
     "art": "12687b5955b3a48e6053e6e68dafa137ac405064f5f60636b0ba2b4ff488f930",
-    "textures": "f507231b785a33c881ec3a386011bbfd296b6237446d55dcdcea83dc16bf1b34",
-    "keys": 101,
-    "nondeterministic": [
-      "entity"
-    ]
+    "textures": "8d569edfa9c46b6b846ee91a4b986b60f8d812c52c493c610c36d33b3a4a3338",
+    "keys": 116,
+    "nondeterministic": []
   },
   "windup": {
-    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
+    "note": "Looked at beside the game at #168, level 1 and the levels with spikes, lava, belts, springs, a moving plate and an arc, in both palettes, and the toy in all six poses. Same place and the same figure: mossy stone blocks with a grass cap, a green factory behind of gears, pipes, lattice towers, a lamp and a WINDUP banner, steel spikes, glowing lava, electricity between two emitters, belts with bright arrows, and a robot with a round head, an antenna, an orange body, teal limbs and a brass wind-up key in its back. Accepted drift: the game's backdrop is darker and less saturated, so it stays behind the stone; its robot is smaller, its head a pale dome with a visor where the card's face shows; its orb is yellow where the card's is white; its hazards are in separate levels rather than one pit. The HUD was looked at again at #169: a dark framed ENERGY panel with the robot's face and a segmented bar running yellow to orange to red, top left, as on the card; top right the game shows its run time and level where the card shows a score the game does not keep, and both panels step aside when the robot comes under them.",
     "art": "f792231667471f974d05b6656d67d6a1b413573f8e36280d9f7543943659b941",
-    "textures": "f15797ad49818730bb862cd5cc1a09f09eec0eb6062e70a5a01ae7d1aa7ce0d2",
-    "keys": 28,
+    "textures": "32098171acfa70ade4740a4a24ca71e21063fa94b3f6fdb51b968e79f8136ee2",
+    "keys": 42,
     "nondeterministic": []
   },
   "lantern-keeper": {
-    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
+    "note": "Looked at beside the finished game at #175: every stage, the title and the forest path. Same place and the same figure: a layered forest with vines and leaves, mossy stone with a grass cap, a hooded keeper with a pack and a lantern held out, iron-and-glass lanterns glowing warm, a wooden DANGER sign, amber text on solid bars top and bottom. Accepted drift: the game is darker and its keeper smaller; its lanterns float rather than hang on chains; it has no rope ladder and no ruined stone pillars; and its bars show lanterns lit, the stage and the oil, where the card shows score, lives and health, which the game does not count.",
     "art": "9b92ea28dcc6406278824a6074115d0c983232a537902446ade6313d366018e9",
-    "textures": "3af891575aac788aaa802d0f73ba97e3296f39fe729183481832d284aa134ff1",
-    "keys": 25,
+    "textures": "bc3860369595167c284d1ece4663c6e2d0edc487b4a9b1474a340c4eb47b8703",
+    "keys": 36,
     "nondeterministic": []
   },
   "pocket-dungeon": {
     "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye. Its DMG art was unreachable when this was recorded; #134 wired the palette toggle, so the hashed art is now art a player can actually see.",
     "art": "24c156be67a95d315b274771eaa331dac018621fa57516ce4be994f04a3eee0c",
-    "textures": "d636c3d69c0b41a650b23c203b698e2f87ac24920890bccbf88d806e1d261423",
-    "keys": 68,
+    "textures": "489ef8409265b972d22071b0a7774b3ba6ab86a61316803f46cfd1b2eab11fa9",
+    "keys": 77,
     "nondeterministic": []
   },
   "cart-crate": {
-    "note": "Baseline only: recorded as the game stood at #132, not compared against the card by eye.",
+    "note": "Looked at beside the finished game at #165: all five worlds in both palettes, the title and the level select. The warehouse is the card's: grey-blue checkered floor, dark red-brown walls with a brick face, wooden crates, bright crosses in lit squares, the courier fox, and shelves and boxes round the room. Accepted drift: the card's room is larger than any one level's and fills its frame, where a level sits in a band of dark warehouse; the other four worlds are their own places in their own colours; and the game has a HUD bar top and bottom that the card does not.",
     "art": "d1ad5e0233bc6b14706d70928fd41270cc800ad6ef9292a7a23f64938daa0c3a",
-    "textures": "a374f1bff1b20ae67f1bc92795ee4130e2746cfe92a43277bb1c252891235770",
-    "keys": 74,
+    "textures": "4398b7251f8f0509788015b63ae22d0a710abf6681cd24cd5bdde6bc8c1e4a69",
+    "keys": 96,
     "nondeterministic": []
   }
 }

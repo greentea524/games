@@ -4,6 +4,7 @@ import {
   GBC_HEIGHT,
   TILE,
   PLAYER_SPEED,
+  scaled,
   SOLID_TILES,
   TILES,
   PAL,
@@ -15,6 +16,11 @@ import { sfx, music } from '../audio'
 import { NPCS, currentTarget } from '../dialogue'
 import { Darkness, type Light } from '../../shared/lighting'
 import { showRunSummary } from '../../shared/runSummary'
+import { crackleMs } from '../sprites'
+import { ENDING_THEME, css, endingLines, endingPrompt, summaryPalette, type Ending } from '../screens'
+import { minimap, minimapCorner, prompt as promptBox, promptText, type Corner } from '../hud'
+import { prefersReducedMotion } from '../../shared/motion'
+import { baseFrame, overFrame } from '../tiles'
 import { ITEMS, TRANSFORMS } from '../items'
 import type { NpcDef } from '../dialogue'
 import {
@@ -65,6 +71,11 @@ interface Structure {
 // see the place by then, and a marker on top of you is noise.
 const DESTINATION_NEAR_TILES = 4
 
+/** The first tile number of the drawn village's tileset: clear of the maps' twelve. */
+const VILLAGE_GID = 100
+/** Above the kid and the townsfolk (10), under the darkness (20). */
+const OVER_DEPTH = 12
+
 /**
  * How far the player can see in a dark room (#73).
  *
@@ -72,7 +83,7 @@ const DESTINATION_NEAR_TILES = 4
  * barely more than arm's reach. Deliberately the same for 'dead' and 'absent':
  * a broken light and no light should look identical, which is the joke.
  */
-const LIGHT_RADIUS = { lit: 44, dim: 18 } as const
+const LIGHT_RADIUS = { lit: scaled(44), dim: scaled(18) } as const
 
 /**
  * The TV lights itself in a dark room (#89).
@@ -83,7 +94,7 @@ const LIGHT_RADIUS = { lit: 44, dim: 18 } as const
  * static is a light source anyway; the radius breathes so it reads as a
  * signal rather than a lamp.
  */
-const TV_GLOW = { radius: 30, flicker: 4, periodMs: 140 } as const
+const TV_GLOW = { radius: scaled(30), flicker: scaled(4), periodMs: 140 } as const
 
 /**
  * How many items a run can actually collect.
@@ -124,6 +135,8 @@ interface Interactable {
   x: number
   y: number
   action: () => void
+  /** What the prompt says pressing the button does. LOOK when unset. */
+  verb?: string
 }
 
 interface DoorData {
@@ -149,6 +162,10 @@ export class WorldScene extends Phaser.Scene {
   private interactables: Interactable[] = []
   private npcGroup!: Phaser.Physics.Arcade.StaticGroup
   private groundLayer!: Phaser.Tilemaps.TilemapLayer
+  private villageBase!: Phaser.Tilemaps.TilemapLayer
+  private villageOver!: Phaser.Tilemaps.TilemapLayer
+  private villageStale = false
+  private villageGround!: Phaser.Tilemaps.TilemapLayer
   private lastStepAt = 0
   private facing: Facing = 'down'
   private transitioning = false
@@ -156,6 +173,13 @@ export class WorldScene extends Phaser.Scene {
   private npcs: NpcInstance[] = []
   private interactKey!: Phaser.Input.Keyboard.Key
   private prompt?: Phaser.GameObjects.Container
+  private promptGfx!: Phaser.GameObjects.Graphics
+  private promptTxt!: Phaser.GameObjects.Text
+  private promptDesktop = false
+  private promptShown = ''
+  private miniGfx?: Phaser.GameObjects.Graphics
+  private miniCorner: Corner | null = 'top-right'
+  private miniSize?: { w: number; h: number }
 
   // Story beats re-check themselves whenever a flag changes (#95).
   private unsubscribeFlags?: () => void
@@ -174,6 +198,8 @@ export class WorldScene extends Phaser.Scene {
    */
   worldGates: { tx: number; ty: number }[] = []
   private tvPos?: { x: number; y: number }
+  /** Everything showing static, and its two frames; see `crackle`. */
+  private crackling: { image: Phaser.GameObjects.Image; keys: [string, string] }[] = []
 
   // Minimap (only on maps larger than one screen)
   private blip?: Phaser.GameObjects.Graphics
@@ -242,6 +268,7 @@ export class WorldScene extends Phaser.Scene {
     const tileset = map.addTilesetImage('tiles', `tiles_${mode}`)!
     const ground = map.createLayer('ground', tileset)!
     ground.setCollision(SOLID_TILES)
+    this.buildVillage(map, ground, mode)
 
     // Spawn: prefer explicit door target, else the map's 'spawn' object.
     let sx = GBC_WIDTH / 2
@@ -274,7 +301,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.setDepth(10)
     this.player.setCollideWorldBounds(true)
     // A slightly slimmer body than the sprite so movement feels roomy.
-    this.player.body.setSize(10, 10).setOffset(3, 5)
+    this.player.body.setSize(scaled(10), scaled(10)).setOffset(scaled(3), scaled(5))
     this.physics.add.collider(this.player, ground)
 
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
@@ -320,7 +347,7 @@ export class WorldScene extends Phaser.Scene {
         `npc_${mode}_${def.id}_down`,
       ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
       sprite.setDepth(10)
-      sprite.body.setSize(12, 12).setOffset(2, 3)
+      sprite.body.setSize(scaled(12), scaled(12)).setOffset(scaled(2), scaled(3))
       this.npcs.push({ sprite, def, facing: 'down' })
     }
     this.physics.add.collider(this.player, npcGroup)
@@ -348,17 +375,20 @@ export class WorldScene extends Phaser.Scene {
     // Interactables (face + press Z/A): the TV portal, and the Phase 3
     // props (fountain valve, cellar hatch, pickups).
     this.interactables = []
+    this.crackling = []
     if (this.mapKey === 'house') {
-      const tv = this.add.image(7 * TILE + TILE / 2, 1 * TILE + TILE / 2, 'tv')
-      this.interactables.push({ x: tv.x, y: tv.y, action: () => this.useTV() })
+      const tv = this.add.image(7 * TILE + TILE / 2, 1 * TILE + TILE / 2, `tv_${mode}`)
+      this.crackle(tv, `tv_${mode}`)
+      this.interactables.push({ x: tv.x, y: tv.y, action: () => this.useTV(), verb: 'USE' })
       this.tvPos = { x: tv.x, y: tv.y }
     }
     // Chapter 5 (#20): the entity at the heart of the static.
     if (this.mapKey === 'core') {
       const ex = 5 * TILE + TILE / 2
       const ey = 2 * TILE + TILE / 2
-      const entity = this.physics.add.staticImage(ex, ey, 'entity')
-      entity.body.setSize(14, 12).setOffset(1, 4)
+      const entity = this.physics.add.staticImage(ex, ey, `entity_${mode}`)
+      this.crackle(entity, `entity_${mode}`)
+      entity.body.setSize(scaled(14), scaled(12)).setOffset(scaled(1), scaled(4))
       this.physics.add.collider(this.player, entity)
       this.interactables.push({
         x: ex,
@@ -370,6 +400,7 @@ export class WorldScene extends Phaser.Scene {
     this.placeDecorations(mode)
     this.groundLayer = ground
     this.applyStoryState(ground, mode)
+    this.startCrackle()
 
     // Background music (#21): town theme in the normal world, the same
     // melody detuned/degraded on the Static-side + in the finale room.
@@ -377,25 +408,22 @@ export class WorldScene extends Phaser.Scene {
       music.play(GameState.world === 'static' || this.mapKey === 'core' ? 'static' : 'town')
     }
 
-    const promptLabel = window.matchMedia('(hover: hover) and (pointer: fine)')
-      .matches
-      ? 'Z'
-      : 'A'
-
-    const boxGfx = this.add.graphics()
-    boxGfx.fillStyle(PAL.lightest, 1)
-    boxGfx.fillRoundedRect(-6, -11, 12, 11, 2)
-    boxGfx.lineStyle(1, PAL.darkest, 1)
-    boxGfx.strokeRoundedRect(-6, -11, 12, 11, 2)
-
-    const labelTxt = this.add.text(0, -6, promptLabel, {
-      fontFamily: 'monospace',
+    // The prompt: which button, and what it will do (#180). Drawn fresh for
+    // each thing it points at, since the words change its width.
+    this.promptDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    this.promptGfx = this.add.graphics()
+    this.promptTxt = this.add.text(0, 0, '', {
+      fontFamily: '"Press Start 2P", monospace',
       fontSize: '8px',
-      fontStyle: 'bold',
       color: '#0f380f',
-    }).setOrigin(0.5)
-
-    this.prompt = this.add.container(0, 0, [boxGfx, labelTxt]).setDepth(2000).setVisible(false)
+      resolution: 2,
+    })
+    this.promptShown = ''
+    this.prompt = this.add
+      .container(0, 0, [this.promptGfx, this.promptTxt])
+      .setDepth(2000)
+      .setScrollFactor(0)
+      .setVisible(false)
 
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<
@@ -446,14 +474,6 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private ensureExtraTextures() {
-    if (!this.textures.exists('tv')) {
-      const g = this.make.graphics({}, false)
-      g.fillStyle(PAL.darkest, 1); g.fillRect(1, 3, 14, 11)
-      g.fillStyle(PAL.light, 1); g.fillRect(3, 5, 8, 7)
-      g.fillStyle(PAL.lightest, 1); g.fillRect(3, 5, 8, 3)
-      g.fillStyle(PAL.darkest, 1); g.fillRect(12, 6, 2, 5)
-      g.generateTexture('tv', 16, 16); g.destroy()
-    }
     if (!this.textures.exists('noise')) {
       const g = this.make.graphics({}, false)
       for (let y = 0; y < 32; y++)
@@ -463,6 +483,40 @@ export class WorldScene extends Phaser.Scene {
         }
       g.generateTexture('noise', 32, 32); g.destroy()
     }
+    // The noise is stretched over the screen, so its own size does not matter.
+  }
+
+  /** Puts the prompt over something in the world, saying what A will do. */
+  private showPrompt(verb: string, wx: number, wy: number) {
+    if (!this.prompt) return
+    const cam = this.cameras.main
+    const text = promptText(verb, this.promptDesktop)
+    // Under the thing when the kid stands above it, or it would be on their head.
+    const b = promptBox(text, wx - cam.scrollX, wy - cam.scrollY, TILE, GBC_WIDTH, this.player.y < wy - TILE / 2)
+    if (text !== this.promptShown) {
+      this.promptShown = text
+      this.promptTxt.setText(text).setPosition(4, 3)
+      this.promptGfx.clear()
+      this.promptGfx.fillStyle(PAL.lightest, 1)
+      this.promptGfx.fillRoundedRect(0, 0, b.width, b.height, 2)
+      this.promptGfx.lineStyle(1, PAL.darkest, 1)
+      this.promptGfx.strokeRoundedRect(0.5, 0.5, b.width - 1, b.height - 1, 2)
+    }
+    this.prompt.setPosition(b.x, b.y).setVisible(true)
+  }
+
+  /**
+   * Screen heights the dialogue box should stay clear of: the kid, and
+   * whoever or whatever they are facing. `UIScene` asks as a dialogue opens.
+   */
+  public dialogueClearYs(): number[] {
+    const top = this.cameras.main.scrollY
+    const ys = [this.player.y - top]
+    const npc = this.facingNpc()
+    const it = npc ? undefined : this.facingInteractable()
+    if (npc) ys.push(npc.sprite.y - top)
+    if (it) ys.push(it.y - top)
+    return ys
   }
 
   private facingInteractable(): Interactable | undefined {
@@ -597,19 +651,19 @@ export class WorldScene extends Phaser.Scene {
         fy,
         drained ? `fountain_drained_${mode}` : `fountain_full_${mode}`,
       )
-      fountain.body.setSize(28, 26)
+      fountain.body.setSize(scaled(28), scaled(26))
       this.physics.add.collider(this.player, fountain)
 
       if (world === 'static') {
         this.interactables.push({
-          x: fx + 8,
-          y: fy + 8,
+          x: fx + scaled(8),
+          y: fy + scaled(8),
           action: () => this.openNarration(VALVE_DEF),
         })
       } else {
         this.interactables.push({
-          x: fx + 8,
-          y: fy + 8,
+          x: fx + scaled(8),
+          y: fy + scaled(8),
           action: () => this.openNarration(FOUNTAIN_DEF),
         })
       }
@@ -687,7 +741,7 @@ export class WorldScene extends Phaser.Scene {
           GUS_STATIC_TILE.ty * TILE + TILE / 2,
           `npc_${mode}_gus_down`,
         ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
-        sprite.body.setSize(12, 12).setOffset(2, 3)
+        sprite.body.setSize(scaled(12), scaled(12)).setOffset(scaled(2), scaled(3))
         this.npcs.push({ sprite, def: GUS_STATIC_DEF, facing: 'down' })
       }
       // Chapter 4 (#19): Ren's house half-written on the static side, with the
@@ -715,7 +769,7 @@ export class WorldScene extends Phaser.Scene {
         20 * TILE + TILE / 2,
         `npc_${mode}_baker_down`,
       ) as Phaser.Types.Physics.Arcade.SpriteWithStaticBody
-      sprite.body.setSize(12, 12).setOffset(2, 3)
+      sprite.body.setSize(scaled(12), scaled(12)).setOffset(scaled(2), scaled(3))
       this.npcs.push({ sprite, def: BAKER_NORMAL_DEF, facing: 'down' })
     }
 
@@ -765,7 +819,7 @@ export class WorldScene extends Phaser.Scene {
     this.groundLayer.setCollision(SOLID_TILES)
     const bx = REN_HOUSE.doorX * TILE + TILE / 2
     const by = REN_HOUSE.wallRow * TILE + TILE / 2
-    this.add.image(bx, by - 4, 'beacon')
+    this.add.image(bx, by - scaled(4), `beacon_${GameState.paletteMode}`)
     this.interactables.push({
       x: bx,
       y: by,
@@ -1031,11 +1085,17 @@ export class WorldScene extends Phaser.Scene {
     ]
     this.worldGates = patches.map(([tx, ty]) => ({ tx, ty }))
     for (const [tx, ty] of patches) {
-      if (open) {
-        this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, key)
-      } else {
-        this.solidProp(tx, ty, 1, 1, key)
+      // A halo, so the patch is lit as well as loud: on a street of warm
+      // brick and green it is the one cold light. Colour mode only; the
+      // green screen has four tones and a blend would be a fifth.
+      if (mode === 'gbc') {
+        this.add.circle(tx * TILE + TILE / 2, ty * TILE + TILE / 2, TILE * 0.8, 0xaaf0ff, open ? 0.14 : 0.24)
+        this.add.circle(tx * TILE + TILE / 2, ty * TILE + TILE / 2, TILE * 0.58, 0xaaf0ff, open ? 0.1 : 0.2)
       }
+      const patch = open
+        ? this.add.image(tx * TILE + TILE / 2, ty * TILE + TILE / 2, key)
+        : this.solidProp(tx, ty, 1, 1, key)
+      this.crackle(patch, key)
       this.examine(tx, ty, CORRUPTION_DEF)
     }
 
@@ -1068,7 +1128,39 @@ export class WorldScene extends Phaser.Scene {
     ground.putTileAt(TILES.DOOR, s.doorX, s.wallRow)
   }
 
+  /**
+   * Static crackles: the picture swaps between two scatters of the same
+   * noise (#179). One timer for everything on the map, so the patches flicker
+   * together and a patch never holds a frame the others have left.
+   *
+   * Under reduced motion it still changes, because a still patch is a grey
+   * rock and the game is named for this, but slowly: about a frame and a half
+   * a second, well under the three flashes a second that is the line for
+   * flicker, and over a tile, not the screen.
+   */
+  private crackle(image: Phaser.GameObjects.Image, key: string) {
+    this.crackling.push({ image, keys: [key, `${key}_b`] })
+  }
+
+  private startCrackle() {
+    let frame = 0
+    this.time.addEvent({
+      delay: crackleMs(prefersReducedMotion()),
+      loop: true,
+      callback: () => {
+        frame = 1 - frame
+        for (const { image, keys } of this.crackling) if (image.active) image.setTexture(keys[frame])
+      },
+    })
+  }
+
+  /**
+   * Noise over the whole screen, three times in a third of a second. Not shown
+   * under reduced motion: it is a full-screen flash, which is the thing that
+   * preference is for. The sound and the change of world still say it happened.
+   */
   private flashStatic() {
+    if (prefersReducedMotion()) return
     const noise = this.add
       .image(0, 0, 'noise')
       .setOrigin(0)
@@ -1203,14 +1295,13 @@ export class WorldScene extends Phaser.Scene {
     sfx.sting()
 
     const empathy = GameState.getFlag('ending_empathy')
-    const bgColor = empathy ? 0xe0f0d0 : 0x08080e
-    const textColor = empathy ? '#0f380f' : '#9bbc0f'
-    // Hard-wrapped to 18 characters. At the font's native 8px that is 144px
-    // on a 160px screen; the old wrapping ran to 196px and was being clipped
-    // off both edges even at 7px.
-    const body = empathy
-      ? 'You step into the\nstatic and stay.\n\nThe lonely thing\nis lonely no more.\n\nThe town remembers\nall it lost.'
-      : 'You tear the\nsignal loose.\n\nThe static\nscreams, then\nfalls silent.\n\nThe town is safe.\n\nBut the vanished\nstay gone.'
+    // The words, their wrapping and their colours are in `screens.ts`, for
+    // the real screen and each palette (#181).
+    const which: Ending = empathy ? 'empathy' : 'severance'
+    const look = ENDING_THEME[GameState.paletteMode][which]
+    const bgColor = look.background
+    const textColor = css(look.text)
+    const body = endingLines(which).join('\n')
 
     const bg = this.add
       .rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, bgColor)
@@ -1224,8 +1315,7 @@ export class WorldScene extends Phaser.Scene {
         fontSize: '8px',
         color: textColor,
         align: 'center',
-        // 1, not 3: at 8px the extra leading pushed the card past 144px tall.
-        lineSpacing: 1,
+        lineSpacing: 2,
         resolution: 1,
       })
       .setOrigin(0.5)
@@ -1236,7 +1326,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.time.delayedCall(3200, () => {
       const prompt = this.add
-        .text(GBC_WIDTH / 2, GBC_HEIGHT - 12, 'Z: on', {
+        .text(GBC_WIDTH / 2, GBC_HEIGHT - 20, endingPrompt(this.promptDesktop), {
           fontFamily: '"Press Start 2P", monospace',
           fontSize: '8px',
           color: textColor,
@@ -1254,10 +1344,13 @@ export class WorldScene extends Phaser.Scene {
       const showTally = () => {
         this.tweens.killTweensOf(prompt)
         prompt.destroy()
+        // The card has been read; the tally is not laid over its words.
+        txt.destroy()
         showRunSummary(this, {
+          screen: { width: GBC_WIDTH, height: GBC_HEIGHT },
           title: 'THE RECORD',
           subtitle: empathy ? 'You stayed' : 'You cut it loose',
-          palette: PAL,
+          palette: summaryPalette(GameState.paletteMode),
           stats: [
             { label: 'CHAPTER', value: `${GameState.chapter}` },
             { label: 'FLAGS', value: `${Object.keys(GameState.flags).length}` },
@@ -1285,13 +1378,15 @@ export class WorldScene extends Phaser.Scene {
     sfx.switchWorld()
     this.player.setVelocity(0, 0)
     if (this.prompt) this.prompt.setVisible(false)
-    const noise = this.add
-      .image(0, 0, 'noise')
-      .setOrigin(0)
-      .setScrollFactor(0)
-      .setDepth(2000)
-      .setDisplaySize(GBC_WIDTH, GBC_HEIGHT)
-    this.tweens.add({ targets: noise, alpha: 0.5, duration: 120, yoyo: true, repeat: 1 })
+    if (!prefersReducedMotion()) {
+      const noise = this.add
+        .image(0, 0, 'noise')
+        .setOrigin(0)
+        .setScrollFactor(0)
+        .setDepth(2000)
+        .setDisplaySize(GBC_WIDTH, GBC_HEIGHT)
+      this.tweens.add({ targets: noise, alpha: 0.5, duration: 120, yoyo: true, repeat: 1 })
+    }
     this.time.delayedCall(260, () => {
       const changed = GameState.toggleWorld()
       // UIScene is a separate scene and survives this one's restart, so the
@@ -1348,6 +1443,67 @@ export class WorldScene extends Phaser.Scene {
     const key = `npc_${mode}_${n.def.id}_${n.facing}`
     if (this.textures.exists(key)) {
       n.sprite.setTexture(key)
+    }
+  }
+
+  /**
+   * What the player sees of the ground (#178).
+   *
+   * `ground` holds the twelve tile kinds the maps are written in. It still
+   * collides, and the story still rewrites it, but it is hidden: two more
+   * layers are drawn from it. One under everything, a picture for each cell
+   * chosen from its kind and its neighbours; one over the kid, for the top of
+   * a tree and a chimney. So nothing that blocks the kid has changed.
+   */
+  private buildVillage(map: Phaser.Tilemaps.Tilemap, ground: Phaser.Tilemaps.TilemapLayer, mode: 'dmg' | 'gbc') {
+    ground.setVisible(false)
+    this.villageGround = ground
+    // A tileset the map files know nothing of, numbered clear of theirs.
+    // Made by hand: `addTilesetImage` only attaches an image to a tileset a
+    // Tiled map already declares, and returns null for a name it does not.
+    const tiles = new Phaser.Tilemaps.Tileset('village', VILLAGE_GID, TILE, TILE)
+    tiles.setImage(this.textures.get(`village_${mode}`))
+    map.tilesets.push(tiles)
+    map.tiles = Phaser.Tilemaps.Parsers.Tiled.BuildTilesetIndex(map)
+    this.villageBase = map.createBlankLayer('village', tiles)!.setDepth(ground.depth)
+    this.villageOver = map.createBlankLayer('village_over', tiles)!.setDepth(OVER_DEPTH)
+    this.paintVillage()
+    // And once more when the scene has finished building, so the cells that
+    // signs and people stand in are known.
+    this.villageStale = true
+
+    // The story rewrites the ground as it goes: a house rebuilt, a hedge
+    // cleared. Whatever does, the picture follows on the next frame.
+    const put = ground.putTileAt.bind(ground)
+    ground.putTileAt = ((...args: Parameters<typeof put>) => {
+      this.villageStale = true
+      return put(...args)
+    }) as typeof ground.putTileAt
+  }
+
+  private paintVillage() {
+    this.villageStale = false
+    const ground = this.villageGround
+    const map = ground.tilemap
+    const kinds = Array.from({ length: map.height }, (_, y) =>
+      Array.from({ length: map.width }, (_, x) => ground.getTileAt(x, y)?.index ?? 0),
+    )
+    // Nothing is drawn over a cell something stands in: a sign under the
+    // leaves of the tree below it would be a sign nobody can read.
+    const taken = new Set<string>()
+    for (const child of this.children.list) {
+      const o = child as Phaser.GameObjects.GameObject & { x?: number; y?: number; type: string }
+      if (o === this.player || o.type === 'TilemapLayer' || o.type === 'Graphics' || o.type === 'Container') continue
+      if (typeof o.x !== 'number' || typeof o.y !== 'number') continue
+      taken.add(`${Math.floor(o.x / TILE)},${Math.floor(o.y / TILE)}`)
+    }
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        this.villageBase.putTileAt(VILLAGE_GID + baseFrame(kinds, x, y), x, y)
+        const over = taken.has(`${x},${y}`) ? null : overFrame(kinds, x, y)
+        if (over === null) this.villageOver.removeTileAt(x, y)
+        else this.villageOver.putTileAt(VILLAGE_GID + over, x, y)
+      }
     }
   }
 
@@ -1446,32 +1602,38 @@ export class WorldScene extends Phaser.Scene {
 
   // A corner minimap showing buildings/water/trees + a blinking player
   // blip. Skipped on maps that already fit one screen (e.g. interiors).
+  //
+  // Two pixels to a tile, placed by `hud.ts` (#180): it was sixty pixels
+  // square, a quarter of the screen, over the town. And in the green-screen
+  // mode it is drawn in the four tones; it used to be terracotta and blue
+  // there too.
   private buildMinimap(
     map: Phaser.Tilemaps.Tilemap,
     ground: Phaser.Tilemaps.TilemapLayer,
   ) {
     this.blip = undefined
+    this.miniGfx = undefined
+    this.miniSize = undefined
+    this.miniCorner = 'top-right'
     const mapW = map.width
     const mapH = map.height
     if (mapW * TILE <= GBC_WIDTH && mapH * TILE <= GBC_HEIGHT) return
 
-    const pad = 2
-    const scale = 40 / Math.max(mapW, mapH)
-    const panelW = mapW * scale + pad * 2
-    const panelH = mapH * scale + pad * 2
-    const ox = GBC_WIDTH - panelW - 3
-    const oy = 3
+    const m = minimap(mapW, mapH, GBC_WIDTH)
+    const scale = m.scale
     this.miniScale = scale
-    this.miniOX = ox + pad
-    this.miniOY = oy + pad
+    this.miniOX = m.originX
+    this.miniOY = m.originY
+    this.miniSize = { w: mapW, h: mapH }
 
+    const dmg = GameState.paletteMode === 'dmg'
     const gfx = this.add.graphics().setScrollFactor(0).setDepth(1000)
-    gfx.fillStyle(PAL.darkest, 0.72)
-    gfx.fillRoundedRect(ox, oy, panelW, panelH, 2)
-    gfx.lineStyle(1, PAL.light, 0.9)
-    gfx.strokeRoundedRect(ox, oy, panelW, panelH, 2)
+    this.miniGfx = gfx
+    gfx.fillStyle(PAL.darkest, dmg ? 1 : 0.78)
+    gfx.fillRect(m.box.x, m.box.y, m.box.width, m.box.height)
+    gfx.lineStyle(1, PAL.light, 1)
+    gfx.strokeRect(m.box.x + 0.5, m.box.y + 0.5, m.box.width - 1, m.box.height - 1)
 
-    const cell = Math.max(1, Math.ceil(scale))
     for (let r = 0; r < mapH; r++) {
       for (let c = 0; c < mapW; c++) {
         const t = ground.getTileAt(c, r)
@@ -1483,24 +1645,52 @@ export class WorldScene extends Phaser.Scene {
           t.index === TILES.DOOR ||
           t.index === TILES.CRACKED_WALL
         ) {
-          color = GBC_PAL.roofBg // buildings pop in terracotta red
+          color = dmg ? PAL.light : GBC_PAL.roofBg // buildings pop in terracotta red
         } else if (t.index === TILES.WATER) {
-          color = GBC_PAL.waterBg // water in GBC azure blue
+          color = dmg ? PAL.lightest : GBC_PAL.waterBg // water in GBC azure blue
         } else if (t.index === TILES.TREE || t.index === TILES.DEAD_TREE) {
-          color = GBC_PAL.treeDark // trees in deep evergreen
+          color = dmg ? PAL.dark : GBC_PAL.treeDark // trees in deep evergreen
         }
         if (color === null) continue
-        gfx.fillStyle(color, 0.95)
-        gfx.fillRect(this.miniOX + c * scale, this.miniOY + r * scale, cell, cell)
+        gfx.fillStyle(color, 1)
+        gfx.fillRect(this.miniOX + c * scale, this.miniOY + r * scale, scale, scale)
       }
     }
 
     this.blip = this.add.graphics().setScrollFactor(0).setDepth(1001)
   }
 
+  /**
+   * Everything on this map a player walks up to, as points on the screen:
+   * doors, people, patches and whatever else answers the button.
+   */
+  private interactivePoints(): { x: number; y: number }[] {
+    const cam = this.cameras.main
+    const at = (x: number, y: number) => ({ x: x - cam.scrollX, y: y - cam.scrollY })
+    return [
+      ...this.doors.map((d) => at(d.zone.x, d.zone.y)),
+      ...this.npcs.map((n) => at(n.sprite.x, n.sprite.y)),
+      ...this.interactables.map((i) => at(i.x, i.y)),
+      ...this.worldGates.map((g) => at(g.tx * TILE + TILE / 2, g.ty * TILE + TILE / 2)),
+    ]
+  }
+
   private updateMinimap() {
-    if (!this.blip) return
+    if (!this.blip || !this.miniSize || !this.miniGfx) return
     this.blip.clear()
+    // The map steps aside when it is over something to walk up to: a map in
+    // a corner must cover something as the town scrolls under it. It was
+    // drawn for the top right, so another corner is that drawing, moved.
+    const { w, h } = this.miniSize
+    const corner = minimapCorner(w, h, GBC_WIDTH, GBC_HEIGHT, this.interactivePoints(), TILE / 2, this.miniCorner)
+    this.miniGfx.setVisible(corner !== null)
+    if (corner === null) return
+    this.miniCorner = corner
+    const home = minimap(w, h, GBC_WIDTH, GBC_HEIGHT, 'top-right')
+    const here = minimap(w, h, GBC_WIDTH, GBC_HEIGHT, corner)
+    this.miniGfx.setPosition(here.box.x - home.box.x, here.box.y - home.box.y)
+    this.miniOX = here.originX
+    this.miniOY = here.originY
 
     // The destination first, so the player's own blip draws over it if they
     // happen to overlap.
@@ -1510,7 +1700,9 @@ export class WorldScene extends Phaser.Scene {
     if (Math.floor(this.time.now / 280) % 2 === 0) {
       const bx = this.miniOX + (this.player.x / TILE) * this.miniScale
       const by = this.miniOY + (this.player.y / TILE) * this.miniScale
-      this.blip.fillStyle(PAL.lightest, 1)
+      // White in colour mode: the palest green is also the lawn's colour
+      // there. On the green screen it is the only tone the map leaves free.
+      this.blip.fillStyle(GameState.paletteMode === 'dmg' ? PAL.lightest : 0xffffff, 1)
       this.blip.fillRect(Math.round(bx) - 1, Math.round(by) - 1, 3, 3)
     }
   }
@@ -1542,7 +1734,7 @@ export class WorldScene extends Phaser.Scene {
     const by = this.miniOY + (target.ty + 0.5) * this.miniScale
     // Brass yellow: distinct from the player's pale green and from the
     // terracotta the buildings are drawn in.
-    this.blip.fillStyle(GBC_PAL.knobGlow, 1)
+    this.blip.fillStyle(GameState.paletteMode === 'dmg' ? PAL.lightest : GBC_PAL.knobGlow, 1)
     this.blip.fillRect(Math.round(bx) - 2, Math.round(by), 5, 1)
     this.blip.fillRect(Math.round(bx), Math.round(by) - 2, 1, 5)
   }
@@ -1572,6 +1764,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update() {
+    if (this.villageStale) this.paintVillage()
     // Finale: once the entity choice is made, play the ending.
     if (
       this.mapKey === 'core' &&
@@ -1604,17 +1797,9 @@ export class WorldScene extends Phaser.Scene {
 
     const near = this.facingNpc()
     const nearIt = !near ? this.facingInteractable() : undefined
-    if (this.prompt) {
-      if (near) {
-        this.prompt.setVisible(true)
-        this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE / 2)
-      } else if (nearIt) {
-        this.prompt.setVisible(true)
-        this.prompt.setPosition(nearIt.x, nearIt.y - TILE / 2)
-      } else {
-        this.prompt.setVisible(false)
-      }
-    }
+    if (near) this.showPrompt('TALK', near.sprite.x, near.sprite.y)
+    else if (nearIt) this.showPrompt(nearIt.verb ?? 'LOOK', nearIt.x, nearIt.y)
+    else this.prompt?.setVisible(false)
 
     // Interact (ignore briefly after a dialogue closes).
     if (interactPressed && this.time.now - GameState.uiClosedAt > 150) {

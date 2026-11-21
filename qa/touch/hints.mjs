@@ -57,13 +57,23 @@ const KEYS = [
  * Two games open on a title panel and show the hint only once a run starts;
  * Anomaly Room fills its hint in only once a round is armed. The rest show it
  * at load. The hint is read where a player reads it, not from source.
+ *
+ * Anomaly Room opens on a study phase and changes only something the player
+ * has seen and is no longer facing (#148), so it is armed the way a player
+ * arms it: look at the room, press Ready, turn round.
  */
 const GAMES = [
   { name: 'tower-stacker', hint: '.ts-hint', start: '.ts-btn-primary' },
   { name: 'tube-runner', hint: '.tr-hint', start: '.tr-btn-primary' },
   { name: 'tilt-maze', hint: '.tm-hint' },
   { name: 'minigolf', hint: '.mg-hint' },
-  { name: 'anomaly-room', hint: '.ar-hint' },
+  {
+    name: 'anomaly-room',
+    hint: '.ar-hint',
+    start: '.ar-panel .ar-btn-primary',
+    before: (page) => page.waitForTimeout(800),
+    after: (page) => page.evaluate(() => window.__game.turn(Math.PI, 0)),
+  },
   { name: 'voxel-digger', hint: '.vd-hint' },
 ]
 
@@ -93,7 +103,9 @@ async function run(game) {
   const { page } = t
   try {
     await page.waitForSelector('#stage canvas')
+    if (game.before) await game.before(page)
     if (game.start) await page.locator(game.start).click()
+    if (game.after) await game.after(page)
     const hint = page.locator(game.hint)
     let shown = true
     try {

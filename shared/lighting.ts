@@ -15,7 +15,7 @@
 // answers to the eye: an overlay that paints an opaque rectangle over the game
 // is the most visible defect a person can have.
 import Phaser from 'phaser'
-import { brushRadius, reachesScreen } from './darkness'
+import { zoomInset, brushRadius, reachesScreen } from './darkness'
 
 export interface Light {
   /** Centre, in world coordinates — conversion to screen space is handled here. */
@@ -34,6 +34,12 @@ export interface DarknessOptions {
   alpha?: number
   /** Overlay colour. Black unless a game wants a tinted gloom. */
   color?: number
+  /**
+   * A light's edge as rings, outermost first: how far out each reaches, as a
+   * share of the radius, and how much of the darkness it lifts (#172). With
+   * none, a light is one hard circle, as it always was.
+   */
+  rings?: readonly { reach: number; lift: number }[]
 }
 
 const BRUSH_PREFIX = '__light_brush_'
@@ -65,12 +71,20 @@ export class Darkness {
   private readonly rt: Phaser.GameObjects.RenderTexture
   private readonly brush: Phaser.GameObjects.Image
   private readonly color: number
+  private readonly rings: readonly { reach: number; lift: number }[]
 
   constructor(scene: Phaser.Scene, opts: DarknessOptions) {
     this.scene = scene
     this.color = opts.color ?? 0x000000
+    this.rings = opts.rings ?? [{ reach: 1, lift: 1 }]
+    // A camera that magnifies does so about the middle of the screen, and
+    // that includes anything fixed to it. So the overlay is the size of what
+    // the camera sees, placed where magnifying it covers the screen: at zoom
+    // 1 that is the corner, as it always was (#171).
+    const cam = scene.cameras.main
+    const [ox, oy] = zoomInset(cam.width, cam.height, cam.zoom)
     this.rt = scene.add
-      .renderTexture(0, 0, opts.width, opts.height)
+      .renderTexture(ox, oy, opts.width, opts.height)
       .setOrigin(0)
       .setScrollFactor(0)
       .setDepth(opts.depth ?? 10)
@@ -105,17 +119,26 @@ export class Darkness {
       if (light.radius <= 0) continue
 
       const r = brushRadius(light.radius)
-      const sx = light.x - cam.scrollX
-      const sy = light.y - cam.scrollY
+      // The corner of what the camera sees, which under a zoom is not its
+      // scroll. Worked out here: `worldView` is a frame behind.
+      const [ox, oy] = zoomInset(cam.width, cam.height, cam.zoom)
+      const sx = light.x - cam.scrollX - ox
+      const sy = light.y - cam.scrollY - oy
 
       if (!reachesScreen(sx, sy, r, this.rt.width, this.rt.height)) continue
 
-      this.brush.setTexture(brushTexture(this.scene, r))
-      // setTexture does not always resize an Image that has had an explicit
-      // display size, so pin it. With a native-size brush this is scale 1.0.
-      this.brush.setDisplaySize(r * 2, r * 2)
-      // erase() honours the brush's centre origin: pass the light's centre.
-      this.rt.erase(this.brush, sx, sy)
+      for (const ring of this.rings) {
+        const rr = brushRadius(r * ring.reach)
+        this.brush.setTexture(brushTexture(this.scene, rr))
+        // setTexture does not always resize an Image that has had an explicit
+        // display size, so pin it. With a native-size brush this is scale 1.0.
+        this.brush.setDisplaySize(rr * 2, rr * 2)
+        // How much is erased is the brush's alpha: a ring that lifts a third
+        // of the darkness leaves two thirds of it there.
+        this.brush.setAlpha(ring.lift)
+        // erase() honours the brush's centre origin: pass the light's centre.
+        this.rt.erase(this.brush, sx, sy)
+      }
     }
   }
 

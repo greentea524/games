@@ -40,6 +40,7 @@ import {
   seededRandom,
   speedAt,
 } from './track'
+import { CAM_MAX_LAG, CAM_RELEASE_STIFFNESS, CAM_STIFFNESS, followStep } from './follow'
 import { OUTLINE } from './constants'
 import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
 import type { Screen } from './hud'
@@ -125,33 +126,8 @@ const CAM_LOOK_AHEAD = 13
 /** How far toward the axis the camera aims, so the runner sits below centre. */
 const CAM_LOOK_RADIUS = CAM_RADIUS * 0.35
 
-/**
- * How the camera follows the runner round the tube (#145).
- *
- * It used to sit at the runner's own angle every frame, so the runner was
- * pinned bottom-centre and the only thing that could move when you steered
- * was the tube — players read pressing left as turning the tube. The input
- * always moved the runner; the camera hid it.
- *
- * Now the camera trails: the runner moves across the screen the moment you
- * steer, and the camera eases round after them, re-centring when you let go.
- * A camera that never turned was the other choice, and it fails at the top of
- * the tube, where the runner is upside down and left on the screen is right on
- * the stick.
- *
- * `CAM_FOLLOW` is the catch-up rate, per second. `CAM_MAX_LAG` caps how far
- * the runner may get ahead, in radians round the tube, so a long hold cannot
- * carry them off the screen. Neither touches `ROTATE_SPEED`, which the
- * fairness bound in track.ts is derived from — this moves the camera, not the
- * runner. Under reduced motion the camera stays locked, as it always was.
- *
- * Measured on a phone viewport, as the runner's x in normalised device
- * coordinates: a held turn settles at +-0.44, and a release re-centres to
- * 0.06 within 0.2 s. The cap was 0.45 rad first, which put the runner at
- * +-0.78 — at the edge of the screen, under the thumb holding that side.
- */
-const CAM_FOLLOW = 5
-const CAM_MAX_LAG = 0.25
+/** How quickly the runner leans into and out of a turn, per second. */
+const LEAN_RATE = 14
 
 /**
  * The `steer()` directions that move the runner left and right *on screen*.
@@ -452,7 +428,8 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
     runner.rotation.z = playerAngle + Math.PI / 2
     // Lean into the turn. Decorative, and the only thing here that tells the
     // player the difference between holding a direction and having released it.
-    runner.rotation.y = reduced ? 0 : -steering * 0.25
+    // Eased in `frame`: it used to snap between upright and full lean (#154).
+    runner.rotation.y = reduced ? 0 : -lean * 0.25
   }
 
   // ------------------------------------------------------------- ring pool
@@ -487,6 +464,12 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
   let steering: -1 | 0 | 1 = 0
   /** Where the camera sits round the tube; trails `playerAngle` (#145). */
   let camAngle = 0
+  /** The camera's own speed round the tube, radians per second. */
+  let camVelocity = 0
+  /** Where the runner was when the camera last followed them. */
+  let followedAngle = 0
+  /** The runner's lean, eased toward the direction held: -1..1. */
+  let lean = 0
   let playerZ = 0
   let cleared = 0
   let spawned = 0
@@ -526,6 +509,9 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
   function reset() {
     playerAngle = 0
     camAngle = 0
+    camVelocity = 0
+    followedAngle = 0
+    lean = 0
     steering = 0
     playerZ = 0
     cleared = 0
@@ -653,15 +639,35 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.1, FOG_FAR + 8)
     // inward, at the tube's axis, so the player's side of the tube is always
     // the bottom of the frame and the HUD marker can be a fixed chevron there.
     const reduced = prefersReducedMotion()
+    lean += (steering - lean) * (1 - Math.exp(-LEAN_RATE * dt))
     poseRunner(runPhase, reduced)
 
     if (reduced) {
       camAngle = playerAngle
+      camVelocity = 0
     } else {
-      camAngle += angleDelta(camAngle, playerAngle) * Math.min(1, dt * CAM_FOLLOW)
+      // The spring in `follow.ts`: stiff while a direction is held, softer
+      // once it is let go.
+      // The runner has already moved this frame; the spring is told how fast,
+      // and starts from where the camera stood relative to them before.
+      const turned = angleDelta(followedAngle, playerAngle)
+      const next = followStep(
+        { offset: -angleDelta(camAngle, followedAngle), velocity: camVelocity },
+        steering === 0 ? CAM_RELEASE_STIFFNESS : CAM_STIFFNESS,
+        dt,
+        dt > 0 ? turned / dt : 0,
+      )
+      camVelocity = next.velocity
+      camAngle = playerAngle + next.offset
+      // Only a guard: nothing in play reaches it. A frame long enough to be
+      // clamped could otherwise leave the runner off the side of the screen.
       const lag = angleDelta(camAngle, playerAngle)
-      if (Math.abs(lag) > CAM_MAX_LAG) camAngle = playerAngle - Math.sign(lag) * CAM_MAX_LAG
+      if (Math.abs(lag) > CAM_MAX_LAG * 1.6) {
+        camAngle = playerAngle - Math.sign(lag) * CAM_MAX_LAG * 1.6
+        camVelocity = 0
+      }
     }
+    followedAngle = playerAngle
     const radialX = Math.cos(camAngle)
     const radialY = Math.sin(camAngle)
     // Behind the runner and inward of them, so they sit low in the frame with

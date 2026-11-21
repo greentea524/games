@@ -9,6 +9,9 @@ export const viewport = { width: 900, height: 690 }
 export async function pose(page) {
   await page.evaluate(async () => {
     const g = window.__game
+    // Past the study phase (#148), so the card shows the room being played
+    // rather than the panel that opens a run.
+    g.ready()
     // Face the crate, chair and table in the north-west of the room.
     g.turn(-0.45, 0.12)
     // Two frames, so the render and the shadow map both catch up.

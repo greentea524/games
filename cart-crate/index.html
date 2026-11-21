@@ -30,7 +30,7 @@
            is generated at runtime through canvas, not loaded as a file.
          - frame-ancestors and report-uri are deliberately absent: a meta CSP
            ignores both, and including them only logs a console warning. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-tocenARxLNCLCKQwarBZsx3C+qtxhI395CjnNaqefDg='; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-Eh/L4C7d6mJWC4hdoQgV/dUIkiUJnGbvEUDWBhdYfNQ='; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' data: blob:; base-uri 'none'; form-action 'none'" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <title>Cart &amp; Crate - GBC Sokoban Puzzle</title>
@@ -49,13 +49,21 @@
     </style>
     <script>
       (function() {
-        var gbcW = 160, gbcH = 144;
+        var gbcW = 240, gbcH = 216;
         var isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
         var availH = window.innerHeight - (isDesktop ? 250 : 380);
+        // Sized in device pixels, not CSS pixels (#155, #160). At 240 wide a whole
+        // CSS multiple gives a phone a 1x box, 240 across, where the 160-wide
+        // screen got a 2x box of 320. A phone has two or three device pixels
+        // to each CSS one, so counting in those keeps the screen as large as
+        // it was. (The shell's padding means the canvas was never scaled by a
+        // whole number in any case: measured 7.125 device pixels to a game
+        // pixel at 160 wide on a phone, and 4.75 at 240.)
+        var dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 4));
         var zoom = Math.max(1, Math.min(
-          Math.floor((window.innerWidth - 40) / gbcW),
-          Math.floor(availH / gbcH)
-        ));
+          Math.floor((window.innerWidth - 40) * dpr / gbcW),
+          Math.floor(availH * dpr / gbcH)
+        )) / dpr;
         var style = document.createElement('style');
         style.id = 'pre-init-game-style';
         style.innerHTML = '#game { width: ' + (gbcW * zoom) + 'px; height: ' + (gbcH * zoom) + 'px; }';

@@ -24,6 +24,7 @@ const state = (page) =>
     look: window.__game.look(),
     armed: window.__game.armed(),
     anomaly: window.__game.anomaly(),
+    seen: window.__game.seen(),
   }))
 
 const canvasMetrics = (page) =>
@@ -114,10 +115,27 @@ async function run() {
 
   const opening = await state(page)
   check('the game opens on the first round', opening.round === 0, `round ${opening.round + 1}`)
-  check('with every guess intact', opening.misses === 0 && opening.phase === 'looking')
-
-  const armed = await waitArmed(page)
-  check('and something changes without being asked', armed.armed, armed.anomaly?.label ?? 'nothing')
+  check('with every guess intact, studying the room', opening.misses === 0 && opening.phase === 'study', opening.phase)
+  // #148. The panel is the one thing on screen while the player is meant to
+  // be looking at the room, so it must leave the room to look at.
+  const panel = await page.evaluate(() => {
+    const el = document.querySelector('.ar-panel')
+    const r = el.getBoundingClientRect()
+    return { shown: !el.hidden, top: r.top, height: window.innerHeight, title: el.querySelector('.ar-panel-title')?.textContent }
+  })
+  check(
+    'the study panel says so, and leaves the room in view above it',
+    panel.shown && panel.title === 'Study the room' && panel.top > panel.height * 0.5,
+    `"${panel.title}", top at ${Math.round((panel.top / panel.height) * 100)}% of the screen`,
+  )
+  const studyText = await page.evaluate(() => document.querySelector('.ar-panel-body')?.textContent ?? '')
+  check(
+    'and says what a run asks of the player',
+    /Find all 8 changes/.test(studyText) && /3 wrong guesses end the run/.test(studyText),
+    `"${studyText.split('\n').pop()}"`,
+  )
+  await page.waitForTimeout(1500)
+  check('nothing changes while the room is being studied', !(await state(page)).armed)
 
   // ------------------------------------------------------ drag to look
 
@@ -127,6 +145,7 @@ async function run() {
   await hand.down(PAD, centre.x, centre.y)
   await hand.move(PAD, centre.x - 60, centre.y)
   await hand.move(PAD, centre.x - 140, centre.y)
+  await hand.settle()
   const dragged = await state(page)
   await hand.up(PAD)
   check(
@@ -139,6 +158,7 @@ async function run() {
   await hand.down(PAD, centre.x, centre.y)
   await hand.move(PAD, centre.x, centre.y + 70)
   await hand.move(PAD, centre.x, centre.y + 150)
+  await hand.settle()
   const pitched = await state(page)
   await hand.up(PAD)
   check(
@@ -174,6 +194,91 @@ async function run() {
     'turning the room around costs no guesses',
     steady.misses === 0 && steady.round === 0,
     `${steady.misses} miss(es) after six full drags`,
+  )
+
+  // ------------------------------------- what can be chosen is shown (#176)
+
+  await lookAt(page, 0, 0.25)
+  const object = await page.evaluate(() => {
+    const g = window.__game
+    for (let ny = 0.2; ny <= 0.7; ny += 0.02) {
+      for (let nx = 0.1; nx <= 0.9; nx += 0.02) {
+        const id = g.probe(nx, ny)
+        if (id) return { nx, ny, id }
+      }
+    }
+    return null
+  })
+  if (object) {
+    const spot = await canvasPoint(page, object.nx, object.ny, '#stage canvas')
+    await hand.down(PAD, spot.x, spot.y)
+    await page.waitForTimeout(200)
+    const pressed = await page.evaluate(() => ({
+      id: window.__game.pointed(),
+      outlined: window.__game.outlined(),
+      label: document.querySelector('.ar-target')?.hidden === false ? document.querySelector('.ar-target').textContent : null,
+    }))
+    check(
+      'pressing on an object outlines it and names it',
+      pressed.id === object.id && pressed.outlined >= 1 && Boolean(pressed.label),
+      `${pressed.id}, "${pressed.label}", ${pressed.outlined} outline(s)`,
+    )
+    // Slide off into a drag: it is no longer a choice, so the outline goes.
+    await hand.move(PAD, spot.x - 60, spot.y)
+    await hand.move(PAD, spot.x - 120, spot.y)
+    await page.waitForTimeout(150)
+    check('and dragging away drops the outline', (await page.evaluate(() => window.__game.pointed())) === null)
+    await hand.up(PAD)
+  } else {
+    check('an object is on screen to press', false)
+  }
+
+  await lookAt(page, 0, 0.5)
+  const wall = await canvasPoint(page, 0.5, 0.2, '#stage canvas')
+  await hand.down(PAD, wall.x, wall.y)
+  await page.waitForTimeout(150)
+  check('pressing on the room itself outlines nothing', (await page.evaluate(() => window.__game.outlined())) === 0)
+  await hand.up(PAD)
+
+  await lookAt(page, 0, 0.25)
+  const showAt = await page.evaluate(() => {
+    const r = document.querySelector('.ar-show').getBoundingClientRect()
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+  })
+  const before176 = await state(page)
+  await hand.tap(PAD, showAt.x, showAt.y)
+  await page.waitForTimeout(300)
+  const shown = await page.evaluate(() => window.__game.outlined())
+  check('"Show objects" outlines everything that can be chosen', shown === 12, `${shown} of 12`)
+  await page.waitForTimeout(3200)
+  const faded = await page.evaluate(() => window.__game.outlined())
+  check('and they fade again', faded === 0, `${faded} left`)
+  check('none of which cost a guess', (await state(page)).misses === before176.misses)
+
+  // ------------------------------------------------ study, then ready
+
+  // A slow look round, the way the panel asks: a pause at each eighth.
+  for (let i = 0; i < 8; i++) {
+    await lookAt(page, (i / 8) * Math.PI * 2, -0.2)
+    await page.waitForTimeout(450)
+  }
+  const studied = await state(page)
+  check('a slow look round sees the whole room', studied.seen.length === 12, `${studied.seen.length} of 12 seen`)
+
+  const readyAt = await page.evaluate(() => {
+    const r = document.querySelector('.ar-panel .ar-btn-primary').getBoundingClientRect()
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+  })
+  await hand.tap(PAD, readyAt.x, readyAt.y)
+  await page.waitForTimeout(250)
+  check('tapping Ready starts the round', (await state(page)).phase === 'looking')
+
+  const armed = await waitArmed(page)
+  check('and something changes without being asked', armed.armed, armed.anomaly?.label ?? 'nothing')
+  check(
+    'to something the player has seen',
+    armed.anomaly !== null && armed.seen.includes(armed.anomaly.id),
+    `${armed.anomaly?.id} among ${armed.seen.length} seen`,
   )
 
   // ------------------------------------------------ tapping a wall is free
@@ -242,10 +347,11 @@ async function run() {
       afterHit.round === beforeHit.round + 1 && afterHit.phase === 'right',
       `round ${beforeHit.round + 1} -> ${afterHit.round + 1}`,
     )
-    check(
-      'and the panel names what it was',
-      await page.evaluate(() => document.querySelector('.ar-panel-body')?.textContent?.length > 0),
-    )
+    const found = await page.evaluate(() => document.querySelector('.ar-panel-body')?.textContent ?? '')
+    check('and the panel names what it was', found.length > 0, `"${found.split('\n')[0]}"`)
+    // #150. The room keeps its changes by design, and a player who was not
+    // told so took it for a reset that never happened.
+    check('and says the change stays', /stays that way/.test(found), `"${found.split('\n').pop()}"`)
   }
 
   // ---------------------------------------------------------- the sound
@@ -288,6 +394,13 @@ async function run() {
       }
     }),
   )
+
+  // The best is shown where the next run starts, read from that same save.
+  await page.reload()
+  await page.waitForSelector('#stage canvas')
+  await page.waitForTimeout(800)
+  const nextStudy = await page.evaluate(() => document.querySelector('.ar-panel-body')?.textContent ?? '')
+  check('and the next run opens with the best in view', /Your best: 5 of 8/.test(nextStudy), `"${nextStudy.split('\n').pop()}"`)
 
   check(
     'there is a way back to the hub',
