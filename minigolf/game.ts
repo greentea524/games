@@ -14,6 +14,7 @@ import {
 } from './physics'
 import type { Hole } from './holes'
 import { createGrassMaterials, createGreenGeometry } from './grass'
+import { prefersReducedMotion } from '../shared/motion'
 import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
 
 const COLOURS = {
@@ -35,6 +36,7 @@ const AIM_LENGTH = 3.2
 export const MIN_POWER = 0.06
 
 export type Phase = 'aiming' | 'rolling' | 'holed' | 'card'
+export type ViewMode = 'follow' | 'overview'
 
 export interface MinigolfGame {
   stage: Stage3D
@@ -45,6 +47,10 @@ export interface MinigolfGame {
   /** Strokes taken on each hole so far. */
   card(): number[]
   phase(): Phase
+  viewMode(): ViewMode
+  toggleView(): void
+  /** Camera's horizontal forward and right unit vectors, for screen-aligned aiming. */
+  cameraBasis(): { forwardX: number; forwardZ: number; rightX: number; rightZ: number }
   /** True when a stroke may be taken — the ball has genuinely stopped. */
   canPutt(): boolean
   ball(): { x: number; y: number; z: number }
@@ -76,7 +82,14 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     // to be recomputed when that changes. Without this, rotating a phone
     // reframes the canvas and crops the hole.
     onResize: () => {
-      if (ready) frameCamera()
+      if (ready) {
+        computeOverviewFrame()
+        if (viewMode === 'overview') {
+          camPos.copy(overviewPos)
+          camLook.copy(overviewLook)
+          applyCamera()
+        }
+      }
     },
   })
   const scene = new THREE.Scene()
@@ -128,6 +141,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   let hole: Hole
   let holeIndex = 0
   let phase: Phase = 'aiming'
+  let viewMode: ViewMode = 'follow'
   let strokes = 0
   const scores: number[] = []
   let aimX = 0
@@ -136,6 +150,17 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   let holedFor = 0
   const listeners: (() => void)[] = []
   const notify = () => listeners.forEach((fn) => fn())
+
+  // Dynamic 3D camera state: smoothed position, look-at target, and yaw angle
+  // behind the ball. Overview targets are cached on hole load / resize.
+  let camYaw = Math.PI
+  const camPos = new THREE.Vector3()
+  const camLook = new THREE.Vector3()
+  const desiredPos = new THREE.Vector3()
+  const desiredLook = new THREE.Vector3()
+  const overviewPos = new THREE.Vector3()
+  const overviewLook = new THREE.Vector3()
+  const camForward = new THREE.Vector3()
 
   let built: THREE.Mesh[] = []
 
@@ -287,7 +312,31 @@ export function createGame(parent: HTMLElement): MinigolfGame {
    * the near end is closer, so it projects larger and sits lower in frame than
    * a symmetric fit would suggest.
    */
-  function frameCamera() {
+  function applyCamera() {
+    camera.position.copy(camPos)
+    camera.lookAt(camLook)
+    camera.updateMatrixWorld()
+  }
+
+  /** Horizontal yaw angle (radians) from (bx, bz) toward the cup. */
+  function angleToCup(bx: number, bz: number): number {
+    const dx = hole.cup.x - bx
+    const dz = hole.cup.z - bz
+    if (Math.hypot(dx, dz) < 0.15) return camYaw
+    return Math.atan2(dx, dz)
+  }
+
+  /** Shortest-path angular interpolation. */
+  function lerpAngle(a: number, b: number, t: number): number {
+    let diff = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI
+    if (diff < -Math.PI) diff += Math.PI * 2
+    return a + diff * t
+  }
+
+  function computeOverviewFrame() {
+    const savedPos = camera.position.clone()
+    const savedQuat = camera.quaternion.clone()
+
     const box = new THREE.Box3()
     const corners = holeCorners()
     for (const c of corners) box.expandByPoint(c)
@@ -322,15 +371,6 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       }
     }
 
-    // Fit and centre together, three times. They interact — pulling back
-    // changes what is off-centre, and sliding sideways changes what is
-    // furthest from the middle — but both corrections are very nearly exact on
-    // the first pass, so this converges immediately rather than oscillating.
-    //
-    // The pan signs are the part worth stating: moving the camera right moves
-    // the image *left*, so a hole sitting right of centre is corrected by
-    // moving toward it, not away. Getting that backwards doubles the error
-    // instead of cancelling it, and looks like the fit failing.
     const forward = new THREE.Vector3()
     const right = new THREE.Vector3()
     const up = new THREE.Vector3()
@@ -345,6 +385,88 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       pan.addScaledVector(up, m.cy * halfHeight)
     }
     measure()
+
+    overviewPos.copy(camera.position)
+    overviewLook.set(centre.x + pan.x, centre.y + pan.y, centre.z + pan.z)
+
+    camera.position.copy(savedPos)
+    camera.quaternion.copy(savedQuat)
+    camera.updateMatrixWorld()
+  }
+
+  function updateCamera(dt: number, snap = false) {
+    const immediate = snap || prefersReducedMotion()
+
+    if (viewMode === 'overview') {
+      desiredPos.copy(overviewPos)
+      desiredLook.copy(overviewLook)
+    } else {
+      const bx = sim.ball.position.x
+      const by = sim.ball.position.y
+      const bz = sim.ball.position.z
+
+      // Slightly widen the follow distance on narrow portrait viewports so
+      // the walls and fairway ahead stay comfortably in frame.
+      const aspectScale = Math.max(1, 0.9 / Math.max(0.45, camera.aspect))
+
+      if (phase === 'holed') {
+        const fx = Math.sin(camYaw)
+        const fz = Math.cos(camYaw)
+        desiredPos.set(
+          hole.cup.x - fx * 3.4 * aspectScale,
+          hole.cup.y + 2.5 * aspectScale,
+          hole.cup.z - fz * 3.4 * aspectScale,
+        )
+        desiredLook.set(hole.cup.x, hole.cup.y + 0.35, hole.cup.z)
+      } else {
+        const targetYaw = angleToCup(bx, bz)
+        if (immediate) {
+          camYaw = targetYaw
+        } else {
+          // While rolling, turn gently so wall bounces never whip-pan; once
+          // stopped, settle cleanly behind the ball facing the cup.
+          const yawRate = phase === 'rolling' ? 1.8 : 4.5
+          camYaw = lerpAngle(camYaw, targetYaw, 1 - Math.exp(-yawRate * dt))
+        }
+
+        const fx = Math.sin(camYaw)
+        const fz = Math.cos(camYaw)
+
+        const rolling = phase === 'rolling'
+        const backDist = (rolling ? 5.2 : 4.5) * aspectScale
+        const height = (rolling ? 4.0 : 3.3) * aspectScale
+        const lookAhead = rolling ? 1.5 : 2.5
+
+        desiredPos.set(bx - fx * backDist, by + height, bz - fz * backDist)
+        desiredLook.set(bx + fx * lookAhead, by + 0.25, bz + fz * lookAhead)
+      }
+    }
+
+    if (immediate) {
+      camPos.copy(desiredPos)
+      camLook.copy(desiredLook)
+    } else {
+      const posRate = phase === 'rolling' ? 4.8 : 5.5
+      const lookRate = phase === 'rolling' ? 7.0 : 6.5
+      camPos.lerp(desiredPos, 1 - Math.exp(-posRate * dt))
+      camLook.lerp(desiredLook, 1 - Math.exp(-lookRate * dt))
+    }
+
+    applyCamera()
+  }
+
+  function cameraBasis() {
+    camera.getWorldDirection(camForward)
+    const len = Math.hypot(camForward.x, camForward.z)
+    const forwardX = len > 1e-6 ? camForward.x / len : 0
+    const forwardZ = len > 1e-6 ? camForward.z / len : -1
+    // Right-handed horizontal right vector: forward × up(0, 1, 0).
+    return {
+      forwardX,
+      forwardZ,
+      rightX: -forwardZ,
+      rightZ: forwardX,
+    }
   }
 
   function load(index: number) {
@@ -352,13 +474,16 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     hole = COURSE[holeIndex]
     sim = createSim(hole)
     buildHole()
-    frameCamera()
+    viewMode = 'follow'
+    computeOverviewFrame()
+    camYaw = angleToCup(sim.ball.position.x, sim.ball.position.z)
     strokes = 0
-    aimX = 0
-    aimZ = -1
+    aimX = Math.sin(camYaw)
+    aimZ = Math.cos(camYaw)
     aimPower = 0
     holedFor = 0
     phase = 'aiming'
+    updateCamera(0, true)
     ready = true
     notify()
   }
@@ -426,6 +551,8 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       material.color.setHex(aimPower > 0.75 ? COLOURS.aimStrong : COLOURS.aim)
     }
 
+    updateCamera(dt)
+
     stage.render(scene, camera)
     requestAnimationFrame(frame)
   }
@@ -439,6 +566,13 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     strokes: () => strokes,
     card: () => scores.slice(),
     phase: () => phase,
+    viewMode: () => viewMode,
+    toggleView() {
+      viewMode = viewMode === 'follow' ? 'overview' : 'follow'
+      if (viewMode === 'overview') computeOverviewFrame()
+      notify()
+    },
+    cameraBasis,
     canPutt: () => phase === 'aiming' && sim.atRest(),
     ball: () => ({ x: sim.ball.position.x, y: sim.ball.position.y, z: sim.ball.position.z }),
     ballSpeed: () => sim.ball.velocity.length(),
@@ -459,6 +593,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       sim.putt(aimX, aimZ, aimPower)
       aimPower = 0
       phase = 'rolling'
+      viewMode = 'follow'
       notify()
       return true
     },

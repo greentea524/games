@@ -34,7 +34,11 @@ export function createHud(game: MinigolfGame): void {
   const status = el('div', 'mg-status')
   const holeLabel = el('span', 'mg-hole')
   const strokeLabel = el('span', 'mg-strokes')
-  status.append(holeLabel, strokeLabel)
+  const viewBtn = el('button', 'mg-view-btn', 'Overview')
+  viewBtn.type = 'button'
+  viewBtn.title = 'Toggle course overview (V)'
+  viewBtn.onclick = () => game.toggleView()
+  status.append(holeLabel, strokeLabel, viewBtn)
   overlay.append(status)
 
   const hint = el(
@@ -65,6 +69,9 @@ export function createHud(game: MinigolfGame): void {
     holeLabel.textContent = `Hole ${holeNo + 1}/${COURSE.length} · ${game.holeName()} · Par ${par}`
     const strokes = game.strokes()
     strokeLabel.textContent = strokes === 1 ? '1 stroke' : `${strokes} strokes`
+    const isOverview = game.viewMode() === 'overview'
+    viewBtn.textContent = isOverview ? 'Ball view' : 'Overview'
+    viewBtn.setAttribute('aria-pressed', String(isOverview))
     hint.hidden = holeNo > 0 || strokes > 0
 
     const phase = game.phase()

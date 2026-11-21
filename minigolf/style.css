@@ -18,6 +18,28 @@
 .mg-hole { font-weight: 600; }
 .mg-strokes { color: #9ec9b3; }
 
+.mg-view-btn {
+  pointer-events: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 241, 236, 0.24);
+  background: rgba(232, 241, 236, 0.1);
+  color: #eaf3ee;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mg-view-btn:hover, .mg-view-btn:focus-visible {
+  background: rgba(53, 214, 138, 0.22);
+  border-color: rgba(53, 214, 138, 0.6);
+}
+.mg-view-btn[aria-pressed='true'] {
+  background: #35d68a;
+  border-color: #35d68a;
+  color: #05261a;
+}
+
 .mg-hint, .mg-waiting {
   position: absolute;
   left: 50%;

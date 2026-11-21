@@ -50,11 +50,15 @@ function powerRadius(): number {
   return Math.max(50, Math.min(width, height) * POWER_RADIUS)
 }
 
-/** Screen delta to an aim. Pulling back aims forward, hence the negation. */
+/** Screen delta to an aim in the camera's horizontal frame. Pulling back aims forward. */
 function aimFrom(dx: number, dy: number) {
   const radius = powerRadius()
-  // Screen right is world +x and screen down is world +z under this camera.
-  return { x: -dx, z: -dy, power: Math.hypot(dx, dy) / radius }
+  const { forwardX, forwardZ, rightX, rightZ } = game.cameraBasis()
+  return {
+    x: rightX * -dx + forwardX * dy,
+    z: rightZ * -dx + forwardZ * dy,
+    power: Math.hypot(dx, dy) / radius,
+  }
 }
 
 canvas.addEventListener('pointerdown', (e) => {
@@ -95,10 +99,28 @@ canvas.addEventListener('lostpointercapture', endDrag)
 // The equivalent path, not the primary one: rotate the aim with left/right,
 // hold space to charge, release to putt.
 
-let aimAngle = Math.PI // pointing at -z, up the hole from the tee
+let aimAngle = Math.PI // pointing along the camera's forward direction
 let charging = false
 let chargeStart = 0
 const CHARGE_TIME = 900
+let lastPhase = game.phase()
+let lastHole = game.hole()
+
+function syncKeyboardAim() {
+  const { forwardX, forwardZ } = game.cameraBasis()
+  aimAngle = Math.atan2(forwardX, forwardZ)
+}
+
+game.onChange(() => {
+  const p = game.phase()
+  const h = game.hole()
+  if ((p === 'aiming' && lastPhase !== 'aiming') || h !== lastHole) {
+    syncKeyboardAim()
+  }
+  lastPhase = p
+  lastHole = h
+})
+syncKeyboardAim()
 
 function applyKeyboardAim(power: number) {
   game.setAim(Math.sin(aimAngle), Math.cos(aimAngle), power)
@@ -106,12 +128,15 @@ function applyKeyboardAim(power: number) {
 
 window.addEventListener('keydown', (e) => {
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
-    aimAngle -= 0.08
+    aimAngle += 0.08
     applyKeyboardAim(game.aim().power)
     e.preventDefault()
   } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
-    aimAngle += 0.08
+    aimAngle -= 0.08
     applyKeyboardAim(game.aim().power)
+    e.preventDefault()
+  } else if (e.code === 'KeyV') {
+    game.toggleView()
     e.preventDefault()
   } else if (e.code === 'Space' && !charging && game.canPutt()) {
     charging = true
