@@ -13,12 +13,11 @@ import {
   type Sim,
 } from './physics'
 import type { Hole } from './holes'
+import { createGrassMaterials, createGreenGeometry } from './grass'
 import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
 
 const COLOURS = {
   background: 0x0d1a14,
-  green: 0x2f8f5b,
-  greenAlt: 0x2a7f51,
   wall: 0xc9d6cd,
   cup: 0x101a14,
   flag: 0xe4573d,
@@ -83,13 +82,21 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(COLOURS.background)
 
+  stage.renderer.shadowMap.enabled = true
+  stage.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+
   const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 300)
   stage.track(camera)
 
   scene.add(new THREE.AmbientLight(0xffffff, lambertIntensity(0.5)))
-  const key = new THREE.DirectionalLight(0xffffff, lambertIntensity(0.85))
+  const key = new THREE.DirectionalLight(0xfffdf6, lambertIntensity(0.85))
   key.position.set(5, 14, 6)
+  key.castShadow = true
+  key.shadow.mapSize.set(1024, 1024)
+  key.shadow.bias = -0.0004
+  key.shadow.normalBias = 0.02
   scene.add(key)
+  scene.add(key.target)
   const fill = new THREE.DirectionalLight(0xbfe3ff, lambertIntensity(0.3))
   fill.position.set(-8, 5, -7)
   scene.add(fill)
@@ -97,16 +104,14 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   const course = new THREE.Group()
   scene.add(course)
 
-  const materials = {
-    green: new THREE.MeshLambertMaterial({ color: COLOURS.green }),
-    greenAlt: new THREE.MeshLambertMaterial({ color: COLOURS.greenAlt }),
-    wall: new THREE.MeshLambertMaterial({ color: COLOURS.wall }),
-  }
+  const grass = createGrassMaterials(stage.renderer)
+  const wallMaterial = new THREE.MeshLambertMaterial({ color: COLOURS.wall })
 
   const ballMesh = new THREE.Mesh(
     new THREE.SphereGeometry(BALL_RADIUS, 24, 16),
     new THREE.MeshLambertMaterial({ color: COLOURS.ball }),
   )
+  ballMesh.castShadow = true
   scene.add(ballMesh)
 
   // The aim indicator is a stretched box rather than a `Line`. A line is one
@@ -132,28 +137,64 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   const listeners: (() => void)[] = []
   const notify = () => listeners.forEach((fn) => fn())
 
-  let built: THREE.Object3D[] = []
+  let built: THREE.Mesh[] = []
 
   function buildHole() {
-    for (const mesh of built) course.remove(mesh)
+    for (const mesh of built) {
+      course.remove(mesh)
+      mesh.geometry.dispose()
+    }
     built = []
 
     for (const box of hole.boxes) {
-      const geometry = new THREE.BoxGeometry(box.w, box.h, box.d)
+      const isGreen = box.surface === 'green'
+      const geometry = isGreen
+        ? createGreenGeometry(box)
+        : new THREE.BoxGeometry(box.w, box.h, box.d)
       // Slopes get the second green, so a ramp reads as a ramp before the ball
       // has been anywhere near it. This used to alternate on the box's index,
       // which happened to tone `Rise`'s ramp correctly and only because the
       // ramp happened to be authored second — inserting a box ahead of it
       // would have silently swapped the two greens over.
       const sloped = Boolean(box.tiltX || box.tiltZ)
-      const material =
-        box.surface === 'wall' ? materials.wall : sloped ? materials.greenAlt : materials.green
+      const material = isGreen ? (sloped ? grass.slope : grass.flat) : wallMaterial
       const mesh = new THREE.Mesh(geometry, material)
       mesh.position.set(box.x, box.y, box.z)
       if (box.tiltX || box.tiltZ) mesh.rotation.set(box.tiltX ?? 0, 0, box.tiltZ ?? 0)
+      mesh.castShadow = true
+      mesh.receiveShadow = true
       course.add(mesh)
       built.push(mesh)
     }
+
+    // Fit the directional shadow frustum tightly around the current hole so
+    // shadows cast onto the turf stay crisp on every layout.
+    const bounds = new THREE.Box3()
+    for (const c of holeCorners()) bounds.expandByPoint(c)
+    const center = bounds.getCenter(new THREE.Vector3())
+    const size = bounds.getSize(new THREE.Vector3())
+    const halfSpan = Math.max(size.x, size.z) * 0.65 + 2
+    key.target.position.copy(center)
+    key.position.set(center.x + 5, center.y + 14, center.z + 6)
+    key.shadow.camera.left = -halfSpan
+    key.shadow.camera.right = halfSpan
+    key.shadow.camera.top = halfSpan
+    key.shadow.camera.bottom = -halfSpan
+    key.shadow.camera.near = 2
+    key.shadow.camera.far = 40
+    key.shadow.camera.updateProjectionMatrix()
+
+    // A trimmed turf collar sits around the dark cup disc so the hole reads as
+    // cut into the grass rather than pasted on top of it.
+    const cupCollar = new THREE.Mesh(
+      new THREE.RingGeometry(0.29, 0.37, 24),
+      grass.cupCollar,
+    )
+    cupCollar.rotation.x = -Math.PI / 2
+    cupCollar.position.set(hole.cup.x, hole.cup.y + 0.008, hole.cup.z)
+    cupCollar.receiveShadow = true
+    course.add(cupCollar)
+    built.push(cupCollar)
 
     // The cup, as a dark disc laid on the surface, and a flag so it is findable
     // from across the hole. A real hole in the mesh would mean cutting geometry
@@ -171,6 +212,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       new THREE.MeshLambertMaterial({ color: COLOURS.wall }),
     )
     pole.position.set(hole.cup.x, hole.cup.y + 0.8, hole.cup.z)
+    pole.castShadow = true
     course.add(pole)
     built.push(pole)
 
@@ -179,6 +221,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       new THREE.MeshLambertMaterial({ color: COLOURS.flag }),
     )
     flag.position.set(hole.cup.x + 0.27, hole.cup.y + 1.4, hole.cup.z)
+    flag.castShadow = true
     course.add(flag)
     built.push(flag)
   }
@@ -439,6 +482,9 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     onChange: (fn) => void listeners.push(fn),
     dispose() {
       running = false
+      for (const mesh of built) mesh.geometry.dispose()
+      grass.dispose()
+      wallMaterial.dispose()
       stage.dispose()
     },
   }
