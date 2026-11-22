@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
-import { TILE, WORLD_WIDTH, WORLD_HEIGHT, VIEW_ZOOM, PAL } from '../constants'
+import { TILE, WORLD_WIDTH, WORLD_HEIGHT, VIEW_ZOOM, PAL, GBC_WIDTH, GBC_HEIGHT } from '../constants'
+import { HUD_THEME } from '../hud'
+import type { UIScene } from './UIScene'
 import { GameState } from '../state'
 import { LEVELS } from '../levels'
 import { sfx, music } from '../audio'
@@ -423,15 +425,20 @@ export class PlatformerScene extends Phaser.Scene {
       GameState.saveGame()
 
       sfx.win()
-      // The HUD is its own scene, so it renders above anything this one adds,
-      // depth or not — the running timer would sit across the panel's top edge
-      // showing the same number the panel does.
-      this.scene.setVisible(false, 'ui')
       // The run summary replaces a bare VICTORY! and a three-second timer
       // (#66). The time has been tracked since #79 and was thrown away here.
-      showRunSummary(this, {
+      //
+      // Shown on the HUD's scene since #170, which is on the real screen:
+      // this one is magnified by 1.5, which drew the panel's 8-pixel text at
+      // 12. The HUD's own panels step out while it is up, since the clock
+      // would show the same number the summary does.
+      const ui = this.scene.get('ui') as UIScene
+      ui.setPanelsHidden(true)
+      const t = HUD_THEME[GameState.paletteMode]
+      showRunSummary(ui, {
         title: 'RUN COMPLETE',
-        palette: PAL,
+        palette: { darkest: t.panel, dark: t.empty, light: t.dim, lightest: t.text },
+        screen: { width: GBC_WIDTH, height: GBC_HEIGHT },
         stats: [
           { label: 'TIME', value: formatRunTime(runMs), highlight: isBest },
           { label: 'ENERGY', value: `${GameState.energyPickups}` },
@@ -445,7 +452,7 @@ export class PlatformerScene extends Phaser.Scene {
         onDismiss: () => {
           this.cameras.main.fadeOut(600)
           this.cameras.main.once('camerafadeoutcomplete', () => {
-            this.scene.setVisible(true, 'ui')
+            ui.setPanelsHidden(false)
             GameState.reset()
             this.scene.restart()
           })
@@ -514,6 +521,7 @@ export class PlatformerScene extends Phaser.Scene {
   update(time: number, delta: number) {
     if (GameState.uiBlocking || this.isTransitioning) {
       this.player.setVelocityX(0)
+      this.placeKey()
       return
     }
 
@@ -831,9 +839,17 @@ export class PlatformerScene extends Phaser.Scene {
     this.keyTurn += (delta / 1000) * keyRate(this.chargeRatio())
     this.key.setFrame(Math.floor(this.keyTurn) % 4)
     this.key.setFlipX(left)
-    // The shaft meets the toy's back: nine drawn pixels behind its middle,
-    // three below, which is where the torso's back edge is.
-    const behind = (9 / VIEW_ZOOM) * (left ? 1 : -1)
+    this.placeKey()
+  }
+
+  /**
+   * Puts the key on the toy's back: nine drawn pixels behind its middle and
+   * three below, where the torso's back edge is. Also done while the game
+   * is between levels or showing the run summary (#170), when `update`
+   * returns early: the key was left where the toy last walked.
+   */
+  private placeKey() {
+    const behind = (9 / VIEW_ZOOM) * (this.facing === 'left' ? 1 : -1)
     this.key.setPosition(this.player.x + behind, this.player.y + 3 / VIEW_ZOOM)
     this.key.setAlpha(this.player.alpha)
   }

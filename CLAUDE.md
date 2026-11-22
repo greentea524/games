@@ -777,6 +777,29 @@ moves to the next clear place, as Static's minimap does.
   green screen is the outline's own tone. `qa:contrast` scores the HUD as a
   named surface and counted 37 pixels of the head lost into it.
 
+**Windup's title, info pages, pause panel and run summary are on the real
+screen (#170).** `screens.ts` lays them out at 240×216 in the HUD's panels
+and colours, and `screens_test.ts` holds the same boxes. The title stands in
+the factory: its backdrop behind, a ledge of mossy stone, and the toy beside
+a station at twice play size. The run summary is drawn on the HUD's scene,
+because the play camera magnified it by 1.5. The HUD's panels step out while
+the summary is up.
+
+- **The palette switch reaches every screen.** It reached only a running
+  level, so the title kept its colours until play began, and a paused level
+  stayed in the old palette behind the pause panel. The title and pause
+  restart now, and a paused level is recoloured in place. A touch check
+  holds the title to no colour art after the switch, and fails without the
+  restart.
+- **`screens_test.ts` found the desktop's controls page running 14 pixels
+  into the ledge.** Its sound line wrapped to a tenth line; it is 26
+  characters now. The pages wrapped for the old screen are the control.
+- **The key follows the toy between levels.** `update` returns early while
+  a level ends, and the key stayed where the toy had last walked.
+
+All 32 levels were looked at in both palettes for this ticket, and nothing
+in the art left a platform edge or a hazard unclear.
+
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover
 it, so it showed only in Static and Lantern Keeper, as an inner frame. #183
