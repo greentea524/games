@@ -29,6 +29,12 @@ export class UIScene extends Phaser.Scene {
   private clearFor = -1
   private clear: Box[] = []
   private mode: 'gbc' | 'dmg' | null = null
+  /** While the run summary is up (#170), the panels step out of its way. */
+  private panelsHidden = false
+
+  setPanelsHidden(hidden: boolean) {
+    this.panelsHidden = hidden
+  }
 
   constructor() {
     super('ui')
@@ -40,6 +46,7 @@ export class UIScene extends Phaser.Scene {
     this.placement = { energy: null, clock: null }
     this.clearFor = -1
     this.mode = null
+    this.panelsHidden = false
 
     const text = (s: string) => this.add.text(0, 0, s, { fontFamily: FONT, fontSize: '8px', resolution: 2 })
     const panelBox = () => this.add.rectangle(0, 0, PANEL.width, PANEL.height).setOrigin(0, 0)
@@ -92,7 +99,7 @@ export class UIScene extends Phaser.Scene {
 
   /** Puts a panel and everything in it at a place, or hides it. */
   private move(panel: Panel, at: Box | null) {
-    const shown = at !== null
+    const shown = at !== null && !this.panelsHidden
     panel.box.setVisible(shown)
     panel.parts.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Visible).setVisible(shown))
     if (!at || (panel.at && panel.at.x === at.x && panel.at.y === at.y)) {

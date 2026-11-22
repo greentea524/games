@@ -20,6 +20,23 @@ async function windup() {
   await page.waitForTimeout(2500)
   const c = await controls(page)
 
+  // #170: the title is on the real screen, with the new toy on it, and the
+  // palette switch reaches it. It used to reach only a running level, so the
+  // title kept its colours until play began, as Static's once did (#181).
+  const title = async () => page.evaluate(() => {
+    const s = window.__game.scene.getScene('mainmenu')
+    const keys = s.children.list.map((o) => o.texture?.key).filter((k) => k && k !== '__DEFAULT')
+    return { zoom: s.cameras.main.zoom, robot: keys.some((k) => k.startsWith('robot_')), gbc: keys.filter((k) => k.endsWith('_gbc')).length, dmg: keys.filter((k) => k.endsWith('_dmg')).length }
+  })
+  const before = await title()
+  check('the title is on the real screen, with the toy on it', before.zoom === 1 && before.robot, JSON.stringify(before))
+  await page.click('#btn-palette')
+  await page.waitForTimeout(400)
+  const green = await title()
+  check('and the palette switch leaves no colour art on the title', green.gbc === 0 && green.dmg > 0, JSON.stringify(green))
+  await page.click('#btn-palette')
+  await page.waitForTimeout(400)
+
   await hand.tap(ACT, c.A.x, c.A.y, 140) // menu -> play
   await page.waitForTimeout(2500)
 
