@@ -107,6 +107,75 @@ async function run() {
   check('with no strokes taken', opening.strokes === 0 && opening.phase === 'aiming')
   check('and the ball is ready to be struck', opening.canPutt)
 
+  // ------------------------------------------------------------ the keyboard
+  //
+  // #184. The arrows turned an aim nobody could see until Space was held,
+  // and the angle they turned was kept apart from the game's aim, so it
+  // survived into the next hole. Read from what is drawn: the preview is a
+  // pale cream nothing else on the course is.
+
+  const cream = () =>
+    page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              const { data } = window.__game.stage.readPixels()
+              let n = 0
+              for (let i = 0; i < data.length; i += 4) {
+                if (data[i] > 235 && data[i + 1] > 225 && data[i + 2] > 180 && data[i + 2] < 225) n++
+              }
+              resolve(n)
+            }),
+          ),
+        ),
+    )
+  const angle = (a) => Math.atan2(a.x, a.z)
+  /** The turn from one aim to another, wrapped to -π..π. */
+  const turnFrom = (a, b) => Math.atan2(Math.sin(angle(b) - angle(a)), Math.cos(angle(b) - angle(a)))
+  const press = async (key, ms = 40) => {
+    await page.keyboard.down(key)
+    await page.waitForTimeout(ms)
+    await page.keyboard.up(key)
+    await hand.settle()
+  }
+
+  const still = await cream()
+  const atRest = await state(page)
+  await press('ArrowLeft', 300)
+  const turned = await state(page)
+  const shown = await cream()
+  check(
+    'an arrow key turns the aim and shows it before Space is held',
+    turned.aim.preview && turnFrom(atRest.aim, turned.aim) > 0.2 && shown > still + 20,
+    `turned ${turnFrom(atRest.aim, turned.aim).toFixed(2)} rad, ${still} -> ${shown} preview pixels`,
+  )
+  await press('Space', 20)
+  const tapped = await state(page)
+  check(
+    'and a Space too short to charge is no stroke, and leaves the direction shown',
+    tapped.strokes === 0 && tapped.canPutt && tapped.aim.preview && (await cream()) > still + 20,
+    `strokes ${tapped.strokes}`,
+  )
+
+  await page.evaluate(() => window.__game.goTo(1))
+  await hand.settle()
+  const next = await state(page)
+  await press('ArrowRight')
+  const nudged = await state(page)
+  const step = turnFrom(next.aim, nudged.aim)
+  check(
+    'a new hole starts its aim afresh, at the cup, and the arrows turn from there',
+    // One short press turns a little to the right of the new hole's aim. How
+    // far depends on how many frames the press spans, which on a slow renderer
+    // is more than one (#182's lesson); the stale angle jumped by the whole
+    // turn made on the last hole.
+    !next.aim.preview && Math.abs(turnFrom(turned.aim, next.aim)) > 0.1 && step < -0.01 && step > -0.25,
+    `hole 2 aim ${angle(next.aim).toFixed(2)}, one tap moved it ${step.toFixed(3)}`,
+  )
+  await page.evaluate(() => window.__game.goTo(0))
+  await hand.settle()
+
   // ------------------------------------------------------------ the drag
 
   const radius = await powerRadius(page)

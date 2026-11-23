@@ -25,6 +25,8 @@ const COLOURS = {
   ball: 0xf7f7f2,
   aim: 0xffd166,
   aimStrong: 0xef476f,
+  /** The direction alone, before any power (#184): paler than the shaft. */
+  aimPreview: 0xfff4cc,
 }
 
 /** How far above the cup the flag reaches, for drawing and for framing. */
@@ -34,6 +36,11 @@ const FLAG_TOP = 1.6
 const AIM_LENGTH = 3.2
 /** Below this a release is a cancel, not a stroke. */
 export const MIN_POWER = 0.06
+/**
+ * How long the direction preview is, in world units (#184): about a third of
+ * a full-power shaft, so it says where without looking like a stroke.
+ */
+export const PREVIEW_LENGTH = 1.1
 
 export type Phase = 'aiming' | 'rolling' | 'holed' | 'card'
 export type ViewMode = 'follow' | 'overview'
@@ -55,10 +62,22 @@ export interface MinigolfGame {
   canPutt(): boolean
   ball(): { x: number; y: number; z: number }
   ballSpeed(): number
-  /** Current aim, as a unit vector in the board plane, and 0..1 power. */
-  aim(): { x: number; z: number; power: number }
+  /**
+   * Current aim, as a unit vector in the board plane, and 0..1 power, and
+   * whether the direction alone is being shown before any power.
+   */
+  aim(): { x: number; z: number; power: number; preview: boolean }
   /** Set the aim while dragging. `x`/`z` need not be normalised. */
   setAim(x: number, z: number, power: number): void
+  /**
+   * Turn the aim without any power, and show its direction (#184). The
+   * keyboard's path: the arrow keys turn the aim before Space charges it,
+   * and a shaft that appears only once there is power was an aim nobody
+   * could see. Releasing Space early still cancels, and the direction stays.
+   */
+  previewAim(x: number, z: number): void
+  /** What the aim indicator is drawing this frame, for checks. */
+  aimShown(): { visible: boolean; length: number; colour: number }
   /** Strike with the current aim. Ignored below `MIN_POWER` or while rolling. */
   strike(): boolean
   /** Abandon the current aim without striking. */
@@ -147,6 +166,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   let aimX = 0
   let aimZ = -1
   let aimPower = 0
+  let aimPreview = false
   let holedFor = 0
   const listeners: (() => void)[] = []
   const notify = () => listeners.forEach((fn) => fn())
@@ -469,6 +489,20 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     }
   }
 
+  /**
+   * Points the aim at the cup and clears any preview: a new hole, a re-tee
+   * and a ball come to rest all start from here (#184). After a stroke the
+   * aim kept the last stroke's direction while the camera turned to face the
+   * cup, so the first arrow key jumped the aim from somewhere off screen.
+   */
+  function aimAtCup() {
+    const yaw = angleToCup(sim.ball.position.x, sim.ball.position.z)
+    aimX = Math.sin(yaw)
+    aimZ = Math.cos(yaw)
+    aimPower = 0
+    aimPreview = false
+  }
+
   function load(index: number) {
     holeIndex = Math.max(0, Math.min(COURSE.length - 1, index))
     hole = COURSE[holeIndex]
@@ -478,9 +512,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     computeOverviewFrame()
     camYaw = angleToCup(sim.ball.position.x, sim.ball.position.z)
     strokes = 0
-    aimX = Math.sin(camYaw)
-    aimZ = Math.cos(camYaw)
-    aimPower = 0
+    aimAtCup()
     holedFor = 0
     phase = 'aiming'
     updateCamera(0, true)
@@ -507,6 +539,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
         strokes++
         sim.tee()
         phase = 'aiming'
+        aimAtCup()
         notify()
       } else if (sim.holed()) {
         phase = 'holed'
@@ -518,6 +551,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
         // genuinely stopped — not merely slowed — the next stroke is not
         // available, because the turn boundary would otherwise be ambiguous.
         phase = 'aiming'
+        aimAtCup()
         notify()
       }
     } else if (phase === 'holed') {
@@ -534,10 +568,14 @@ export function createGame(parent: HTMLElement): MinigolfGame {
 
     // The aim shaft lies along the aim direction, scaled by power, starting at
     // the ball. Only while aiming and only when there is a stroke to take.
-    const showAim = phase === 'aiming' && aimPower >= MIN_POWER
+    // Before any power, a short pale preview of the direction when the
+    // keyboard has turned the aim (#184).
+    const charged = phase === 'aiming' && aimPower >= MIN_POWER
+    const previewing = !charged && phase === 'aiming' && aimPreview && sim.atRest()
+    const showAim = charged || previewing
     aimMesh.visible = showAim
     if (showAim) {
-      const length = AIM_LENGTH * aimPower
+      const length = charged ? AIM_LENGTH * aimPower : PREVIEW_LENGTH
       aimMesh.scale.set(1, 1, length)
       aimMesh.position.set(
         sim.ball.position.x + aimX * (length / 2),
@@ -548,7 +586,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       // Colour carries the power as well as length, so it reads at a glance
       // on a small screen where a few units of shaft is a few pixels.
       const material = aimMesh.material as THREE.MeshBasicMaterial
-      material.color.setHex(aimPower > 0.75 ? COLOURS.aimStrong : COLOURS.aim)
+      material.color.setHex(!charged ? COLOURS.aimPreview : aimPower > 0.75 ? COLOURS.aimStrong : COLOURS.aim)
     }
 
     updateCamera(dt)
@@ -576,7 +614,22 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     canPutt: () => phase === 'aiming' && sim.atRest(),
     ball: () => ({ x: sim.ball.position.x, y: sim.ball.position.y, z: sim.ball.position.z }),
     ballSpeed: () => sim.ball.velocity.length(),
-    aim: () => ({ x: aimX, z: aimZ, power: aimPower }),
+    aim: () => ({ x: aimX, z: aimZ, power: aimPower, preview: aimPreview }),
+    previewAim(x, z) {
+      if (phase !== 'aiming') return
+      const length = Math.hypot(x, z)
+      if (length > 1e-6) {
+        aimX = x / length
+        aimZ = z / length
+      }
+      aimPreview = true
+      notify()
+    },
+    aimShown: () => ({
+      visible: aimMesh.visible,
+      length: aimMesh.scale.z,
+      colour: (aimMesh.material as THREE.MeshBasicMaterial).color.getHex(),
+    }),
     setAim(x, z, power) {
       if (phase !== 'aiming') return
       const length = Math.hypot(x, z)
@@ -592,6 +645,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       strokes++
       sim.putt(aimX, aimZ, aimPower)
       aimPower = 0
+      aimPreview = false
       phase = 'rolling'
       viewMode = 'follow'
       notify()

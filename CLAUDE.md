@@ -250,6 +250,18 @@ work found that `REST_TIME`'s derivation used a sliding block's acceleration
 and the wrong threshold, so its "2.2× margin" was 1.6×. It now uses a rolling
 sphere's 5/7 g·sinθ, against `STILL_SPEED`.
 
+**Minigolf's keyboard turns the game's own aim, and shows it (#184).** The
+arrow keys used to turn an aim that was drawn only once Space gave it power,
+so a keyboard player aimed blind. The angle was also kept in `main.ts` apart
+from the game's aim, so it drifted from what was drawn. It is read from
+`game.aim()` now, and `previewAim` shows the direction as a short pale shaft
+before any power. The game points the aim at the cup on a new hole, a re-tee
+and a ball come to rest; after a stroke it used to keep the old stroke's
+direction while the camera turned to face the cup. Held arrows turn smoothly
+in the frame loop, and a first press also steps a little, so a tap shorter
+than a frame still turns. The touch suite counts the preview's cream pixels
+on screen, and all three of its keyboard checks fail on the old code.
+
 **Anomaly Room's models live inside their boxes, and a tap hits only what is
 drawn (#147).** The round picker decides what is out of view, shadow included,
 from each candidate's box in `room.ts`. So the models in `models.ts` are
