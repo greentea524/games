@@ -126,7 +126,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   const key = new THREE.DirectionalLight(0xfffdf6, lambertIntensity(0.85))
   key.position.set(5, 14, 6)
   key.castShadow = true
-  key.shadow.mapSize.set(2048, 2048)
+  key.shadow.mapSize.set(1024, 1024)
   key.shadow.bias = -0.0004
   key.shadow.normalBias = 0.02
   scene.add(key)

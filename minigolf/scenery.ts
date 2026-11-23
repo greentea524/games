@@ -5,6 +5,10 @@
 // flowering shrubs, garden boulders, a quiet pond, and drifting clouds —
 // placed strictly outside the course footprint and tee camera wedge so
 // scenery frames the shot without ever obstructing a putt.
+//
+// Props are batched into InstancedMeshes so the entire parkland renders in
+// a handful of draw calls and holds a steady frame rate on mobile GPUs and
+// headless software WebGL alike.
 import * as THREE from 'three'
 import type { Box, Hole } from './holes'
 import { prefersReducedMotion } from '../shared/motion'
@@ -30,7 +34,7 @@ function hashSeed(index: number, name: string): number {
   return h >>> 0
 }
 
-/** 2D footprint of a box in XZ, expanded for tilted ramps. */
+/** 2D footprint of a box in XZ. */
 interface Footprint {
   minX: number
   maxX: number
@@ -39,16 +43,12 @@ interface Footprint {
 }
 
 function boxFootprints(boxes: Box[]): Footprint[] {
-  return boxes.map((b) => {
-    const halfW = b.w / 2
-    const halfD = b.d / 2
-    return {
-      minX: b.x - halfW,
-      maxX: b.x + halfW,
-      minZ: b.z - halfD,
-      maxZ: b.z + halfD,
-    }
-  })
+  return boxes.map((b) => ({
+    minX: b.x - b.w / 2,
+    maxX: b.x + b.w / 2,
+    minZ: b.z - b.d / 2,
+    maxZ: b.z + b.d / 2,
+  }))
 }
 
 /** Shortest horizontal distance from (x, z) to any box footprint in the hole. */
@@ -81,7 +81,6 @@ function buildSkyTexture(): THREE.CanvasTexture {
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, w, h)
 
-  // Soft warm sunlit glow aligned roughly with the directional key light.
   const sunX = w * 0.68
   const sunY = h * 0.28
   const sun = ctx.createRadialGradient(sunX, sunY, 4, sunX, sunY, 96)
@@ -106,13 +105,10 @@ function hillElevation(
   phaseB: number,
   pond: { x: number; z: number } | null,
 ): number {
-  // Keep a level parkland apron directly beneath and beside the course so no
-  // ground geometry ever pokes up into a green, ramp, or wall.
   if (clearDist <= 2.4) return -0.46
   const blend = Math.min(1, (clearDist - 2.4) / 14)
   let smooth = blend * blend * (3 - 2 * blend)
 
-  // Carve a level meadow hollow around the pond so water never clips a hill slope.
   if (pond) {
     const pd = Math.hypot(x - pond.x, z - pond.z)
     if (pd <= 3.6) return -0.46
@@ -121,18 +117,35 @@ function hillElevation(
   }
 
   const wave1 = Math.sin(x * 0.075 + phaseA) * Math.cos(z * 0.065 + phaseB)
-  const wave2 = Math.sin((x * 0.04 - z * 0.05) + phaseB * 1.3) * 0.65
-  const wave3 = Math.cos((x * 0.13 + z * 0.11) - phaseA) * 0.22
+  const wave2 = Math.sin(x * 0.04 - z * 0.05 + phaseB * 1.3) * 0.65
+  const wave3 = Math.cos(x * 0.13 + z * 0.11 - phaseA) * 0.22
   const distRise = Math.min(2.8, Math.max(0, clearDist - 18) * 0.048)
 
   const h = (wave1 * 1.15 + wave2 * 0.9 + wave3 * 0.45 + 0.75 + distRise) * smooth
   return -0.46 + Math.max(0, h)
 }
 
-interface CloudItem {
-  group: THREE.Group
+interface InstanceEntry {
+  x: number
+  y: number
+  z: number
+  rx: number
+  ry: number
+  rz: number
+  sx: number
+  sy: number
+  sz: number
+  color: number
+}
+
+interface CloudPuff {
+  x: number
+  y: number
+  z: number
+  sx: number
+  sy: number
+  sz: number
   speed: number
-  limit: number
 }
 
 export interface SceneryController {
@@ -141,13 +154,15 @@ export interface SceneryController {
   dispose(): void
 }
 
+const FLOWER_COLORS = [0xf26d5b, 0xf6c94c, 0xc293e6, 0xf9f5eb]
+const PINE_COLORS = [0x266544, 0x2f7850, 0x3b8b5b]
+
 export function createScenery(scene: THREE.Scene): SceneryController {
   const root = new THREE.Group()
   scene.add(root)
 
-  // Sky dome + atmospheric horizon haze.
   const skyTex = buildSkyTexture()
-  const skyGeo = new THREE.SphereGeometry(145, 24, 16)
+  const skyGeo = new THREE.SphereGeometry(145, 20, 12)
   const skyMat = new THREE.MeshBasicMaterial({
     map: skyTex,
     side: THREE.BackSide,
@@ -159,54 +174,38 @@ export function createScenery(scene: THREE.Scene): SceneryController {
 
   scene.fog = new THREE.Fog(SKY_HORIZON_COLOR, 36, 128)
 
-  // Shared prop geometries & materials reused across holes.
-  const trunkGeo = new THREE.CylinderGeometry(0.11, 0.18, 1.0, 6)
-  const pineBotGeo = new THREE.ConeGeometry(0.95, 1.6, 7)
-  const pineMidGeo = new THREE.ConeGeometry(0.74, 1.35, 7)
-  const pineTopGeo = new THREE.ConeGeometry(0.5, 1.05, 7)
-  const canopyGeo = new THREE.IcosahedronGeometry(0.82, 1)
-  const shrubGeo = new THREE.IcosahedronGeometry(0.42, 1)
-  const blossomGeo = new THREE.IcosahedronGeometry(0.1, 0)
-  const rockGeo = new THREE.DodecahedronGeometry(0.52, 0)
-  const cloudPuffGeo = new THREE.IcosahedronGeometry(1.0, 1)
-  const pondGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.08, 16)
-  const reedGeo = new THREE.CylinderGeometry(0.025, 0.04, 0.72, 5)
-  const postGeo = new THREE.BoxGeometry(0.12, 0.52, 0.12)
-  const railGeo = new THREE.BoxGeometry(1.4, 0.07, 0.06)
+  // Shared geometries & materials for instanced batches.
+  const geos = {
+    trunk: new THREE.CylinderGeometry(0.11, 0.18, 1.0, 6),
+    cone: new THREE.ConeGeometry(0.95, 1.6, 7),
+    blob: new THREE.IcosahedronGeometry(0.8, 1),
+    rock: new THREE.DodecahedronGeometry(0.52, 0),
+    box: new THREE.BoxGeometry(1, 1, 1),
+    disc: new THREE.CylinderGeometry(1.0, 1.0, 0.08, 14),
+    cloud: new THREE.IcosahedronGeometry(1.0, 1),
+  }
 
-  const materials = {
+  const mats = {
     ground: new THREE.MeshLambertMaterial({ vertexColors: true }),
-    trunk: new THREE.MeshLambertMaterial({ color: 0x6b4c35 }),
-    pineA: new THREE.MeshLambertMaterial({ color: 0x266544 }),
-    pineB: new THREE.MeshLambertMaterial({ color: 0x2f7850 }),
-    pineC: new THREE.MeshLambertMaterial({ color: 0x3b8b5b }),
-    oakA: new THREE.MeshLambertMaterial({ color: 0x458f49 }),
-    oakB: new THREE.MeshLambertMaterial({ color: 0x5aa653 }),
-    shrub: new THREE.MeshLambertMaterial({ color: 0x3a844c }),
-    rock: new THREE.MeshLambertMaterial({ color: 0x8f9992 }),
-    rockWarm: new THREE.MeshLambertMaterial({ color: 0x9c988a }),
+    lambert: new THREE.MeshLambertMaterial({ color: 0xffffff }),
     pond: new THREE.MeshStandardMaterial({
       color: 0x4da8c9,
       roughness: 0.24,
       metalness: 0.06,
     }),
-    pondEdge: new THREE.MeshLambertMaterial({ color: 0x7d8b7d }),
-    reed: new THREE.MeshLambertMaterial({ color: 0x4f8246 }),
-    wood: new THREE.MeshLambertMaterial({ color: 0x8a6949 }),
     cloud: new THREE.MeshBasicMaterial({ color: 0xf7fbf9, fog: false }),
-    flowers: [
-      new THREE.MeshLambertMaterial({ color: 0xf26d5b }),
-      new THREE.MeshLambertMaterial({ color: 0xf6c94c }),
-      new THREE.MeshLambertMaterial({ color: 0xc293e6 }),
-      new THREE.MeshLambertMaterial({ color: 0xf9f5eb }),
-    ],
   }
 
   const holeGroup = new THREE.Group()
   root.add(holeGroup)
 
   const dynamicGeometries: THREE.BufferGeometry[] = []
-  let clouds: CloudItem[] = []
+  let cloudMesh: THREE.InstancedMesh | null = null
+  let cloudPuffs: CloudPuff[] = []
+  let cloudLimit = 78
+
+  const dummy = new THREE.Object3D()
+  const tmpColor = new THREE.Color()
 
   function clearHole() {
     while (holeGroup.children.length > 0) {
@@ -214,190 +213,35 @@ export function createScenery(scene: THREE.Scene): SceneryController {
     }
     for (const g of dynamicGeometries) g.dispose()
     dynamicGeometries.length = 0
-    clouds = []
+    cloudMesh = null
+    cloudPuffs = []
   }
 
-  function makePineTree(rand: () => number): THREE.Group {
-    const g = new THREE.Group()
-    const trunkH = 0.8 + rand() * 0.45
-    const trunk = new THREE.Mesh(trunkGeo, materials.trunk)
-    trunk.scale.set(1, trunkH, 1)
-    trunk.position.y = trunkH * 0.5
-    trunk.castShadow = true
-    g.add(trunk)
-
-    const tones = [materials.pineA, materials.pineB, materials.pineC]
-    const bot = new THREE.Mesh(pineBotGeo, tones[0])
-    bot.position.y = trunkH + 0.65
-    bot.rotation.y = rand() * Math.PI
-    bot.castShadow = true
-    g.add(bot)
-
-    const mid = new THREE.Mesh(pineMidGeo, tones[1])
-    mid.position.y = trunkH + 1.48
-    mid.rotation.y = rand() * Math.PI
-    mid.castShadow = true
-    g.add(mid)
-
-    const top = new THREE.Mesh(pineTopGeo, tones[2])
-    top.position.y = trunkH + 2.2
-    top.rotation.y = rand() * Math.PI
-    top.castShadow = true
-    g.add(top)
-
-    const s = 0.78 + rand() * 0.55
-    g.scale.set(s, s * (0.92 + rand() * 0.22), s)
-    return g
-  }
-
-  function makeOakTree(rand: () => number): THREE.Group {
-    const g = new THREE.Group()
-    const trunkH = 1.0 + rand() * 0.4
-    const trunk = new THREE.Mesh(trunkGeo, materials.trunk)
-    trunk.scale.set(1.15, trunkH, 1.15)
-    trunk.position.y = trunkH * 0.5
-    trunk.castShadow = true
-    g.add(trunk)
-
-    const mainMat = rand() < 0.5 ? materials.oakA : materials.oakB
-    const altMat = mainMat === materials.oakA ? materials.oakB : materials.oakA
-
-    const crown = new THREE.Mesh(canopyGeo, mainMat)
-    crown.position.set(0, trunkH + 0.65, 0)
-    crown.scale.set(1.15, 0.92, 1.1)
-    crown.castShadow = true
-    g.add(crown)
-
-    const puffs = 2 + Math.floor(rand() * 2)
-    for (let i = 0; i < puffs; i++) {
-      const a = (i / puffs) * Math.PI * 2 + rand() * 0.8
-      const p = new THREE.Mesh(canopyGeo, i === 0 ? altMat : mainMat)
-      p.scale.setScalar(0.62 + rand() * 0.25)
-      p.position.set(Math.cos(a) * 0.52, trunkH + 0.45 + rand() * 0.35, Math.sin(a) * 0.52)
-      p.castShadow = true
-      g.add(p)
+  function addBatch(
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    entries: InstanceEntry[],
+    castShadow = false,
+    receiveShadow = false,
+  ): THREE.InstancedMesh | null {
+    if (entries.length === 0) return null
+    const mesh = new THREE.InstancedMesh(geo, mat, entries.length)
+    mesh.castShadow = castShadow
+    mesh.receiveShadow = receiveShadow
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i]
+      dummy.position.set(e.x, e.y, e.z)
+      dummy.rotation.set(e.rx, e.ry, e.rz)
+      dummy.scale.set(e.sx, e.sy, e.sz)
+      dummy.updateMatrix()
+      mesh.setMatrixAt(i, dummy.matrix)
+      tmpColor.setHex(e.color)
+      mesh.setColorAt(i, tmpColor)
     }
-
-    const s = 0.85 + rand() * 0.48
-    g.scale.setScalar(s)
-    return g
-  }
-
-  function makeShrub(rand: () => number): THREE.Group {
-    const g = new THREE.Group()
-    const count = 2 + Math.floor(rand() * 2)
-    for (let i = 0; i < count; i++) {
-      const m = new THREE.Mesh(shrubGeo, i === 0 ? materials.shrub : materials.oakA)
-      const sc = 0.72 + rand() * 0.48
-      m.scale.set(sc * 1.15, sc * 0.85, sc * 1.1)
-      m.position.set((rand() - 0.5) * 0.55, sc * 0.32, (rand() - 0.5) * 0.55)
-      m.castShadow = true
-      g.add(m)
-    }
-    // Tiny colorful blossoms on some shrubs for warm garden character.
-    if (rand() < 0.65) {
-      const flowerMat = materials.flowers[Math.floor(rand() * materials.flowers.length)]
-      const dots = 3 + Math.floor(rand() * 3)
-      for (let i = 0; i < dots; i++) {
-        const b = new THREE.Mesh(blossomGeo, flowerMat)
-        const a = rand() * Math.PI * 2
-        const r = 0.16 + rand() * 0.32
-        b.position.set(Math.cos(a) * r, 0.38 + rand() * 0.2, Math.sin(a) * r)
-        g.add(b)
-      }
-    }
-    return g
-  }
-
-  function makeBoulder(rand: () => number): THREE.Mesh {
-    const rock = new THREE.Mesh(rockGeo, rand() < 0.55 ? materials.rock : materials.rockWarm)
-    const sx = 0.65 + rand() * 0.75
-    const sy = 0.42 + rand() * 0.42
-    const sz = 0.65 + rand() * 0.75
-    rock.scale.set(sx, sy, sz)
-    rock.rotation.set(rand() * 0.5, rand() * Math.PI * 2, rand() * 0.5)
-    rock.position.y = sy * 0.28
-    rock.castShadow = true
-    rock.receiveShadow = true
-    return rock
-  }
-
-  function makePond(rand: () => number): THREE.Group {
-    const g = new THREE.Group()
-    const lobes = 3
-    for (let i = 0; i < lobes; i++) {
-      const a = (i / lobes) * Math.PI * 2 + rand() * 0.5
-      const dist = i === 0 ? 0 : 0.9 + rand() * 0.6
-      const rad = i === 0 ? 1.85 + rand() * 0.45 : 1.15 + rand() * 0.45
-      const ox = Math.cos(a) * dist
-      const oz = Math.sin(a) * dist
-
-      const bank = new THREE.Mesh(pondGeo, materials.pondEdge)
-      bank.scale.set(rad + 0.22, 0.85, rad + 0.22)
-      bank.position.set(ox, 0.02, oz)
-      bank.receiveShadow = true
-      g.add(bank)
-
-      const water = new THREE.Mesh(pondGeo, materials.pond)
-      water.scale.set(rad, 1, rad)
-      water.position.set(ox, 0.055, oz)
-      water.receiveShadow = true
-      g.add(water)
-    }
-
-    // Ring of pebbles and reeds around the pond edge.
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2 + rand() * 0.4
-      const r = 1.9 + rand() * 0.65
-      const pebble = makeBoulder(rand)
-      pebble.scale.multiplyScalar(0.45)
-      pebble.position.set(Math.cos(a) * r, 0.08, Math.sin(a) * r)
-      g.add(pebble)
-    }
-    for (let i = 0; i < 7; i++) {
-      const a = rand() * Math.PI * 2
-      const r = 1.75 + rand() * 0.55
-      const reed = new THREE.Mesh(reedGeo, materials.reed)
-      reed.position.set(Math.cos(a) * r, 0.32, Math.sin(a) * r)
-      reed.rotation.set((rand() - 0.5) * 0.25, rand() * Math.PI, (rand() - 0.5) * 0.25)
-      g.add(reed)
-    }
-
-    return g
-  }
-
-  function makeFenceSegment(): THREE.Group {
-    const g = new THREE.Group()
-    for (const sx of [-0.65, 0.65]) {
-      const post = new THREE.Mesh(postGeo, materials.wood)
-      post.position.set(sx, 0.26, 0)
-      post.castShadow = true
-      g.add(post)
-    }
-    for (const y of [0.22, 0.4]) {
-      const rail = new THREE.Mesh(railGeo, materials.wood)
-      rail.position.set(0, y, 0)
-      rail.castShadow = true
-      g.add(rail)
-    }
-    return g
-  }
-
-  function makeCloud(rand: () => number): THREE.Group {
-    const g = new THREE.Group()
-    const puffs = 3 + Math.floor(rand() * 3)
-    for (let i = 0; i < puffs; i++) {
-      const p = new THREE.Mesh(cloudPuffGeo, materials.cloud)
-      const sc = i === 0 ? 1.8 + rand() * 0.8 : 1.0 + rand() * 0.9
-      p.scale.set(sc * 1.45, sc * 0.62, sc * 1.05)
-      p.position.set(
-        (i - (puffs - 1) / 2) * (1.35 + rand() * 0.4),
-        (rand() - 0.35) * 0.45,
-        (rand() - 0.5) * 0.9,
-      )
-      g.add(p)
-    }
-    return g
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    holeGroup.add(mesh)
+    return mesh
   }
 
   function rebuild(hole: Hole, holeIndex: number) {
@@ -406,7 +250,6 @@ export function createScenery(scene: THREE.Scene): SceneryController {
     const rand = mulberry32(hashSeed(holeIndex, hole.name))
     const prints = boxFootprints(hole.boxes)
 
-    // Course center & radius for centering the terrain and rings of props.
     let minX = Infinity
     let maxX = -Infinity
     let minZ = Infinity
@@ -421,8 +264,6 @@ export function createScenery(scene: THREE.Scene): SceneryController {
     const cz = (minZ + maxZ) / 2
     const courseRad = Math.hypot((maxX - minX) / 2, (maxZ - minZ) / 2)
 
-    // Direction behind the tee where the opening 3D camera sits — keep tall
-    // trees out of this wedge so they never stand in front of the lens.
     const teeDx = hole.cup.x - hole.tee.x
     const teeDz = hole.cup.z - hole.tee.z
     const teeLen = Math.hypot(teeDx, teeDz) || 1
@@ -432,7 +273,6 @@ export function createScenery(scene: THREE.Scene): SceneryController {
     const phaseA = rand() * Math.PI * 2
     const phaseB = rand() * Math.PI * 2
 
-    // Keep track of placed props to prevent overlapping.
     const placed: { x: number; z: number; r: number }[] = []
     const canPlace = (x: number, z: number, propRadius: number, minCourseClear: number, tall: boolean) => {
       if (distToCourse(x, z, prints) < minCourseClear + propRadius) return false
@@ -443,8 +283,7 @@ export function createScenery(scene: THREE.Scene): SceneryController {
       return true
     }
 
-    // Choose the pond location first so the ground mesh carves a level hollow
-    // underneath it instead of sloping through the water surface.
+    // Choose the pond location first so the ground mesh carves a level hollow.
     let pondPos: { x: number; z: number } | null = null
     for (let attempt = 0; attempt < 24; attempt++) {
       const angle = rand() * Math.PI * 2
@@ -461,7 +300,7 @@ export function createScenery(scene: THREE.Scene): SceneryController {
 
     // 1. Sculpted parkland ground plane with vertex-colored meadow gradients.
     const groundSize = 185
-    const segs = 68
+    const segs = 32
     const groundGeo = new THREE.PlaneGeometry(groundSize, groundSize, segs, segs)
     groundGeo.rotateX(-Math.PI / 2)
 
@@ -488,7 +327,6 @@ export function createScenery(scene: THREE.Scene): SceneryController {
       } else {
         tmp.copy(cHill).lerp(cFar, Math.min(1, (elev - 2.2) / 4.0))
       }
-      // Subtle per-vertex meadow warmth variation.
       const tint = Math.sin(vx * 0.21 + phaseA) * Math.cos(vz * 0.19 - phaseB) * 0.035
       colors[i * 3] = Math.max(0, Math.min(1, tmp.r + tint))
       colors[i * 3 + 1] = Math.max(0, Math.min(1, tmp.g + tint * 1.1))
@@ -499,21 +337,105 @@ export function createScenery(scene: THREE.Scene): SceneryController {
     groundGeo.computeVertexNormals()
     dynamicGeometries.push(groundGeo)
 
-    const groundMesh = new THREE.Mesh(groundGeo, materials.ground)
+    const groundMesh = new THREE.Mesh(groundGeo, mats.ground)
     groundMesh.receiveShadow = true
     holeGroup.add(groundMesh)
 
-    // 2. Place the garden pond in its carved hollow.
+    // Accumulators for instanced batches (shadowed near-ring vs unshadowed far).
+    const trunksNear: InstanceEntry[] = []
+    const trunksFar: InstanceEntry[] = []
+    const conesNear: InstanceEntry[] = []
+    const conesFar: InstanceEntry[] = []
+    const blobsNear: InstanceEntry[] = []
+    const blobsFar: InstanceEntry[] = []
+    const rocks: InstanceEntry[] = []
+    const woodBoxes: InstanceEntry[] = []
+    const pondBanks: InstanceEntry[] = []
+    const pondWaters: InstanceEntry[] = []
+
+    // 2. Garden pond in its carved hollow.
     if (pondPos) {
-      const pond = makePond(rand)
-      pond.position.set(pondPos.x, -0.46, pondPos.z)
-      pond.rotation.y = rand() * Math.PI * 2
-      holeGroup.add(pond)
+      const rot = rand() * Math.PI * 2
+      const cosR = Math.cos(rot)
+      const sinR = Math.sin(rot)
+      const baseY = -0.46
+
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + rand() * 0.5
+        const dist = i === 0 ? 0 : 0.9 + rand() * 0.6
+        const rad = i === 0 ? 1.85 + rand() * 0.45 : 1.15 + rand() * 0.45
+        const lx = Math.cos(a) * dist
+        const lz = Math.sin(a) * dist
+        const wx = pondPos.x + lx * cosR - lz * sinR
+        const wz = pondPos.z + lx * sinR + lz * cosR
+
+        pondBanks.push({
+          x: wx,
+          y: baseY + 0.02,
+          z: wz,
+          rx: 0,
+          ry: 0,
+          rz: 0,
+          sx: rad + 0.22,
+          sy: 0.85,
+          sz: rad + 0.22,
+          color: 0x7d8b7d,
+        })
+        pondWaters.push({
+          x: wx,
+          y: baseY + 0.055,
+          z: wz,
+          rx: 0,
+          ry: 0,
+          rz: 0,
+          sx: rad,
+          sy: 1,
+          sz: rad,
+          color: 0xffffff,
+        })
+      }
+
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + rand() * 0.4
+        const r = 1.9 + rand() * 0.65
+        const sx = (0.65 + rand() * 0.6) * 0.45
+        const sy = (0.42 + rand() * 0.35) * 0.45
+        const sz = (0.65 + rand() * 0.6) * 0.45
+        rocks.push({
+          x: pondPos.x + Math.cos(a) * r,
+          y: baseY + 0.08,
+          z: pondPos.z + Math.sin(a) * r,
+          rx: rand() * 0.5,
+          ry: rand() * Math.PI * 2,
+          rz: rand() * 0.5,
+          sx,
+          sy,
+          sz,
+          color: rand() < 0.55 ? 0x8f9992 : 0x9c988a,
+        })
+      }
+
+      for (let i = 0; i < 7; i++) {
+        const a = rand() * Math.PI * 2
+        const r = 1.75 + rand() * 0.55
+        trunksFar.push({
+          x: pondPos.x + Math.cos(a) * r,
+          y: baseY + 0.32,
+          z: pondPos.z + Math.sin(a) * r,
+          rx: (rand() - 0.5) * 0.25,
+          ry: rand() * Math.PI,
+          rz: (rand() - 0.5) * 0.25,
+          sx: 0.22,
+          sy: 0.72,
+          sz: 0.22,
+          color: 0x4f8246,
+        })
+      }
     }
 
-    // 3. Low garden accents near the course perimeter (shrubs, boulders, wooden fences).
-    for (let i = 0; i < 28; i++) {
-      const angle = (i / 28) * Math.PI * 2 + (rand() - 0.5) * 0.25
+    // 3. Low garden accents near the course perimeter.
+    for (let i = 0; i < 22; i++) {
+      const angle = (i / 22) * Math.PI * 2 + (rand() - 0.5) * 0.25
       const dist = courseRad + 1.8 + rand() * 8.5
       const px = cx + Math.cos(angle) * dist
       const pz = cz + Math.sin(angle) * dist
@@ -522,26 +444,99 @@ export function createScenery(scene: THREE.Scene): SceneryController {
 
       const py = hillElevation(px, pz, dCourse, phaseA, phaseB, pondPos)
       const roll = rand()
-      let obj: THREE.Object3D
       if (roll < 0.55) {
-        obj = makeShrub(rand)
+        const count = 2 + Math.floor(rand() * 2)
+        for (let k = 0; k < count; k++) {
+          const sc = (0.72 + rand() * 0.48) * 0.52
+          blobsFar.push({
+            x: px + (rand() - 0.5) * 0.55,
+            y: py + sc * 0.55,
+            z: pz + (rand() - 0.5) * 0.55,
+            rx: 0,
+            ry: rand() * Math.PI,
+            rz: 0,
+            sx: sc * 1.15,
+            sy: sc * 0.85,
+            sz: sc * 1.1,
+            color: k === 0 ? 0x3a844c : 0x458f49,
+          })
+        }
+        if (rand() < 0.65) {
+          const fColor = FLOWER_COLORS[Math.floor(rand() * FLOWER_COLORS.length)]
+          for (let k = 0; k < 3; k++) {
+            const fa = rand() * Math.PI * 2
+            const fr = 0.16 + rand() * 0.3
+            blobsFar.push({
+              x: px + Math.cos(fa) * fr,
+              y: py + 0.38 + rand() * 0.18,
+              z: pz + Math.sin(fa) * fr,
+              rx: 0,
+              ry: 0,
+              rz: 0,
+              sx: 0.12,
+              sy: 0.12,
+              sz: 0.12,
+              color: fColor,
+            })
+          }
+        }
       } else if (roll < 0.86) {
-        obj = makeBoulder(rand)
+        const sx = 0.65 + rand() * 0.75
+        const sy = 0.42 + rand() * 0.42
+        const sz = 0.65 + rand() * 0.75
+        rocks.push({
+          x: px,
+          y: py + sy * 0.28,
+          z: pz,
+          rx: rand() * 0.5,
+          ry: rand() * Math.PI * 2,
+          rz: rand() * 0.5,
+          sx,
+          sy,
+          sz,
+          color: rand() < 0.55 ? 0x8f9992 : 0x9c988a,
+        })
       } else {
-        obj = makeFenceSegment()
-        obj.rotation.y = angle + Math.PI / 2
+        const fy = angle + Math.PI / 2
+        const cosF = Math.cos(fy)
+        const sinF = Math.sin(fy)
+        for (const sx of [-0.65, 0.65]) {
+          woodBoxes.push({
+            x: px + sx * cosF,
+            y: py + 0.26,
+            z: pz - sx * sinF,
+            rx: 0,
+            ry: fy,
+            rz: 0,
+            sx: 0.12,
+            sy: 0.52,
+            sz: 0.12,
+            color: 0x8a6949,
+          })
+        }
+        for (const ry of [0.22, 0.4]) {
+          woodBoxes.push({
+            x: px,
+            y: py + ry,
+            z: pz,
+            rx: 0,
+            ry: fy,
+            rz: 0,
+            sx: 1.4,
+            sy: 0.07,
+            sz: 0.06,
+            color: 0x8a6949,
+          })
+        }
       }
-      obj.position.set(px, py, pz)
-      holeGroup.add(obj)
       placed.push({ x: px, z: pz, r: 0.9 })
     }
 
-    // 4. Midground & background parkland trees (mix of pine and oak, varied per hole).
+    // 4. Parkland trees (near ring casts shadows; far ring stays unshadowed).
     const pineBias = 0.35 + (holeIndex % 3) * 0.2
-    const treeAttempts = 85
-    for (let i = 0; i < treeAttempts; i++) {
+    for (let i = 0; i < 64; i++) {
       const angle = rand() * Math.PI * 2
-      const ring = i < 36 ? 0 : 1
+      const ring = i < 28 ? 0 : 1
       const dist =
         ring === 0
           ? courseRad + 4.2 + rand() * 14
@@ -552,42 +547,163 @@ export function createScenery(scene: THREE.Scene): SceneryController {
       if (!canPlace(px, pz, 1.4, minClear, true)) continue
 
       const dCourse = distToCourse(px, pz, prints)
-      const py = hillElevation(px, pz, dCourse, phaseA, phaseB, pondPos)
-      const tree = rand() < pineBias ? makePineTree(rand) : makeOakTree(rand)
-      tree.position.set(px, py - 0.08, pz)
-      holeGroup.add(tree)
+      const py = hillElevation(px, pz, dCourse, phaseA, phaseB, pondPos) - 0.08
+      const near = ring === 0
+      const tList = near ? trunksNear : trunksFar
+
+      if (rand() < pineBias) {
+        const s = 0.78 + rand() * 0.55
+        const sy = s * (0.92 + rand() * 0.22)
+        const trunkH = 0.8 + rand() * 0.45
+        tList.push({
+          x: px,
+          y: py + trunkH * 0.5 * sy,
+          z: pz,
+          rx: 0,
+          ry: 0,
+          rz: 0,
+          sx: s,
+          sy: trunkH * sy,
+          sz: s,
+          color: 0x6b4c35,
+        })
+        const cList = near ? conesNear : conesFar
+        const tiers = [
+          { dy: trunkH + 0.65, r: 1.0, h: 1.0, col: PINE_COLORS[0] },
+          { dy: trunkH + 1.48, r: 0.78, h: 0.84, col: PINE_COLORS[1] },
+          { dy: trunkH + 2.2, r: 0.53, h: 0.66, col: PINE_COLORS[2] },
+        ]
+        for (const t of tiers) {
+          cList.push({
+            x: px,
+            y: py + t.dy * sy,
+            z: pz,
+            rx: 0,
+            ry: rand() * Math.PI,
+            rz: 0,
+            sx: t.r * s,
+            sy: t.h * sy,
+            sz: t.r * s,
+            color: t.col,
+          })
+        }
+      } else {
+        const s = 0.85 + rand() * 0.48
+        const trunkH = 1.0 + rand() * 0.4
+        tList.push({
+          x: px,
+          y: py + trunkH * 0.5 * s,
+          z: pz,
+          rx: 0,
+          ry: 0,
+          rz: 0,
+          sx: 1.15 * s,
+          sy: trunkH * s,
+          sz: 1.15 * s,
+          color: 0x6b4c35,
+        })
+        const bList = near ? blobsNear : blobsFar
+        const mainCol = rand() < 0.5 ? 0x458f49 : 0x5aa653
+        const altCol = mainCol === 0x458f49 ? 0x5aa653 : 0x458f49
+        bList.push({
+          x: px,
+          y: py + (trunkH + 0.65) * s,
+          z: pz,
+          rx: 0,
+          ry: 0,
+          rz: 0,
+          sx: 1.18 * s,
+          sy: 0.94 * s,
+          sz: 1.12 * s,
+          color: mainCol,
+        })
+        const puffs = 2 + Math.floor(rand() * 2)
+        for (let k = 0; k < puffs; k++) {
+          const pa = (k / puffs) * Math.PI * 2 + rand() * 0.8
+          const ps = (0.62 + rand() * 0.25) * s
+          bList.push({
+            x: px + Math.cos(pa) * 0.52 * s,
+            y: py + (trunkH + 0.45 + rand() * 0.35) * s,
+            z: pz + Math.sin(pa) * 0.52 * s,
+            rx: 0,
+            ry: 0,
+            rz: 0,
+            sx: ps,
+            sy: ps,
+            sz: ps,
+            color: k === 0 ? altCol : mainCol,
+          })
+        }
+      }
       placed.push({ x: px, z: pz, r: 1.55 })
     }
 
-    // 5. High drifting low-poly clouds.
-    const cloudCount = 10
-    for (let i = 0; i < cloudCount; i++) {
-      const cloud = makeCloud(rand)
-      const limit = 78
-      const x = cx + (rand() - 0.5) * limit * 1.8
-      const y = 11 + rand() * 8
-      const z = cz + (rand() - 0.5) * limit * 1.6
-      cloud.position.set(x, y, z)
-      holeGroup.add(cloud)
-      clouds.push({
-        group: cloud,
-        speed: 0.35 + rand() * 0.45,
-        limit,
-      })
+    // Commit all instanced batches (total ~10 draw calls for the whole park).
+    addBatch(geos.trunk, mats.lambert, trunksNear, true, false)
+    addBatch(geos.trunk, mats.lambert, trunksFar, false, false)
+    addBatch(geos.cone, mats.lambert, conesNear, true, false)
+    addBatch(geos.cone, mats.lambert, conesFar, false, false)
+    addBatch(geos.blob, mats.lambert, blobsNear, true, false)
+    addBatch(geos.blob, mats.lambert, blobsFar, false, false)
+    addBatch(geos.rock, mats.lambert, rocks, false, true)
+    addBatch(geos.box, mats.lambert, woodBoxes, false, false)
+    addBatch(geos.disc, mats.lambert, pondBanks, false, true)
+    addBatch(geos.disc, mats.pond, pondWaters, false, true)
+
+    // 5. High drifting low-poly clouds (single InstancedMesh).
+    cloudLimit = 78
+    for (let i = 0; i < 9; i++) {
+      const speed = 0.35 + rand() * 0.45
+      const baseX = cx + (rand() - 0.5) * cloudLimit * 1.8
+      const baseY = 11 + rand() * 8
+      const baseZ = cz + (rand() - 0.5) * cloudLimit * 1.6
+      const puffs = 3 + Math.floor(rand() * 2)
+      for (let k = 0; k < puffs; k++) {
+        const sc = k === 0 ? 1.8 + rand() * 0.8 : 1.0 + rand() * 0.85
+        cloudPuffs.push({
+          x: baseX + (k - (puffs - 1) / 2) * (1.35 + rand() * 0.4),
+          y: baseY + (rand() - 0.35) * 0.45,
+          z: baseZ + (rand() - 0.5) * 0.9,
+          sx: sc * 1.45,
+          sy: sc * 0.62,
+          sz: sc * 1.05,
+          speed,
+        })
+      }
     }
 
-    // Keep sky centered on the hole.
+    if (cloudPuffs.length > 0) {
+      cloudMesh = new THREE.InstancedMesh(geos.cloud, mats.cloud, cloudPuffs.length)
+      cloudMesh.frustumCulled = false
+      writeClouds()
+      holeGroup.add(cloudMesh)
+    }
+
     skyMesh.position.set(cx, 0, cz)
   }
 
-  function update(dt: number, reducedMotion: boolean) {
-    if (reducedMotion || prefersReducedMotion()) return
-    for (const c of clouds) {
-      c.group.position.x += c.speed * dt
-      if (c.group.position.x > skyMesh.position.x + c.limit) {
-        c.group.position.x = skyMesh.position.x - c.limit
-      }
+  function writeClouds() {
+    if (!cloudMesh) return
+    for (let i = 0; i < cloudPuffs.length; i++) {
+      const c = cloudPuffs[i]
+      dummy.position.set(c.x, c.y, c.z)
+      dummy.rotation.set(0, 0, 0)
+      dummy.scale.set(c.sx, c.sy, c.sz)
+      dummy.updateMatrix()
+      cloudMesh.setMatrixAt(i, dummy.matrix)
     }
+    cloudMesh.instanceMatrix.needsUpdate = true
+  }
+
+  function update(dt: number, reducedMotion: boolean) {
+    if (!cloudMesh || reducedMotion || prefersReducedMotion()) return
+    const minX = skyMesh.position.x - cloudLimit
+    const maxX = skyMesh.position.x + cloudLimit
+    for (const c of cloudPuffs) {
+      c.x += c.speed * dt
+      if (c.x > maxX) c.x = minX
+    }
+    writeClouds()
   }
 
   function dispose() {
@@ -596,35 +712,8 @@ export function createScenery(scene: THREE.Scene): SceneryController {
     skyGeo.dispose()
     skyMat.dispose()
     skyTex.dispose()
-    trunkGeo.dispose()
-    pineBotGeo.dispose()
-    pineMidGeo.dispose()
-    pineTopGeo.dispose()
-    canopyGeo.dispose()
-    shrubGeo.dispose()
-    blossomGeo.dispose()
-    rockGeo.dispose()
-    cloudPuffGeo.dispose()
-    pondGeo.dispose()
-    reedGeo.dispose()
-    postGeo.dispose()
-    railGeo.dispose()
-    materials.ground.dispose()
-    materials.trunk.dispose()
-    materials.pineA.dispose()
-    materials.pineB.dispose()
-    materials.pineC.dispose()
-    materials.oakA.dispose()
-    materials.oakB.dispose()
-    materials.shrub.dispose()
-    materials.rock.dispose()
-    materials.rockWarm.dispose()
-    materials.pond.dispose()
-    materials.pondEdge.dispose()
-    materials.reed.dispose()
-    materials.wood.dispose()
-    materials.cloud.dispose()
-    for (const f of materials.flowers) f.dispose()
+    for (const g of Object.values(geos)) g.dispose()
+    for (const m of Object.values(mats)) m.dispose()
     scene.remove(root)
   }
 

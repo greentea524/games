@@ -174,7 +174,7 @@ async function run() {
     `hole 2 aim ${angle(next.aim).toFixed(2)}, one tap moved it ${step.toFixed(3)}`,
   )
   await page.evaluate(() => window.__game.goTo(0))
-  await hand.settle()
+  await settle(page)
 
   // ------------------------------------------------------------ the drag
 
