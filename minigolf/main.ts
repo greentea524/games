@@ -20,7 +20,7 @@ if (!parent) throw new Error('#stage is missing from the page')
 const game = createGame(parent)
 exposeForQA(game)
 preventZoomGestures()
-createHud(game)
+const hud = createHud(game)
 
 game.onChange(() => {
   if (game.phase() === 'card') {
@@ -134,6 +134,8 @@ function turnAim(by: number) {
 }
 
 window.addEventListener('keydown', (e) => {
+  // Nothing turns or putts behind the how-to-play panel.
+  if (hud.helpOpen()) return
   const left = e.code === 'ArrowLeft' || e.code === 'KeyA'
   const right = e.code === 'ArrowRight' || e.code === 'KeyD'
   if (left || right) {

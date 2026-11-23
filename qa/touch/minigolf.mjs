@@ -11,7 +11,7 @@
 // the reason #113's original design was rewritten — it specified a charging
 // meter on a d-pad, which went with the GameBoy shell — so it is the thing
 // most worth driving with an actual finger.
-import { launchTouch, canvasPoint, gameUrl, checker, PAD } from './driver.mjs'
+import { launchTouch, canvasPoint, centreOf, gameUrl, checker, PAD } from './driver.mjs'
 
 const { check, finish } = checker()
 
@@ -106,6 +106,63 @@ async function run() {
   check('the game opens on the first hole', opening.hole === 0, opening.name)
   check('with no strokes taken', opening.strokes === 0 && opening.phase === 'aiming')
   check('and the ball is ready to be struck', opening.canPutt)
+
+  // ------------------------------------------------------------ how to play
+  //
+  // A button opens the instructions over the course. While they are open a
+  // drag on them is not a putt, and Space does not charge behind them.
+
+  const helpShown = () => page.evaluate(() => {
+    const h = document.querySelector('.mg-help')
+    return { open: !!h && !h.hidden && getComputedStyle(h).display !== 'none', headings: [...document.querySelectorAll('.mg-help-heading')].map((n) => n.textContent) }
+  })
+  const helpBtn = await centreOf(page, '.mg-help-btn')
+  await hand.tap(PAD, helpBtn.x, helpBtn.y)
+  await hand.settle()
+  const opened = await helpShown()
+  check(
+    'the How to play button opens the instructions, touch and keyboard both',
+    opened.open && opened.headings.some((h) => /touch/i.test(h)) && opened.headings.some((h) => /keyboard/i.test(h)),
+    opened.headings.join(' / '),
+  )
+  // On the card itself: a press on the dimmed course round it closes them.
+  const under = await centreOf(page, '.mg-help-card')
+  await hand.down(PAD, under.x, under.y)
+  await hand.move(PAD, under.x, under.y + 120)
+  await hand.settle()
+  await hand.up(PAD)
+  await hand.settle()
+  const dragged = await state(page)
+  check('and a drag on them is not a putt', dragged.strokes === 0 && dragged.aim.power === 0 && (await helpShown()).open,
+    `strokes ${dragged.strokes}, power ${dragged.aim.power.toFixed(2)}`)
+  const close = await centreOf(page, '.mg-help-close')
+  await hand.tap(PAD, close.x, close.y)
+  await hand.settle()
+  check('and Got it closes them', !(await helpShown()).open)
+
+  // From the keyboard: H opens them with Got it focused, so Space closes them
+  // rather than charging a putt behind them; and the next Space is a putt,
+  // not a press of a button that kept the focus.
+  const spaceFor = async (ms) => {
+    await page.keyboard.down('Space')
+    await page.waitForTimeout(ms)
+    await page.keyboard.up('Space')
+    await hand.settle()
+  }
+  await page.keyboard.press('KeyH')
+  await hand.settle()
+  const byKey = (await helpShown()).open
+  await spaceFor(400)
+  const shut = await state(page)
+  check('H opens them, and Space then closes them without a putt',
+    byKey && !(await helpShown()).open && shut.strokes === 0 && shut.aim.power === 0, `strokes ${shut.strokes}`)
+  await spaceFor(400)
+  await settle(page)
+  const after = await state(page)
+  check('and the next Space putts, and does not open them again',
+    after.strokes === 1 && !(await helpShown()).open, `strokes ${after.strokes}`)
+  await page.evaluate(() => window.__game.goTo(0))
+  await hand.settle()
 
   // ------------------------------------------------------------ the keyboard
   //

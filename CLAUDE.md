@@ -262,6 +262,19 @@ in the frame loop, and a first press also steps a little, so a tap shorter
 than a frame still turns. The touch suite counts the preview's cream pixels
 on screen, and all three of its keyboard checks fail on the old code.
 
+**Minigolf has a How to play panel.** A button under the way back opens it, and
+so does H. It covers the aim, touch and keyboard putting, the rules and the
+names of scores, from `HOW_TO_PLAY` in `hud.ts`. It does not open by itself,
+so the hub capture and every check see the course as before. While it is
+open it takes pointer events (`data-interactive`), and the keyboard handler in
+`main.ts` returns early, so nothing is played behind it. Focus is let go when
+it closes, not handed back to the button, because Space is the putt: on a
+focused button it pressed the button and opened the panel again. The touch
+suite drives it by tap and by key, and the drag check fails without the
+pointer blocking. On a phone the first draft was taller than the screen and
+the centred card lost its title above the top. The card now scrolls from its
+top when it does not fit, and the text was cut to fit a 390-by-844 phone.
+
 **Anomaly Room's models live inside their boxes, and a tap hits only what is
 drawn (#147).** The round picker decides what is out of view, shadow included,
 from each candidate's box in `room.ts`. So the models in `models.ts` are
