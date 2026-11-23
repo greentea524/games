@@ -92,9 +92,17 @@ setupDpad({ dispatch: (type, code) => dispatchKey(code, type) })
 const togglePalette = (e?: Event) => {
   if (e) e.preventDefault()
   GameState.setPaletteMode(GameState.paletteMode === 'gbc' ? 'dmg' : 'gbc')
+  // Whichever screen is showing takes the new palette (#170). The title and
+  // the pause panel are built in one palette, so they are built again; the
+  // level is recoloured in place, paused or not, so it is right behind the
+  // pause panel and when play resumes. Only the level was handled before,
+  // and only while running, as Static's switch once was (#181).
   const scene = game.scene.getScene('platformer') as PlatformerScene
-  if (scene && scene.sys.isActive()) {
+  if (scene && (scene.sys.isActive() || scene.sys.isPaused())) {
     scene.reloadPalette()
+  }
+  for (const key of ['mainmenu', 'pause']) {
+    if (game.scene.isActive(key)) game.scene.getScene(key).scene.restart()
   }
 }
 

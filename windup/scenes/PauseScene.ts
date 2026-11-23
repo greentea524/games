@@ -1,5 +1,9 @@
 import Phaser from 'phaser'
-import { WORLD_WIDTH as GBC_WIDTH, WORLD_HEIGHT as GBC_HEIGHT, FONT, CSS_LIGHTEST, CSS_DARKEST, CSS_MID, CSS_LIGHT, VIEW_ZOOM } from '../constants'
+import { FONT } from '../constants'
+import { HUD_THEME, SCREEN_W, SCREEN_H } from '../hud'
+import { pauseLayout } from '../screens'
+
+const css = (c: number) => `#${c.toString(16).padStart(6, '0')}`
 import { GameState } from '../state'
 import { sfx, isMuted, setMuted } from '../audio'
 
@@ -15,35 +19,34 @@ export class PauseScene extends Phaser.Scene {
     super('pause')
   }
 
-  create() {
-    // Still laid out for 160×144, and shown enlarged from the top left by
-    // the play camera's factor (#166). The later tickets lay it out anew.
-    this.cameras.main.setOrigin(0, 0).setZoom(VIEW_ZOOM)
-    // Semi-transparent overlay
-    this.add.rectangle(0, 0, GBC_WIDTH, GBC_HEIGHT, 0x000000, 0.7).setOrigin(0, 0)
+  private layout!: ReturnType<typeof pauseLayout>
 
-    // Title
-    this.add.text(GBC_WIDTH / 2, 40, 'PAUSED', {
+  create() {
+    // On the real screen since #170, in the HUD's panel and colours.
+    const theme = HUD_THEME[GameState.paletteMode]
+    this.cameras.main.setOrigin(0, 0).setZoom(1)
+    this.selectedIndex = 0
+    this.layout = pauseLayout(this.menuItems.map((m) => this.labelFor(m)).concat('SOUND: OFF'))
+    const l = this.layout
+    // The level dimmed behind, and the panel over it.
+    this.add.rectangle(0, 0, SCREEN_W, SCREEN_H, theme.panel, 0.7).setOrigin(0, 0)
+    this.add.rectangle(l.panel.x, l.panel.y, l.panel.width, l.panel.height, theme.panel, 1).setOrigin(0).setStrokeStyle(1, theme.frame)
+
+    this.add.text(l.heading.x, l.heading.y, 'PAUSED', {
       fontFamily: FONT,
       fontSize: '16px',
-      color: GameState.paletteMode === 'dmg' ? CSS_LIGHTEST : '#ffffff',
+      color: css(theme.seg.full),
       resolution: 2,
-    }).setOrigin(0.5).setShadow(1, 1, CSS_DARKEST, 0, false, true)
+    }).setOrigin(0.5, 0)
 
-    // Menu Items
-    const startY = 80
-    this.menuTexts = []
-    this.menuItems.forEach((item, index) => {
-      const txt = this.add.text(GBC_WIDTH / 2, startY + index * 16, this.labelFor(item), {
+    this.menuTexts = this.menuItems.map((item, index) =>
+      this.add.text(l.items[index].x, l.items[index].y, this.labelFor(item), {
         fontFamily: FONT,
         fontSize: '8px',
-        color: CSS_MID,
         resolution: 2,
-      }).setOrigin(0.5)
-      this.menuTexts.push(txt)
-    })
+      }),
+    )
 
-    // Cursor
     this.cursorGfx = this.add.graphics()
     this.updateSelection()
 
@@ -78,17 +81,12 @@ export class PauseScene extends Phaser.Scene {
   }
 
   private updateSelection() {
-    this.menuTexts.forEach((txt, i) => {
-      txt.setColor(i === this.selectedIndex ? CSS_LIGHTEST : CSS_MID)
-    })
-
-    const targetTxt = this.menuTexts[this.selectedIndex]
+    const theme = HUD_THEME[GameState.paletteMode]
+    this.menuTexts.forEach((txt, i) => txt.setColor(css(i === this.selectedIndex ? theme.text : theme.dim)))
+    const c = this.layout.items[this.selectedIndex].cursor
     this.cursorGfx.clear()
-    this.cursorGfx.fillStyle(Phaser.Display.Color.HexStringToColor(CSS_LIGHT).color)
-    // Draw a small triangle cursor
-    const cx = targetTxt.x - targetTxt.width / 2 - 8
-    const cy = targetTxt.y
-    this.cursorGfx.fillTriangle(cx - 3, cy - 3, cx + 3, cy, cx - 3, cy + 3)
+    this.cursorGfx.fillStyle(theme.seg.full, 1)
+    this.cursorGfx.fillTriangle(c.x - 4, c.y - 4, c.x - 4, c.y + 4, c.x, c.y)
   }
 
   private handleSelection() {

@@ -250,6 +250,18 @@ work found that `REST_TIME`'s derivation used a sliding block's acceleration
 and the wrong threshold, so its "2.2× margin" was 1.6×. It now uses a rolling
 sphere's 5/7 g·sinθ, against `STILL_SPEED`.
 
+**Minigolf's keyboard turns the game's own aim, and shows it (#184).** The
+arrow keys used to turn an aim that was drawn only once Space gave it power,
+so a keyboard player aimed blind. The angle was also kept in `main.ts` apart
+from the game's aim, so it drifted from what was drawn. It is read from
+`game.aim()` now, and `previewAim` shows the direction as a short pale shaft
+before any power. The game points the aim at the cup on a new hole, a re-tee
+and a ball come to rest; after a stroke it used to keep the old stroke's
+direction while the camera turned to face the cup. Held arrows turn smoothly
+in the frame loop, and a first press also steps a little, so a tap shorter
+than a frame still turns. The touch suite counts the preview's cream pixels
+on screen, and all three of its keyboard checks fail on the old code.
+
 **Anomaly Room's models live inside their boxes, and a tap hits only what is
 drawn (#147).** The round picker decides what is out of view, shadow included,
 from each candidate's box in `room.ts`. So the models in `models.ts` are
@@ -776,6 +788,29 @@ moves to the next clear place, as Static's minimap does.
 - **The portrait has no outline now.** It sits on the panel, which on the
   green screen is the outline's own tone. `qa:contrast` scores the HUD as a
   named surface and counted 37 pixels of the head lost into it.
+
+**Windup's title, info pages, pause panel and run summary are on the real
+screen (#170).** `screens.ts` lays them out at 240×216 in the HUD's panels
+and colours, and `screens_test.ts` holds the same boxes. The title stands in
+the factory: its backdrop behind, a ledge of mossy stone, and the toy beside
+a station at twice play size. The run summary is drawn on the HUD's scene,
+because the play camera magnified it by 1.5. The HUD's panels step out while
+the summary is up.
+
+- **The palette switch reaches every screen.** It reached only a running
+  level, so the title kept its colours until play began, and a paused level
+  stayed in the old palette behind the pause panel. The title and pause
+  restart now, and a paused level is recoloured in place. A touch check
+  holds the title to no colour art after the switch, and fails without the
+  restart.
+- **`screens_test.ts` found the desktop's controls page running 14 pixels
+  into the ledge.** Its sound line wrapped to a tenth line; it is 26
+  characters now. The pages wrapped for the old screen are the control.
+- **The key follows the toy between levels.** `update` returns early while
+  a level ends, and the key stayed where the toy had last walked.
+
+All 32 levels were looked at in both palettes for this ticket, and nothing
+in the art left a platform edge or a hazard unclear.
 
 **The band between the bezel and the picture is gone (#177).** `#game` had 15
 pixels of dark green padding. Three games' canvases used to overflow and cover

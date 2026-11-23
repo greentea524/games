@@ -96,44 +96,53 @@ canvas.addEventListener('lostpointercapture', endDrag)
 
 // ------------------------------------------------------------- the keyboard
 //
-// The equivalent path, not the primary one: rotate the aim with left/right,
+// The equivalent path, not the primary one: turn the aim with left/right,
 // hold space to charge, release to putt.
+//
+// The angle is read from the game's own aim every time, never kept here
+// (#184). It was a variable of its own, synced to the camera when a hole or a
+// stroke began, so it drifted from the aim the game was drawing: turned on one
+// hole, it fired at the old angle on the next, and after a stroke the first
+// press jumped the aim. The game points the aim at the cup at every new hole,
+// re-tee and rest, and this follows it.
 
-let aimAngle = Math.PI // pointing along the camera's forward direction
+/** Turning speed while an arrow is held, in radians a second. */
+const TURN_RATE = 1.6
+/** One tap's turn, for a press too short to span a frame. */
+const TAP_TURN = 0.03
+const CHARGE_TIME = 900
+
 let charging = false
 let chargeStart = 0
-const CHARGE_TIME = 900
-let lastPhase = game.phase()
-let lastHole = game.hole()
+/** Which arrows are held down. */
+const held = { left: false, right: false }
 
-function syncKeyboardAim() {
-  const { forwardX, forwardZ } = game.cameraBasis()
-  aimAngle = Math.atan2(forwardX, forwardZ)
+const aimAngle = () => {
+  const a = game.aim()
+  return Math.atan2(a.x, a.z)
 }
 
-game.onChange(() => {
-  const p = game.phase()
-  const h = game.hole()
-  if ((p === 'aiming' && lastPhase !== 'aiming') || h !== lastHole) {
-    syncKeyboardAim()
-  }
-  lastPhase = p
-  lastHole = h
-})
-syncKeyboardAim()
-
-function applyKeyboardAim(power: number) {
-  game.setAim(Math.sin(aimAngle), Math.cos(aimAngle), power)
+/**
+ * Turns the aim by `by` radians, showing its direction (left is positive).
+ * Not gated on the ball being at rest: just after a hole loads it is still
+ * settling onto the tee, and a turn then is harmless. `previewAim` ignores
+ * anything but the aiming phase.
+ */
+function turnAim(by: number) {
+  const angle = aimAngle() + by
+  game.previewAim(Math.sin(angle), Math.cos(angle))
 }
 
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
-    aimAngle += 0.08
-    applyKeyboardAim(game.aim().power)
-    e.preventDefault()
-  } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
-    aimAngle -= 0.08
-    applyKeyboardAim(game.aim().power)
+  const left = e.code === 'ArrowLeft' || e.code === 'KeyA'
+  const right = e.code === 'ArrowRight' || e.code === 'KeyD'
+  if (left || right) {
+    // Held keys turn in the frame loop below, smoothly, rather than in steps
+    // at the system's key-repeat rate. A first press also turns a little at
+    // once, so a tap shorter than a frame still does something.
+    if (!e.repeat) turnAim(left ? TAP_TURN : -TAP_TURN)
+    if (left) held.left = true
+    else held.right = true
     e.preventDefault()
   } else if (e.code === 'KeyV') {
     game.toggleView()
@@ -146,29 +155,44 @@ window.addEventListener('keydown', (e) => {
 })
 
 window.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') held.left = false
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') held.right = false
   if (e.code !== 'Space' || !charging) return
   charging = false
   e.preventDefault()
   if (game.aim().power >= MIN_POWER) game.strike()
-  else game.cancelAim()
+  else {
+    // Too short to be a stroke: a cancel, and the direction stays on show.
+    game.cancelAim()
+    const a = game.aim()
+    game.previewAim(a.x, a.z)
+  }
 })
 
 // The charge has to be sampled, not computed on release: the aim indicator
 // grows while the key is held, which is the whole feedback the keyboard path
-// gives.
-function pollCharge() {
+// gives. Held arrows turn the aim here too, by the time since the last frame.
+let lastFrame = performance.now()
+function pollKeys(now: number) {
+  const dt = Math.min(0.05, (now - lastFrame) / 1000)
+  lastFrame = now
+  const turn = (held.left ? 1 : 0) - (held.right ? 1 : 0)
+  if (turn !== 0) turnAim(turn * TURN_RATE * dt)
   if (charging) {
     // Ping-pong, so overshooting the power you wanted is recoverable by
     // holding rather than by releasing and starting again.
-    const t = ((performance.now() - chargeStart) % (CHARGE_TIME * 2)) / CHARGE_TIME
-    applyKeyboardAim(t <= 1 ? t : 2 - t)
+    const t = ((now - chargeStart) % (CHARGE_TIME * 2)) / CHARGE_TIME
+    const a = game.aim()
+    game.setAim(a.x, a.z, t <= 1 ? t : 2 - t)
   }
-  requestAnimationFrame(pollCharge)
+  requestAnimationFrame(pollKeys)
 }
-requestAnimationFrame(pollCharge)
+requestAnimationFrame(pollKeys)
 
 window.addEventListener('blur', () => {
   charging = false
+  held.left = false
+  held.right = false
   dragId = null
   game.cancelAim()
 })
