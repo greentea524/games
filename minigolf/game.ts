@@ -14,11 +14,13 @@ import {
 } from './physics'
 import type { Hole } from './holes'
 import { createGrassMaterials, createGreenGeometry } from './grass'
+import { createScenery, SKY_HORIZON_COLOR } from './scenery'
+import { createConfetti } from './confetti'
 import { prefersReducedMotion } from '../shared/motion'
 import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
 
 const COLOURS = {
-  background: 0x0d1a14,
+  background: SKY_HORIZON_COLOR,
   wall: 0xc9d6cd,
   cup: 0x101a14,
   flag: 0xe4573d,
@@ -105,7 +107,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   const key = new THREE.DirectionalLight(0xfffdf6, lambertIntensity(0.85))
   key.position.set(5, 14, 6)
   key.castShadow = true
-  key.shadow.mapSize.set(1024, 1024)
+  key.shadow.mapSize.set(2048, 2048)
   key.shadow.bias = -0.0004
   key.shadow.normalBias = 0.02
   scene.add(key)
@@ -113,6 +115,9 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   const fill = new THREE.DirectionalLight(0xbfe3ff, lambertIntensity(0.3))
   fill.position.set(-8, 5, -7)
   scene.add(fill)
+
+  const scenery = createScenery(scene)
+  const confetti = createConfetti(scene)
 
   const course = new THREE.Group()
   scene.add(course)
@@ -192,21 +197,21 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       built.push(mesh)
     }
 
-    // Fit the directional shadow frustum tightly around the current hole so
-    // shadows cast onto the turf stay crisp on every layout.
+    // Fit the directional shadow frustum around the current hole and nearby
+    // perimeter trees so shadows on the turf and meadow stay crisp.
     const bounds = new THREE.Box3()
     for (const c of holeCorners()) bounds.expandByPoint(c)
     const center = bounds.getCenter(new THREE.Vector3())
     const size = bounds.getSize(new THREE.Vector3())
-    const halfSpan = Math.max(size.x, size.z) * 0.65 + 2
+    const halfSpan = Math.max(size.x, size.z) * 0.75 + 7
     key.target.position.copy(center)
-    key.position.set(center.x + 5, center.y + 14, center.z + 6)
+    key.position.set(center.x + 7, center.y + 18, center.z + 8)
     key.shadow.camera.left = -halfSpan
     key.shadow.camera.right = halfSpan
     key.shadow.camera.top = halfSpan
     key.shadow.camera.bottom = -halfSpan
     key.shadow.camera.near = 2
-    key.shadow.camera.far = 40
+    key.shadow.camera.far = 55
     key.shadow.camera.updateProjectionMatrix()
 
     // A trimmed turf collar sits around the dark cup disc so the hole reads as
@@ -413,11 +418,11 @@ export function createGame(parent: HTMLElement): MinigolfGame {
         const fx = Math.sin(camYaw)
         const fz = Math.cos(camYaw)
         desiredPos.set(
-          hole.cup.x - fx * 3.4 * aspectScale,
+          hole.cup.x - fx * 3.9 * aspectScale,
           hole.cup.y + 2.5 * aspectScale,
-          hole.cup.z - fz * 3.4 * aspectScale,
+          hole.cup.z - fz * 3.9 * aspectScale,
         )
-        desiredLook.set(hole.cup.x, hole.cup.y + 0.35, hole.cup.z)
+        desiredLook.set(hole.cup.x, hole.cup.y + 0.72, hole.cup.z)
       } else {
         const targetYaw = angleToCup(bx, bz)
         if (immediate) {
@@ -474,6 +479,8 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     hole = COURSE[holeIndex]
     sim = createSim(hole)
     buildHole()
+    scenery.rebuild(hole, holeIndex)
+    confetti.clear()
     viewMode = 'follow'
     computeOverviewFrame()
     camYaw = angleToCup(sim.ball.position.x, sim.ball.position.z)
@@ -483,6 +490,7 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     aimPower = 0
     holedFor = 0
     phase = 'aiming'
+    ballMesh.visible = true
     updateCamera(0, true)
     ready = true
     notify()
@@ -512,6 +520,8 @@ export function createGame(parent: HTMLElement): MinigolfGame {
         phase = 'holed'
         scores[holeIndex] = strokes
         holedFor = 0
+        ballMesh.visible = false
+        confetti.burst(hole.cup.x, hole.cup.y, hole.cup.z)
         notify()
       } else if (phase === 'rolling' && sim.atRest()) {
         // The gate #113 asks for. Until the detector says the ball has
@@ -551,6 +561,8 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       material.color.setHex(aimPower > 0.75 ? COLOURS.aimStrong : COLOURS.aim)
     }
 
+    scenery.update(dt, prefersReducedMotion())
+    confetti.update(dt)
     updateCamera(dt)
 
     stage.render(scene, camera)
@@ -618,6 +630,8 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     dispose() {
       running = false
       for (const mesh of built) mesh.geometry.dispose()
+      scenery.dispose()
+      confetti.dispose()
       grass.dispose()
       wallMaterial.dispose()
       stage.dispose()

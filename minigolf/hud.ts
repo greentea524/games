@@ -81,6 +81,7 @@ export function createHud(game: MinigolfGame): void {
     waiting.hidden = phase !== 'rolling' || game.canPutt()
 
     panel.hidden = phase !== 'holed' && phase !== 'card'
+    panel.classList.toggle('mg-panel--holed', phase === 'holed')
     cardList.replaceChildren()
 
     if (phase === 'holed') {

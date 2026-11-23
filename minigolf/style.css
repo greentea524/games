@@ -61,9 +61,15 @@
   color: #9ec9b3;
   padding: 4px 12px;
   border-radius: 10px;
-  background: rgba(8, 20, 15, 0.6);
+  background: rgba(8, 20, 15, 0.68);
 }
-.mg-waiting { color: #d9c27a; bottom: 52px; }
+.mg-waiting {
+  color: #f3dc8b;
+  bottom: 52px;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: rgba(8, 20, 15, 0.68);
+}
 
 .mg-btn {
   pointer-events: auto;
@@ -91,6 +97,19 @@
   background: rgba(6, 14, 11, 0.74);
   backdrop-filter: blur(3px);
   text-align: center;
+}
+/* Keep the cup and confetti fountain unobstructed in the centre of the screen
+   when a hole is sunk — only the final scorecard takes over the whole frame. */
+.mg-panel.mg-panel--holed {
+  inset: auto auto 26px 50%;
+  transform: translateX(-50%);
+  min-width: min(86vw, 310px);
+  padding: 16px 26px;
+  gap: 6px;
+  border-radius: 18px;
+  background: rgba(7, 18, 13, 0.78);
+  border: 1px solid rgba(232, 241, 236, 0.2);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
 }
 .mg-panel-title { margin: 0; font-size: clamp(1.6rem, 6vw, 2.4rem); font-weight: 700; }
 .mg-panel-body { margin: 0 0 6px; color: #9ec9b3; }
