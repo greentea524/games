@@ -176,6 +176,16 @@ export function createHud(game: AnomalyGame, audio: RoomAudio, hooks: HudHooks):
 
   }
 
+  // A button clicked with a pointer lets go of focus (#185). Space and Enter
+  // are the room's keys, and a button left focused took them for itself:
+  // after Mouse look, Space on a round's panel asked for mouse look again.
+  // A click the keyboard made has a `detail` of 0 and keeps focus, so a
+  // player moving with Tab keeps their place.
+  overlay.addEventListener('click', (e) => {
+    if (e.detail === 0) return
+    ;(e.target as HTMLElement).closest?.('button')?.blur()
+  })
+
   game.onChange(refresh)
   document.addEventListener('pointerlockchange', refresh)
   refresh()

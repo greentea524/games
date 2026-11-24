@@ -303,6 +303,30 @@ parented to its model. It is taken out of raycasting: a line has a wide hit
 area, and an outline left in would be chosen in place of the wall behind it.
 `anomaly_test.ts` keeps a frame with raycasting left on as its control.
 
+**Anomaly Room plays from end to end on the keyboard, and Mouse look lets go
+at a panel (#185).** Space and Enter now do what a panel's button does:
+'right' and 'wrong' go on, 'won' and 'over' start again. They are ignored
+on a key repeat, so a held key does not run through the panels. Leaving
+'study' or 'looking' releases pointer lock; it kept the cursor hidden and
+every click on the canvas, so a panel's button could not be pressed without
+Esc. The arrow keys no longer turn the room behind a panel. Two traps came
+with it:
+
+- **A focused button takes Space and Enter for itself.** The room's key
+  handler leaves keys on a button to the button, or one press would act
+  twice. So a HUD button clicked with a pointer lets go of focus; left on
+  Mouse look, the next Space asked for mouse look again instead of going on.
+  A click the keyboard made has `detail` 0 and keeps focus, for Tab users.
+- **Do not focus a panel's button as it opens.** That was tried. The panel
+  opens on the Space key-down that flagged, so the key-up then pressed the
+  newly focused button, and one press flagged and dismissed together.
+
+The touch suite's desktop run plays a run by keyboard and clicks under real
+pointer lock, which this headless browser grants. It clicks where the mouse
+already is: moving there first is a movement under the lock and turns the
+head off the target. Every new check after the first two fails on the old
+code.
+
 **Voxel Digger's tap drills, and a check must play from the angle a player
 does (#151, #152).** #151 widened the dig to a 3×3 patch and was verified by a
 player who looked straight down every shaft. From the angle the game opens at,
