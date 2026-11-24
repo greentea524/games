@@ -28,6 +28,7 @@ import {
 } from './physics'
 import { LEVELS, type Cell } from './levels'
 import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
+import { fitDistance, reachableCorners, FOV, VIEW_DIR } from './framing'
 
 const COLOURS = {
   background: 0x0b0f14,
@@ -38,8 +39,6 @@ const COLOURS = {
   ball: 0xffc94a,
 }
 
-/** How far the camera sits from the board, as a multiple of its longest side. */
-const CAMERA_REACH = 1.15
 
 export type Phase = 'playing' | 'won' | 'complete'
 
@@ -72,15 +71,25 @@ export interface TiltGame {
   /** Jump to a level. Used by the QA suite and the thumbnail hook. */
   goTo(index: number): void
   onChange(fn: () => void): void
+  /**
+   * Where the real camera puts every corner the board can reach, in
+   * normalised device coordinates (#186). For checks: the framing is worked
+   * out by `framing.ts`'s own projection, and this is three's.
+   */
+  cornersOnScreen(): { x: number; y: number }[]
   dispose(): void
 }
 
 export function createGame(parent: HTMLElement): TiltGame {
-  const stage = createStage3D({ parent, background: COLOURS.background })
+  // Reframed whenever the canvas changes shape (#186): a phone turned on its
+  // side, or a window resized, kept the framing of the shape it loaded in.
+  // The first resize comes before a board exists, so it is let pass.
+  let framed = false
+  const stage = createStage3D({ parent, background: COLOURS.background, onResize: () => framed && frameCamera() })
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(COLOURS.background)
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200)
+  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 400)
   stage.track(camera)
 
   // Intensities are the brightness wanted in the image; `lambertIntensity`
@@ -168,13 +177,17 @@ export function createGame(parent: HTMLElement): TiltGame {
     }
   }
 
-  /** Frames the whole board, whatever its size. */
+  /**
+   * Frames the whole board, leaned any way it can be, on the canvas as it is
+   * now (#186): `fitDistance` in `framing.ts` finds how far back that is.
+   */
   function frameCamera() {
-    const wide = grid[0].length * CELL
-    const deep = grid.length * CELL
-    const reach = Math.max(wide, deep) * CAMERA_REACH
-    camera.position.set(0, reach * 0.95, reach * 0.75)
+    const { width, height } = stage.size()
+    const distance = fitDistance(grid[0].length, grid.length, width, height)
+    const length = Math.hypot(VIEW_DIR.x, VIEW_DIR.y, VIEW_DIR.z)
+    camera.position.set((VIEW_DIR.x / length) * distance, (VIEW_DIR.y / length) * distance, (VIEW_DIR.z / length) * distance)
     camera.lookAt(0, 0, 0)
+    framed = true
   }
 
   function load(index: number) {
@@ -285,6 +298,13 @@ export function createGame(parent: HTMLElement): TiltGame {
     restart: () => load(levelIndex),
     goTo: (index) => load(index),
     onChange: (fn) => void listeners.push(fn),
+    cornersOnScreen() {
+      camera.updateMatrixWorld()
+      return reachableCorners(grid[0].length, grid.length).map((c) => {
+        const v = new THREE.Vector3(c.x, c.y, c.z).project(camera)
+        return { x: v.x, y: v.y }
+      })
+    },
     dispose() {
       running = false
       stage.dispose()
