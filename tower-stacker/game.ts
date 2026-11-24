@@ -23,6 +23,7 @@ import {
 } from './stack'
 import { OUTLINE, SKY } from './constants'
 import { HALF_HEIGHT, HALF_WIDTH, VIEW_DIR, frustumFor } from './framing'
+import { createTowerScenery } from './scenery'
 import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
 import { type Screen } from './hud'
 import { loadTowerSave, recordRun } from './save'
@@ -155,6 +156,7 @@ export interface TowerGame {
   shake(): number
   /** Start, or retry from the end screen. */
   press(): void
+  dispose(): void
   stage: Stage3D
   onChange(fn: () => void): void
 }
@@ -199,46 +201,11 @@ export function createGame(parent: HTMLElement): TowerGame {
   scene.add(light)
   scene.add(new THREE.AmbientLight(0xffffff, lambertIntensity(AMBIENT)))
 
-  /**
-   * The star field, as points in the world rather than pixels in the HUD.
-   *
-   * In the GameBoy build this was drawn into the 2D HUD surface and scrolled
-   * by hand against the camera height, which meant the field had to be told
-   * how far the run had come. In the scene it simply is where it is, and the
-   * camera rising through it is the parallax — one fewer thing that can drift
-   * out of step with the tower.
-   *
-   * Deterministic rather than random, for the reason it always was: a field
-   * that reshuffles on every retry reads as noise, and climbing past a field
-   * you recognise is what makes the height legible.
-   */
-  const STAR_COUNT = 320
-  const STAR_SPREAD = 26
-  const STAR_TOP = 180
-  const starPositions = new Float32Array(STAR_COUNT * 3)
-  for (let i = 0; i < STAR_COUNT; i++) {
-    // A cheap hash of the index, so the layout is stable across reloads
-    // without shipping a table of coordinates.
-    const a = Math.sin(i * 12.9898) * 43758.5453
-    const b = Math.sin(i * 78.233) * 12345.6789
-    const c = Math.sin(i * 39.4251) * 24634.6345
-    const frac = (n: number) => n - Math.floor(n)
-    starPositions[i * 3] = (frac(a) - 0.5) * STAR_SPREAD * 2
-    starPositions[i * 3 + 1] = frac(b) * STAR_TOP - 8
-    // Pushed behind the tower. The far plane is 120 from the camera and the
-    // camera sits 24 back, so anything much deeper than this is clipped away.
-    starPositions[i * 3 + 2] = (frac(c) - 0.5) * STAR_SPREAD * 2 - 20
-  }
-  const starGeometry = new THREE.BufferGeometry()
-  starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
-  const stars = new THREE.Points(
-    starGeometry,
-    // `sizeAttenuation` off: under an orthographic camera there is no
-    // perspective for it to work with, and leaving it on renders every star at
-    // a size derived from a division that means nothing here.
-    new THREE.PointsMaterial({ color: 0x4a5f80, size: 2, sizeAttenuation: false }),
-  )
-  scene.add(stars)
+  // Altitude-layered scenery (#187): pedestal, twilight city skyline, drifting
+  // night clouds, crescent moon, upper-atmosphere aurora, ringed planet, and
+  // deterministic multi-tier starfield — all positioned in world space so the
+  // rising orthographic camera provides natural vertical parallax.
+  const scenery = createTowerScenery(scene)
 
   // One geometry for every block. A unit box scaled per mesh costs one
   // buffer instead of one per slab, which matters on a tower that can run to
@@ -529,10 +496,12 @@ export function createGame(parent: HTMLElement): TowerGame {
   // ---------------------------------------------------------------- the loop
 
   let last = performance.now()
+  let running = true
   /** Reused every frame; a fresh Vector3 at 60Hz is pure GC churn. */
   const lookTarget = new THREE.Vector3()
 
   function frame(now: number) {
+    if (!running) return
     // Clamped: a backgrounded tab hands back a delta of seconds, and an
     // unclamped one would teleport the sliding block across its whole travel
     // between two frames — the player would return to a run already lost.
@@ -586,11 +555,7 @@ export function createGame(parent: HTMLElement): TowerGame {
     camera.position.copy(lookTarget).add(viewOffset)
     camera.lookAt(lookTarget)
 
-    // The star field parallaxes because it is *in* the scene rather than
-    // painted behind it: the camera rises through it, so the sense of climbing
-    // costs nothing to keep in step with the tower. In the GameBoy build this
-    // was scrolled by hand in HUD space against `cameraY`, which had to be
-    // told how far the run had come.
+    scenery.update(dt, cameraY, elapsed)
     stage.render(scene, camera)
 
     requestAnimationFrame(frame)
@@ -613,6 +578,15 @@ export function createGame(parent: HTMLElement): TowerGame {
     clock: () => elapsed,
     shake: () => shake,
     press,
+    dispose() {
+      running = false
+      clearScene()
+      scenery.dispose()
+      unitBox.dispose()
+      unitEdges.dispose()
+      edgeMaterial.dispose()
+      stage.dispose()
+    },
     stage,
     onChange(fn) {
       listeners.push(fn)
