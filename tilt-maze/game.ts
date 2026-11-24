@@ -29,9 +29,10 @@ import {
 import { LEVELS, type Cell } from './levels'
 import { createStage3D, lambertIntensity, type Stage3D } from '../shared/stage3d'
 import { fitDistance, reachableCorners, FOV, VIEW_DIR } from './framing'
+import { createTiltScenery, DESK_BG_COLOR } from './scenery'
 
 const COLOURS = {
-  background: 0x0b0f14,
+  background: DESK_BG_COLOR,
   floor: 0x53627a,
   floorAlt: 0x45536a,
   wall: 0x8496ae,
@@ -89,6 +90,9 @@ export function createGame(parent: HTMLElement): TiltGame {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(COLOURS.background)
 
+  stage.renderer.shadowMap.enabled = true
+  stage.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 400)
   stage.track(camera)
 
@@ -96,14 +100,20 @@ export function createGame(parent: HTMLElement): TiltGame {
   // carries the 1/PI factor three's Lambert BRDF applies. Without it the whole
   // board renders at a third of this and reads as unlit.
   scene.add(new THREE.AmbientLight(0xffffff, lambertIntensity(0.55)))
-  const key = new THREE.DirectionalLight(0xffffff, lambertIntensity(0.9))
-  key.position.set(6, 12, 5)
+  const key = new THREE.DirectionalLight(0xfff7eb, lambertIntensity(0.9))
+  key.position.set(6, 14, 5)
+  key.castShadow = true
+  key.shadow.mapSize.set(1024, 1024)
+  key.shadow.bias = -0.0004
+  key.shadow.normalBias = 0.02
   scene.add(key)
   // A cool bounce from the opposite side, so the far walls are not black
   // silhouettes and the board reads as an object rather than a cut-out.
   const fill = new THREE.DirectionalLight(0x88aaff, lambertIntensity(0.35))
   fill.position.set(-7, 4, -6)
   scene.add(fill)
+
+  const scenery = createTiltScenery(scene, stage.renderer)
 
   // Everything that leans. The ball is a child of this too, which is what makes
   // rotating gravity and rotating the view the same tilt rather than two.
@@ -123,6 +133,7 @@ export function createGame(parent: HTMLElement): TiltGame {
     new THREE.SphereGeometry(BALL_RADIUS, 24, 16),
     new THREE.MeshLambertMaterial({ color: COLOURS.ball, emissive: COLOURS.ball, emissiveIntensity: 0.12 }),
   )
+  ballMesh.castShadow = true
   board.add(ballMesh)
 
   let sim: Sim
@@ -164,17 +175,30 @@ export function createGame(parent: HTMLElement): TiltGame {
             : materials.floorAlt
         const floor = new THREE.Mesh(floorGeometry, material)
         floor.position.set(x, -FLOOR_THICKNESS / 2, z)
+        floor.receiveShadow = true
         board.add(floor)
         built.push(floor)
 
         if (cell === '#') {
           const wall = new THREE.Mesh(wallGeometry, materials.wall)
           wall.position.set(x, WALL_HEIGHT / 2, z)
+          wall.castShadow = true
+          wall.receiveShadow = true
           board.add(wall)
           built.push(wall)
         }
       }
     }
+
+    // Fit directional shadows tightly over the board, wooden housing, and desk props.
+    const span = Math.max(grid[0].length, grid.length) * CELL * 0.85 + 5
+    key.shadow.camera.left = -span
+    key.shadow.camera.right = span
+    key.shadow.camera.top = span
+    key.shadow.camera.bottom = -span
+    key.shadow.camera.near = 2
+    key.shadow.camera.far = 36
+    key.shadow.camera.updateProjectionMatrix()
   }
 
   /**
@@ -195,6 +219,7 @@ export function createGame(parent: HTMLElement): TiltGame {
     grid = LEVELS[levelIndex].grid
     sim = createSim(grid)
     buildBoard()
+    scenery.rebuild(grid[0].length, grid.length, levelIndex, LEVELS[levelIndex].name)
     frameCamera()
     tiltX = 0
     tiltZ = 0
@@ -246,6 +271,13 @@ export function createGame(parent: HTMLElement): TiltGame {
           restFor += dt
           if (restFor >= REST_TIME) {
             phase = levelIndex >= LEVELS.length - 1 ? 'complete' : 'won'
+            board.updateMatrixWorld()
+            const winPos = new THREE.Vector3(
+              sim.ball.position.x,
+              sim.ball.position.y,
+              sim.ball.position.z,
+            ).applyMatrix4(board.matrixWorld)
+            scenery.burstWin(winPos.x, winPos.y, winPos.z)
             notify()
           }
         } else {
@@ -267,6 +299,7 @@ export function createGame(parent: HTMLElement): TiltGame {
     board.rotation.z = -tiltX
     board.rotation.x = tiltZ
 
+    scenery.update(dt, tiltX, tiltZ)
     stage.render(scene, camera)
     requestAnimationFrame(frame)
   }
@@ -307,6 +340,15 @@ export function createGame(parent: HTMLElement): TiltGame {
     },
     dispose() {
       running = false
+      scenery.dispose()
+      floorGeometry.dispose()
+      wallGeometry.dispose()
+      materials.floor.dispose()
+      materials.floorAlt.dispose()
+      materials.wall.dispose()
+      materials.goal.dispose()
+      ballMesh.geometry.dispose()
+      ;(ballMesh.material as THREE.Material).dispose()
       stage.dispose()
     },
   }

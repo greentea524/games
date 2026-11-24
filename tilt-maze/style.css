@@ -54,9 +54,12 @@
   width: max-content;
   max-width: min(90vw, 460px);
   text-align: center;
-  color: #9fb0c4;
+  color: #b7c8da;
   font-size: 0.85rem;
   line-height: 1.5;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: rgba(11, 15, 20, 0.68);
 }
 
 .tm-panel {
