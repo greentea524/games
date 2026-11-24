@@ -13,6 +13,8 @@
 // of flagging, or a short drag that flags something on the way past and spends
 // a guess the player never meant to.
 import { launchTouch, canvasPoint, gameUrl, checker, PAD, checkSound } from './driver.mjs'
+import { chromium } from 'playwright-core'
+import { browserLaunchOptions } from '../harness.mjs'
 
 const { check, finish } = checker()
 
@@ -410,9 +412,111 @@ async function run() {
     }),
   )
 
+  await desktop(t.log)
+
   const passed = finish(t.log)
   await t.browser.close()
   return passed
+}
+
+/**
+ * A whole run with the keyboard alone, and Mouse look letting go at a panel
+ * (#185). On a desktop, because a touch device is not offered Mouse look.
+ *
+ * Space only ever flags the centre of the screen, so the head is turned
+ * through the game's own API until `probe(0.5, 0.5)` names what is wanted:
+ * the same aiming a player does with the arrows, without the walk.
+ */
+async function desktop(log) {
+  console.log('\n### anomaly-room, keyboard and mouse look ###\n')
+  const browser = await chromium.launch(browserLaunchOptions())
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+  page.on('pageerror', (e) => log.push({ kind: 'pageerror', text: e.message }))
+  page.on('console', (m) => {
+    if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) log.push({ kind: 'console.error', text: m.text() })
+  })
+  // The game publishes window.__game only when asked (#98), as launchTouch does.
+  const u = new URL(gameUrl('anomaly-room'))
+  u.searchParams.set('qa', '1')
+  await page.goto(u.toString())
+  await page.waitForSelector('#stage canvas')
+  await page.waitForTimeout(1000)
+
+  const key = async (code) => {
+    await page.keyboard.press(code)
+    await page.waitForTimeout(150)
+  }
+  /** Turns until the centre of the screen is on `want(id)`; true if it got there. */
+  const aimCentre = (wantAnomaly) =>
+    page.evaluate((wantAnomaly) => {
+      const g = window.__game
+      const wanted = g.anomaly()?.id
+      for (let i = 0; i < 48 * 7; i++) {
+        const id = g.probe(0.5, 0.5)
+        if (id && (wantAnomaly ? id === wanted : id !== wanted)) return id
+        const c = g.look()
+        const yaw = ((i % 48) / 48) * Math.PI * 2
+        const pitch = -0.45 + Math.floor(i / 48) * 0.15
+        g.turn(-(yaw - c.yaw), -(pitch - c.pitch))
+      }
+      return null
+    }, wantAnomaly)
+
+  // Study, by keyboard.
+  await key('Space')
+  check('Space ends the study and starts the search', (await state(page)).phase === 'looking')
+  await waitArmed(page)
+
+  // A wrong flag, and on to the same room.
+  const wrongId = await aimCentre(false)
+  await key('Space')
+  const wrong = await state(page)
+  check('Space flags what is ahead: a wrong object opens the miss panel', wrongId !== null && wrong.phase === 'wrong', `${wrongId}`)
+  // Holding a turn key behind the panel turns nothing (#185).
+  const lookBefore = (await state(page)).look
+  await page.keyboard.down('ArrowLeft')
+  await page.waitForTimeout(400)
+  await page.keyboard.up('ArrowLeft')
+  const lookAfter = (await state(page)).look
+  check('and a held arrow does not turn the room behind the panel', Math.abs(lookAfter.yaw - lookBefore.yaw) < 1e-6,
+    `yaw ${lookBefore.yaw.toFixed(3)} -> ${lookAfter.yaw.toFixed(3)}`)
+  await key('Enter')
+  check('Enter closes the miss panel and the search goes on', (await state(page)).phase === 'looking')
+
+  // The right one, with Mouse look on: the lock lets go at the panel.
+  await page.click('.ar-look')
+  await page.waitForTimeout(200)
+  const lockedBefore = await page.evaluate(() => document.pointerLockElement?.tagName ?? null)
+  const rightId = await aimCentre(true)
+  const beforeHit = await state(page)
+  // A click where the mouse already is. Moving it first is a movement under
+  // the lock, which turns the head off what was aimed at.
+  await page.mouse.down()
+  await page.mouse.up()
+  await page.waitForTimeout(200)
+  const hit = await state(page)
+  const lockedAfter = await page.evaluate(() => document.pointerLockElement?.tagName ?? null)
+  check('a click under Mouse look scores the round, and lets the pointer go for the panel',
+    lockedBefore === 'CANVAS' && rightId !== null && hit.phase === 'right' && lockedAfter === null,
+    `locked ${lockedBefore} -> ${lockedAfter}, phase ${hit.phase}`)
+  await key('Space')
+  const next = await state(page)
+  check('Space goes on to the next round', next.phase === 'looking' && next.round === beforeHit.round + 1, `round ${next.round + 1}`)
+
+  // Out of guesses, and Space starts again.
+  await waitArmed(page)
+  for (let i = 0; i < 6 && (await state(page)).phase !== 'over'; i++) {
+    await aimCentre(false)
+    await key('Space')
+    if ((await state(page)).phase === 'wrong') await key('Space')
+  }
+  const over = await state(page)
+  await key('Space')
+  const again = await state(page)
+  check('and when the guesses run out, Space starts a new run', over.phase === 'over' && again.phase === 'study' && again.round === 0,
+    `${over.phase} -> ${again.phase}`)
+
+  await browser.close()
 }
 
 process.exit((await run()) ? 0 : 1)

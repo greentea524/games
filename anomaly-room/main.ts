@@ -61,6 +61,24 @@ createHud(game, audio, {
   locked: () => document.pointerLockElement === canvas,
 })
 
+/** While the room is on screen to look round: studying it, or searching it. */
+const inRoom = () => game.phase() === 'study' || game.phase() === 'looking'
+
+// A panel over the room lets the pointer go (#185). Mouse look kept it locked
+// behind a round's result, so the cursor was hidden and every click went to
+// the canvas, where a flag outside 'looking' does nothing: the panel's button
+// could not be pressed without Esc first. Mouse look is asked for again from
+// its button, as it was at the start.
+game.onChange(() => {
+  if (!inRoom() && document.pointerLockElement === canvas) {
+    try {
+      document.exitPointerLock?.()
+    } catch {
+      // Nothing to release.
+    }
+  }
+})
+
 /**
  * Radians of turn per CSS pixel of drag.
  *
@@ -185,14 +203,28 @@ const LOOK_KEYS = new Set([
 
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'Enter') {
+    // A focused button takes Space and Enter as a press of its own. Acting
+    // here too would do it twice, and two `next()`s skip a round.
+    const target = e.target as HTMLElement | null
+    if (target?.closest?.('button, a, input, select, textarea')) return
     e.preventDefault()
-    // Ready, while the room is being studied; flag what is ahead after that.
-    if (game.phase() === 'study') {
-      game.ready()
+    const phase = game.phase()
+    // Ready, while the room is being studied; flag what is ahead after that;
+    // and on a panel, what its button does (#185), so a whole run can be
+    // played without a pointer, as this path promises. A held key does not
+    // run through the panels.
+    if (phase === 'study') {
+      if (!e.repeat) game.ready()
+    } else if (phase === 'looking') {
+      const result = game.flag(0.5, 0.5)
+      if (result) audio.sting(result.correct)
+    } else if (e.repeat) {
       return
+    } else if (phase === 'right' || phase === 'wrong') {
+      game.next()
+    } else if (phase === 'won' || phase === 'over') {
+      game.restart()
     }
-    const result = game.flag(0.5, 0.5)
-    if (result) audio.sting(result.correct)
     return
   }
   if (LOOK_KEYS.has(e.code)) {
@@ -212,8 +244,9 @@ function pollKeys() {
   if (held.has('ArrowUp') || held.has('KeyW')) pitch -= KEY_STEP
   if (held.has('ArrowDown') || held.has('KeyS')) pitch += KEY_STEP
   // Held rather than stepped per keypress, so turning is a smooth sweep and
-  // not a stutter at the operating system's key-repeat rate.
-  if (yaw || pitch) {
+  // not a stutter at the operating system's key-repeat rate. Not behind a
+  // panel (#185): the room spun under a round's result while a key was held.
+  if ((yaw || pitch) && inRoom()) {
     game.turn(yaw, pitch)
     // With the keys, Space flags the centre — so that is what is outlined.
     game.point(0.5, 0.5)

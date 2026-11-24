@@ -218,17 +218,27 @@ async function run() {
   await page.evaluate(() => window.__game.goTo(1))
   await hand.settle()
   const next = await state(page)
+  // The turn a press should make is the tap's step plus the turning rate for
+  // as long as the page saw the key held, read from the events' own times.
+  // Not from this script's clock: on a renderer drawing six frames a second
+  // each key event waits for a frame, and a 40 ms press reached the page as
+  // a 264 ms hold.
+  await page.evaluate(() => {
+    window.__keys = []
+    for (const type of ['keydown', 'keyup']) window.addEventListener(type, (e) => window.__keys.push(e.timeStamp))
+  })
   await press('ArrowRight')
   const nudged = await state(page)
+  const heldMs = await page.evaluate(() => window.__keys[1] - window.__keys[0])
+  const expected = -(0.03 + 1.6 * Math.min(0.25, heldMs / 1000))
   const step = turnFrom(next.aim, nudged.aim)
   check(
     'a new hole starts its aim afresh, at the cup, and the arrows turn from there',
-    // One short press turns a little to the right of the new hole's aim. How
-    // far depends on how many frames the press spans, which on a slow renderer
-    // is more than one (#182's lesson); the stale angle jumped by the whole
-    // turn made on the last hole.
-    !next.aim.preview && Math.abs(turnFrom(turned.aim, next.aim)) > 0.1 && step < -0.01 && step > -0.25,
-    `hole 2 aim ${angle(next.aim).toFixed(2)}, one tap moved it ${step.toFixed(3)}`,
+    // One short press turns right from the new hole's aim by what it should,
+    // and no more; the stale angle jumped by the whole turn made on the last
+    // hole.
+    !next.aim.preview && Math.abs(turnFrom(turned.aim, next.aim)) > 0.1 && Math.abs(step - expected) < 0.04,
+    `hole 2 aim ${angle(next.aim).toFixed(2)}, a press the page saw for ${Math.round(heldMs)} ms moved it ${step.toFixed(3)}, ${expected.toFixed(3)} expected`,
   )
   await page.evaluate(() => window.__game.goTo(0))
   await settle(page)

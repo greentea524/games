@@ -110,12 +110,38 @@ canvas.addEventListener('lostpointercapture', endDrag)
 const TURN_RATE = 1.6
 /** One tap's turn, for a press too short to span a frame. */
 const TAP_TURN = 0.03
+/**
+ * The longest stretch a held key is turned for at once, in seconds. Only a
+ * stall is cut short. A per-frame cap of 0.05 here made a held arrow turn at
+ * under a third of `TURN_RATE` on a renderer drawing six frames a second.
+ */
+const MAX_FRAME = 0.25
 const CHARGE_TIME = 900
 
 let charging = false
 let chargeStart = 0
-/** Which arrows are held down. */
-const held = { left: false, right: false }
+/**
+ * Since when each arrow has been turning the aim, in `performance.now()`
+ * time, or null when it is up. A turn is the time a key was really held, not
+ * the frames it spanned: a press of 40 ms that crossed one frame boundary
+ * was credited with that whole frame, a sixth of a second at six frames a
+ * second, and turned 0.35 radians where a tap is meant to nudge.
+ */
+const held: { left: number | null; right: number | null } = { left: null, right: null }
+
+/** Turns the aim for the time each held key has been down since `since`, up to `until`. */
+function turnHeld(until: number) {
+  let by = 0
+  for (const [side, sign] of [['left', 1], ['right', -1]] as const) {
+    const from = held[side]
+    if (from === null) continue
+    // Never more than a stall's worth at once: see `MAX_FRAME`. A frame's
+    // time can be earlier than the press it follows, so nothing runs backwards.
+    by += sign * TURN_RATE * Math.min(MAX_FRAME, Math.max(0, (until - from) / 1000))
+    held[side] = Math.max(from, until)
+  }
+  if (by !== 0) turnAim(by)
+}
 
 const aimAngle = () => {
   const a = game.aim()
@@ -142,9 +168,13 @@ window.addEventListener('keydown', (e) => {
     // Held keys turn in the frame loop below, smoothly, rather than in steps
     // at the system's key-repeat rate. A first press also turns a little at
     // once, so a tap shorter than a frame still does something.
-    if (!e.repeat) turnAim(left ? TAP_TURN : -TAP_TURN)
-    if (left) held.left = true
-    else held.right = true
+    if (!e.repeat) {
+      turnAim(left ? TAP_TURN : -TAP_TURN)
+      // The event's own time, not the handler's: on a slow renderer the main
+      // thread is drawing, the event is handled a frame or two late, and
+      // timing by the handler made a 40 ms tap a 200 ms hold.
+      held[left ? 'left' : 'right'] = e.timeStamp
+    }
     e.preventDefault()
   } else if (e.code === 'KeyV') {
     game.toggleView()
@@ -157,8 +187,12 @@ window.addEventListener('keydown', (e) => {
 })
 
 window.addEventListener('keyup', (e) => {
-  if (e.code === 'ArrowLeft' || e.code === 'KeyA') held.left = false
-  else if (e.code === 'ArrowRight' || e.code === 'KeyD') held.right = false
+  // The last stretch of a hold, from the last frame to the key coming up.
+  const side = e.code === 'ArrowLeft' || e.code === 'KeyA' ? 'left' : e.code === 'ArrowRight' || e.code === 'KeyD' ? 'right' : null
+  if (side) {
+    turnHeld(e.timeStamp)
+    held[side] = null
+  }
   if (e.code !== 'Space' || !charging) return
   charging = false
   e.preventDefault()
@@ -173,13 +207,9 @@ window.addEventListener('keyup', (e) => {
 
 // The charge has to be sampled, not computed on release: the aim indicator
 // grows while the key is held, which is the whole feedback the keyboard path
-// gives. Held arrows turn the aim here too, by the time since the last frame.
-let lastFrame = performance.now()
+// gives. Held arrows turn the aim here too, by the time each has been held.
 function pollKeys(now: number) {
-  const dt = Math.min(0.05, (now - lastFrame) / 1000)
-  lastFrame = now
-  const turn = (held.left ? 1 : 0) - (held.right ? 1 : 0)
-  if (turn !== 0) turnAim(turn * TURN_RATE * dt)
+  turnHeld(now)
   if (charging) {
     // Ping-pong, so overshooting the power you wanted is recoverable by
     // holding rather than by releasing and starting again.
@@ -193,8 +223,8 @@ requestAnimationFrame(pollKeys)
 
 window.addEventListener('blur', () => {
   charging = false
-  held.left = false
-  held.right = false
+  held.left = null
+  held.right = null
   dragId = null
   game.cancelAim()
 })

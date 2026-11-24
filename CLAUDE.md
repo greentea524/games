@@ -262,6 +262,15 @@ in the frame loop, and a first press also steps a little, so a tap shorter
 than a frame still turns. The touch suite counts the preview's cream pixels
 on screen, and all three of its keyboard checks fail on the old code.
 
+A held arrow turns by the time the page saw the key held, from the events'
+own `timeStamp`s, not by frames. This was found when the scenery that followed
+took this container to 6 frames a second. A per-frame cap of 0.05 s turned a
+held arrow at under a third of its rate. Crediting whole frames made a tap a
+sixth of a second's turn. Timing by the handler's clock counted the frames the
+event waited for. And a check cannot time a press from its own side: each
+synthetic key event waits for a frame, so a 40 ms press reached the page as a
+264 ms hold. The check reads the same timestamps the game does.
+
 **Minigolf has a How to play panel.** A button under the way back opens it, and
 so does H. It covers the aim, touch and keyboard putting, the rules and the
 names of scores, from `HOW_TO_PLAY` in `hud.ts`. It does not open by itself,
@@ -302,6 +311,30 @@ for a couple of seconds. The outline is the candidate's box as a wire frame,
 parented to its model. It is taken out of raycasting: a line has a wide hit
 area, and an outline left in would be chosen in place of the wall behind it.
 `anomaly_test.ts` keeps a frame with raycasting left on as its control.
+
+**Anomaly Room plays from end to end on the keyboard, and Mouse look lets go
+at a panel (#185).** Space and Enter now do what a panel's button does:
+'right' and 'wrong' go on, 'won' and 'over' start again. They are ignored
+on a key repeat, so a held key does not run through the panels. Leaving
+'study' or 'looking' releases pointer lock; it kept the cursor hidden and
+every click on the canvas, so a panel's button could not be pressed without
+Esc. The arrow keys no longer turn the room behind a panel. Two traps came
+with it:
+
+- **A focused button takes Space and Enter for itself.** The room's key
+  handler leaves keys on a button to the button, or one press would act
+  twice. So a HUD button clicked with a pointer lets go of focus; left on
+  Mouse look, the next Space asked for mouse look again instead of going on.
+  A click the keyboard made has `detail` 0 and keeps focus, for Tab users.
+- **Do not focus a panel's button as it opens.** That was tried. The panel
+  opens on the Space key-down that flagged, so the key-up then pressed the
+  newly focused button, and one press flagged and dismissed together.
+
+The touch suite's desktop run plays a run by keyboard and clicks under real
+pointer lock, which this headless browser grants. It clicks where the mouse
+already is: moving there first is a movement under the lock and turns the
+head off the target. Every new check after the first two fails on the old
+code.
 
 **Voxel Digger's tap drills, and a check must play from the angle a player
 does (#151, #152).** #151 widened the dig to a 3×3 patch and was verified by a
