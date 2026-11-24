@@ -305,6 +305,44 @@ async function run() {
     }),
   )
 
+  // ------------------------------------------------------------ framing (#186)
+  //
+  // Every board's every reachable corner, through the real camera's
+  // projection, on this phone held upright; then on its side, without a
+  // reload. The board was framed by its longest side alone, cropped on every
+  // upright phone, and never reframed.
+  const framing = async () => {
+    const out = []
+    for (let i = 0; i < 8; i++) {
+      out.push(await page.evaluate((i) => {
+        const g = window.__game
+        g.goTo(i)
+        const c = document.querySelector('#stage canvas')
+        // The top's 60 CSS pixels are the HUD's, as framing.ts keeps them.
+        const top = 1 - (2 * 60) / c.clientHeight
+        const pts = g.cornersOnScreen()
+        const worst = Math.max(...pts.map((p) => Math.max(Math.abs(p.x), -p.y, p.y > top ? p.y - top + 1 : 0)))
+        return { name: g.levelName(), inside: pts.every((p) => Math.abs(p.x) <= 1 && p.y >= -1 && p.y <= top + 1e-6), worst }
+      }, i))
+    }
+    return out
+  }
+  const upright = await framing()
+  const outU = upright.filter((b) => !b.inside)
+  check('upright, every board is whole on screen at every lean, under the HUD',
+    outU.length === 0, outU.map((b) => `${b.name} ${b.worst.toFixed(2)}`).join(', ') || `${upright.length} boards`)
+  const framedBefore = await page.evaluate(() => { window.__game.goTo(5); return window.__game.cornersOnScreen() })
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.waitForTimeout(600)
+  const framedAfter = await page.evaluate(() => window.__game.cornersOnScreen())
+  const turned = await framing()
+  const outT = turned.filter((b) => !b.inside)
+  check('turned on its side, the board in play is reframed at once, and every board fits',
+    JSON.stringify(framedBefore) !== JSON.stringify(framedAfter) && outT.length === 0,
+    outT.map((b) => `${b.name} ${b.worst.toFixed(2)}`).join(', ') || `${turned.length} boards`)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(400)
+
   ok = finish(t.log) && ok
   await t.browser.close()
 }

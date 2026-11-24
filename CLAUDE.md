@@ -216,6 +216,20 @@ these boxes sit at `left: 50%`, so they shrink to half the screen unless
 `width: max-content` lets their `max-width` apply, and Minigolf's lands on its
 pale front rail on a wide screen.
 
+**Tilt Maze frames the whole board at any screen shape, and reframes when it
+changes (#186).** The camera stood back by the board's longest side times
+1.15, whatever the screen's shape, and the field of view is fixed in the
+vertical. So on an upright phone it cropped all eight boards: Spiral's side
+wall landed at 1.88 against the screen's ±1. `framing.ts` finds the nearest
+distance at which every corner the board can reach is on screen and clear of
+the HUD: the floor's underside and the walls' tops, at every lean to
+`MAX_TILT`. It is a search over its own projection, and has no three.js in
+it. `framing_test.ts` holds all eight boards at five screen shapes, fitted and
+no further back than needed, with the old rule as the control. The game
+reframes from the stage's `onResize`. The touch suite reads `cornersOnScreen`,
+which uses three's own projection, upright and after turning the phone on its
+side; both checks fail on the old framing.
+
 **Minigolf's solver measures how far the ball still has to *walk* (#141).**
 `course_test.ts` plays every hole greedily, and it used to score a resting ball
 by straight-line distance to the cup. That only works for a route that closes
