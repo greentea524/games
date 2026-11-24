@@ -262,6 +262,15 @@ in the frame loop, and a first press also steps a little, so a tap shorter
 than a frame still turns. The touch suite counts the preview's cream pixels
 on screen, and all three of its keyboard checks fail on the old code.
 
+A held arrow turns by the time the page saw the key held, from the events'
+own `timeStamp`s, not by frames. This was found when the scenery that followed
+took this container to 6 frames a second. A per-frame cap of 0.05 s turned a
+held arrow at under a third of its rate. Crediting whole frames made a tap a
+sixth of a second's turn. Timing by the handler's clock counted the frames the
+event waited for. And a check cannot time a press from its own side: each
+synthetic key event waits for a frame, so a 40 ms press reached the page as a
+264 ms hold. The check reads the same timestamps the game does.
+
 **Minigolf has a How to play panel.** A button under the way back opens it, and
 so does H. It covers the aim, touch and keyboard putting, the rules and the
 names of scores, from `HOW_TO_PLAY` in `hud.ts`. It does not open by itself,
