@@ -298,6 +298,24 @@ pointer blocking. On a phone the first draft was taller than the screen and
 the centred card lost its title above the top. The card now scrolls from its
 top when it does not fit, and the text was cut to fit a 390-by-844 phone.
 
+**Minigolf's cup is a hole the ball falls into.** It was a distance and a
+speed: within 0.3 of the middle at under 2.4 u/s and the ball vanished, and
+anything faster rolled across a painted disc. A graze dropped as surely as a
+putt through the middle, and nothing lipped out. The green is still not cut
+in the physics. While the ball's centre is over the hole, `physics.ts` takes
+the greens out of its collision mask, gravity takes it, and the rim, wall and
+floor are applied by hand as a circle, a cylinder and a plane. A slow ball
+tips in, a firm one rides up the far lip, and a graze is turned by the rim.
+None of it is tuned: the fastest putt that drops is 4 u/s through the middle
+and 1.8 u/s at 0.2 off. All of it is worked out from the ball's position,
+with no state, because `course_test.ts` copies a ball between sims.
+`cup_test.ts` holds it, with the old rule as its control. The cup is the
+green's 0.4 thickness deep and drawn inside that slab: that green's top is a
+turf sheet with a round hole in it. A holed ball stays drawn and settles on
+the floor. The flagstick cannot be in the physics: a 0.3 cup has no room for
+a 0.32 ball beside a pin, and a ball wedged there never drops. So it lifts out
+and fades as a rolling ball comes near, as if someone were tending it.
+
 **Anomaly Room's models live inside their boxes, and a tap hits only what is
 drawn (#147).** The round picker decides what is out of view, shadow included,
 from each candidate's box in `room.ts`. So the models in `models.ts` are

@@ -349,6 +349,42 @@ async function run() {
     sawItRolling ? 'canPutt stayed false for the whole roll' : 'never saw the ball moving',
   )
 
+  // ------------------------------------------------------------- the cup
+  //
+  // The cup is a hole the ball falls into. It used to vanish the ball the
+  // moment it came near enough and slow enough, so a holed ball was never
+  // seen in the cup, and the flag stood in the middle of it throughout.
+
+  await page.evaluate(() => window.__game.goTo(0))
+  await page.waitForTimeout(500)
+  const standing = await page.evaluate(() => window.__game.cupView())
+  check('the flag stands in the cup before the putt', standing.flagLift === 0, `lift ${standing.flagLift}`)
+  let sunk = null
+  for (const power of [0.85, 0.8, 0.9, 0.75, 0.95, 0.7]) {
+    await page.evaluate(() => window.__game.goTo(0))
+    await page.waitForTimeout(400)
+    await putt(page, hand, 0, -1, power)
+    const after = await settle(page)
+    if (after.phase === 'holed') {
+      sunk = after
+      break
+    }
+  }
+  check('a straight putt on the Opener drops', sunk !== null)
+  if (sunk) {
+    // Settled: time for the drop, and for the flag to finish lifting.
+    await page.waitForTimeout(1500)
+    const { CUP_DEPTH, BALL_RADIUS } = await page.evaluate(async () => {
+      const m = await import('/games/minigolf/physics.ts')
+      return { CUP_DEPTH: m.CUP_DEPTH, BALL_RADIUS: m.BALL_RADIUS }
+    })
+    const v = await page.evaluate(() => window.__game.cupView())
+    check('the holed ball is drawn, down in the cup', v.ballDrawn && v.ballDepth > BALL_RADIUS,
+      `${v.ballDrawn ? 'drawn' : 'hidden'}, centre ${v.ballDepth.toFixed(3)} below the rim`)
+    check('and rests on the cup\'s floor', Math.abs(v.ballDepth - (CUP_DEPTH - BALL_RADIUS)) < 0.02, `${v.ballDepth.toFixed(3)}`)
+    check('and the flag has been lifted out for it', v.flagLift === 1, `lift ${v.flagLift.toFixed(2)}`)
+  }
+
   // ------------------------------------------------------ the climb on Rise
   //
   // The reason this hole exists, and the one that was unplayable in review: a
