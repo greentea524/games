@@ -8,12 +8,14 @@ import * as THREE from 'three'
 import {
   BALL_RADIUS,
   COURSE,
+  CUP_DEPTH,
+  CUP_RADIUS,
   MAX_PUTT_SPEED,
   createSim,
   type Sim,
 } from './physics'
 import type { Hole } from './holes'
-import { createGrassMaterials, createGreenGeometry } from './grass'
+import { createGrassMaterials, createGreenGeometry, createHoledTop, withoutTop } from './grass'
 import { createScenery, SKY_HORIZON_COLOR } from './scenery'
 import { createConfetti } from './confetti'
 import { prefersReducedMotion } from '../shared/motion'
@@ -23,6 +25,9 @@ const COLOURS = {
   background: SKY_HORIZON_COLOR,
   wall: 0xc9d6cd,
   cup: 0x101a14,
+  /** The cup's inside, below its white liner. */
+  cupWall: 0x2c332e,
+  cupLiner: 0xf1f1e8,
   flag: 0xe4573d,
   ball: 0xf7f7f2,
   aim: 0xffd166,
@@ -33,6 +38,12 @@ const COLOURS = {
 
 /** How far above the cup the flag reaches, for drawing and for framing. */
 const FLAG_TOP = 1.6
+/** The white band round the top of the cup. */
+const LINER_DEPTH = 0.05
+/** How near a rolling ball comes before the flag is lifted out, and how fast it goes. */
+const FLAG_ATTEND = 1.6
+const FLAG_LIFT_TIME = 0.3
+const FLAG_RAISE = 0.8
 
 /** Aim shaft length at full power, in world units. */
 const AIM_LENGTH = 3.2
@@ -80,6 +91,12 @@ export interface MinigolfGame {
   previewAim(x: number, z: number): void
   /** What the aim indicator is drawing this frame, for checks. */
   aimShown(): { visible: boolean; length: number; colour: number }
+  /**
+   * The cup as the player sees it: how far the ball's centre is below the rim
+   * (negative above it), whether the ball is drawn, and how far the flag is
+   * lifted out, 0 standing to 1 gone.
+   */
+  cupView(): { ballDepth: number; ballDrawn: boolean; flagLift: number }
   /** Strike with the current aim. Ignored below `MIN_POWER` or while rolling. */
   strike(): boolean
   /** Abandon the current aim without striking. */
@@ -188,6 +205,10 @@ export function createGame(parent: HTMLElement): MinigolfGame {
   const camForward = new THREE.Vector3()
 
   let built: THREE.Mesh[] = []
+  /** The flagstick and flag, which lift out of the cup as the ball comes. */
+  let flagParts: THREE.Mesh[] = []
+  /** How far they are lifted, 0 to 1. */
+  let flagLift = 0
 
   function buildHole() {
     for (const mesh of built) {
@@ -198,9 +219,20 @@ export function createGame(parent: HTMLElement): MinigolfGame {
 
     for (const box of hole.boxes) {
       const isGreen = box.surface === 'green'
+      // The green the cup is cut into: its top is drawn with a hole in it,
+      // so the ball can be seen going down.
+      const cutHere = isGreen && holdsCup(box)
       const geometry = isGreen
-        ? createGreenGeometry(box)
+        ? cutHere ? withoutTop(createGreenGeometry(box)) : createGreenGeometry(box)
         : new THREE.BoxGeometry(box.w, box.h, box.d)
+      if (cutHere) {
+        const top = new THREE.Mesh(createHoledTop(box, hole.cup.x, hole.cup.z, CUP_RADIUS), grass.flat[2])
+        top.position.set(box.x, box.y, box.z)
+        top.castShadow = true
+        top.receiveShadow = true
+        course.add(top)
+        built.push(top)
+      }
       // Slopes get the second green, so a ramp reads as a ramp before the ball
       // has been anywhere near it. This used to alternate on the box's index,
       // which happened to tone `Rise`'s ramp correctly and only because the
@@ -246,34 +278,87 @@ export function createGame(parent: HTMLElement): MinigolfGame {
     course.add(cupCollar)
     built.push(cupCollar)
 
-    // The cup, as a dark disc laid on the surface, and a flag so it is findable
-    // from across the hole. A real hole in the mesh would mean cutting geometry
-    // for a target the ball is tested against by distance anyway.
-    const cup = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.3, 0.3, 0.04, 20),
-      new THREE.MeshBasicMaterial({ color: COLOURS.cup }),
+    // The cup: a white liner round the top, a dark wall under it and a
+    // floor, inside the green's slab. The ball drops into it (physics.ts).
+    const liner = new THREE.Mesh(
+      new THREE.CylinderGeometry(CUP_RADIUS, CUP_RADIUS, LINER_DEPTH, 40, 1, true),
+      new THREE.MeshLambertMaterial({ color: COLOURS.cupLiner, side: THREE.BackSide }),
     )
-    cup.position.set(hole.cup.x, hole.cup.y + 0.02, hole.cup.z)
-    course.add(cup)
-    built.push(cup)
+    liner.position.set(hole.cup.x, hole.cup.y - LINER_DEPTH / 2, hole.cup.z)
+    liner.receiveShadow = true
+    course.add(liner)
+    built.push(liner)
+    const wallDepth = CUP_DEPTH - LINER_DEPTH
+    const cupWall = new THREE.Mesh(
+      new THREE.CylinderGeometry(CUP_RADIUS, CUP_RADIUS, wallDepth, 40, 1, true),
+      new THREE.MeshLambertMaterial({ color: COLOURS.cupWall, side: THREE.BackSide }),
+    )
+    cupWall.position.set(hole.cup.x, hole.cup.y - LINER_DEPTH - wallDepth / 2, hole.cup.z)
+    cupWall.receiveShadow = true
+    course.add(cupWall)
+    built.push(cupWall)
+    const cupFloor = new THREE.Mesh(
+      new THREE.CircleGeometry(CUP_RADIUS, 40),
+      new THREE.MeshLambertMaterial({ color: COLOURS.cup }),
+    )
+    cupFloor.rotation.x = -Math.PI / 2
+    cupFloor.position.set(hole.cup.x, hole.cup.y - CUP_DEPTH + 0.002, hole.cup.z)
+    cupFloor.receiveShadow = true
+    course.add(cupFloor)
+    built.push(cupFloor)
 
+    // The flagstick stands on the cup's floor. The cup is too narrow for a
+    // ball beside it, so it is lifted out as the ball comes near (`liftFlag`).
     const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.03, 0.03, 1.6, 8),
-      new THREE.MeshLambertMaterial({ color: COLOURS.wall }),
+      new THREE.CylinderGeometry(0.03, 0.03, 1.6 + CUP_DEPTH, 8),
+      new THREE.MeshLambertMaterial({ color: COLOURS.wall, transparent: true }),
     )
-    pole.position.set(hole.cup.x, hole.cup.y + 0.8, hole.cup.z)
+    pole.position.set(hole.cup.x, hole.cup.y + (1.6 - CUP_DEPTH) / 2, hole.cup.z)
     pole.castShadow = true
     course.add(pole)
     built.push(pole)
+    flagParts = [pole]
 
     const flag = new THREE.Mesh(
       new THREE.BoxGeometry(0.5, 0.32, 0.02),
-      new THREE.MeshLambertMaterial({ color: COLOURS.flag }),
+      new THREE.MeshLambertMaterial({ color: COLOURS.flag, transparent: true }),
     )
     flag.position.set(hole.cup.x + 0.27, hole.cup.y + 1.4, hole.cup.z)
     flag.castShadow = true
     course.add(flag)
     built.push(flag)
+    flagParts.push(flag)
+    for (const part of flagParts) part.userData.restY = part.position.y
+    flagLift = 0
+  }
+
+  /** Whether a flat green, at the cup's height, has the cup in it. */
+  function holdsCup(box: Hole['boxes'][number]) {
+    return (
+      !box.tiltX &&
+      !box.tiltZ &&
+      Math.abs(hole.cup.x - box.x) <= box.w / 2 - CUP_RADIUS &&
+      Math.abs(hole.cup.z - box.z) <= box.d / 2 - CUP_RADIUS &&
+      Math.abs(hole.cup.y - (box.y + box.h / 2)) < 1e-6
+    )
+  }
+
+  /**
+   * Lifts the flagstick out of the cup while a rolling ball is near it, and
+   * puts it back once the ball has stopped elsewhere, as someone attending
+   * the flag would. It rises and fades.
+   */
+  function liftFlag(dt: number) {
+    const near = (phase === 'rolling' && sim.cupDistance() < FLAG_ATTEND) || phase === 'holed' || phase === 'card'
+    const step = dt / FLAG_LIFT_TIME
+    flagLift = Math.max(0, Math.min(1, flagLift + (near ? step : -step)))
+    const eased = flagLift * flagLift * (3 - 2 * flagLift)
+    for (const part of flagParts) {
+      part.position.y = part.userData.restY + eased * FLAG_RAISE
+      const material = part.material as THREE.MeshLambertMaterial
+      material.opacity = 1 - eased
+      part.visible = eased < 0.999
+    }
   }
 
   /**
@@ -553,7 +638,6 @@ export function createGame(parent: HTMLElement): MinigolfGame {
         phase = 'holed'
         scores[holeIndex] = strokes
         holedFor = 0
-        ballMesh.visible = false
         confetti.burst(hole.cup.x, hole.cup.y, hole.cup.z)
         notify()
       } else if (phase === 'rolling' && sim.atRest()) {
@@ -565,8 +649,11 @@ export function createGame(parent: HTMLElement): MinigolfGame {
         notify()
       }
     } else if (phase === 'holed') {
+      // The ball goes on falling to the cup's floor and settles there.
+      sim.step(dt)
       holedFor += dt
     }
+    liftFlag(dt)
 
     ballMesh.position.set(sim.ball.position.x, sim.ball.position.y, sim.ball.position.z)
     ballMesh.quaternion.set(
@@ -637,6 +724,11 @@ export function createGame(parent: HTMLElement): MinigolfGame {
       aimPreview = true
       notify()
     },
+    cupView: () => ({
+      ballDepth: hole.cup.y - sim.ball.position.y,
+      ballDrawn: ballMesh.visible,
+      flagLift,
+    }),
     aimShown: () => ({
       visible: aimMesh.visible,
       length: aimMesh.scale.z,

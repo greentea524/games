@@ -114,10 +114,35 @@ export const ROLL_ACCEL = (5 / 7) * GRAVITY * Math.sin(MIN_SLOPE)
 export const STILL_SPEED = Math.min(REST_SPEED, REST_SPIN * BALL_RADIUS)
 export const REST_TIME = (STILL_SPEED / ROLL_ACCEL) * REST_MARGIN
 
-/** Horizontal distance within which a slow ball drops into the cup. */
+/**
+ * The cup is a real hole (the ticket after #186): a rim of this radius, a wall
+ * and a floor, and the ball has to fall in.
+ *
+ * It used to be a distance and a speed: a ball whose centre came within 0.3 of
+ * the cup at under 2.4 u/s vanished, and anything faster rolled straight
+ * across as if the cup were painted on. So a putt that grazed the edge dropped
+ * as surely as one in the middle, and nothing ever lipped out.
+ *
+ * The green is not cut. While the ball's centre is over the hole the green
+ * stops colliding with it, gravity takes it, and the rim, wall and floor here
+ * hold it, as a sphere against a circle, a cylinder and a plane. Everything a
+ * putt does at the cup falls out of that: a slow ball tips over the near edge;
+ * a firm one crosses before it has fallen far, rides up the far lip and goes
+ * on, slower; one that clips the edge is pushed round by it and curls away.
+ */
 export const CUP_RADIUS = 0.3
-/** And the speed it has to be under. Faster than this and it laps the rim. */
-export const CUP_SPEED = 2.4
+/** How deep the cup is: the green's thickness, so the cup is inside its slab. */
+export const CUP_DEPTH = 0.4
+/** How much speed a knock against the rim or the wall keeps. */
+export const RIM_RESTITUTION = 0.3
+/** And against the floor of the cup: a dull plastic thud. */
+export const FLOOR_RESTITUTION = 0.2
+/**
+ * A ball counts as holed once its centre is this far below the rim. Half a
+ * ball down, between the wall, it cannot climb out again: nothing here throws
+ * it upward, and the floor keeps a fifth of a fall.
+ */
+export const HOLED_DEPTH = BALL_RADIUS / 2
 
 export interface Sim {
   world: World
@@ -132,13 +157,17 @@ export interface Sim {
   atRest(): boolean
   /** Seconds the ball has been continuously below the rest thresholds. */
   stillFor(): number
-  /** True when the ball is over the cup and slow enough to drop. */
+  /** True once the ball has dropped into the cup, below the rim. */
   holed(): boolean
+  /** Horizontal distance from the ball's centre to the cup's. */
+  cupDistance(): number
   /** True when the ball has fallen off the course. */
   offCourse(): boolean
 }
 
 const FIXED_STEP = 1 / 120
+/** The collision group of the greens, which the ball stops meeting over the cup. */
+const GREEN_GROUP = 2
 const MAX_SUBSTEPS = 8
 
 export interface SimOptions {
@@ -184,6 +213,8 @@ export function createSim(hole: Hole, options: SimOptions = {}): Sim {
 
   /** The level greens: the only surfaces that apply rolling resistance. */
   const flatGreens = new Set<Body>()
+  /** Every green: what stops holding the ball up while it is over the cup. */
+  const greens = new Set<Body>()
   for (const box of hole.boxes) {
     const body = new Body({
       mass: 0,
@@ -198,6 +229,10 @@ export function createSim(hole: Hole, options: SimOptions = {}): Sim {
     }
     if (box.surface === 'green' && (rollingOnRamps || !(box.tiltX || box.tiltZ))) {
       flatGreens.add(body)
+    }
+    if (box.surface === 'green') {
+      body.collisionFilterGroup = GREEN_GROUP
+      greens.add(body)
     }
     world.addBody(body)
   }
@@ -235,6 +270,93 @@ export function createSim(hole: Hole, options: SimOptions = {}): Sim {
     ball.angularVelocity.scale(k, ball.angularVelocity)
   })
 
+  // The cup. All of it is worked out from where the ball is, with no state
+  // carried between steps, so a ball copied into another sim (the course
+  // check does this) behaves there exactly as it did here.
+  const cup = hole.cup
+  /** Where the ball is from the cup: across the green, and its centre's height above the rim. */
+  const fromCup = () => {
+    const qx = ball.position.x - cup.x
+    const qz = ball.position.z - cup.z
+    return { qx, qz, r: Math.hypot(qx, qz), y: ball.position.y - cup.y }
+  }
+  /** Over the hole and down at the green's level, not flying over it. */
+  const overHole = (r: number, y: number) => r < CUP_RADIUS && y < BALL_RADIUS + 0.05 && y > -CUP_DEPTH
+  let fallThrough = false
+
+  world.addEventListener('preStep', () => {
+    const { r, y } = fromCup()
+    fallThrough = overHole(r, y)
+    ball.collisionFilterMask = fallThrough ? ~GREEN_GROUP : -1
+  })
+
+  world.addEventListener('postStep', () => {
+    if (!fallThrough) return
+    const { qx, qz, r, y } = fromCup()
+    const v = ball.velocity
+    // Outward across the green, from the cup's middle.
+    const ux = r > 1e-6 ? qx / r : 1
+    const uz = r > 1e-6 ? qz / r : 0
+    const b = BALL_RADIUS
+
+    if (r >= CUP_RADIUS) {
+      // Crossed back out over the green during the step: stand on it.
+      if (y < b) {
+        ball.position.y = cup.y + b
+        if (v.y < 0) v.y = 0
+      }
+      return
+    }
+
+    if (y >= 0) {
+      // Above the rim: the ball is held by the rim's edge, the nearest point
+      // of the circle. Its push leans in toward the middle, which is what
+      // tips a slow ball in and turns a grazing one.
+      const dx = qx - CUP_RADIUS * ux
+      const dz = qz - CUP_RADIUS * uz
+      const dist = Math.hypot(dx, y, dz)
+      if (dist < b && dist > 1e-9) {
+        const nx = dx / dist
+        const ny = y / dist
+        const nz = dz / dist
+        const push = b - dist
+        ball.position.x += nx * push
+        ball.position.y += ny * push
+        ball.position.z += nz * push
+        bounce(nx, ny, nz, RIM_RESTITUTION)
+      }
+    } else {
+      // Below the rim: the cup's wall.
+      if (r > CUP_RADIUS - b) {
+        const push = r - (CUP_RADIUS - b)
+        ball.position.x -= ux * push
+        ball.position.z -= uz * push
+        bounce(-ux, 0, -uz, RIM_RESTITUTION)
+      }
+      // And its floor.
+      if (y < -CUP_DEPTH + b) {
+        ball.position.y = cup.y - CUP_DEPTH + b
+        if (v.y < 0) {
+          v.y = -v.y * FLOOR_RESTITUTION
+          v.x *= 0.85
+          v.z *= 0.85
+          ball.angularVelocity.scale(0.7, ball.angularVelocity)
+        }
+      }
+    }
+  })
+
+  /** Takes the part of the ball's velocity going into a surface away, keeping `e` of it. */
+  function bounce(nx: number, ny: number, nz: number, e: number) {
+    const v = ball.velocity
+    const vn = v.x * nx + v.y * ny + v.z * nz
+    if (vn >= 0) return
+    const k = (1 + e) * vn
+    v.x -= k * nx
+    v.y -= k * ny
+    v.z -= k * nz
+  }
+
   let still = 0
 
   const sim: Sim = {
@@ -271,15 +393,12 @@ export function createSim(hole: Hole, options: SimOptions = {}): Sim {
     atRest: () => still >= restTime,
     stillFor: () => still,
     holed() {
-      const dx = ball.position.x - hole.cup.x
-      const dz = ball.position.z - hole.cup.z
-      // Height matters: on the Rise, the cup is on the upper green and a ball
-      // still on the lower one can be directly beneath it.
-      const dy = Math.abs(ball.position.y - (hole.cup.y + BALL_RADIUS))
-      return (
-        Math.hypot(dx, dz) < CUP_RADIUS && dy < 0.5 && ball.velocity.length() < CUP_SPEED
-      )
+      // Height matters both ways: on the Rise the cup is on the upper green,
+      // and a ball on the lower one can be directly beneath it.
+      const { r, y } = fromCup()
+      return r < CUP_RADIUS && y < -HOLED_DEPTH && y > -CUP_DEPTH
     },
+    cupDistance: () => fromCup().r,
     offCourse: () => ball.position.y < -3,
   }
 

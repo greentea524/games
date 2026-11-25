@@ -47,7 +47,7 @@ export const HOW_TO_PLAY: { heading: string; lines: string[] }[] = [
   },
   {
     heading: 'Rules',
-    lines: ['Putt again once the ball has stopped. Off the course costs a stroke and a return to the tee.'],
+    lines: ['Putt again once the ball has stopped. Off the course costs a stroke and a return to the tee. Too firm or off the middle and the ball can lip out of the cup.'],
   },
   {
     heading: 'Scoring',

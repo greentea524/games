@@ -434,3 +434,42 @@ export function createGreenGeometry(box: Box): THREE.BoxGeometry {
   uv.needsUpdate = true
   return geo
 }
+
+/**
+ * The top of the green the cup is cut into: the same world-scaled turf, with
+ * a round hole where the cup is. `createGreenGeometry`'s own top is dropped
+ * for this green (`withoutTop`), so the ball can be seen going down.
+ *
+ * `cupX`/`cupZ` are in world space; the result is in the box's own space,
+ * like the box's geometry, so the two share a mesh position.
+ */
+export function createHoledTop(box: Box, cupX: number, cupZ: number, radius: number): THREE.ShapeGeometry {
+  // Drawn in the shape's own plane, x across and y = -z, then laid flat.
+  const shape = new THREE.Shape()
+  shape.moveTo(-box.w / 2, -box.d / 2)
+  shape.lineTo(box.w / 2, -box.d / 2)
+  shape.lineTo(box.w / 2, box.d / 2)
+  shape.lineTo(-box.w / 2, box.d / 2)
+  shape.closePath()
+  const hole = new THREE.Path()
+  hole.absarc(cupX - box.x, -(cupZ - box.z), radius, 0, Math.PI * 2, true)
+  shape.holes.push(hole)
+
+  const geo = new THREE.ShapeGeometry(shape, 48)
+  geo.rotateX(-Math.PI / 2)
+  geo.translate(0, box.h / 2, 0)
+  const pos = geo.attributes.position
+  const uv = geo.attributes.uv
+  for (let i = 0; i < pos.count; i++) {
+    uv.setXY(i, (box.x + pos.getX(i)) / TILE_SIZE, (box.z + pos.getZ(i)) / TILE_SIZE)
+  }
+  uv.needsUpdate = true
+  return geo
+}
+
+/** Takes the top face off a green's box, for the green a cup is cut into. */
+export function withoutTop(geo: THREE.BoxGeometry): THREE.BoxGeometry {
+  // BoxGeometry face group order: +X, -X, +Y (top), -Y (bottom), +Z, -Z.
+  geo.groups[2].count = 0
+  return geo
+}
